@@ -18,6 +18,8 @@ bash ~/.claude/hooks/app-store-compliance-guard.sh <project-path>
 
 2b. Load the structured references for full context. From `~/.claude/skills/app-store-compliance/references/` load the by app type file that matches the app and the relevant rule category files, so the audit reasons from the full guideline set, not only the guard output. Offer the user `templates/REVIEW-NOTES-TEMPLATE.md` for a new submission.
 
+2c. Run the metadata layer. If the user pulled the listing into a metadata directory, run `python3 ~/.claude/skills/app-store-compliance/scripts/metadata-audit.py <metadata-dir>` to audit the real store listing, and `--propose` to write suggested fixes. The pull step is `scripts/pull-metadata.sh apple`. A large share of rejections live in the listing text.
+
 3. Run the human checks the scanner cannot see, from `~/.claude/skills/app-store-compliance/docs/PRE-SUBMISSION-CHECKLIST.md`.
    - The production backend is live and stays up during review.
    - A working demo account exists, with no 2FA the reviewer cannot pass, not expired, pre populated with data.

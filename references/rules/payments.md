@@ -13,6 +13,12 @@
 - Detection signals. Stripe, PayPal, checkout, WKWebView payment, buy now
 - Present means handled. StoreKit, SKProduct, Product.purchase, in app purchase
 
+How to detect.
+
+```bash
+grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' . && ! grep -rn 'StoreKit\|SKProduct\|Product.purchase' --include='*.swift' .
+```
+
 ## GOOGLE-PLAY-BILLING
 
 - Title. Digital goods sold without Play Billing
@@ -24,6 +30,12 @@
 - Detection signals. Stripe, PayPal, checkout, razorpay
 - Present means handled. BillingClient, Play Billing, com.android.billingclient
 
+How to detect.
+
+```bash
+grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' . && ! grep -rn 'BillingClient\|com.android.billingclient' .
+```
+
 ## BOTH-LOOTBOX-ODDS
 
 - Title. Random reward mechanic without disclosed odds
@@ -33,6 +45,12 @@
 - What triggers it. Loot box, gacha, or random reward purchase present without odds disclosed before purchase.
 - How to fix it. Disclose the odds for every random reward before the user purchases.
 - Detection signals. lootbox, loot box, gacha, random reward, mystery box
+
+How to detect.
+
+```bash
+grep -rni 'lootbox\|loot box\|gacha\|mystery box\|random reward' .
+```
 
 ## APPLE-RESTORE-PURCHASES-MISSING
 
@@ -45,6 +63,12 @@
 - Detection signals. SKProduct, Product.purchase, StoreKit
 - Present means handled. restorePurchases, restoreCompletedTransactions, AppStore.sync, Restore Purchases
 
+How to detect.
+
+```bash
+grep -rn 'SKProduct\|Product.purchase\|StoreKit' --include='*.swift' . && ! grep -rn 'restorePurchases\|restoreCompletedTransactions\|AppStore.sync' --include='*.swift' .
+```
+
 ## APPLE-3.1.2-MISLEADING-PRICING
 
 - Title. Subscription shows the per month price more prominently than the billed amount
@@ -53,3 +77,9 @@
 - Severity. high
 - What triggers it. Manual paywall check. An annual subscription shows a small per month figure large and the actual billed total small.
 - How to fix it. Show the actual amount the user will be charged at least as prominently as any per month figure. Source. truongduy2611 misleading_pricing rule.
+
+How to detect.
+
+```bash
+python3 scripts/metadata-audit.py ./metadata
+```

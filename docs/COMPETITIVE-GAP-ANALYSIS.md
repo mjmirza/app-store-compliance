@@ -69,6 +69,15 @@ This survey also confirmed where this playbook is ahead.
 - Cross store coverage. Huawei, the Chinese stores, Samsung, Amazon, Microsoft, and RuStore, in `OTHER-STORES.md`.
 - A working automated guard with a test suite, not only a written checklist.
 
+## The two edges the leader had, now closed
+
+The first pass of this analysis honestly noted two places the most popular repository was ahead. Both are now closed.
+
+1. Live metadata pull and an autofix loop. We built `scripts/metadata-audit.py`, which audits the real store listing, name, subtitle, keywords, description, promotional text, review notes, and URLs, against the metadata rejection rules, with a propose and re validate loop, plus `scripts/pull-metadata.sh` to pull the live Apple listing through the asc CLI. The metadata layer is tested.
+2. Per rule detection commands. Every rule in the `references/rules/` tree now carries a concrete detection command, generated from `data/detection-recipes.json`. An agent or a developer can run the exact grep, plist, or manifest check for each rule.
+
+What remains is not a capability gap, it is adoption. The most popular repository has the stars. That is earned over time through the launch, shares, and contributions, and the on ramp for that is in place.
+
 ## The standing process
 
 This analysis is repeatable. When a new comparable repository appears, read it through the API, extract its structure and unique rules, diff against this playbook, and fold in the net new patterns. Contributions that bring a pattern from another open source list are welcome, with a link to the source.

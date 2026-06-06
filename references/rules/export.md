@@ -11,3 +11,9 @@
 - What triggers it. ITSAppUsesNonExemptEncryption is not set in Info.plist, so each submission stalls in Missing Compliance and never reaches review.
 - How to fix it. Set ITSAppUsesNonExemptEncryption in Info.plist. The exempt answer applies to a standard HTTPS only app.
 - Present means handled. ITSAppUsesNonExemptEncryption
+
+How to detect.
+
+```bash
+grep -rn 'ITSAppUsesNonExemptEncryption' */Info.plist || echo 'MISSING ITSAppUsesNonExemptEncryption, build will stall in Missing Compliance'
+```

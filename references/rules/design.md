@@ -13,6 +13,12 @@
 - Detection signals. FacebookLogin, GoogleSignIn, GIDSignIn, LoginWithFacebook
 - Present means handled. SignInWithApple, ASAuthorizationAppleIDProvider
 
+How to detect.
+
+```bash
+grep -rn 'FacebookLogin\|GoogleSignIn\|GIDSignIn' --include='*.swift' . && ! grep -rn 'SignInWithApple\|ASAuthorizationAppleIDProvider' --include='*.swift' .
+```
+
 ## APPLE-4.2-WEB-WRAPPER
 
 - Title. Thin web wrapper with no added value
@@ -33,3 +39,9 @@
 - How to fix it. Use the name and email from the Apple credential, do not re ask, use the standard SIWA button, keep SIWA at least as prominent as other logins, and accept private relay emails. Source. truongduy2611 sign_in_with_apple rule.
 - Detection signals. ASAuthorizationAppleIDProvider, SignInWithApple
 - Present means handled. ASAuthorizationAppleIDButton, privaterelay.appleid.com
+
+How to detect.
+
+```bash
+grep -rn 'ASAuthorizationAppleIDProvider' --include='*.swift' . && grep -rn 'completeProfile\|askForName\|nameTextField\|emailTextField' --include='*.swift' .   # asking for name or email after SIWA is a violation
+```

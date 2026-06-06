@@ -22,6 +22,12 @@
 - How to fix it. Add the matching usage description key with a specific reason for every sensitive framework used.
 - Detection signals. AVCaptureDevice, CLLocationManager, PHPhotoLibrary, CNContactStore, HKHealthStore
 
+How to detect.
+
+```bash
+for k in NSCameraUsageDescription NSLocationWhenInUseUsageDescription NSPhotoLibraryUsageDescription NSContactsUsageDescription NSMicrophoneUsageDescription; do echo "$k"; plutil -extract "$k" raw */Info.plist 2>/dev/null || echo '  MISSING or empty'; done
+```
+
 ## APPLE-5.1.1-NO-ACCOUNT-DELETION
 
 - Title. Account creation without in app account deletion
@@ -32,6 +38,12 @@
 - How to fix it. Add an in app account deletion flow for any app that supports account creation.
 - Detection signals. signUp, createAccount, register
 - Present means handled. deleteAccount, delete_account, account deletion
+
+How to detect.
+
+```bash
+grep -rn 'createAccount\|signUp\|register' --include='*.swift' . && ! grep -rn 'deleteAccount\|delete_account\|account deletion' --include='*.swift' .
+```
 
 ## GOOGLE-MISSING-PRIVACY-POLICY
 
@@ -54,6 +66,12 @@
 - Detection signals. NSFileManager, UserDefaults, systemUptime, ProcessInfo, Firebase, Alamofire
 - Present means handled. PrivacyInfo.xcprivacy, NSPrivacyAccessedAPITypes
 
+How to detect.
+
+```bash
+find . -name 'PrivacyInfo.xcprivacy' | grep -q . || echo 'MISSING PrivacyInfo.xcprivacy'; find . -path '*/*.framework/*' -name 'PrivacyInfo.xcprivacy'   # each bundled SDK should ship one
+```
+
 ## APPLE-5.1.1-VAGUE-PURPOSE-STRING
 
 - Title. Generic or empty permission purpose string
@@ -74,6 +92,12 @@
 - How to fix it. Call the ATT prompt before any cross app tracking and add the tracking usage description.
 - Detection signals. AppsFlyer, Adjust, Branch, FacebookSDK, IDFA, ASIdentifierManager
 - Present means handled. ATTrackingManager, NSUserTrackingUsageDescription
+
+How to detect.
+
+```bash
+grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' --include='*.swift' . && ! grep -rn 'ATTrackingManager\|NSUserTrackingUsageDescription' .
+```
 
 ## APPLE-5.1.2-AI-NO-CONSENT-MODAL
 
@@ -117,6 +141,12 @@
 - How to fix it. Do not fingerprint. Use the platform advertising identifier with consent where tracking is genuinely needed.
 - Detection signals. fingerprint, deviceFingerprint, canvas fingerprint, identifierForVendor cross app
 
+How to detect.
+
+```bash
+grep -rni 'fingerprint\|deviceFingerprint\|canvas fingerprint' .
+```
+
 ## APPLE-5.1.1-UNNECESSARY-DATA
 
 - Title. Requiring personal data not relevant to core functionality
@@ -126,3 +156,9 @@
 - What triggers it. A registration or onboarding form requires phone number, gender, marital status, date of birth, or home address when it is not essential to the core feature. Relevance is contextual.
 - How to fix it. Make non essential personal fields optional. Require only data directly relevant to the core feature. Source. truongduy2611 unnecessary_data rule.
 - Detection signals. phone, gender, marital, date of birth, birthdate, address
+
+How to detect.
+
+```bash
+grep -rni 'phone\|gender\|marital\|date.of.birth\|birthdate\|address' --include='*.swift' . | grep -i 'required\|validator\|isRequired'
+```

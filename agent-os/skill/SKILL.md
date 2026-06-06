@@ -29,7 +29,15 @@ The compliance reference lives in the `app-store-compliance` repo. The key files
 - `templates/REVIEW-NOTES-TEMPLATE.md` the review notes template to hand the user for a new submission.
 - `agent-os/hooks/app-store-compliance-guard.sh` the automated scanner.
 
-For the strongest audit, also pull the live App Store Connect metadata and inspect the words in the real listing, not only the source. The asc CLI (`brew install asc`, then `asc metadata pull`) or the App Store Connect API gives the live title, subtitle, keywords, description, and review notes. A large share of rejections live in the listing text, so checking the real metadata catches what a source scan cannot.
+For the strongest audit, also run the metadata layer. A large share of rejections live in the listing text, not the source.
+
+```
+bash scripts/pull-metadata.sh apple      # pulls the live listing into ./metadata via the asc CLI
+python3 scripts/metadata-audit.py ./metadata        # audits name, subtitle, keywords, description, URLs
+python3 scripts/metadata-audit.py ./metadata --propose   # writes suggested fixes, source copy untouched
+```
+
+The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and broken URLs. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
 
 ### Step 2. Run the automated scan
 

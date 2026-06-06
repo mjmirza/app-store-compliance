@@ -106,9 +106,18 @@ def esc(s):
     return (s or "").strip()
 
 
+def load_recipes():
+    path = os.path.join(ROOT, "data", "detection-recipes.json")
+    try:
+        return json.load(open(path)).get("recipes", {})
+    except Exception:
+        return {}
+
+
 def write_rules():
     data = json.load(open(PATTERNS))
     patterns = data["patterns"]
+    recipes = load_recipes()
     buckets = {slug: [] for slug, _t, _k in CATEGORIES}
     for p in patterns:
         buckets.setdefault(categorize(p), []).append(p)
@@ -144,6 +153,14 @@ def write_rules():
             cs = p.get("counterSignals") or []
             if cs:
                 lines.append(f"- Present means handled. {', '.join(cs)}")
+            cmd = recipes.get(p["id"])
+            if cmd:
+                lines.append("")
+                lines.append("How to detect.")
+                lines.append("")
+                lines.append("```bash")
+                lines.append(cmd)
+                lines.append("```")
             lines.append("")
         path = os.path.join(RULES_DIR, f"{slug}.md")
         open(path, "w").write("\n".join(lines))

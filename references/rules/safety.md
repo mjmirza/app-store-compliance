@@ -23,3 +23,9 @@
 - How to fix it. Add moderation, reporting, blocking, an accurate age rating, and abuse safeguards. Prevent NSFW, deepfake, face swap, and undress generation.
 - Detection signals. openai, anthropic, stable diffusion, image generation, chat/completions, text-to-image
 - Present means handled. moderation, report, block user, content filter
+
+How to detect.
+
+```bash
+grep -rni 'api.openai.com\|anthropic\|generativelanguage\|stable diffusion\|text-to-image' . && ! grep -rni 'moderation\|report\|block user\|content filter' .
+```
