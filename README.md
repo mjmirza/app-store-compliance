@@ -36,6 +36,10 @@ Treat the store reviewer as an adversarial integration test that you cannot see 
 
 Every fact in this playbook traces to a live canonical source. Primary sources are Apple's App Store Review Guidelines and developer news, and Google Play's Developer Program Policy and Play Console enforcement documentation. Empirical statistics are cited inline in the docs. This repository is maintained as a living reference and is regenerated as the guidelines change.
 
+## Contributing
+
+Contributions are welcome and wanted. App store rules change constantly, and this playbook stays accurate only when many practitioners keep it current. If you have shipped iOS or Android apps and hit a rejection this playbook does not cover, open an issue or a pull request. New contributors are encouraged, look for issues labelled good first issue. See `.github/CONTRIBUTING.md` for the standard, which is simple. Every factual claim traces to a live Apple or Google source, and no guideline number or statistic is ever invented.
+
 ## License
 
 MIT. See `LICENSE`.
