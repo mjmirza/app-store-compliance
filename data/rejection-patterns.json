@@ -1,0 +1,414 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-06-06",
+  "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
+  "sources": [
+    "https://developer.apple.com/app-store/review/guidelines/",
+    "https://developer.apple.com/app-store/review/",
+    "https://play.google/developer-content-policy/",
+    "https://support.google.com/googleplay/android-developer/answer/9899234"
+  ],
+  "patterns": [
+    {
+      "id": "APPLE-2.1-MISSING-DEMO-ACCOUNT",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "Account based app without demo credentials",
+      "severity": "critical",
+      "detection": "Login or auth code present (SignInWithApple, OAuth, Auth, login view) but no demo account note found in review metadata or fastlane review_information.",
+      "signals": ["LoginView", "signIn", "AuthService", "OAuth", "Firebase Auth"],
+      "fix": "Add a working demo account and a live test path to the Notes for Review field before submission."
+    },
+    {
+      "id": "APPLE-2.1-PLACEHOLDER-CONTENT",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "Placeholder content in the build",
+      "severity": "high",
+      "detection": "Strings such as lorem ipsum, TODO, FIXME, placeholder, dummy, test data, example.com found in shipped resources.",
+      "signals": ["lorem ipsum", "placeholder", "TODO", "FIXME", "dummy", "example.com"],
+      "fix": "Replace all placeholder text and assets with real content before submission."
+    },
+    {
+      "id": "APPLE-2.1-STAGING-BACKEND",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "Backend points at staging or localhost",
+      "severity": "critical",
+      "detection": "API base URL in the release config contains localhost, 127.0.0.1, staging, dev, or ngrok.",
+      "signals": ["localhost", "127.0.0.1", "staging.", "dev.", "ngrok", "http://"],
+      "fix": "Point the release build at the live production backend and confirm it stays up during review."
+    },
+    {
+      "id": "APPLE-5.1.1-MISSING-PRIVACY-POLICY",
+      "platform": "apple",
+      "guideline": "5.1.1(i)",
+      "title": "Missing privacy policy",
+      "severity": "critical",
+      "detection": "No privacy policy URL in App Store Connect metadata and no in app privacy link reference in the codebase.",
+      "signals": ["privacyPolicy", "privacy-policy", "PrivacyPolicyURL"],
+      "fix": "Publish a privacy policy, link it in App Store Connect, and reach it from inside the app."
+    },
+    {
+      "id": "APPLE-5.1.1-VAGUE-PURPOSE-STRING",
+      "platform": "apple",
+      "guideline": "5.1.1(ii)",
+      "title": "Generic or empty permission purpose string",
+      "severity": "high",
+      "detection": "An NSxUsageDescription key in Info.plist is empty or carries a generic value such as needs access or required.",
+      "signals": ["NSCameraUsageDescription", "NSLocationWhenInUseUsageDescription", "NSPhotoLibraryUsageDescription", "NSMicrophoneUsageDescription", "NSContactsUsageDescription"],
+      "fix": "Write a specific purpose string naming the real feature that uses each permission."
+    },
+    {
+      "id": "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION",
+      "platform": "apple",
+      "guideline": "5.1.1(ii)",
+      "title": "Sensitive framework linked without a usage description",
+      "severity": "critical",
+      "detection": "A sensitive framework or API is referenced in code but the matching NSxUsageDescription key is absent from Info.plist.",
+      "signals": ["AVCaptureDevice", "CLLocationManager", "PHPhotoLibrary", "CNContactStore", "HKHealthStore"],
+      "fix": "Add the matching usage description key with a specific reason for every sensitive framework used."
+    },
+    {
+      "id": "APPLE-5.1.1-NO-ACCOUNT-DELETION",
+      "platform": "apple",
+      "guideline": "5.1.1(v)",
+      "title": "Account creation without in app account deletion",
+      "severity": "critical",
+      "detection": "Account creation or sign up code present but no delete account flow found.",
+      "signals": ["signUp", "createAccount", "register"],
+      "counterSignals": ["deleteAccount", "delete_account", "account deletion"],
+      "fix": "Add an in app account deletion flow for any app that supports account creation."
+    },
+    {
+      "id": "APPLE-5.1.2-MISSING-ATT",
+      "platform": "apple",
+      "guideline": "5.1.2(i)",
+      "title": "Tracking SDK without App Tracking Transparency",
+      "severity": "high",
+      "detection": "A tracking or advertising SDK is present but ATTrackingManager request is not called and NSUserTrackingUsageDescription is absent.",
+      "signals": ["AppsFlyer", "Adjust", "Branch", "FacebookSDK", "IDFA", "ASIdentifierManager"],
+      "counterSignals": ["ATTrackingManager", "NSUserTrackingUsageDescription"],
+      "fix": "Call the ATT prompt before any cross app tracking and add the tracking usage description."
+    },
+    {
+      "id": "APPLE-3.1.1-EXTERNAL-PAYMENT",
+      "platform": "apple",
+      "guideline": "3.1.1",
+      "title": "Digital goods sold outside in app purchase",
+      "severity": "critical",
+      "detection": "A web checkout or external payment SDK is used for digital content rather than StoreKit.",
+      "signals": ["Stripe", "PayPal", "checkout", "WKWebView payment", "buy now"],
+      "counterSignals": ["StoreKit", "SKProduct", "Product.purchase", "in app purchase"],
+      "fix": "Route all digital goods through StoreKit in app purchase unless the app is a documented exempt category."
+    },
+    {
+      "id": "APPLE-4.8-SOCIAL-LOGIN-ONLY",
+      "platform": "apple",
+      "guideline": "4.8",
+      "title": "Third party social login without an equal alternative",
+      "severity": "high",
+      "detection": "Facebook, Google, or similar social login is present without Sign in with Apple or an equal privacy preserving option.",
+      "signals": ["FacebookLogin", "GoogleSignIn", "GIDSignIn", "LoginWithFacebook"],
+      "counterSignals": ["SignInWithApple", "ASAuthorizationAppleIDProvider"],
+      "fix": "Add Sign in with Apple or an equal login that limits data to name and email and allows a private email."
+    },
+    {
+      "id": "APPLE-4.2-WEB-WRAPPER",
+      "platform": "apple",
+      "guideline": "4.2",
+      "title": "Thin web wrapper with no added value",
+      "severity": "high",
+      "detection": "The app is mostly a single web view loading a website with little native code.",
+      "signals": ["WKWebView loadRequest", "single WebView", "Capacitor", "Cordova"],
+      "fix": "Add native capability, offline value, device integration, or content the web version lacks."
+    },
+    {
+      "id": "APPLE-2.5.1-PRIVATE-API",
+      "platform": "apple",
+      "guideline": "2.5.1",
+      "title": "Private API or deprecated framework use",
+      "severity": "high",
+      "detection": "References to known private API selectors or deprecated frameworks found in the binary or code.",
+      "signals": ["respondsToSelector private", "UIWebView", "performSelector hidden"],
+      "fix": "Use only documented public APIs and current frameworks."
+    },
+    {
+      "id": "APPLE-2.3-CROSS-PLATFORM-REFERENCE",
+      "platform": "apple",
+      "guideline": "2.3.10",
+      "title": "Reference to other platform or marketplace",
+      "severity": "medium",
+      "detection": "Strings such as Android, Google Play, or alternative marketplace names found in app facing copy or metadata.",
+      "signals": ["Google Play", "available on Android", "download on the Play Store"],
+      "fix": "Remove references to other platforms and marketplaces from the app and metadata."
+    },
+    {
+      "id": "APPLE-2.3-AGE-RATING-2026",
+      "platform": "apple",
+      "guideline": "2.3.6",
+      "title": "New 2026 age rating questionnaire not answered",
+      "severity": "high",
+      "detection": "Manual check. The updated age rating questions (13 plus, 16 plus, 18 plus) must be answered by 31 January 2026 to submit updates.",
+      "signals": [],
+      "fix": "Answer the updated age rating questionnaire in App Store Connect for every app."
+    },
+    {
+      "id": "APPLE-5.1.2-AI-NO-CONSENT-MODAL",
+      "platform": "apple",
+      "guideline": "5.1.2(i)",
+      "title": "Personal data shared with third party AI without consent modal",
+      "severity": "high",
+      "detection": "A third party AI or LLM SDK is present and personal data may be sent without a consent modal naming the provider.",
+      "signals": ["OpenAI", "anthropic", "gemini", "completion", "chat/completions"],
+      "counterSignals": ["consent", "data sharing modal"],
+      "fix": "Show a consent modal naming the AI provider and data types before any personal data leaves the app."
+    },
+    {
+      "id": "GOOGLE-DATASAFETY-MISMATCH",
+      "platform": "google",
+      "guideline": "Data Safety",
+      "title": "Data Safety form does not match runtime behavior",
+      "severity": "critical",
+      "detection": "Analytics, ads, or tracking SDKs are present that collect or share data not declared in the Data Safety section. This is the number one Google rejection cause.",
+      "signals": ["firebase-analytics", "com.google.android.gms.ads", "facebook", "appsflyer", "adjust"],
+      "fix": "Audit every SDK and runtime data flow and declare every collection, sharing, and security practice accurately in the Data Safety form."
+    },
+    {
+      "id": "GOOGLE-PERM-BACKGROUND-LOCATION",
+      "platform": "google",
+      "guideline": "Permissions and APIs",
+      "title": "Background location without a qualifying core feature",
+      "severity": "critical",
+      "detection": "ACCESS_BACKGROUND_LOCATION declared in AndroidManifest with no clear core feature or prominent disclosure.",
+      "signals": ["ACCESS_BACKGROUND_LOCATION"],
+      "fix": "Use foreground location where possible, or justify background use with a core feature and a prominent disclosure and the permission declaration."
+    },
+    {
+      "id": "GOOGLE-PERM-ALL-FILES",
+      "platform": "google",
+      "guideline": "Permissions and APIs",
+      "title": "All files access without a qualifying use case",
+      "severity": "critical",
+      "detection": "MANAGE_EXTERNAL_STORAGE declared in AndroidManifest.",
+      "signals": ["MANAGE_EXTERNAL_STORAGE"],
+      "fix": "Use scoped storage. Request all files access only for a qualifying use case with the required declaration."
+    },
+    {
+      "id": "GOOGLE-PERM-SMS-CALLLOG",
+      "platform": "google",
+      "guideline": "Permissions and APIs",
+      "title": "SMS or Call Log without an approved core use case",
+      "severity": "critical",
+      "detection": "READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, or WRITE_CALL_LOG declared without an approved use case.",
+      "signals": ["READ_SMS", "SEND_SMS", "RECEIVE_SMS", "READ_CALL_LOG", "WRITE_CALL_LOG"],
+      "fix": "Use the permissions declaration form for an approved core use case, or drop the permission."
+    },
+    {
+      "id": "GOOGLE-PERM-ACCESSIBILITY-MISUSE",
+      "platform": "google",
+      "guideline": "Permissions and APIs",
+      "title": "AccessibilityService used for non accessibility purposes",
+      "severity": "critical",
+      "detection": "BIND_ACCESSIBILITY_SERVICE declared in an app that is not an accessibility tool.",
+      "signals": ["BIND_ACCESSIBILITY_SERVICE", "AccessibilityService"],
+      "fix": "Use accessibility APIs only for genuine accessibility features and declare the use, or remove the service."
+    },
+    {
+      "id": "GOOGLE-TARGET-API",
+      "platform": "google",
+      "guideline": "Target API level",
+      "title": "App does not target the current required API level",
+      "severity": "high",
+      "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement.",
+      "signals": ["targetSdkVersion", "targetSdk"],
+      "fix": "Build against the current required Android target API level before submission."
+    },
+    {
+      "id": "GOOGLE-12-TESTER-RULE",
+      "platform": "google",
+      "guideline": "Closed testing requirement",
+      "title": "New personal account without the closed test",
+      "severity": "high",
+      "detection": "Manual check. New personal developer accounts need at least 12 testers for 14 consecutive days of closed testing before production.",
+      "signals": [],
+      "fix": "Run the closed test with at least 12 testers over 14 consecutive days, or use an organization account where appropriate."
+    },
+    {
+      "id": "GOOGLE-PLAY-BILLING",
+      "platform": "google",
+      "guideline": "Payments",
+      "title": "Digital goods sold without Play Billing",
+      "severity": "critical",
+      "detection": "A web checkout or third party payment SDK is used for in app digital goods rather than Play Billing.",
+      "signals": ["Stripe", "PayPal", "checkout", "razorpay"],
+      "counterSignals": ["BillingClient", "Play Billing", "com.android.billingclient"],
+      "fix": "Use Play Billing for in app digital goods, with regional alternatives only where Google permits."
+    },
+    {
+      "id": "GOOGLE-MISSING-PRIVACY-POLICY",
+      "platform": "google",
+      "guideline": "User Data",
+      "title": "Missing privacy policy",
+      "severity": "critical",
+      "detection": "No privacy policy URL set in the Play Console store listing while the app collects user data.",
+      "signals": ["privacyPolicy", "privacy-policy"],
+      "fix": "Publish a privacy policy and set its URL in the Play Console store listing."
+    },
+    {
+      "id": "GOOGLE-MISLEADING-LISTING",
+      "platform": "google",
+      "guideline": "Store Listing and Promotion",
+      "title": "Listing claims a feature the app lacks",
+      "severity": "high",
+      "detection": "Manual check. The store listing, screenshots, and description must match the app's actual functionality.",
+      "signals": [],
+      "fix": "Make the listing match the build exactly, with screenshots of real in app screens."
+    },
+    {
+      "id": "GOOGLE-FAMILIES-AD-SDK",
+      "platform": "google",
+      "guideline": "Families",
+      "title": "Non compliant ad SDK in a child targeted app",
+      "severity": "critical",
+      "detection": "An app declared for children uses an ad SDK that is not Families certified, or shows behavioral ads to minors.",
+      "signals": ["children", "Designed for Families", "kids"],
+      "fix": "Use only Families certified ad SDKs and remove behavioral advertising to minors."
+    },
+    {
+      "id": "BOTH-SDK-SUPPLY-CHAIN",
+      "platform": "both",
+      "guideline": "SDK responsibility",
+      "title": "Third party SDK violates policy on the developer's behalf",
+      "severity": "high",
+      "detection": "A bundled SDK requests permissions, tracks users, or behaves in ways the app does not declare. The developer is responsible for SDK behavior.",
+      "signals": [],
+      "fix": "Vet every SDK, keep them current, and remove any that collect or share data the app does not declare."
+    },
+    {
+      "id": "BOTH-LOOTBOX-ODDS",
+      "platform": "both",
+      "guideline": "Apple 3.1.1, Google gambling",
+      "title": "Random reward mechanic without disclosed odds",
+      "severity": "high",
+      "detection": "Loot box, gacha, or random reward purchase present without odds disclosed before purchase.",
+      "signals": ["lootbox", "loot box", "gacha", "random reward", "mystery box"],
+      "fix": "Disclose the odds for every random reward before the user purchases."
+    },
+    {
+      "id": "APPLE-PRIVACY-MANIFEST-MISSING",
+      "platform": "apple",
+      "guideline": "Privacy Manifest",
+      "title": "Required reason APIs or third party SDKs without a privacy manifest",
+      "severity": "critical",
+      "detection": "Required reason API usage or a commonly used third party SDK is present but no PrivacyInfo.xcprivacy is bundled, or an SDK lacks its signed manifest. Enforced by Apple at upload since 2024. The top modern Apple upload rejection.",
+      "signals": ["NSFileManager", "UserDefaults", "systemUptime", "ProcessInfo", "Firebase", "Alamofire"],
+      "counterSignals": ["PrivacyInfo.xcprivacy", "NSPrivacyAccessedAPITypes"],
+      "fix": "Add a PrivacyInfo.xcprivacy with NSPrivacyAccessedAPITypes and approved reason codes, list NSPrivacyTrackingDomains, and confirm every third party SDK ships its signed manifest."
+    },
+    {
+      "id": "APPLE-EXPORT-COMPLIANCE-MISSING",
+      "platform": "apple",
+      "guideline": "Export compliance",
+      "title": "Missing encryption declaration leaves the build in Missing Compliance",
+      "severity": "high",
+      "detection": "ITSAppUsesNonExemptEncryption is not set in Info.plist, so each submission stalls in Missing Compliance and never reaches review.",
+      "signals": [],
+      "counterSignals": ["ITSAppUsesNonExemptEncryption"],
+      "fix": "Set ITSAppUsesNonExemptEncryption in Info.plist. The exempt answer applies to a standard HTTPS only app."
+    },
+    {
+      "id": "APPLE-RESTORE-PURCHASES-MISSING",
+      "platform": "apple",
+      "guideline": "3.1.1",
+      "title": "Non consumable purchase without a Restore Purchases control",
+      "severity": "high",
+      "detection": "StoreKit purchases are present but no restore path is found.",
+      "signals": ["SKProduct", "Product.purchase", "StoreKit"],
+      "counterSignals": ["restorePurchases", "restoreCompletedTransactions", "AppStore.sync", "Restore Purchases"],
+      "fix": "Add a visible Restore Purchases control. It is required for non consumables and non renewing subscriptions."
+    },
+    {
+      "id": "APPLE-ACCOUNT-DELETION-WEAK",
+      "platform": "apple",
+      "guideline": "5.1.1(v)",
+      "title": "Account deletion is a mailto or deactivate only flow",
+      "severity": "high",
+      "detection": "The only account removal path is a mailto link, a web form the user must leave the app to reach, or a deactivate that does not delete.",
+      "signals": ["mailto:", "deactivate", "contact us to delete"],
+      "fix": "Provide genuine in app deletion of the account and its data, not a deactivate or an external form."
+    },
+    {
+      "id": "ANDROID-DYNAMIC-CODE-LOADING",
+      "platform": "google",
+      "guideline": "Device and Network Abuse",
+      "title": "Dynamic code loading at runtime",
+      "severity": "high",
+      "detection": "DexClassLoader, PathClassLoader from a downloaded file, or downloading and executing code at runtime.",
+      "signals": ["DexClassLoader", "PathClassLoader", "loadDex", "createPackageContext"],
+      "fix": "Ship all code in the package. Server side changes must be data, not executable code."
+    },
+    {
+      "id": "ANDROID-QUERY-ALL-PACKAGES",
+      "platform": "google",
+      "guideline": "Package visibility",
+      "title": "QUERY_ALL_PACKAGES without a permitted use case",
+      "severity": "high",
+      "detection": "QUERY_ALL_PACKAGES declared in AndroidManifest.",
+      "signals": ["QUERY_ALL_PACKAGES"],
+      "fix": "Declare specific packages with a queries element, or qualify for a permitted use case."
+    },
+    {
+      "id": "ANDROID-OVERLAY-TAPJACKING",
+      "platform": "google",
+      "guideline": "Permissions and APIs",
+      "title": "System overlay permission, a tapjacking and malware signal",
+      "severity": "high",
+      "detection": "SYSTEM_ALERT_WINDOW or application overlay declared, especially combined with AccessibilityService.",
+      "signals": ["SYSTEM_ALERT_WINDOW", "TYPE_APPLICATION_OVERLAY"],
+      "fix": "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal Google enforces against."
+    },
+    {
+      "id": "ANDROID-ACCOUNT-DELETION-URL",
+      "platform": "google",
+      "guideline": "User Data",
+      "title": "Account creation without in app deletion and a data deletion URL",
+      "severity": "high",
+      "detection": "Account creation present but no in app delete path and no web data deletion URL.",
+      "signals": ["signUp", "createAccount", "register"],
+      "counterSignals": ["deleteAccount", "delete_account", "account deletion"],
+      "fix": "Provide in app account deletion and set a public data deletion URL in the Play Console listing."
+    },
+    {
+      "id": "BOTH-AI-GENERATED-CONTENT",
+      "platform": "both",
+      "guideline": "Apple 1.2, Google AI Generated Content",
+      "title": "Generative AI output without moderation or safeguards",
+      "severity": "high",
+      "detection": "A generative AI or image generation integration is present without content filtering, reporting, blocking, age rating, or abuse safeguards. Apple applies UGC rules to AI output. Google has a dedicated AI Generated Content policy.",
+      "signals": ["openai", "anthropic", "stable diffusion", "image generation", "chat/completions", "text-to-image"],
+      "counterSignals": ["moderation", "report", "block user", "content filter"],
+      "fix": "Add moderation, reporting, blocking, an accurate age rating, and abuse safeguards. Prevent NSFW, deepfake, face swap, and undress generation."
+    },
+    {
+      "id": "BOTH-METADATA-DECORATION",
+      "platform": "both",
+      "guideline": "Apple 2.3.7, Google Store Listing",
+      "title": "Metadata field overflow or banned decoration",
+      "severity": "medium",
+      "detection": "App name over the limit (Apple 30, Google 30), emoji in the title, all caps, or ranking and price claims such as number one, best, top, or free in the title or icon.",
+      "signals": [],
+      "fix": "Keep each metadata field within its limit and remove emoji, all caps, and ranking or price claims from the title and icon."
+    },
+    {
+      "id": "BOTH-FINGERPRINTING",
+      "platform": "both",
+      "guideline": "Apple 5.1.2, Google Device and Network Abuse",
+      "title": "Device fingerprinting to track users",
+      "severity": "high",
+      "detection": "Building a persistent device fingerprint from hardware or settings to identify users. Apple bans this regardless of ATT consent.",
+      "signals": ["fingerprint", "deviceFingerprint", "canvas fingerprint", "identifierForVendor cross app"],
+      "fix": "Do not fingerprint. Use the platform advertising identifier with consent where tracking is genuinely needed."
+    }
+  ]
+}
