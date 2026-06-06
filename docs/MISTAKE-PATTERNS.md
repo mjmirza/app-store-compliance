@@ -95,6 +95,17 @@ A rejection is recoverable. A bad appeal turns one rejection into a strike.
 
 Address the cited rule, show evidence, change the build if needed, and reply once with everything. Speed comes from precision, not from volume.
 
+## Real rejection case studies
+
+Named, real rejections teach more than an abstract rule. These come from open source community collections.
+
+- Halide, an Apple Design Award winning camera app, was rejected because it did not explain why the app uses the camera. Even a polished, award winning app fails the permission purpose check. This is the missing exit and the vague purpose string patterns in real life.
+- iDOS, a DOS emulator, received an App Store takedown. Emulators sit in a contested category and have been pulled even after a period of availability. Category risk is real, and it can arrive after approval.
+- A game that had not been updated in seven years was removed for being out of date. Approval is not permanent. An app that goes stale against current requirements can be pulled.
+- A developer submitted a macOS build under an iOS app and was rejected. Platform and target rules are strict. A Mac build is a separate target with its own rules.
+
+The lesson across all four. Approval is a moment, not a state. The rules apply at submission and keep applying after, so the privacy strings, the category fit, and the current SDK all have to stay correct over the life of the app.
+
 ## How to operationalize this
 
 Put the pre submission checklist into the definition of done for every release. Run the automated guard before every upload. Keep this taxonomy in code review so a reviewer can name the pattern a change risks. The goal is that no rejection reason in this document can reach submission without a human or a hook catching it first.

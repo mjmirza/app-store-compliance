@@ -121,7 +121,9 @@ bash agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 | `docs/APPLE.md` | Apple rejection map, sections 1 to 5, every guideline with the trigger and the fix, plus the 2026 age rating and AI disclosure changes |
 | `docs/GOOGLE-PLAY.md` | Google Play rejection map across every policy, plus the four level enforcement ladder from rejection to account termination |
 | `docs/ADVANCED-2026.md` | The modern upload time layer (privacy manifests, export compliance), payments and DMA depth, the full legal layer (GDPR, EU AI Act, DSA, COPPA), gambling depth, AI content policy, and Android specifics |
-| `docs/OPEN-SOURCE-PATTERNS.md` | What the community already codified. The fastlane precheck metadata rule set, community rejection repositories, and the Google Play pre-launch report, folded in |
+| `docs/BY-APP-TYPE.md` | The rejection map routed by app type. Universal, subscriptions, social, kids, health, games, macOS, AI, crypto and finance, VPN |
+| `docs/COMPETITIVE-GAP-ANALYSIS.md` | A survey of the other open source compliance repositories, what each publishes and why, the gaps they surfaced, and what was folded in here |
+| `docs/OPEN-SOURCE-PATTERNS.md` | What the community already codified. The fastlane precheck metadata rule set, the Android Play Policy Insights and security lints, community rejection repositories, and the Google Play pre-launch report, folded in |
 | `docs/OTHER-STORES.md` | Huawei AppGallery, the Chinese stores, Samsung, Amazon, Microsoft, and RuStore, plus the cross store patterns worth adopting |
 | `docs/MISTAKE-PATTERNS.md` | The eight root cause patterns, the top mistakes, and the appeal playbook |
 | `docs/PRE-SUBMISSION-CHECKLIST.md` | Exhaustive pre submission checklists for both stores, every item a verifiable check |

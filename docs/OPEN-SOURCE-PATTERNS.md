@@ -66,6 +66,22 @@ From these open source patterns, the guard and the taxonomy gained metadata leve
 
 The rest of the precheck rules, such as curse words and copyright date, are documented here as a manual metadata pass, because a safe automated word list belongs in each team's own configuration rather than hard coded in a shared guard.
 
+## The Android side. Google's own and open source tooling
+
+The Apple side has fastlane precheck. The Android side has its own equivalents, some from Google itself.
+
+| Tool | What it does |
+|---|---|
+| Play Policy Insights in Android Studio | Google's own policy lint, surfaced as lint checks in recent Android Studio releases. It flags likely policy issues before you submit, the closest Android equivalent of a pre review check. Source. [Play Policy Insights](https://developer.android.com/studio/publish/insights) |
+| [google/android-security-lints](https://github.com/google/android-security-lints) | Google's open source security focused custom lint checks, more security oriented and experimental than the built in lint |
+| Google Play pre-launch report | The test lab crawl on real devices, covered in the section above |
+
+Three Android facts worth pinning, gathered from the community checklists.
+
+- Target API level. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher. Below the threshold is an automatic rejection.
+- The package name, the applicationId, is permanent once published. Choose it carefully.
+- Enable R8 or ProGuard. It shrinks the app and makes it harder to reverse engineer, which also helps the security review.
+
 ## How to use this with fastlane
 
 If a team already uses fastlane, wire precheck into the lane before deliver, and keep this playbook for the code level, privacy, and policy checks that precheck does not cover. The two are complementary. precheck guards the words in the listing, this playbook guards the app, the privacy posture, and the submission settings.

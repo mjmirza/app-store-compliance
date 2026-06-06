@@ -220,9 +220,9 @@
       "guideline": "Target API level",
       "title": "App does not target the current required API level",
       "severity": "high",
-      "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement.",
+      "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher.",
       "signals": ["targetSdkVersion", "targetSdk"],
-      "fix": "Build against the current required Android target API level before submission."
+      "fix": "Build against the current required Android target API level. From 31 August 2026 that is API 36 or higher. Submissions below the threshold are rejected automatically."
     },
     {
       "id": "GOOGLE-12-TESTER-RULE",
@@ -439,6 +439,57 @@
       "detection": "A support URL, marketing URL, or privacy policy URL in the listing does not load. Mirrors the fastlane precheck unreachable_urls rule.",
       "signals": [],
       "fix": "Confirm every listing URL is public and loads during the entire review window."
+    },
+    {
+      "id": "APPLE-5.2.5-APPLE-DEVICE-IMAGE",
+      "platform": "apple",
+      "guideline": "5.2.5",
+      "title": "Apple device image or Apple trademark in the icon or screenshots",
+      "severity": "high",
+      "detection": "Manual metadata check. The app icon or screenshots show an Apple device, the Apple logo, or imply Apple endorsement.",
+      "signals": [],
+      "fix": "Remove Apple device images and Apple marks from the icon and screenshots. Source. truongduy2611 apple_trademark rule."
+    },
+    {
+      "id": "APPLE-2.3.4-DEVICE-FRAMES-PREVIEW",
+      "platform": "apple",
+      "guideline": "2.3.4",
+      "title": "Device frames around the app in a preview video",
+      "severity": "medium",
+      "detection": "Manual metadata check. The app preview video wraps the app in a device frame instead of showing the app full screen.",
+      "signals": [],
+      "fix": "Capture the preview video full screen from the device, without a device frame overlay."
+    },
+    {
+      "id": "APPLE-3.1.2-MISLEADING-PRICING",
+      "platform": "apple",
+      "guideline": "3.1.2",
+      "title": "Subscription shows the per month price more prominently than the billed amount",
+      "severity": "high",
+      "detection": "Manual paywall check. An annual subscription shows a small per month figure large and the actual billed total small.",
+      "signals": [],
+      "fix": "Show the actual amount the user will be charged at least as prominently as any per month figure. Source. truongduy2611 misleading_pricing rule."
+    },
+    {
+      "id": "APPLE-1.2-UGC-24H-ACTION",
+      "platform": "apple",
+      "guideline": "1.2",
+      "title": "User generated content without the 24 hour action mechanism",
+      "severity": "critical",
+      "detection": "UGC present without a EULA with zero tolerance for objectionable content, content filtering, a flag mechanism, user blocking, and the ability to act on a report within 24 hours by removing content and ejecting the user.",
+      "signals": ["post", "comment", "upload", "chat", "feed", "community"],
+      "counterSignals": ["report", "block user", "EULA", "moderation"],
+      "fix": "Add a zero tolerance EULA, content filtering, in app reporting, user blocking, and a process to act on reports within 24 hours. Source. real Apple Safety 1.2 rejection email."
+    },
+    {
+      "id": "CHINA-AI-REFERENCES",
+      "platform": "apple",
+      "guideline": "5",
+      "title": "External AI service references in a China storefront",
+      "severity": "high",
+      "detection": "Manual storefront check. References to ChatGPT, Gemini, OpenAI, or similar external AI services in an app distributed on the China storefront can trigger a regional rejection.",
+      "signals": [],
+      "fix": "Remove or localize external AI service references for the China storefront. Source. truongduy2611 china_storefront rule."
     }
   ]
 }
