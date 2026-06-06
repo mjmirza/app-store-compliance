@@ -5,3 +5,4 @@
 - Real money gaming is licensed, geo restricted, free to download, with official rules. Apple 5.3.
 - Simulated gambling and social casino is a separate category with its own rating.
 - Accurate age rating for the content and any chance mechanics.
+- For the per country loot box and gambling rules, see docs/GAMBLING-MATRIX.md.
