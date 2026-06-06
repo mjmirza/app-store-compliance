@@ -9,6 +9,7 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 [![Apple App Store](https://img.shields.io/badge/Apple_App_Store-000000?logo=apple&logoColor=white)](https://developer.apple.com/app-store/review/guidelines/)
 [![Google Play](https://img.shields.io/badge/Google_Play-414141?logo=googleplay&logoColor=white)](https://play.google/developer-content-policy/)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-ready-000000?logo=anthropic&logoColor=white)](#how-you-actually-use-this)
+[![CI](https://img.shields.io/github/actions/workflow/status/mjmirza/app-store-compliance/ci.yml?branch=master&label=CI)](https://github.com/mjmirza/app-store-compliance/actions)
 [![MIT License](https://img.shields.io/badge/License-MIT-2ea44f)](LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2ea44f)](.github/CONTRIBUTING.md)
 

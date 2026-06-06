@@ -92,6 +92,12 @@ grep -rn 'BIND_ACCESSIBILITY_SERVICE\|AccessibilityService' --include='AndroidMa
 - How to fix it. Use only Families certified ad SDKs and remove behavioral advertising to minors.
 - Detection signals. children, Designed for Families, kids
 
+How to detect.
+
+```bash
+grep -rn 'com.google.android.gms.ads\|applovin\|unity.*ads\|ironsource' --include='*.gradle' . && grep -rni 'children\|families\|kids' --include='AndroidManifest.xml' .
+```
+
 ## GOOGLE-TARGET-API
 
 - Title. App does not target the current required API level

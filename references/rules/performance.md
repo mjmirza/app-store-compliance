@@ -12,6 +12,12 @@
 - How to fix it. Add a working demo account and a live test path to the Notes for Review field before submission.
 - Detection signals. LoginView, signIn, AuthService, OAuth, Firebase Auth
 
+How to detect.
+
+```bash
+grep -rn 'signIn\|LoginView\|OAuth\|FirebaseAuth' --include='*.swift' .   # then confirm a demo account is in the review notes
+```
+
 ## APPLE-2.1-STAGING-BACKEND
 
 - Title. Backend points at staging or localhost

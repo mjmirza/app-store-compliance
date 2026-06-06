@@ -13,6 +13,12 @@
 - Detection signals. post, comment, upload, chat, feed, community
 - Present means handled. report, block user, EULA, moderation
 
+How to detect.
+
+```bash
+grep -rni 'post\|comment\|upload\|feed\|community' --include='*.swift' . && ! grep -rni 'report\|block user\|EULA\|moderation' --include='*.swift' .
+```
+
 ## BOTH-AI-GENERATED-CONTENT
 
 - Title. Generative AI output without moderation or safeguards

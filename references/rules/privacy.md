@@ -12,6 +12,12 @@
 - How to fix it. Publish a privacy policy, link it in App Store Connect, and reach it from inside the app.
 - Detection signals. privacyPolicy, privacy-policy, PrivacyPolicyURL
 
+How to detect.
+
+```bash
+grep -rn 'privacyPolicy\|privacy-policy\|PrivacyPolicy' --include='*.swift' . || echo 'no privacy policy reference found'
+```
+
 ## APPLE-5.1.1-MISSING-USAGE-DESCRIPTION
 
 - Title. Sensitive framework linked without a usage description
@@ -55,6 +61,12 @@ grep -rn 'createAccount\|signUp\|register' --include='*.swift' . && ! grep -rn '
 - How to fix it. Publish a privacy policy and set its URL in the Play Console store listing.
 - Detection signals. privacyPolicy, privacy-policy
 
+How to detect.
+
+```bash
+grep -rn 'privacyPolicy\|privacy-policy' . || echo 'set a privacy policy URL in the Play listing'
+```
+
 ## APPLE-PRIVACY-MANIFEST-MISSING
 
 - Title. Required reason APIs or third party SDKs without a privacy manifest
@@ -81,6 +93,12 @@ find . -name 'PrivacyInfo.xcprivacy' | grep -q . || echo 'MISSING PrivacyInfo.xc
 - What triggers it. An NSxUsageDescription key in Info.plist is empty or carries a generic value such as needs access or required.
 - How to fix it. Write a specific purpose string naming the real feature that uses each permission.
 - Detection signals. NSCameraUsageDescription, NSLocationWhenInUseUsageDescription, NSPhotoLibraryUsageDescription, NSMicrophoneUsageDescription, NSContactsUsageDescription
+
+How to detect.
+
+```bash
+for k in NSCameraUsageDescription NSLocationWhenInUseUsageDescription NSPhotoLibraryUsageDescription NSContactsUsageDescription; do v=$(plutil -extract "$k" raw */Info.plist 2>/dev/null); echo "$k = $v"; done   # flag empty or generic values like 'required'
+```
 
 ## APPLE-5.1.2-MISSING-ATT
 
@@ -110,6 +128,12 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 - Detection signals. OpenAI, anthropic, gemini, completion, chat/completions
 - Present means handled. consent, data sharing modal
 
+How to detect.
+
+```bash
+grep -rni 'api.openai.com\|anthropic\|generativelanguage\|chat/completions' . && ! grep -rni 'consent' .
+```
+
 ## APPLE-ACCOUNT-DELETION-WEAK
 
 - Title. Account deletion is a mailto or deactivate only flow
@@ -119,6 +143,12 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 - What triggers it. The only account removal path is a mailto link, a web form the user must leave the app to reach, or a deactivate that does not delete.
 - How to fix it. Provide genuine in app deletion of the account and its data, not a deactivate or an external form.
 - Detection signals. mailto:, deactivate, contact us to delete
+
+How to detect.
+
+```bash
+grep -rn 'deleteAccount\|delete account' --include='*.swift' . && grep -rn 'mailto:\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate
+```
 
 ## ANDROID-ACCOUNT-DELETION-URL
 
@@ -130,6 +160,12 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 - How to fix it. Provide in app account deletion and set a public data deletion URL in the Play Console listing.
 - Detection signals. signUp, createAccount, register
 - Present means handled. deleteAccount, delete_account, account deletion
+
+How to detect.
+
+```bash
+grep -rn 'createAccount\|signUp\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\|delete_account' .   # also set a data deletion URL in the Play listing
+```
 
 ## BOTH-FINGERPRINTING
 

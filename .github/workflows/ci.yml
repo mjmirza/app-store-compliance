@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate data files and consistency
+        run: python3 scripts/validate.py
+
+      - name: Guard test suite
+        run: bash agent-os/hooks/app-store-compliance-guard-test.sh
+
+      - name: Metadata audit test suite
+        run: bash scripts/metadata-audit-test.sh
+
+      - name: References are in sync with the taxonomy
+        run: |
+          python3 scripts/generate-references.py
+          if ! git diff --quiet -- references/; then
+            echo "references/ is out of date. Run scripts/generate-references.py and commit."
+            git --no-pager diff --stat -- references/
+            exit 1
+          fi
+          echo "references/ in sync"
+
+      - name: JSON well formed
+        run: |
+          python3 -c "import json; json.load(open('data/rejection-patterns.json')); json.load(open('data/detection-recipes.json')); print('json ok')"

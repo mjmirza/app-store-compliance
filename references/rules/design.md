@@ -29,6 +29,12 @@ grep -rn 'FacebookLogin\|GoogleSignIn\|GIDSignIn' --include='*.swift' . && ! gre
 - How to fix it. Add native capability, offline value, device integration, or content the web version lacks.
 - Detection signals. WKWebView loadRequest, single WebView, Capacitor, Cordova
 
+How to detect.
+
+```bash
+grep -rn 'WKWebView\|loadRequest\|Capacitor\|Cordova' --include='*.swift' . | wc -l   # a high count with little native code is a thin wrapper
+```
+
 ## APPLE-4.0-SIWA-UX
 
 - Title. Sign in with Apple UX violation

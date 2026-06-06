@@ -3,7 +3,6 @@
   "recipes": {
     "APPLE-2.1-STAGING-BACKEND": "grep -rn 'localhost\\|127.0.0.1\\|staging\\.\\|ngrok\\|http://' --include='*.swift' --include='*.plist' . | grep -v https",
     "APPLE-2.1-PLACEHOLDER-CONTENT": "grep -rni 'lorem ipsum\\|placeholder\\|TODO\\|FIXME\\|example.com' --include='*.swift' --include='*.strings' .",
-    "APPLE-2.1-DEMO-OR-LOGIN": "grep -rn 'signIn\\|LoginView\\|OAuth\\|FirebaseAuth' --include='*.swift' .   # then confirm a demo account is in the review notes",
     "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION": "for k in NSCameraUsageDescription NSLocationWhenInUseUsageDescription NSPhotoLibraryUsageDescription NSContactsUsageDescription NSMicrophoneUsageDescription; do echo \"$k\"; plutil -extract \"$k\" raw */Info.plist 2>/dev/null || echo '  MISSING or empty'; done",
     "APPLE-5.1.1-NO-ACCOUNT-DELETION": "grep -rn 'createAccount\\|signUp\\|register' --include='*.swift' . && ! grep -rn 'deleteAccount\\|delete_account\\|account deletion' --include='*.swift' .",
     "APPLE-5.1.2-MISSING-ATT": "grep -rn 'AppsFlyer\\|Adjust\\|FBSDK\\|advertisingIdentifier\\|ASIdentifierManager' --include='*.swift' . && ! grep -rn 'ATTrackingManager\\|NSUserTrackingUsageDescription' .",
@@ -37,6 +36,16 @@
     "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": "python3 scripts/metadata-audit.py ./metadata",
     "BOTH-UNREACHABLE-METADATA-URL": "python3 scripts/metadata-audit.py ./metadata --check-urls",
     "APPLE-3.1.2-MISLEADING-PRICING": "python3 scripts/metadata-audit.py ./metadata",
-    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": "use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections"
+    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": "use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections",
+    "APPLE-2.1-MISSING-DEMO-ACCOUNT": "grep -rn 'signIn\\|LoginView\\|OAuth\\|FirebaseAuth' --include='*.swift' .   # then confirm a demo account is in the review notes",
+    "APPLE-5.1.1-MISSING-PRIVACY-POLICY": "grep -rn 'privacyPolicy\\|privacy-policy\\|PrivacyPolicy' --include='*.swift' . || echo 'no privacy policy reference found'",
+    "APPLE-5.1.1-VAGUE-PURPOSE-STRING": "for k in NSCameraUsageDescription NSLocationWhenInUseUsageDescription NSPhotoLibraryUsageDescription NSContactsUsageDescription; do v=$(plutil -extract \"$k\" raw */Info.plist 2>/dev/null); echo \"$k = $v\"; done   # flag empty or generic values like 'required'",
+    "APPLE-4.2-WEB-WRAPPER": "grep -rn 'WKWebView\\|loadRequest\\|Capacitor\\|Cordova' --include='*.swift' . | wc -l   # a high count with little native code is a thin wrapper",
+    "APPLE-5.1.2-AI-NO-CONSENT-MODAL": "grep -rni 'api.openai.com\\|anthropic\\|generativelanguage\\|chat/completions' . && ! grep -rni 'consent' .",
+    "GOOGLE-MISSING-PRIVACY-POLICY": "grep -rn 'privacyPolicy\\|privacy-policy' . || echo 'set a privacy policy URL in the Play listing'",
+    "APPLE-ACCOUNT-DELETION-WEAK": "grep -rn 'deleteAccount\\|delete account' --include='*.swift' . && grep -rn 'mailto:\\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate",
+    "ANDROID-ACCOUNT-DELETION-URL": "grep -rn 'createAccount\\|signUp\\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\\|delete_account' .   # also set a data deletion URL in the Play listing",
+    "APPLE-1.2-UGC-24H-ACTION": "grep -rni 'post\\|comment\\|upload\\|feed\\|community' --include='*.swift' . && ! grep -rni 'report\\|block user\\|EULA\\|moderation' --include='*.swift' .",
+    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' ."
   }
 }
