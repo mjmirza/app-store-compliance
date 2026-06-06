@@ -490,6 +490,67 @@
       "detection": "Manual storefront check. References to ChatGPT, Gemini, OpenAI, or similar external AI services in an app distributed on the China storefront can trigger a regional rejection.",
       "signals": [],
       "fix": "Remove or localize external AI service references for the China storefront. Source. truongduy2611 china_storefront rule."
+    },
+    {
+      "id": "APPLE-2.4.5-UNUSED-ENTITLEMENTS",
+      "platform": "apple",
+      "guideline": "2.4.5(i)",
+      "title": "Entitlements declared but not used",
+      "severity": "high",
+      "detection": "An entitlements file declares a capability the app does not use. Apple requests justification for any entitlement with no matching functionality, which blocks review. Temporary exception entitlements draw extra scrutiny.",
+      "signals": ["com.apple.security.temporary-exception", ".entitlements"],
+      "fix": "Remove any entitlement the app does not actively use. Cross check each entitlement against real code usage. Source. truongduy2611 unused_entitlements rule."
+    },
+    {
+      "id": "APPLE-4.0-SIWA-UX",
+      "platform": "apple",
+      "guideline": "4.0",
+      "title": "Sign in with Apple UX violation",
+      "severity": "high",
+      "detection": "Asking for name or email again after Sign in with Apple already provided them, a non standard SIWA button, hiding SIWA below other social logins, or rejecting a private relay email.",
+      "signals": ["ASAuthorizationAppleIDProvider", "SignInWithApple"],
+      "counterSignals": ["ASAuthorizationAppleIDButton", "privaterelay.appleid.com"],
+      "fix": "Use the name and email from the Apple credential, do not re ask, use the standard SIWA button, keep SIWA at least as prominent as other logins, and accept private relay emails. Source. truongduy2611 sign_in_with_apple rule."
+    },
+    {
+      "id": "APPLE-5.1.1-UNNECESSARY-DATA",
+      "platform": "apple",
+      "guideline": "5.1.1",
+      "title": "Requiring personal data not relevant to core functionality",
+      "severity": "high",
+      "detection": "A registration or onboarding form requires phone number, gender, marital status, date of birth, or home address when it is not essential to the core feature. Relevance is contextual.",
+      "signals": ["phone", "gender", "marital", "date of birth", "birthdate", "address"],
+      "fix": "Make non essential personal fields optional. Require only data directly relevant to the core feature. Source. truongduy2611 unnecessary_data rule."
+    },
+    {
+      "id": "APPLE-2.1-DEBUG-FEATURES",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "Debug or test features shipped in the production build",
+      "severity": "high",
+      "detection": "Debug menus, test logins, or developer backdoors left visible in the release build rather than gated behind a debug only flag.",
+      "signals": ["debug menu", "debugMenu", "test login", "skip login", "bypass auth", "DEBUG_BYPASS"],
+      "fix": "Hide debug and test features behind a debug only compile flag so they never ship in production. Source. lukylab checklist."
+    },
+    {
+      "id": "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "iCloud or CloudKit schema not deployed to production",
+      "severity": "critical",
+      "detection": "The app uses CloudKit or iCloud but the schema and containers are only in the development environment, so the feature fails for the reviewer on the production build.",
+      "signals": ["CKContainer", "CloudKit", "NSUbiquitousKeyValueStore", "iCloud"],
+      "fix": "Deploy the CloudKit schema and containers to production before submitting. Source. lukylab checklist."
+    },
+    {
+      "id": "APPLE-2.1-REVIEW-NOTES-INCOMPLETE",
+      "platform": "apple",
+      "guideline": "2.1",
+      "title": "Review notes missing a required section for a new submission",
+      "severity": "high",
+      "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
+      "signals": [],
+      "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
     }
   ]
 }

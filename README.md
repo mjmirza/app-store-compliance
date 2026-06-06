@@ -130,6 +130,9 @@ bash agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 | `data/rejection-patterns.json` | Machine readable taxonomy of rejection patterns with detection signals and fixes. Drives the guard |
 | `agent-os/skill/SKILL.md` | An agent skill that runs a full pre submission compliance audit |
 | `agent-os/hooks/app-store-compliance-guard.sh` | The tested pre submission guard, usable standalone or as an agent hook |
+| `references/` | A structured, AI loadable reference tree. Rules by category (metadata, privacy, payments, design, performance, entitlements, safety, Android) and guidelines by app type, generated from the taxonomy. Load the slices that match the task |
+| `templates/REVIEW-NOTES-TEMPLATE.md` | A fill in the blanks App Store review notes template, the six sections that clear most 2.1 rejections |
+| `docs/CREDITS.md` | Attribution for every open source repository and tool this playbook learned from |
 
 ## The first principle
 
@@ -143,9 +146,13 @@ Contributions are welcome and wanted. App store rules change constantly, and thi
 
 Apple and Android logos in this README are by [Flaticon](https://www.flaticon.com/) under the Flaticon free license. The Apple logo and the Android robot are trademarks of their respective owners and are used here only to indicate the platforms this playbook covers.
 
+## Credits
+
+This playbook learned from the open source community and credits every source in [docs/CREDITS.md](docs/CREDITS.md). If you reuse a pattern here that came from another project, keep that project's credit too.
+
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Free to use, including commercially. Attribution is required. Code is MIT, content is CC BY 4.0. See [LICENSE](LICENSE) and keep a link back to this repository.
 
 <div align="center">
 

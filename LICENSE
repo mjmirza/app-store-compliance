@@ -1,4 +1,16 @@
-MIT License
+App Store Compliance Playbook. License
+
+This project is dual licensed. Use is free, including commercial use. Attribution is required.
+
+1. Code (the scripts, the guard, the hooks, anything executable) is licensed under the MIT License below.
+
+2. Content (the docs, the references tree, the rejection pattern data, the templates) is licensed under Creative Commons Attribution 4.0 International, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/. You may share and adapt it for any purpose, including commercial, as long as you give appropriate credit.
+
+How to give credit. Link back to https://github.com/mjmirza/app-store-compliance and keep this notice. If you reuse a pattern that this project itself adopted from another open source project, also keep the attribution to the original source listed in docs/CREDITS.md.
+
+----------------------------------------------------------------------
+
+MIT License (applies to the code)
 
 Copyright (c) 2026 Mirza Iqbal
 
