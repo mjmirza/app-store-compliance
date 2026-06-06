@@ -16,6 +16,8 @@ Run a full pre submission compliance audit on a mobile app project so it passes 
 bash ~/.claude/hooks/app-store-compliance-guard.sh <project-path>
 ```
 
+2b. Load the structured references for full context. From `~/.claude/skills/app-store-compliance/references/` load the by app type file that matches the app and the relevant rule category files, so the audit reasons from the full guideline set, not only the guard output. Offer the user `templates/REVIEW-NOTES-TEMPLATE.md` for a new submission.
+
 3. Run the human checks the scanner cannot see, from `~/.claude/skills/app-store-compliance/docs/PRE-SUBMISSION-CHECKLIST.md`.
    - The production backend is live and stays up during review.
    - A working demo account exists, with no 2FA the reviewer cannot pass, not expired, pre populated with data.

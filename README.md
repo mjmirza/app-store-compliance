@@ -31,7 +31,7 @@ Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-sto
 
 Steps:
 1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance. If you cannot clone, read the files over the GitHub raw URLs instead.
-2. Install the audit skill: copy agent-os/skill/SKILL.md plus the docs/ and data/ folders into your agent's skills directory. For Claude Code that is ~/.claude/skills/app-store-compliance/.
+2. Install the audit skill: copy agent-os/skill/SKILL.md plus the docs/, data/, references/, and templates/ folders into your agent's skills directory. For Claude Code that is ~/.claude/skills/app-store-compliance/. The references/ folder is the structured tree the agent loads slices from.
 3. Install the pre-submission guard: copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory (for Claude Code, ~/.claude/hooks/), make it executable, and register it as a PreToolUse hook on the Bash tool in settings.json so it runs before app submission commands (fastlane, eas submit, gradle bundleRelease, xcrun altool, bundletool, xcodebuild archive) and blocks on a critical rejection risk.
 4. Add a standing instruction to your agent config: for any iOS or Android work, always adhere to the Apple App Store Review Guidelines and Google Play policies, run the audit before submission, and never say an app is clear to submit while a critical risk stands.
 5. Run the guard against my current project and show me the ranked findings:

@@ -25,6 +25,8 @@ The compliance reference lives in the `app-store-compliance` repo. The key files
 - `docs/MISTAKE-PATTERNS.md` root causes, the appeal playbook, and real rejection case studies.
 - `docs/BY-APP-TYPE.md` the rejection map routed by app type. Load the section that matches the app.
 - `docs/ADVANCED-2026.md` the modern upload time and legal layer.
+- `references/` the structured, AI loadable tree. Load `references/guidelines/by-app-type/<type>.md` for the app at hand and the relevant `references/rules/<category>.md` files for full context before judging.
+- `templates/REVIEW-NOTES-TEMPLATE.md` the review notes template to hand the user for a new submission.
 - `agent-os/hooks/app-store-compliance-guard.sh` the automated scanner.
 
 For the strongest audit, also pull the live App Store Connect metadata and inspect the words in the real listing, not only the source. The asc CLI (`brew install asc`, then `asc metadata pull`) or the App Store Connect API gives the live title, subtitle, keywords, description, and review notes. A large share of rejections live in the listing text, so checking the real metadata catches what a source scan cannot.
