@@ -409,6 +409,36 @@
       "detection": "Building a persistent device fingerprint from hardware or settings to identify users. Apple bans this regardless of ATT consent.",
       "signals": ["fingerprint", "deviceFingerprint", "canvas fingerprint", "identifierForVendor cross app"],
       "fix": "Do not fingerprint. Use the platform advertising identifier with consent where tracking is genuinely needed."
+    },
+    {
+      "id": "APPLE-2.3-FUTURE-FUNCTIONALITY",
+      "platform": "apple",
+      "guideline": "2.3.1",
+      "title": "Metadata promises features that do not ship in this build",
+      "severity": "medium",
+      "detection": "Listing or in app copy uses coming soon, beta, or a promised feature not present in the build. Mirrors the fastlane precheck future_functionality rule.",
+      "signals": ["coming soon", "coming-soon", "beta", "will be available", "in a future update", "stay tuned"],
+      "fix": "Describe only what the build does today. Remove coming soon and future feature promises from the listing."
+    },
+    {
+      "id": "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT",
+      "platform": "apple",
+      "guideline": "2.3.1",
+      "title": "Metadata names an iOS bug or references Apple negatively",
+      "severity": "medium",
+      "detection": "Listing copy mentions an iOS bug or makes a negative or insensitive reference to Apple. Mirrors the fastlane precheck negative_apple_sentiment rule.",
+      "signals": ["iOS bug", "apple bug", "broken on iOS", "fix for ios bug"],
+      "fix": "Remove negative references to Apple and iOS bugs from the listing copy."
+    },
+    {
+      "id": "BOTH-UNREACHABLE-METADATA-URL",
+      "platform": "both",
+      "guideline": "Apple 1.5 and 2.1, Google User Data",
+      "title": "Broken support, marketing, or privacy URL in the listing",
+      "severity": "high",
+      "detection": "A support URL, marketing URL, or privacy policy URL in the listing does not load. Mirrors the fastlane precheck unreachable_urls rule.",
+      "signals": [],
+      "fix": "Confirm every listing URL is public and loads during the entire review window."
     }
   ]
 }

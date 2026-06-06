@@ -88,6 +88,13 @@ echo ""
 if grep_has 'lorem ipsum|[^a-z]TODO[^a-z]|FIXME|placeholder|example\.com'; then
   finding high "BOTH-PLACEHOLDER" "Placeholder content or example.com found in sources" "Replace all placeholder text and assets with real content."
 fi
+# fastlane precheck derived metadata checks
+if grep_has 'coming soon|coming-soon|will be available|in a future update|stay tuned'; then
+  finding medium "APPLE-2.3-FUTURE-FUNCTIONALITY" "Future functionality language found (coming soon, beta)" "Describe only what the build does today (fastlane precheck future_functionality, Apple 2.3.1)."
+fi
+if grep_has 'iOS bug|apple bug|broken on iOS'; then
+  finding medium "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT" "Negative Apple or iOS bug reference in copy" "Remove negative references to Apple and iOS bugs (fastlane precheck negative_apple_sentiment)."
+fi
 if grep_has 'loot ?box|gacha|mystery box|random reward'; then
   finding high "BOTH-LOOTBOX-ODDS" "Random reward mechanic present" "Disclose the odds for every random reward before purchase (Apple 3.1.1, Google gambling)."
 fi
