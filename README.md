@@ -23,6 +23,18 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 
 </div>
 
+## What you get
+
+A rejection costs a week. You submit, you wait days in review, you get a one line rejection, you guess at the fix, you resubmit, you wait again. This playbook turns that loop into a check you run before you ever submit.
+
+- **You catch the rejection before Apple or Google does.** The guard runs against your project and names the risk while you can still fix it cheaply, not after a reviewer has already said no.
+- **You stop guessing at the cause.** Every rejection pattern maps to the exact guideline and the exact fix, so a one line rejection email becomes a known problem with a known answer.
+- **The two checks that sink most submissions are covered first.** A working demo account with a live backend, and a privacy declaration that matches what your app actually does at runtime, including every SDK. These are the top modern rejection causes and the playbook holds them above everything else.
+- **It works whether or not you write code.** A developer wires the guard into the build. A non developer reads the plain English checklist and walks the submission safely.
+- **Every claim is real.** Guideline numbers and statistics trace to a live Apple or Google source, never invented, so you are acting on the actual rules, not a guess.
+
+If it saves you one rejection, it has paid for the ten minutes it takes to read.
+
 ## Paste this into Claude Code, Codex, or any AI coding tool
 
 No setup effort. Copy the block below, paste it into your AI coding tool, and it installs the whole playbook and wires the guard into your flow.
@@ -146,7 +158,7 @@ Treat the store reviewer as an adversarial integration test that runs once, on a
 
 Contributions are welcome and wanted. App store rules change constantly, and this playbook stays accurate only when many practitioners keep it current. Open an issue or a pull request, and look for issues labelled good first issue. See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md). The one standard. every factual claim traces to a live Apple or Google source, and no guideline number or statistic is ever invented.
 
-## Credits
+## Logo attribution
 
 Apple and Android logos in this README are by [Flaticon](https://www.flaticon.com/) under the Flaticon free license. The Apple logo and the Android robot are trademarks of their respective owners and are used here only to indicate the platforms this playbook covers.
 
