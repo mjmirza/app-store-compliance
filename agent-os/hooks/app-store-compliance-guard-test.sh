@@ -31,6 +31,28 @@ mk_android_bad() {
   echo "$d"
 }
 
+# The four known FALSE-POSITIVE scenarios, which must all stay SILENT: a localhost only inside
+# #if DEBUG (never shipped), a location usage description in the modern INFOPLIST_KEY build-setting
+# form, example.com used as test input inside a Tests dir (never shipped), and the bare word "Adjust".
+mk_ios_precision_safe() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App.xcodeproj" "$d/App" "$d/AppTests"
+  printf 'INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "for prayer times";\nITSAppUsesNonExemptEncryption = NO;\n' > "$d/App.xcodeproj/project.pbxproj"
+  printf '{}' > "$d/App/PrivacyInfo.xcprivacy"
+  printf 'import CoreLocation\nimport SwiftUI\nlet m = CLLocationManager()\nlet policy = "https://app.com/privacy-policy"\nvar base: String {\n#if DEBUG\nreturn "http://localhost:8787"\n#else\nreturn "https://prod.app.com"\n#endif\n}\nstruct V: View { var body: some View { TextField("Search", text: .constant("")) } }\nlet label = "Adjust times"\n' > "$d/App/Main.swift"
+  printf 'let testURL = "https://example.com/x"\n' > "$d/AppTests/T.swift"
+  echo "$d"
+}
+
+# The SAME four categories as REAL shipped violations, which must all FIRE (no blind spot): a
+# release-reachable localhost string, CLLocationManager with no usage description, a real tracking
+# SDK (AdjustConfig), and lorem ipsum in shipped (non-test) source.
+mk_ios_precision_real() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App.xcodeproj" "$d/App"
+  printf 'X=1;\n' > "$d/App.xcodeproj/project.pbxproj"
+  printf 'import CoreLocation\nimport AdjustSdk\nlet m = CLLocationManager()\nlet staging = "http://localhost:9000"\nlet cfg = AdjustConfig(appToken:"x")\nlet copy = "lorem ipsum dolor sit"\n' > "$d/App/Main.swift"
+  echo "$d"
+}
+
 # 1 positive. iOS with violations blocks
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "iOS violations block (exit 2, has CRITICAL)" || bad "iOS violations block"
@@ -71,6 +93,22 @@ OUT="$(printf '%s' '{not valid json [[[ command : oops }}}' | bash "$GUARD" 2>&1
 # 9 stress. Empty stdin does not hang or crash
 OUT="$(printf '' | bash "$GUARD" /tmp 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
+
+# 10 precision. The four known false-positive scenarios must NOT fire (no false alarms).
+D="$(mk_ios_precision_safe)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if echo "$OUT" | grep -Eq 'STAGING-BACKEND|MISSING-USAGE-DESCRIPTION|BOTH-PLACEHOLDER|MISSING-ATT' || [ "$RC" -ne 0 ]; then
+  bad "Precision: false positives silent (rc=$RC, leaked: $(echo "$OUT" | grep -Eo 'STAGING-BACKEND|MISSING-USAGE-DESCRIPTION|BOTH-PLACEHOLDER|MISSING-ATT' | paste -sd, -))"
+else ok "Precision: #if-DEBUG localhost, INFOPLIST_KEY location, example.com-in-Tests, word Adjust all stay silent"; fi
+rm -rf "$D"
+
+# 11 no blind spot. The SAME four categories as real shipped violations must STILL fire.
+D="$(mk_ios_precision_real)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+MISS=""
+for pat in STAGING-BACKEND MISSING-USAGE-DESCRIPTION BOTH-PLACEHOLDER MISSING-ATT; do
+  echo "$OUT" | grep -q "$pat" || MISS="$MISS $pat"
+done
+[ -z "$MISS" ] && ok "No blind spot: release localhost, no-usage location, AdjustConfig, lorem ipsum all still fire" || bad "No blind spot: missed$MISS"
+rm -rf "$D"
 
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

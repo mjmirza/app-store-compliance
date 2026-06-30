@@ -53,8 +53,9 @@ find "$DIR" -type f \( \
   -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
   -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
   -o -name '*.json' -o -name '*.js' -o -name '*.ts' -o -name '*.dart' -o -name '*.xcconfig' \
+  -o -name '*.pbxproj' -o -name '*.entitlements' \
   \) 2>/dev/null \
-  | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' \
+  | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
   > "$FILELIST"
 
 grep_has() {  # 0 if regex found in any source file
@@ -62,6 +63,31 @@ grep_has() {  # 0 if regex found in any source file
   local out
   out="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
   [ -n "$out" ]
+}
+
+# True only if a STRING LITERAL containing the regex appears in RELEASE-reachable source. For
+# Swift, `#if DEBUG` / `#if !RELEASE` debug-only regions are stripped first, so a URL only a debug
+# build compiles is not flagged. The string-literal requirement (the match must sit inside "...")
+# skips comments and identifiers. This is what makes the backend check precise instead of matching
+# a localhost mentioned in a comment or guarded behind DEBUG. Without it the check cries wolf.
+release_string_has() {
+  [ -s "$FILELIST" ] || return 1
+  local f
+  while IFS= read -r f; do
+    case "$f" in
+      *.swift)
+        awk '
+          /^[[:space:]]*#if/    { d++; if ($0 ~ /#if[[:space:]]+DEBUG/ || $0 ~ /#if[[:space:]]+!RELEASE/) { dbg=d; skip=1 } next }
+          /^[[:space:]]*#else/  { if (skip && d==dbg) skip=0; next }
+          /^[[:space:]]*#elseif/ { next }
+          /^[[:space:]]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; next }
+          skip!=1 { print }
+        ' "$f" 2>/dev/null ;;
+      *) cat "$f" 2>/dev/null ;;
+    esac
+  done < "$FILELIST" \
+    | grep -EIq "\"[^\"]*($1)[^\"]*\"" && return 0
+  return 1
 }
 
 finding() {  # severity id title fix
@@ -85,8 +111,11 @@ echo "Platforms. iOS=$IS_IOS Android=$IS_AND"
 echo ""
 
 # ===== shared checks =====
-if grep_has 'lorem ipsum|[^a-z]TODO[^a-z]|FIXME|placeholder|example\.com'; then
-  finding high "BOTH-PLACEHOLDER" "Placeholder content or example.com found in sources" "Replace all placeholder text and assets with real content."
+# Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
+# `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
+# rejection cause, so match real placeholder markers a reviewer would actually see.
+if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
+  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content."
 fi
 # fastlane precheck derived metadata checks
 if grep_has 'coming soon|coming-soon|will be available|in a future update|stay tuned'; then
@@ -101,8 +130,8 @@ fi
 
 # ===== iOS checks =====
 if [ "$IS_IOS" -eq 1 ]; then
-  if grep_has 'localhost|127\.0\.0\.1|staging\.|//dev\.|ngrok'; then
-    finding critical "APPLE-2.1-STAGING-BACKEND" "Release sources reference localhost or staging" "Point the release build at the live production backend and keep it up during review."
+  if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
+    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles."
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
     if ! grep_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
@@ -124,7 +153,10 @@ if [ "$IS_IOS" -eq 1 ]; then
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
     grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)."
   fi
-  if grep_has 'AppsFlyer|Adjust|Branch|FBSDK|ASIdentifierManager|advertisingIdentifier'; then
+  # Match the tracking SDKs by their own type names / imports, never the bare words "Adjust" or
+  # "Branch", which collide with ordinary English ("Adjust times", a git branch) and false-flag a
+  # tracking SDK that is not present.
+  if grep_has 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'; then
     grep_has 'ATTrackingManager|NSUserTrackingUsageDescription' || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency" "Call the ATT prompt and add NSUserTrackingUsageDescription (Apple 5.1.2)."
   fi
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
@@ -169,7 +201,7 @@ if [ "$IS_AND" -eq 1 ]; then
   if grep_has 'Stripe|PayPal|braintree|razorpay'; then
     grep_has 'BillingClient|com\.android\.billingclient' || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods."
   fi
-  if grep_has 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|adjust|com\.facebook'; then
+  if grep_has 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'; then
     finding high "GOOGLE-DATASAFETY-MISMATCH" "Analytics or ad SDK present. Verify the Data Safety form" "Declare every collection and sharing accurately. Data Safety mismatch is the top Google rejection."
   fi
   if ! grep_has 'privacyPolicy|privacy-policy'; then
