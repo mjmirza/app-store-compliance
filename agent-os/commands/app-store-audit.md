@@ -27,6 +27,7 @@ bash ~/.claude/hooks/app-store-compliance-guard.sh <project-path>
    - Screenshots show the app in use, the listing claims only what the app does.
    - For a new Google personal account, the closed test of 12 testers over 14 days is complete.
    - The 2026 Apple age rating questionnaire is answered.
+   - For any app reaching EU, US, or other-global users, load and check the legal layer. `docs/EU-REGULATORY-2026.md` (the EU AI Act, the DMA and the Core Technology Fee, DSA trader status, the European Accessibility Act) and `docs/GLOBAL-REGULATORY-2026.md` (COPPA, the US state App Store Accountability Acts, the external-link rules, the UK, Australia, Brazil, Canada, South Korea, India, and more, plus Apple's cross-region age-assurance spine). Store review does not check these, and several are release blockers with real fines.
 
 4. Produce a ranked findings table. The pattern id, the platform, the cited guideline, the severity, the concrete fix, and the file or setting to change. Order by severity. Mark every critical as a release blocker.
 
