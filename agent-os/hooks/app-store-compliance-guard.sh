@@ -86,7 +86,7 @@ release_string_has() {
       *) cat "$f" 2>/dev/null ;;
     esac
   done < "$FILELIST" \
-    | grep -EIq "\"[^\"]*($1)[^\"]*\"" && return 0
+    | LC_ALL=C grep -Eq "\"[^\"]*($1)[^\"]*\"" && return 0
   return 1
 }
 
