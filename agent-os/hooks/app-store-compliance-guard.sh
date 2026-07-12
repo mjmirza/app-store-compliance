@@ -86,8 +86,12 @@ release_string_has() {
       *) cat "$f" 2>/dev/null ;;
     esac
   done < "$FILELIST" \
-    | LC_ALL=C grep -Eq "\"[^\"]*($1)[^\"]*\"" && return 0
-  return 1
+    | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1
+  # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
+  # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
+  # then reports the whole pipeline non-zero even though grep matched. That made this check
+  # silently miss on the CI runner (GNU grep, timing-dependent) while passing on a fast local
+  # machine. Draining all input with plain grep and returning its status is deterministic.
 }
 
 finding() {  # severity id title fix
