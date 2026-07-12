@@ -4,7 +4,12 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- docs/EU-REGULATORY-2026.md. The EU legal hard rules with dated sources and Apple developer citations. the EU AI Act (Article 50 transparency by 2 August 2026, Article 4 AI literacy, Article 5 prohibited practices, Article 99 penalties, provider versus deployer), the Digital Markets Act (distribution channels, notarization, external purchase entitlement and disclosure sheet, the Core Technology Fee and Core Technology Commission, the 500 million euro anti-steering fine), DSA trader status (Apple removal from 17 February 2025), the European Accessibility Act (in force 28 June 2025, EN 301 549 and WCAG 2.1 AA), and the Apple 2025 and 2026 platform changes (age rating deadline 31 January 2026, Guideline 5.1.2(i) third-party-AI consent, the Declared Age Range API, mini apps 4.7, Xcode 26 SDK deadline 28 April 2026).
+- docs/GLOBAL-REGULATORY-2026.md. The USA and other-global legal hard rules with dated sources. US COPPA and the amended rule, the state app-store age-verification laws, the external-link rules after the Epic injunction, US state privacy laws, plus the UK Online Safety Act and Children's Code, Australia, Brazil, Canada, South Korea, India, and other jurisdictions, and what Apple tells developers to do per region.
+- An EU legal gate section in docs/PRE-SUBMISSION-CHECKLIST.md.
+- Pointers from the Advanced 2026 legal layer and the README docs index to the new EU and global legal docs.
 
 ## 1.0.0 (2026-06-06)
 
