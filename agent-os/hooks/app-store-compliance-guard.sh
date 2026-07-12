@@ -77,11 +77,11 @@ release_string_has() {
     case "$f" in
       *.swift)
         awk '
-          /^[[:space:]]*#if/    { d++; if ($0 ~ /#if[[:space:]]+DEBUG/ || $0 ~ /#if[[:space:]]+!RELEASE/) { dbg=d; skip=1 } next }
-          /^[[:space:]]*#else/  { if (skip && d==dbg) skip=0; next }
-          /^[[:space:]]*#elseif/ { next }
-          /^[[:space:]]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; next }
-          skip!=1 { print }
+          /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } next }
+          /^[ \t]*#else/  { if (skip && d==dbg) skip=0; next }
+          /^[ \t]*#elseif/ { next }
+          /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; next }
+          !skip { print }
         ' "$f" 2>/dev/null ;;
       *) cat "$f" 2>/dev/null ;;
     esac
