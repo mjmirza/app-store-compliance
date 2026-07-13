@@ -78,7 +78,7 @@ Apple 4.0 Design covers the practical your app looks broken bucket the base map 
 | EU AI Act | Transparency duties, risk classification, and disclosure for AI features shipping in the EU, phasing in across 2025 and 2026 |
 | DSA trader status | Verified trader or developer identity for EU distribution |
 
-The EU obligations above are shallow pointers. The full EU legal layer, with dated hard rules and sources for the EU AI Act (including the Article 50 transparency deadline of 2 August 2026), the Digital Markets Act and the Core Technology Fee, DSA trader status, and the European Accessibility Act (in force 28 June 2025), lives in [EU-REGULATORY-2026.md](EU-REGULATORY-2026.md). The USA and other-global legal layer lives in [GLOBAL-REGULATORY-2026.md](GLOBAL-REGULATORY-2026.md).
+The EU obligations above are shallow pointers. The full EU legal layer, with dated hard rules and sources for the EU AI Act (including the Article 50 transparency deadline of 2 August 2026), the Digital Markets Act and the Core Technology Fee, DSA trader status, and the European Accessibility Act (in force 28 June 2025), lives in [EU-REGULATORY-2026.md](EU-REGULATORY-2026.md). The USA and other-global legal layer lives in [GLOBAL-REGULATORY-2026.md](GLOBAL-REGULATORY-2026.md). The platform-mechanics and newer-policy hard rules (macOS notarization, Guideline 4.2 and 4.3, reader apps, the France ANSSI encryption declaration, visionOS and watchOS and tvOS specifics, Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, sanctions, and PCI items) live in [PLATFORM-MECHANICS-2026.md](PLATFORM-MECHANICS-2026.md).
 
 ## 7. Children and families depth
 
