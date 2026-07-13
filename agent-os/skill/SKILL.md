@@ -27,6 +27,7 @@ The compliance reference lives in the `app-store-compliance` repo. The key files
 - `docs/ADVANCED-2026.md` the modern upload time and legal layer.
 - `docs/EU-REGULATORY-2026.md` the EU legal hard rules with dated sources. the EU AI Act, the DMA and the Core Technology Fee, DSA trader status, and the European Accessibility Act. Load it for any app reaching EU users.
 - `docs/GLOBAL-REGULATORY-2026.md` the USA and other-global legal hard rules with dated sources. COPPA, the US state App Store Accountability Acts, the external-link rules, the UK, Australia, Brazil, Canada, South Korea, India, and more, plus Apple's cross-region age-assurance spine. Load it for any app reaching those users.
+- `docs/PLATFORM-MECHANICS-2026.md` the platform-mechanics and newer-policy hard rules with dated sources. macOS notarization, Guideline 4.2 and 4.3 with the June 2026 saturation tightening, reader apps, France ANSSI encryption, visionOS and watchOS and tvOS specifics, Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, sanctions, and PCI items. Load it for any app whose type touches these.
 - `references/` the structured, AI loadable tree. Load `references/guidelines/by-app-type/<type>.md` for the app at hand and the relevant `references/rules/<category>.md` files for full context before judging.
 - `templates/REVIEW-NOTES-TEMPLATE.md` the review notes template to hand the user for a new submission.
 - `agent-os/hooks/app-store-compliance-guard.sh` the automated scanner.
@@ -63,6 +64,7 @@ Some rejection causes are not visible in code. Walk these by hand against the pr
 - For a new Google personal account, is the closed test of 12 testers over 14 days complete.
 - Are the 2026 Apple age rating questions answered.
 - For any app reaching EU, US, or other-global users, is the legal layer satisfied. the EU AI Act AI-disclosure and the European Accessibility Act, US COPPA and the state age-assurance laws, the DSA trader status, and the per-region 18-plus age gating. Store review does not check these. See `docs/EU-REGULATORY-2026.md` and `docs/GLOBAL-REGULATORY-2026.md`.
+- Are the platform-mechanics gates satisfied for the app's type. macOS notarization, Guideline 4.2 and 4.3, reader-app rules, Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, deletion-URL, sanctions, and PCI items. See `docs/PLATFORM-MECHANICS-2026.md`.
 
 ### Step 4. Produce the fix plan
 
