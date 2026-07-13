@@ -89,6 +89,37 @@ The full hard rules and sources are in docs/GLOBAL-REGULATORY-2026.md. This is l
 - [ ] South Korea Korea-only binary with an approved payment provider if alternative billing is used.
 - [ ] China MIIT app filing with a local entity, plus PIPL and a Banhao license for a game.
 
+## Platform mechanics gate (both stores, if the item applies)
+
+The full detail with dated sources is in `PLATFORM-MECHANICS-2026.md`. These are current, common, blocking causes the base maps did not carry.
+
+Apple.
+
+- [ ] macOS app distributed outside the Mac App Store is Developer ID signed with the hardened runtime, notarized with `notarytool`, and stapled with `stapler`.
+- [ ] Not a thin wrapper (Guideline 4.2) and not a duplicate, clone, or un-differentiated saturated-category app (Guideline 4.3, tightened June 2026).
+- [ ] Reader app using the External Link Account Entitlement meets every 3.1.3(a) condition and link rule, and offers no in-app purchase while the entitlement is used.
+- [ ] France ANSSI encryption declaration uploaded in App Store Connect if the app uses non-exempt encryption and ships on the French App Store.
+- [ ] App Store Connect content-rights question answered, with proof of rights available for any third-party content.
+- [ ] visionOS App Motion declared, and watchOS and tvOS built with the platform-26 SDK and Xcode 26 by 28 April 2026.
+
+Android.
+
+- [ ] Developer identity verified before 30 September 2026 if the app is distributed to Brazil, Indonesia, Singapore, or Thailand.
+- [ ] Every foreground service declares `foregroundServiceType` in the manifest with the matching permission, and each type is declared in the Play Console with a demo video.
+- [ ] No SafetyNet Attestation. attestation uses the Play Integrity API, verified server-side.
+- [ ] Play Billing Library at version 8 or later before 31 August 2026, and digital goods route through Play Billing.
+- [ ] `targetSdkVersion` at least 35 today, planned for at least 36 by the 2026 deadline.
+- [ ] No unexpected launch-time or mid-task full-screen interstitial, and every interstitial is closable by 15 seconds.
+- [ ] Health app has the Health Apps Declaration, a core-function justification per Health Connect permission, the migrated Organization Account, and the correct medical-device label or disclaimer.
+
+Cross-cutting.
+
+- [ ] A US-facing UGC app has a documented NCMEC CyberTipline report path on actual knowledge and a 1-year preservation policy.
+- [ ] A UGC or social app has a content filter, in-app report and block, published contact, and 24-hour remove-and-eject (Apple 1.2), plus the Google Play Child Safety Standards items for the Social and Dating categories.
+- [ ] Account-creating app has both an in-app account-and-data deletion flow and a publicly reachable web deletion URL, declared.
+- [ ] Not on the OFAC SDN list, and country availability excludes the embargoed territories.
+- [ ] Non-store card payments for real goods implement PSD2 SCA and 3D Secure in the EU or UK, store no card number, and identify the correct PCI SAQ.
+
 ## The two checks that prevent the most rejections
 
 Two checks stop the majority of rejections across both stores. A working demo account with a live backend, and a privacy declaration that matches actual runtime behavior including SDKs. If you verify nothing else, verify these two.
