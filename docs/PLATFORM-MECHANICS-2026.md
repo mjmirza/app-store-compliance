@@ -106,11 +106,15 @@ A health app completes the Health Apps Declaration (the Health Connect declarati
 
 Sources. [Play Console Health content and services](https://support.google.com/googleplay/android-developer/answer/16679511?hl=en), [Play Console Health Connect permissions](https://support.google.com/googleplay/android-developer/answer/12991134?hl=en).
 
-### 2.8 Real-money games
+### 2.8 Real-money games and Brazilian betting license (HARD)
 
-Google historically allowed real-money games only where a government licensing regime exists. a 2024 pilot opened a program for real-money games not covered by an existing regime (first in India, Mexico, Brazil), then Google paused the expansion of new types citing the absence of a central approval authority in some regions. India moved toward a developer self-declaration model in mid-2025, status evolving. Verify a real-money-game app is in a supported country with an accepted license or a valid self-declaration, with the real-money-game declarations, age-gating, geo-restriction, and the correct service-fee model in place.
+- **Google Real-Money Games**: Google historically allowed real-money games only where a government licensing regime exists. a 2024 pilot opened a program for real-money games not covered by an existing regime (first in India, Mexico, Brazil), then Google paused the expansion of new types citing the absence of a central approval authority in some regions. India moved toward a developer self-declaration model in mid-2025, status evolving. Verify a real-money-game app is in a supported country with an accepted license or a valid self-declaration, with the real-money-game declarations, age-gating, geo-restriction, and the correct service-fee model in place.
+- **Apple Brazilian Betting License (May 8, 2026)**: Following changes to Brazil's fixed-odds betting regulation, apps with fixed-odds betting (gambling) features can only be distributed on the App Store in Brazil with a valid fixed-odds betting license from the **Secretariat of Prizes and Bets (SPA)**.
+  - Answering "Yes" to the gambling question in the age rating questionnaire in App Store Connect will automatically set the app's Brazil age rating to **A18**.
+  - To trigger the license verification process, **a new app version must be submitted** for review; simply updating the App Review Information section in App Store Connect alone is insufficient and will not start the verification review.
+  - License information must be explicitly provided in the App Review Information section during the submission of the new version.
 
-Sources. [Google real-money games approach](https://android-developers.googleblog.com/2024/01/a-new-approach-to-real-money-games-on-google-play.html), [Google pauses RMG expansion (NEXT.io)](https://next.io/news/regulation/google-halts-rmg-expansion-on-play-store/).
+Sources. [Google real-money games approach](https://android-developers.googleblog.com/2024/01/a-new-approach-to-real-money-games-on-google-play.html), [Google pauses RMG expansion (NEXT.io)](https://next.io/news/regulation/google-halts-rmg-expansion-on-play-store/), Apple Developer News, "Brazilian betting license requirement for App Store availability" (May 8, 2026).
 
 ### 2.9 Media permissions, exact alarm, package visibility, and account-deletion URL
 

@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+13 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -96,6 +96,22 @@ How to detect.
 
 ```bash
 grep -rn 'com.google.android.gms.ads\|applovin\|unity.*ads\|ironsource' --include='*.gradle' . && grep -rni 'children\|families\|kids' --include='AndroidManifest.xml' .
+```
+
+## GOOGLE-PLAY-AGE-SIGNALS-MISUSE
+
+- Title. Misuse of Play Age Signals API
+- Platform. google
+- Guideline or policy. User Data
+- Severity. critical
+- What triggers it. Usage of the Play Age Signals API (com.google.android.play:age-signals) in conjunction with advertising, marketing, user profiling, or analytics libraries, which violates Google Play's strict Terms of Service.
+- How to fix it. Ensure that information from the Play Age Signals API is solely used to provide age-appropriate content and experiences in compliance with laws. Do not use the API or its returned signals for advertising, marketing, user profiling, or analytics.
+- Detection signals. com.google.android.play:age-signals, AgeSignalsManager, AgeSignalsRequest
+
+How to detect.
+
+```bash
+grep -rn 'com.google.android.play:age-signals\|AgeSignalsManager\|AgeSignalsRequest' --include='*.gradle' --include='*.kts' --include='*.kt' --include='*.java' .   # if present, confirm age signals are never passed to ad, marketing, profiling, or analytics SDKs
 ```
 
 ## GOOGLE-TARGET-API

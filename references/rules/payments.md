@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-5 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+6 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -34,6 +34,22 @@ How to detect.
 
 ```bash
 grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' . && ! grep -rn 'BillingClient\|com.android.billingclient' .
+```
+
+## APPLE-GAMBLING-BRAZIL-LICENSE
+
+- Title. Missing Brazilian fixed-odds betting license
+- Platform. apple
+- Guideline or policy. 3.1.1
+- Severity. critical
+- What triggers it. An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.
+- How to fix it. Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification.
+- Detection signals. gambling, fixed-odds betting, Secretariat of Prizes and Bets, SPA license
+
+How to detect.
+
+```bash
+grep -rni 'gambling\|fixed-odds\|betting' --include='*.swift' .   # then verify the SPA license is provided in App Review Information for Brazil storefront
 ```
 
 ## BOTH-LOOTBOX-ODDS
