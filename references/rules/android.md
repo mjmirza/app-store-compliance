@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+16 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -178,4 +178,72 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-A11Y-TALKBACK-LABELS
+
+- Title. Graphical or interactive elements missing contentDescription for TalkBack
+- Platform. google
+- Guideline or policy. User Experience (Accessibility)
+- Severity. medium
+- What triggers it. ImageView, ImageButton, or custom views in layout XML files or Compose layouts lack android:contentDescription or contentDescription = null for meaningful visual assets.
+- How to fix it. Add descriptive android:contentDescription to all interactive and meaningful graphical controls, or set to null/empty only for decorative elements.
+- Detection signals. ImageView, ImageButton, Image, IconButton, contentDescription
+- Present means handled. contentDescription, android:contentDescription
+
+How to detect.
+
+```bash
+grep -rn 'ImageView\|ImageButton' --include='*.xml' --include='*.kt' --include='*.java' . && ! grep -rn 'contentDescription' .
+```
+
+## ANDROID-A11Y-FONT-SCALING
+
+- Title. Hardcoded text sizes ignoring user font scaling preferences
+- Platform. google
+- Guideline or policy. User Experience (Accessibility)
+- Severity. medium
+- What triggers it. Text sizes in layouts or styles declared using absolute pixel measurements (dp, dip, px) rather than scale-independent pixels (sp).
+- How to fix it. Always define android:textSize in scale-independent pixels (sp) so that the text respects the user's system font size preferences.
+- Detection signals. android:textSize=", textSize =
+- Present means handled. sp, TextUnit.Sp, fontSize =
+
+How to detect.
+
+```bash
+grep -rn 'android:textSize="[0-9]\+dp' --include='*.xml' .
+```
+
+## ANDROID-A11Y-HIGH-CONTRAST
+
+- Title. Low-contrast color combinations or ignoring High Contrast setting
+- Platform. google
+- Guideline or policy. User Experience (Accessibility)
+- Severity. medium
+- What triggers it. Hardcoded low-contrast color hex codes in colors.xml or Jetpack Compose files that do not adjust for system theme or high-contrast mode.
+- How to fix it. Ensure foreground/background contrast is at least 4.5:1, and use dynamic system/material themes rather than hardcoded hex values.
+- Detection signals. #FF777777, #FF888888, #FFAAAAAA
+- Present means handled. isSystemInDarkTheme(), MaterialTheme.colorScheme
+
+How to detect.
+
+```bash
+grep -rn '#FF777777\|#FF888888\|#FFAAAAAA' --include='*.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-A11Y-SCANNER-TOUCH-TARGETS
+
+- Title. Touch targets below Android Accessibility Scanner recommended 48dp
+- Platform. google
+- Guideline or policy. User Experience (Accessibility)
+- Severity. medium
+- What triggers it. Small buttons or touchable layout elements configured with dimensions less than 48dp x 48dp.
+- How to fix it. Enlarge interactive targets to at least 48dp x 48dp or increase their touch delegate or padding area to meet Android Accessibility Scanner guidelines.
+- Detection signals. android:layout_width=", android:layout_height=", Modifier.size(, width = , height =
+- Present means handled. 48dp, 48.dp, minWidth, minHeight
+
+How to detect.
+
+```bash
+grep -rn 'layout_width="[1-3][0-9]dp' --include='*.xml' .
 ```
