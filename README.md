@@ -127,6 +127,32 @@ Run a manual audit any time.
 bash agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 ```
 
+### Apple Developer Requirements Monitor
+
+Keep your projects in sync with Apple's continuously evolving requirements. The monitor tracks changes to 25 critical areas including App Store guidelines, privacy manifests, alternative payments, and child safety.
+
+Run a requirements check on your repository against the live Apple Developer RSS news feed:
+
+```
+python3 scripts/monitor.py --project /path/to/your/app
+```
+
+You can simulate specific tracking updates to generate concrete migration tasks, draft pull requests, and estimate release impact:
+
+```
+# Simulate an update for Privacy Manifests
+python3 scripts/monitor.py --project /path/to/your/app --simulate "Privacy Manifests"
+
+# Simulate updates across all 25 tracks
+python3 scripts/monitor.py --project /path/to/your/app --simulate "all"
+```
+
+To integrate with CI/CD or automated pipelines, request JSON output:
+
+```
+python3 scripts/monitor.py --project /path/to/your/app --simulate "In-App Purchase policies" --json
+```
+
 ## What is inside
 
 | Path | What it holds |
@@ -147,6 +173,8 @@ bash agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 | `data/rejection-patterns.json` | Machine readable taxonomy of rejection patterns with detection signals and fixes. Drives the guard |
 | `agent-os/skill/SKILL.md` | An agent skill that runs a full pre submission compliance audit |
 | `agent-os/hooks/app-store-compliance-guard.sh` | The tested pre submission guard, usable standalone or as an agent hook |
+| `scripts/monitor.py` | Monitors 25 Apple developer requirements tracks, maps announcements to tracks, identifies affected files, generates migration tasks, estimates release impact, and drafts pull requests |
+| `scripts/monitor-test.sh` | Unit and integration test suite verifying the monitor's mapping, simulation, and scanning functionalities |
 | `scripts/metadata-audit.py` | Audits the live store listing (name, subtitle, keywords, description, URLs) against the metadata rejection rules, with a propose and re validate loop. A large share of rejections live in the listing, not the code |
 | `scripts/pull-metadata.sh` | Pulls the live App Store Connect listing into a metadata directory via the asc CLI, with the Play API path documented |
 | `references/` | A structured, AI loadable reference tree. Rules by category (metadata, privacy, payments, design, performance, entitlements, safety, Android) and guidelines by app type, each with a detection command, generated from the taxonomy. Load the slices that match the task |
