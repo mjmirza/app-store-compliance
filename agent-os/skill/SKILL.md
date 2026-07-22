@@ -42,6 +42,20 @@ python3 scripts/metadata-audit.py ./metadata --propose   # writes suggested fixe
 
 The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and broken URLs. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
 
+For monitoring evolving developer requirements, also run the Apple Developer requirements monitor. This tracks 25 key categories against active developer news/announcements and maps updates directly to repository impact:
+
+```
+python3 scripts/monitor.py --project /path/to/app/project
+```
+
+Or simulate a simulated track update (e.g., "Privacy Manifests") to preview impact:
+
+```
+python3 scripts/monitor.py --project /path/to/app/project --simulate "Privacy Manifests"
+```
+
+The monitor determines repository impact, identifies affected files, generates migration tasks, estimates release impact, and drafts a complete pull request description.
+
 ### Step 2. Run the automated scan
 
 Run the guard against the project root.
