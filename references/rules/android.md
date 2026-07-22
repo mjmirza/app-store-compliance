@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+13 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -178,4 +178,21 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-INSECURE-BACKUP
+
+- Title. Android backup is enabled without filtering sensitive data
+- Platform. google
+- Guideline or policy. Device and Network Abuse
+- Severity. high
+- What triggers it. android:allowBackup is set to true in AndroidManifest.xml without setting data extraction rules to exclude credentials/databases.
+- How to fix it. Disable backups with allowBackup="false", or configure dataExtractionRules / fullBackupContent to exclude sensitive credentials and SQLite databases.
+- Detection signals. allowBackup="true"
+- Present means handled. dataExtractionRules, fullBackupContent, allowBackup="false"
+
+How to detect.
+
+```bash
+grep -rn 'allowBackup="true"' . && ! grep -rn 'dataExtractionRules\|fullBackupContent\|allowBackup="false"' .
 ```
