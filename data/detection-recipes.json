@@ -46,6 +46,16 @@
     "APPLE-ACCOUNT-DELETION-WEAK": "grep -rn 'deleteAccount\\|delete account' --include='*.swift' . && grep -rn 'mailto:\\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate",
     "ANDROID-ACCOUNT-DELETION-URL": "grep -rn 'createAccount\\|signUp\\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\\|delete_account' .   # also set a data deletion URL in the Play listing",
     "APPLE-1.2-UGC-24H-ACTION": "grep -rni 'post\\|comment\\|upload\\|feed\\|community' --include='*.swift' . && ! grep -rni 'report\\|block user\\|EULA\\|moderation' --include='*.swift' .",
-    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' ."
+    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' .",
+    "APPLE-ACCESSIBILITY-VOICEOVER": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-VOICEOVER",
+    "APPLE-ACCESSIBILITY-DYNAMIC-TYPE": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-DYNAMIC-TYPE",
+    "APPLE-ACCESSIBILITY-REDUCE-MOTION": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-REDUCE-MOTION",
+    "APPLE-ACCESSIBILITY-COLOR-CONTRAST": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-COLOR-CONTRAST",
+    "APPLE-ACCESSIBILITY-HAPTICS": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-HAPTICS",
+    "APPLE-ACCESSIBILITY-KEYBOARD": "python3 scripts/accessibility-audit.py . --check APPLE-ACCESSIBILITY-KEYBOARD",
+    "ANDROID-ACCESSIBILITY-TALKBACK": "python3 scripts/accessibility-audit.py . --check ANDROID-ACCESSIBILITY-TALKBACK",
+    "ANDROID-ACCESSIBILITY-FONT-SCALING": "python3 scripts/accessibility-audit.py . --check ANDROID-ACCESSIBILITY-FONT-SCALING",
+    "ANDROID-ACCESSIBILITY-HIGH-CONTRAST": "python3 scripts/accessibility-audit.py . --check ANDROID-ACCESSIBILITY-HIGH-CONTRAST",
+    "ANDROID-ACCESSIBILITY-SCANNER": "python3 scripts/accessibility-audit.py . --check ANDROID-ACCESSIBILITY-SCANNER"
   }
 }

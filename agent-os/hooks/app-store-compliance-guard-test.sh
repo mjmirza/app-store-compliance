@@ -110,6 +110,39 @@ done
 [ -z "$MISS" ] && ok "No blind spot: release localhost, no-usage location, AdjustConfig, lorem ipsum all still fire" || bad "No blind spot: missed$MISS"
 rm -rf "$D"
 
+# Accessibility test helpers
+mk_ios_accessibility_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  touch "$d/App/Info.plist"
+  printf 'import SwiftUI\nstruct BadView: View {\n  var body: some View {\n    Button(action: {}) {\n      Text("Submit")\n    }\n    Text("Hello").font(.system(size: 16))\n  }\n}\n' > "$d/App/Bad.swift"
+  echo "$d"
+}
+
+mk_android_accessibility_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/app/src/main/res/layout"
+  touch "$d/app/build.gradle"
+  printf '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android">\n  <ImageView android:id="@+id/img" android:layout_width="10dp" android:layout_height="10dp" />\n  <TextView android:id="@+id/txt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="16dp" />\n</LinearLayout>' > "$d/app/src/main/res/layout/activity_main.xml"
+  echo "$d"
+}
+
+# 12 accessibility. iOS accessibility regressions detected
+D="$(mk_ios_accessibility_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+MISS=""
+for pat in APPLE-ACCESSIBILITY-VOICEOVER APPLE-ACCESSIBILITY-DYNAMIC-TYPE; do
+  echo "$OUT" | grep -q "$pat" || MISS="$MISS $pat"
+done
+[ -z "$MISS" ] && ok "iOS accessibility regressions detected (VoiceOver, Dynamic Type)" || bad "iOS accessibility regressions missed: $MISS"
+rm -rf "$D"
+
+# 13 accessibility. Android accessibility regressions detected
+D="$(mk_android_accessibility_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+MISS=""
+for pat in ANDROID-ACCESSIBILITY-TALKBACK ANDROID-ACCESSIBILITY-FONT-SCALING; do
+  echo "$OUT" | grep -q "$pat" || MISS="$MISS $pat"
+done
+[ -z "$MISS" ] && ok "Android accessibility regressions detected (TalkBack, Font scaling)" || bad "Android accessibility regressions missed: $MISS"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

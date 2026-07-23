@@ -109,6 +109,10 @@ find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name
 find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
 
+GUARD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLAYBOOK_ROOT="$(cd "$GUARD_DIR/../.." && pwd)"
+AUDIT_SCRIPT="$PLAYBOOK_ROOT/scripts/accessibility-audit.py"
+
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND"
@@ -186,6 +190,27 @@ if [ "$IS_IOS" -eq 1 ]; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form."
   fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
+
+  if [ -f "$AUDIT_SCRIPT" ]; then
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-VOICEOVER >/dev/null 2>&1; then
+      finding high "APPLE-ACCESSIBILITY-VOICEOVER" "VoiceOver elements missing descriptive labels or traits" "Provide clear, concise accessibilityLabel or SwiftUI accessibility modifiers for all interactive views."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-DYNAMIC-TYPE >/dev/null 2>&1; then
+      finding high "APPLE-ACCESSIBILITY-DYNAMIC-TYPE" "Dynamic Type font scaling not supported" "Set adjustsFontForContentSizeCategory to true for UIKit fonts, use preferredFont(forTextStyle:), or use SwiftUI standard text styles that automatically scale."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-REDUCE-MOTION >/dev/null 2>&1; then
+      finding medium "APPLE-ACCESSIBILITY-REDUCE-MOTION" "Custom animations do not respect Reduce Motion" "Check UIAccessibility.isReduceMotionEnabled or use @Environment(\\.accessibilityReduceMotion) to disable or simplify custom animations."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-COLOR-CONTRAST >/dev/null 2>&1; then
+      finding medium "APPLE-ACCESSIBILITY-COLOR-CONTRAST" "Hardcoded colors do not honor accessibility contrast settings" "Use system/semantic colors or check UIAccessibility.isDarkerSystemColorsEnabled to provide high-contrast alternatives."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-HAPTICS >/dev/null 2>&1; then
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Interactive actions lack physical or haptic feedback" "Trigger physical feedback using UIFeedbackGenerator or SwiftUI sensoryFeedback when users perform critical or interactive actions."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check APPLE-ACCESSIBILITY-KEYBOARD >/dev/null 2>&1; then
+      finding medium "APPLE-ACCESSIBILITY-KEYBOARD" "iPad or Mac Catalyst app lacks external keyboard navigation support" "Declare standard keyCommands or manage preferredFocusEnvironments to support full keyboard navigation."
+    fi
+  fi
 fi
 
 # ===== Android checks =====
@@ -225,6 +250,21 @@ if [ "$IS_AND" -eq 1 ]; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
+
+  if [ -f "$AUDIT_SCRIPT" ]; then
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check ANDROID-ACCESSIBILITY-TALKBACK >/dev/null 2>&1; then
+      finding high "ANDROID-ACCESSIBILITY-TALKBACK" "TalkBack contentDescription missing on interactive or graphical elements" "Add android:contentDescription in XML or contentDescription in Compose for all user-facing images."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check ANDROID-ACCESSIBILITY-FONT-SCALING >/dev/null 2>&1; then
+      finding high "ANDROID-ACCESSIBILITY-FONT-SCALING" "Text size declared using fixed units instead of sp" "Always define text sizes using sp (scale-independent pixel) units to support system-level font scaling."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check ANDROID-ACCESSIBILITY-HIGH-CONTRAST >/dev/null 2>&1; then
+      finding medium "ANDROID-ACCESSIBILITY-HIGH-CONTRAST" "High text contrast system setting ignored" "Query isHighTextContrastEnabled() or use dynamic themes that adapt to system accessibility contrast changes."
+    fi
+    if ! python3 "$AUDIT_SCRIPT" "$DIR" --check ANDROID-ACCESSIBILITY-SCANNER >/dev/null 2>&1; then
+      finding high "ANDROID-ACCESSIBILITY-SCANNER" "Touch target size below 48dp or missing label recommendations" "Set minimum touch targets to at least 48dp using minWidth/minHeight in XML or sizeIn/size in Jetpack Compose."
+    fi
+  fi
 fi
 
 # ===== summary and exit =====
