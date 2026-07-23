@@ -132,6 +132,19 @@ if grep_has 'loot ?box|gacha|mystery box|random reward'; then
   finding high "BOTH-LOOTBOX-ODDS" "Random reward mechanic present" "Disclose the odds for every random reward before purchase (Apple 3.1.1, Google gambling)."
 fi
 
+# Security - Shared Checks
+if grep_has 'UserDefaults|SharedPreferences|localStorage|AsyncStorage'; then
+  if ! grep_has 'Keychain|Keystore|SecureStore|KeychainSwift|EncryptedSharedPreferences|keychain-access|flutter_secure_storage'; then
+    finding critical "BOTH-SECURE-STORAGE" "Unencrypted or insecure local storage for sensitive data" "Store sensitive credentials exclusively in platform secure storage mechanisms (iOS Keychain, Android Keystore, or EncryptedSharedPreferences)."
+  fi
+fi
+
+if grep_has 'intent-filter|CFBundleURLTypes|URL Schemes'; then
+  if ! grep_has 'apple-app-site-association|assetlinks\.json|Associated Domains|autoVerify="true"'; then
+    finding high "BOTH-UNSAFE-DEEPLINK" "Unsafe deep link intent handling without validation" "Use verified links (Universal Links or App Links) for sensitive entry points, and strictly sanitize all incoming URL query parameters."
+  fi
+fi
+
 # ===== iOS checks =====
 if [ "$IS_IOS" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
@@ -223,6 +236,11 @@ if [ "$IS_AND" -eq 1 ]; then
   fi
   if grep_has 'SYSTEM_ALERT_WINDOW|TYPE_APPLICATION_OVERLAY'; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
+  fi
+  if grep_has 'allowBackup="true"'; then
+    if ! grep_has 'allowBackup="false"|dataExtractionRules|fullBackupContent'; then
+      finding high "ANDROID-INSECURE-BACKUP" "Insecure backup configuration allows credential extraction" "Set android:allowBackup to false in the AndroidManifest.xml or declare a restrictive backup rules XML configuration."
+    fi
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
 fi

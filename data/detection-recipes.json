@@ -46,6 +46,9 @@
     "APPLE-ACCOUNT-DELETION-WEAK": "grep -rn 'deleteAccount\\|delete account' --include='*.swift' . && grep -rn 'mailto:\\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate",
     "ANDROID-ACCOUNT-DELETION-URL": "grep -rn 'createAccount\\|signUp\\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\\|delete_account' .   # also set a data deletion URL in the Play listing",
     "APPLE-1.2-UGC-24H-ACTION": "grep -rni 'post\\|comment\\|upload\\|feed\\|community' --include='*.swift' . && ! grep -rni 'report\\|block user\\|EULA\\|moderation' --include='*.swift' .",
-    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' ."
+    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' .",
+    "BOTH-SECURE-STORAGE": "grep -rn 'UserDefaults\\|SharedPreferences\\|localStorage\\|AsyncStorage' . && ! grep -rn 'Keychain\\|Keystore\\|SecureStore\\|EncryptedSharedPreferences' .",
+    "ANDROID-INSECURE-BACKUP": "grep -rn 'allowBackup=\"true\"' --include='AndroidManifest.xml' . && ! grep -rn 'allowBackup=\"false\"\\|dataExtractionRules\\|fullBackupContent' --include='AndroidManifest.xml' .",
+    "BOTH-UNSAFE-DEEPLINK": "grep -rn 'intent-filter\\|CFBundleURLTypes\\|URL Schemes' . && ! grep -rn 'assetlinks.json\\|apple-app-site-association' ."
   }
 }

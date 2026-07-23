@@ -551,6 +551,39 @@
       "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
       "signals": [],
       "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
+    },
+    {
+      "id": "BOTH-SECURE-STORAGE",
+      "platform": "both",
+      "guideline": "Security",
+      "title": "Unencrypted or insecure local storage for sensitive data",
+      "severity": "critical",
+      "detection": "Use of insecure local storage (such as UserDefaults, SharedPreferences, localStorage, or AsyncStorage) to persist credentials, auth tokens, or private keys without encryption.",
+      "signals": ["UserDefaults", "SharedPreferences", "localStorage", "AsyncStorage", "getSharedPreferences"],
+      "counterSignals": ["Keychain", "Keystore", "SecureStore", "KeychainSwift", "EncryptedSharedPreferences", "keychain-access", "flutter_secure_storage"],
+      "fix": "Store sensitive credentials exclusively in platform secure storage mechanisms (iOS Keychain, Android Keystore, or EncryptedSharedPreferences)."
+    },
+    {
+      "id": "ANDROID-INSECURE-BACKUP",
+      "platform": "google",
+      "guideline": "Security",
+      "title": "Insecure backup configuration allows credential extraction",
+      "severity": "high",
+      "detection": "android:allowBackup is set to true in AndroidManifest.xml without any data extraction rules, allowing local app database and token extraction via ADB.",
+      "signals": ["allowBackup=\"true\"", "android:allowBackup=\"true\""],
+      "counterSignals": ["allowBackup=\"false\"", "android:allowBackup=\"false\"", "android:dataExtractionRules", "android:fullBackupContent"],
+      "fix": "Set android:allowBackup to false in the AndroidManifest.xml or declare a restrictive backup rules XML configuration."
+    },
+    {
+      "id": "BOTH-UNSAFE-DEEPLINK",
+      "platform": "both",
+      "guideline": "Security",
+      "title": "Unsafe deep link intent handling without validation",
+      "severity": "high",
+      "detection": "Custom URL scheme or intent filter registered but actions executed on incoming data without any verification or sanitization.",
+      "signals": ["intent-filter", "CFBundleURLTypes", "URL Schemes"],
+      "counterSignals": ["Associated Domains", "assetlinks.json", "apple-app-site-association", "autoVerify=\"true\""],
+      "fix": "Use verified links (Universal Links or App Links) for sensitive entry points, and strictly sanitize all incoming URL query parameters."
     }
   ]
 }
