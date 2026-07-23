@@ -46,6 +46,17 @@
     "APPLE-ACCOUNT-DELETION-WEAK": "grep -rn 'deleteAccount\\|delete account' --include='*.swift' . && grep -rn 'mailto:\\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate",
     "ANDROID-ACCOUNT-DELETION-URL": "grep -rn 'createAccount\\|signUp\\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\\|delete_account' .   # also set a data deletion URL in the Play listing",
     "APPLE-1.2-UGC-24H-ACTION": "grep -rni 'post\\|comment\\|upload\\|feed\\|community' --include='*.swift' . && ! grep -rni 'report\\|block user\\|EULA\\|moderation' --include='*.swift' .",
-    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' ."
+    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' .",
+    "APPLE-PRIVACY-NUTRITION-LABELS": "grep -rn 'email\\|phoneNumber\\|userName\\|location\\|coordinates' --include='*.swift' . && ! grep -rn 'NSPrivacyCollectedDataTypes\\|privacyNutritionLabels\\|privacy-nutrition-labels' .",
+    "ANDROID-USER-DATA-DISCLOSURE": "grep -rn 'contacts\\|SMS\\|device accounts\\|files\\|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\\|user consent\\|privacy consent\\|accept policy' .",
+    "ANDROID-ADVERTISING-ID": "grep -rn 'com.google.android.gms.permission.AD_ID\\|AD_ID\\|getAdvertisingIdInfo' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' . && ! grep -rn 'opt-out\\|reset AD_ID\\|advertisingIdConsent\\|delete AD_ID' .",
+    "ANDROID-RUNTIME-PERMISSIONS": "grep -rn 'requestPermissions\\|checkSelfPermission\\|shouldShowRequestPermissionRationale' --include='*.kt' --include='*.java' . && ! grep -rn 'permission explanation\\|showPermissionRationale\\|explainPermission' .",
+    "ANDROID-HEALTH-PERMISSIONS": "grep -rn 'HealthConnectClient\\|com.google.android.gms.permission.HealthConnect\\|READ_STEPS\\|READ_HEART_RATE' --include='*.kt' --include='*.java' --include='AndroidManifest.xml' . && ! grep -rn 'healthConnectConsent\\|healthPrivacyPolicy\\|Health Connect' .",
+    "WEB-GDPR-COMPLIANCE": "grep -rn 'processData\\|personalData\\|submitForm\\|registerWeb\\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\\|opt-in\\|privacyConsent\\|deletePersonalData\\|exportData' .",
+    "WEB-COOKIE-CONSENT": "grep -rn 'document.cookie\\|setCookie\\|cookieStore\\|js-cookie\\|cookieConsent' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'cookieBanner\\|cookieConsentBanner\\|acceptCookies\\|cookiePreferences' .",
+    "WEB-LOCAL-STORAGE": "grep -rn 'localStorage.setItem\\|localStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedStorage\\|encryptToken\\|consentLocalStorage\\|clearLocalStorage' .",
+    "WEB-SESSION-STORAGE": "grep -rn 'sessionStorage.setItem\\|sessionStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedSession\\|clearSessionStorage' .",
+    "WEB-INDEXEDDB": "grep -rn 'indexedDB.open\\|indexedDB\\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\\|deleteDatabase\\|consentIndexedDB' .",
+    "WEB-TRACKING-TECHNOLOGIES": "grep -rn 'gtag\\|fbq\\|google-analytics\\|trackingPixel\\|analytics.js\\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\\|disableTracking\\|optOutTracking\\|trackingPreferences' ."
   }
 }
