@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+16 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -98,6 +98,40 @@ How to detect.
 grep -rn 'com.google.android.gms.ads\|applovin\|unity.*ads\|ironsource' --include='*.gradle' . && grep -rni 'children\|families\|kids' --include='AndroidManifest.xml' .
 ```
 
+## ANDROID-USER-DATA-DISCLOSURE
+
+- Title. Missing prominent disclosure for sensitive user data
+- Platform. google
+- Guideline or policy. User Data
+- Severity. critical
+- What triggers it. Collecting personal user data (e.g. contacts, SMS, device accounts, files) without a prominent disclosure and explicit user consent block.
+- How to fix it. Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent.
+- Detection signals. contacts, SMS, device accounts, files, personalData
+- Present means handled. prominent disclosure, user consent, privacy consent, accept policy
+
+How to detect.
+
+```bash
+grep -rn 'contacts\|SMS\|device accounts\|files\|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\|user consent\|privacy consent\|accept policy' .
+```
+
+## ANDROID-HEALTH-PERMISSIONS
+
+- Title. Health or fitness data access without Health Connect declaration
+- Platform. google
+- Guideline or policy. Permissions and APIs
+- Severity. critical
+- What triggers it. Accessing Health Connect client or querying health permissions (e.g. steps, heart rate) without proper declaration or dedicated health privacy policy.
+- How to fix it. Declare Health Connect permissions, complete the console Health Connect form, and maintain a dedicated health privacy policy.
+- Detection signals. HealthConnectClient, com.google.android.gms.permission.HealthConnect, READ_STEPS, READ_HEART_RATE
+- Present means handled. healthConnectConsent, healthPrivacyPolicy, Health Connect
+
+How to detect.
+
+```bash
+grep -rn 'HealthConnectClient\|com.google.android.gms.permission.HealthConnect\|READ_STEPS\|READ_HEART_RATE' --include='*.kt' --include='*.java' --include='AndroidManifest.xml' . && ! grep -rn 'healthConnectConsent\|healthPrivacyPolicy\|Health Connect' .
+```
+
 ## GOOGLE-TARGET-API
 
 - Title. App does not target the current required API level
@@ -178,4 +212,38 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-ADVERTISING-ID
+
+- Title. Google Play Advertising ID usage without disclosure or opt-out
+- Platform. google
+- Guideline or policy. User Data
+- Severity. high
+- What triggers it. Using com.google.android.gms.permission.AD_ID permission or querying GAID but lacking opt-out support or user deletion pathways in code/privacy policy.
+- How to fix it. Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy.
+- Detection signals. com.google.android.gms.permission.AD_ID, AD_ID, getAdvertisingIdInfo
+- Present means handled. opt-out, reset AD_ID, advertisingIdConsent, delete AD_ID
+
+How to detect.
+
+```bash
+grep -rn 'com.google.android.gms.permission.AD_ID\|AD_ID\|getAdvertisingIdInfo' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' . && ! grep -rn 'opt-out\|reset AD_ID\|advertisingIdConsent\|delete AD_ID' .
+```
+
+## ANDROID-RUNTIME-PERMISSIONS
+
+- Title. Sensitive runtime permissions requested without validation
+- Platform. google
+- Guideline or policy. Permissions and APIs
+- Severity. high
+- What triggers it. Requesting critical permissions (camera, contacts, storage) without dynamic checks or explicit explanation/rationale to the user.
+- How to fix it. Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully.
+- Detection signals. requestPermissions, checkSelfPermission, shouldShowRequestPermissionRationale
+- Present means handled. permission explanation, showPermissionRationale, explainPermission
+
+How to detect.
+
+```bash
+grep -rn 'requestPermissions\|checkSelfPermission\|shouldShowRequestPermissionRationale' --include='*.kt' --include='*.java' . && ! grep -rn 'permission explanation\|showPermissionRationale\|explainPermission' .
 ```
