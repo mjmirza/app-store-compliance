@@ -9,10 +9,12 @@ Checks:
 Exit code 0 on pass, 1 on any error.
 """
 import json, os, sys
+from datetime import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")
 RECIPES = os.path.join(ROOT, "data", "detection-recipes.json")
+DEADLINES = os.path.join(ROOT, "data", "regulatory-deadlines.json")
 
 REQUIRED = ["id", "platform", "guideline", "title", "severity", "detection", "fix"]
 SEVERITIES = {"critical", "high", "medium", "low"}
@@ -52,6 +54,56 @@ def main():
         sig = p.get("signals")
         if sig and p["id"] not in with_recipe:
             warnings.append(f"{p['id']} has detection signals but no recipe command yet")
+
+    # Validate regulatory-deadlines.json
+    if not os.path.exists(DEADLINES):
+        errors.append("regulatory-deadlines.json is missing")
+    else:
+        try:
+            with open(DEADLINES, "r", encoding="utf-8") as f:
+                deadlines_data = json.load(f)
+            if not isinstance(deadlines_data, list):
+                errors.append("regulatory-deadlines.json is not a JSON list")
+            else:
+                required_deadline_fields = [
+                    "jurisdiction", "law", "requirement", "effective_date",
+                    "grace_period", "mandatory_date", "enforcement_date",
+                    "affected_repository_sections", "priority"
+                ]
+                for idx, dl in enumerate(deadlines_data):
+                    dl_desc = dl.get("law", f"index {idx}")
+                    for fld in required_deadline_fields:
+                        if fld not in dl:
+                            errors.append(f"Deadline '{dl_desc}' is missing field '{fld}'")
+                        elif dl[fld] is None or dl[fld] == "":
+                            if fld in ["jurisdiction", "law", "requirement", "priority"]:
+                                errors.append(f"Deadline '{dl_desc}' has empty required field '{fld}'")
+
+                    # Validate priority value
+                    prio = dl.get("priority")
+                    if prio and prio not in SEVERITIES:
+                        errors.append(f"Deadline '{dl_desc}' has invalid priority '{prio}'")
+
+                    # Validate date formats
+                    for date_fld in ["effective_date", "mandatory_date", "enforcement_date"]:
+                        d_val = dl.get(date_fld)
+                        if d_val:
+                            try:
+                                datetime.strptime(d_val, "%Y-%m-%d")
+                            except ValueError:
+                                errors.append(f"Deadline '{dl_desc}' has invalid '{date_fld}' format: '{d_val}' (must be YYYY-MM-DD)")
+
+                    # Validate affected repo sections
+                    sections = dl.get("affected_repository_sections")
+                    if isinstance(sections, list):
+                        for sec in sections:
+                            sec_path = os.path.join(ROOT, sec)
+                            if not os.path.exists(sec_path):
+                                errors.append(f"Deadline '{dl_desc}' references non-existent repository section '{sec}'")
+                    elif sections is not None:
+                        errors.append(f"Deadline '{dl_desc}' 'affected_repository_sections' is not a list")
+        except Exception as ex:
+            errors.append(f"Failed to parse regulatory-deadlines.json: {ex}")
 
     return finish(len(patterns), len(recipes))
 

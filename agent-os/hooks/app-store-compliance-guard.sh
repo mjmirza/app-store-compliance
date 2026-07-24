@@ -16,6 +16,9 @@
 # @matcher: Bash
 set -uo pipefail
 
+# ----- playbook root resolution -----
+PLAYBOOK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 HOOK_LOG="$HOME/.claude/hooks/hook-log.sh"
 # shellcheck disable=SC1090
 [ -f "$HOOK_LOG" ] && source "$HOOK_LOG" 2>/dev/null || true
@@ -225,6 +228,12 @@ if [ "$IS_AND" -eq 1 ]; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
+fi
+
+# ===== deadline checker =====
+echo ""
+if [ -f "$PLAYBOOK_ROOT/scripts/deadline-checker.py" ]; then
+  python3 "$PLAYBOOK_ROOT/scripts/deadline-checker.py"
 fi
 
 # ===== summary and exit =====
