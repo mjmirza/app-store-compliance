@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+14 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -120,4 +120,106 @@ How to detect.
 
 ```bash
 use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
+```
+
+## APPLE-A11Y-VOICEOVER-LABELS
+
+- Title. Interactive elements missing VoiceOver accessibility labels or traits
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Interactive visual components (buttons, custom controls, image links) lack accessibilityLabel, accessibilityTraits, or accessibilityHint set in code.
+- How to fix it. Ensure every interactive control has a descriptive, non-empty accessibilityLabel, and correct accessibilityTraits (e.g., .isButton).
+- Detection signals. UIButton, Image, Button, Label, accessibilityLabel, accessibilityIdentifier, accessibilityTraits
+- Present means handled. accessibilityLabel, isAccessibilityElement = true
+
+How to detect.
+
+```bash
+grep -rn 'UIButton\|Image\|Button\|Label' --include='*.swift' --include='*.storyboard' --include='*.xib' . && ! grep -rn 'accessibilityLabel' .
+```
+
+## APPLE-A11Y-DYNAMIC-TYPE
+
+- Title. Text views missing Dynamic Type or font scaling support
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Hardcoded font sizes (UIFont.systemFont(ofSize:)) used without dynamically scaled fonts (UIFontMetrics) or adjustsFontForContentSizeCategory = true in Swift or custom SwiftUI views.
+- How to fix it. Use preferredFont(forTextStyle:) or UIFontMetrics to scale custom fonts, and enable adjustsFontForContentSizeCategory = true.
+- Detection signals. systemFont(ofSize:, font:, adjustsFontForContentSizeCategory
+- Present means handled. adjustsFontForContentSizeCategory = true, UIFontMetrics, DynamicType, Font.custom, UIFont.preferredFont
+
+How to detect.
+
+```bash
+grep -rn 'systemFont(ofSize:' --include='*.swift' . && ! grep -rn 'adjustsFontForContentSizeCategory\|preferredFont' .
+```
+
+## APPLE-A11Y-REDUCE-MOTION
+
+- Title. Animations ignore UIAccessibility.isReduceMotionEnabled setting
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Custom layout transitions or intensive animations are run without checking if UIAccessibility.isReduceMotionEnabled is true.
+- How to fix it. Wrap intensive animations or transitions in a conditional check for UIAccessibility.isReduceMotionEnabled and provide a cross-dissolve fallback.
+- Detection signals. UIView.animate, withAnimation, CABasicAnimation, CAKeyframeAnimation
+- Present means handled. isReduceMotionEnabled, accessibilityReduceMotion, Reduce Motion
+
+How to detect.
+
+```bash
+grep -rn 'UIView.animate\|withAnimation\|CABasicAnimation' --include='*.swift' . && ! grep -rn 'isReduceMotionEnabled\|accessibilityReduceMotion' .
+```
+
+## APPLE-A11Y-COLOR-CONTRAST
+
+- Title. Hardcoded or low-contrast text colors
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Text elements using fixed custom low-contrast foreground colors that do not adapt to system Dark Mode or respect color contrast guidelines.
+- How to fix it. Use system dynamic semantic colors (e.g., labelColor, secondaryLabelColor) and verify against WCAG 2.1 AA contrast ratio (4.5:1 for normal text).
+- Detection signals. UIColor(red:, Color(red:, UIColor.lightGray, UIColor.gray
+- Present means handled. preferredContentSizeCategory, colorScheme, labelColor, systemBackground
+
+How to detect.
+
+```bash
+grep -rn 'UIColor(red:\|Color(red:\|lightGray' --include='*.swift' .
+```
+
+## APPLE-A11Y-HAPTICS
+
+- Title. No audio/visual fallback for critical haptic feedback
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Using UIImpactFeedbackGenerator, UINotificationFeedbackGenerator, or CHHapticEngine for critical system alerts without an accompanying visual or auditory modal or fallback.
+- How to fix it. Provide standard accessibility notifications (UIAccessibility.post(notification:argument:)) or alert popups as fallbacks for haptic-only alerts.
+- Detection signals. UIImpactFeedbackGenerator, UINotificationFeedbackGenerator, CHHapticEngine, haptic
+- Present means handled. alert, sound, UIAccessibility.post
+
+How to detect.
+
+```bash
+grep -rn 'UIImpactFeedbackGenerator\|UINotificationFeedbackGenerator' --include='*.swift' .
+```
+
+## APPLE-A11Y-KEYBOARD-NAV
+
+- Title. Interactive views missing keyboard or switch navigation focus
+- Platform. apple
+- Guideline or policy. Design (Accessibility)
+- Severity. medium
+- What triggers it. Custom gestures or non-standard interactive UI controls are not focusable via external keyboard or Switch Control.
+- How to fix it. Ensure custom interactive views set isAccessibilityElement = true, override canBecomeFocused, or respond to keyCommands.
+- Detection signals. addGestureRecognizer, UITapGestureRecognizer
+- Present means handled. keyCommands, accessibilityElements, canBecomeFocused
+
+How to detect.
+
+```bash
+grep -rn 'addGestureRecognizer\|UITapGestureRecognizer' --include='*.swift' .
 ```

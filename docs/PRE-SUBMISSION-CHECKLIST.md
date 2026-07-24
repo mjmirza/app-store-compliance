@@ -69,7 +69,9 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] A short AI-literacy record exists for the team building or operating the AI feature (Article 4, live since 2 February 2025).
 - [ ] No prohibited AI practice ships (manipulation, banned emotion inference, biometric categorisation) (Article 5, live since 2 February 2025).
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
-- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes an accessibility statement (European Accessibility Act, in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
+- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes an accessibility statement (European Accessibility Act, in force 28 June 2025).
+  - Apple: VoiceOver descriptive labels, traits, and hints; Dynamic Type and scalable custom fonts; Reduce Motion (checking `UIAccessibility.isReduceMotionEnabled` for transitions/animations); dynamic semantic Colors and contrast of 4.5:1; Audio/visual fallbacks for haptic-only alerts; Keyboard/Switch focus for custom interactions.
+  - Android: TalkBack `contentDescription` on graphical/interactive controls; scale-independent font scaling (sp instead of dp/px); High contrast theme dynamic coloring; Touch target sizes complying with Accessibility Scanner minimum recommendations (48dp).
 - [ ] If the app promotes external offers in the EU, the external-purchase entitlement is declared, every external link calls the disclosure sheet, IAP and external offers are not mixed on one storefront, and reporting is wired (DMA).
 
 ## Global specific (USA and other markets, if the app reaches those users)

@@ -186,6 +186,26 @@ if [ "$IS_IOS" -eq 1 ]; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form."
   fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
+
+  # iOS Accessibility Checks
+  if grep_has 'UIButton|Image|Button|Label'; then
+    grep_has 'accessibilityLabel' || finding medium "APPLE-A11Y-VOICEOVER-LABELS" "Interactive elements missing VoiceOver accessibility labels or traits" "Ensure every interactive control has a descriptive, non-empty accessibilityLabel, and correct accessibilityTraits."
+  fi
+  if grep_has 'systemFont\(ofSize:'; then
+    grep_has 'adjustsFontForContentSizeCategory|preferredFont' || finding medium "APPLE-A11Y-DYNAMIC-TYPE" "Text views missing Dynamic Type or font scaling support" "Use preferredFont(forTextStyle:) or UIFontMetrics to scale custom fonts, and enable adjustsFontForContentSizeCategory = true."
+  fi
+  if grep_has 'UIView.animate|withAnimation|CABasicAnimation'; then
+    grep_has 'isReduceMotionEnabled|accessibilityReduceMotion' || finding medium "APPLE-A11Y-REDUCE-MOTION" "Animations ignore UIAccessibility.isReduceMotionEnabled setting" "Wrap intensive animations or transitions in a conditional check for UIAccessibility.isReduceMotionEnabled and provide a cross-dissolve fallback."
+  fi
+  if grep_has 'UIColor\(red:|Color\(red:|\.lightGray|\.gray'; then
+    finding medium "APPLE-A11Y-COLOR-CONTRAST" "Hardcoded or low-contrast text colors" "Use system dynamic semantic colors (e.g., labelColor, secondaryLabelColor) and verify against WCAG 2.1 AA contrast ratio (4.5:1 for normal text)."
+  fi
+  if grep_has 'UIImpactFeedbackGenerator|UINotificationFeedbackGenerator'; then
+    finding medium "APPLE-A11Y-HAPTICS" "No audio/visual fallback for critical haptic feedback" "Provide standard accessibility notifications (UIAccessibility.post(notification:argument:)) or alert popups as fallbacks for haptic-only alerts."
+  fi
+  if grep_has 'addGestureRecognizer|UITapGestureRecognizer'; then
+    finding medium "APPLE-A11Y-KEYBOARD-NAV" "Interactive views missing keyboard or switch navigation focus" "Ensure custom interactive views set isAccessibilityElement = true, override canBecomeFocused, or respond to keyCommands."
+  fi
 fi
 
 # ===== Android checks =====
@@ -224,6 +244,21 @@ if [ "$IS_AND" -eq 1 ]; then
   if grep_has 'SYSTEM_ALERT_WINDOW|TYPE_APPLICATION_OVERLAY'; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
   fi
+
+  # Android Accessibility Checks
+  if grep_has 'ImageView|ImageButton'; then
+    grep_has 'contentDescription' || finding medium "ANDROID-A11Y-TALKBACK-LABELS" "Graphical or interactive elements missing contentDescription for TalkBack" "Add descriptive android:contentDescription to all interactive and meaningful graphical controls, or set to null/empty only for decorative elements."
+  fi
+  if grep_has 'android:textSize="[0-9]+\+dp'; then
+    finding medium "ANDROID-A11Y-FONT-SCALING" "Hardcoded text sizes ignoring user font scaling preferences" "Always define android:textSize in scale-independent pixels (sp) so that the text respects the user's system font size preferences."
+  fi
+  if grep_has '#FF777777|#FF888888|#FFAAAAAA'; then
+    finding medium "ANDROID-A11Y-HIGH-CONTRAST" "Low-contrast color combinations or ignoring High Contrast setting" "Ensure foreground/background contrast is at least 4.5:1, and use dynamic system/material themes rather than hardcoded hex values."
+  fi
+  if grep_has 'layout_width="[1-3][0-9]dp'; then
+    finding medium "ANDROID-A11Y-SCANNER-TOUCH-TARGETS" "Touch targets below Android Accessibility Scanner recommended 48dp" "Enlarge interactive targets to at least 48dp x 48dp or increase their touch delegate or padding area to meet Android Accessibility Scanner guidelines."
+  fi
+
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
 fi
 
