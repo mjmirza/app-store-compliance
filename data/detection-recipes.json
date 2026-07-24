@@ -46,6 +46,17 @@
     "APPLE-ACCOUNT-DELETION-WEAK": "grep -rn 'deleteAccount\\|delete account' --include='*.swift' . && grep -rn 'mailto:\\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate",
     "ANDROID-ACCOUNT-DELETION-URL": "grep -rn 'createAccount\\|signUp\\|register' --include='*.kt' --include='*.java' . && ! grep -rn 'deleteAccount\\|delete_account' .   # also set a data deletion URL in the Play listing",
     "APPLE-1.2-UGC-24H-ACTION": "grep -rni 'post\\|comment\\|upload\\|feed\\|community' --include='*.swift' . && ! grep -rni 'report\\|block user\\|EULA\\|moderation' --include='*.swift' .",
-    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' ."
+    "GOOGLE-FAMILIES-AD-SDK": "grep -rn 'com.google.android.gms.ads\\|applovin\\|unity.*ads\\|ironsource' --include='*.gradle' . && grep -rni 'children\\|families\\|kids' --include='AndroidManifest.xml' .",
+    "APPLE-PRIVACY-NUTRITION-LABELS": "grep -rn 'FirebaseAnalytics\\|GoogleMobileAds\\|Adjust\\|AppsFlyerLib\\|Mixpanel' --include='*.swift' --include='*.kt' .",
+    "ANDROID-USER-DATA-DISCLOSURE": "grep -rn 'READ_CONTACTS\\|WRITE_CONTACTS\\|GET_ACCOUNTS\\|READ_PHONE_STATE' --include='AndroidManifest.xml' .",
+    "ANDROID-ADVERTISING-ID": "grep -rn 'com.google.android.gms.ads.identifier.AdvertisingIdClient\\|advertisingId\\|AD_ID' --include='*.kt' --include='*.java' --include='AndroidManifest.xml' .",
+    "ANDROID-RUNTIME-PERMISSIONS": "grep -rn 'permission.CAMERA\\|permission.RECORD_AUDIO\\|permission.ACCESS_FINE_LOCATION' --include='AndroidManifest.xml' . && ! grep -rn 'checkSelfPermission\\|requestPermissions\\|registerForActivityResult' --include='*.kt' --include='*.java' .",
+    "ANDROID-HEALTH-CONNECT-PERMISSIONS": "grep -rn 'health.permission\\|HealthConnectClient' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .",
+    "WEB-GDPR-COMPLIANCE": "grep -rn 'cookie\\|localStorage\\|sessionStorage' --include='*.html' --include='*.js' --include='*.ts' . && ! grep -rn 'gdpr\\|consent\\|opt-out\\|delete\\|clearUserData' --include='*.html' --include='*.js' --include='*.ts' .",
+    "WEB-COOKIE-CONSENT": "grep -rn 'document.cookie\\|setCookie' --include='*.js' --include='*.ts' . && ! grep -rn 'cookieConsent\\|cookie-banner\\|CookieConsentBanner\\|acceptCookies' --include='*.js' --include='*.ts' --include='*.html' .",
+    "WEB-LOCAL-STORAGE-UNSAFE": "grep -rn 'localStorage.setItem\\|localStorage' --include='*.js' --include='*.ts' . && ! grep -rn 'encrypt\\|secureStore\\|SessionStorage\\|HttpOnly' --include='*.js' --include='*.ts' .",
+    "WEB-INDEXEDDB-UNSAFE": "grep -rn 'indexedDB\\|indexedDB.open\\|IDBDatabase' --include='*.js' --include='*.ts' . && ! grep -rn 'encrypt\\|crypto.subtle\\|AES' --include='*.js' --include='*.ts' .",
+    "WEB-SESSION-STORAGE-UNSAFE": "grep -rn 'sessionStorage.setItem\\|sessionStorage' --include='*.js' --include='*.ts' . && ! grep -rn 'sessionStorage.clear\\|removeItem\\|logout' --include='*.js' --include='*.ts' .",
+    "WEB-TRACKING-TECHNOLOGIES": "grep -rn 'google-analytics.com\\|googletagmanager.com\\|connect.facebook.net\\|fbq' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentApproved\\|loadTracking\\|trackingConsent' --include='*.js' --include='*.ts' ."
   }
 }

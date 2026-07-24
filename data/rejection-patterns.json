@@ -551,6 +551,123 @@
       "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
       "signals": [],
       "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
+    },
+    {
+      "id": "APPLE-PRIVACY-NUTRITION-LABELS",
+      "platform": "apple",
+      "guideline": "5.1.1",
+      "title": "Privacy Nutrition Labels mismatch with runtime behavior",
+      "severity": "high",
+      "detection": "Common tracking or analytics SDKs are imported but the required Privacy Nutrition Labels questionnaire is not completed or is blank in App Store Connect.",
+      "signals": ["FirebaseAnalytics", "GoogleMobileAds", "Adjust", "AppsFlyerLib", "Mixpanel"],
+      "fix": "Complete the privacy nutrition questionnaire in App Store Connect declaring all collected data categories matching the SDKs."
+    },
+    {
+      "id": "ANDROID-USER-DATA-DISCLOSURE",
+      "platform": "google",
+      "guideline": "User Data Policy",
+      "title": "Prominent disclosure missing for user data collection",
+      "severity": "critical",
+      "detection": "Accessing or uploading personal user data (like contacts or phone states) without an in-app prominent disclosure before accessing.",
+      "signals": ["READ_CONTACTS", "WRITE_CONTACTS", "GET_ACCOUNTS", "READ_PHONE_STATE"],
+      "fix": "Add a prominent in-app disclosure before requesting access or collecting personal user data, detailing what data is collected and why."
+    },
+    {
+      "id": "ANDROID-ADVERTISING-ID",
+      "platform": "google",
+      "guideline": "Advertising ID",
+      "title": "Android Advertising ID permission declaration missing",
+      "severity": "high",
+      "detection": "Targeting Android 12 (API 31) or higher and referencing Advertising ID but missing the required AD_ID permission.",
+      "signals": ["com.google.android.gms.ads.identifier.AdvertisingIdClient", "advertisingId", "AD_ID"],
+      "fix": "Declare the com.google.android.permission.AD_ID permission in AndroidManifest.xml when targeting Android 12 (API 31) or higher."
+    },
+    {
+      "id": "ANDROID-RUNTIME-PERMISSIONS",
+      "platform": "google",
+      "guideline": "Runtime permissions",
+      "title": "Missing runtime permission checks before accessing sensitive data",
+      "severity": "critical",
+      "detection": "Using sensitive runtime permissions (such as CAMERA, RECORD_AUDIO, or ACCESS_FINE_LOCATION) but failing to call runtime permission checks.",
+      "signals": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION"],
+      "counterSignals": ["checkSelfPermission", "requestPermissions", "registerForActivityResult"],
+      "fix": "Check and request runtime permissions before calling APIs that access camera, location, microphone, or external storage."
+    },
+    {
+      "id": "ANDROID-HEALTH-CONNECT-PERMISSIONS",
+      "platform": "google",
+      "guideline": "Health permissions",
+      "title": "Health Connect permissions declared without declaration form or user consent",
+      "severity": "critical",
+      "detection": "Health Connect permissions (health.permission) are declared in AndroidManifest without a prominent disclosure or Health Connect compliance declaration.",
+      "signals": ["health.permission", "HealthConnectClient"],
+      "fix": "Ensure you submit the Google Play Health Connect declaration form and obtain explicit, prominent user consent before accessing health data."
+    },
+    {
+      "id": "WEB-GDPR-COMPLIANCE",
+      "platform": "web",
+      "guideline": "GDPR",
+      "title": "Web platform lacking GDPR compliant user controls or delete account options",
+      "severity": "critical",
+      "detection": "User identification, cookies, or local data is used on the web page, but no GDPR consent, opt-out, or user data deletion options are presented.",
+      "signals": ["cookie", "localStorage", "sessionStorage"],
+      "counterSignals": ["gdpr", "consent", "opt-out", "delete", "clearUserData"],
+      "fix": "Implement a GDPR-compliant opt-out option, user data deletion controls, and clear data protection contacts."
+    },
+    {
+      "id": "WEB-COOKIE-CONSENT",
+      "platform": "web",
+      "guideline": "Cookie consent",
+      "title": "Cookie consent banner or preferences modal missing",
+      "severity": "critical",
+      "detection": "Writing to document.cookie or setting tracking cookies without a visible cookie consent banner or modal.",
+      "signals": ["document.cookie", "setCookie"],
+      "counterSignals": ["cookieConsent", "cookie-banner", "CookieConsentBanner", "acceptCookies"],
+      "fix": "Add a prominent cookie consent banner that blocks non-essential cookies until the user provides explicit consent."
+    },
+    {
+      "id": "WEB-LOCAL-STORAGE-UNSAFE",
+      "platform": "web",
+      "guideline": "Local storage",
+      "title": "Unprotected sensitive data in localStorage",
+      "severity": "high",
+      "detection": "Storing sensitive auth tokens, passwords, or personal credentials in Web LocalStorage, which is vulnerable to XSS.",
+      "signals": ["localStorage.setItem", "localStorage"],
+      "counterSignals": ["encrypt", "secureStore", "SessionStorage", "HttpOnly"],
+      "fix": "Avoid storing highly sensitive data like access tokens or passwords in localStorage. Use secure HttpOnly cookies instead."
+    },
+    {
+      "id": "WEB-INDEXEDDB-UNSAFE",
+      "platform": "web",
+      "guideline": "IndexedDB",
+      "title": "Unencrypted personal data in IndexedDB",
+      "severity": "high",
+      "detection": "Storing unstructured personal or sensitive health/financial data in unencrypted IndexedDB stores.",
+      "signals": ["indexedDB", "indexedDB.open", "IDBDatabase"],
+      "counterSignals": ["encrypt", "crypto.subtle", "AES"],
+      "fix": "Encrypt sensitive user data using standard cryptographic APIs (e.g., Web Crypto API) before storing it in IndexedDB."
+    },
+    {
+      "id": "WEB-SESSION-STORAGE-UNSAFE",
+      "platform": "web",
+      "guideline": "Session storage",
+      "title": "Sensitive session data leaked or not cleared",
+      "severity": "medium",
+      "detection": "Using sessionStorage for session tracking without clear sign-out handlers or data clearing routines.",
+      "signals": ["sessionStorage.setItem", "sessionStorage"],
+      "counterSignals": ["sessionStorage.clear", "removeItem", "logout"],
+      "fix": "Clear sessionStorage explicitly on user logout or session expiration to prevent data lingering across tabs."
+    },
+    {
+      "id": "WEB-TRACKING-TECHNOLOGIES",
+      "platform": "web",
+      "guideline": "Tracking technologies",
+      "title": "Web tracking technologies loaded without user opt-out",
+      "severity": "high",
+      "detection": "Loading tracking scripts (e.g., Google Analytics, Facebook Pixel) directly without conditional loading based on cookie consent.",
+      "signals": ["google-analytics.com", "googletagmanager.com", "connect.facebook.net", "fbq"],
+      "counterSignals": ["consentApproved", "loadTracking", "trackingConsent"],
+      "fix": "Load tracking technologies and analytic scripts conditionally only after user consent is granted."
     }
   ]
 }

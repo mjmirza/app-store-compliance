@@ -53,7 +53,7 @@ find "$DIR" -type f \( \
   -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
   -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
   -o -name '*.json' -o -name '*.js' -o -name '*.ts' -o -name '*.dart' -o -name '*.xcconfig' \
-  -o -name '*.pbxproj' -o -name '*.entitlements' \
+  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' \
   \) 2>/dev/null \
   | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
   > "$FILELIST"
@@ -104,14 +104,15 @@ finding() {  # severity id title fix
 }
 
 # ----- platform detection -----
-IS_IOS=0; IS_AND=0
+IS_IOS=0; IS_AND=0; IS_WEB=0
 find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
+find "$DIR" -maxdepth 4 \( -name 'index.html' -o -name 'package.json' \) 2>/dev/null | grep -q . && IS_WEB=1
 
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
-echo "Platforms. iOS=$IS_IOS Android=$IS_AND"
+echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 echo ""
 
 # ===== shared checks =====
@@ -186,6 +187,9 @@ if [ "$IS_IOS" -eq 1 ]; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form."
   fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
+  if grep_has 'FirebaseAnalytics|GoogleMobileAds|Adjust|AppsFlyerLib|Mixpanel'; then
+    finding high "APPLE-PRIVACY-NUTRITION-LABELS" "Privacy Nutrition Labels mismatch with runtime behavior" "Complete the privacy nutrition questionnaire in App Store Connect declaring all collected data categories matching the SDKs."
+  fi
 fi
 
 # ===== Android checks =====
@@ -225,6 +229,54 @@ if [ "$IS_AND" -eq 1 ]; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
+  if grep_has 'READ_CONTACTS|WRITE_CONTACTS|GET_ACCOUNTS|READ_PHONE_STATE'; then
+    finding critical "ANDROID-USER-DATA-DISCLOSURE" "Prominent disclosure missing for user data collection" "Add a prominent in-app disclosure before requesting access or collecting personal user data, detailing what data is collected and why."
+  fi
+  if grep_has 'com\.google\.android\.gms\.ads\.identifier\.AdvertisingIdClient|advertisingId|AD_ID'; then
+    finding high "ANDROID-ADVERTISING-ID" "Android Advertising ID permission declaration missing" "Declare the com.google.android.permission.AD_ID permission in AndroidManifest.xml when targeting Android 12 (API 31) or higher."
+  fi
+  if grep_has 'android\.permission\.(CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION)'; then
+    if ! grep_has 'checkSelfPermission|requestPermissions|registerForActivityResult'; then
+      finding critical "ANDROID-RUNTIME-PERMISSIONS" "Missing runtime permission checks before accessing sensitive data" "Check and request runtime permissions before calling APIs that access camera, location, microphone, or external storage."
+    fi
+  fi
+  if grep_has 'health\.permission|HealthConnectClient'; then
+    finding critical "ANDROID-HEALTH-CONNECT-PERMISSIONS" "Health Connect permissions declared without declaration form or user consent" "Ensure you submit the Google Play Health Connect declaration form and obtain explicit, prominent user consent before accessing health data."
+  fi
+fi
+
+# ===== Web checks =====
+if [ "$IS_WEB" -eq 1 ]; then
+  if grep_has 'cookie|localStorage|sessionStorage'; then
+    if ! grep_has 'gdpr|consent|opt-out|delete|clearUserData'; then
+      finding critical "WEB-GDPR-COMPLIANCE" "Web platform lacking GDPR compliant user controls or delete account options" "Implement a GDPR-compliant opt-out option, user data deletion controls, and clear data protection contacts."
+    fi
+  fi
+  if grep_has 'document\.cookie|setCookie'; then
+    if ! grep_has 'cookieConsent|cookie-banner|CookieConsentBanner|acceptCookies'; then
+      finding critical "WEB-COOKIE-CONSENT" "Cookie consent banner or preferences modal missing" "Add a prominent cookie consent banner that blocks non-essential cookies until the user provides explicit consent."
+    fi
+  fi
+  if grep_has 'localStorage\.setItem|localStorage'; then
+    if ! grep_has 'encrypt|secureStore|SessionStorage|HttpOnly'; then
+      finding high "WEB-LOCAL-STORAGE-UNSAFE" "Unprotected sensitive data in localStorage" "Avoid storing highly sensitive data like access tokens or passwords in localStorage. Use secure HttpOnly cookies instead."
+    fi
+  fi
+  if grep_has 'indexedDB|indexedDB\.open|IDBDatabase'; then
+    if ! grep_has 'encrypt|crypto\.subtle|AES'; then
+      finding high "WEB-INDEXEDDB-UNSAFE" "Unencrypted personal data in IndexedDB" "Encrypt sensitive user data using standard cryptographic APIs (e.g., Web Crypto API) before storing it in IndexedDB."
+    fi
+  fi
+  if grep_has 'sessionStorage\.setItem|sessionStorage'; then
+    if ! grep_has 'sessionStorage\.clear|removeItem|logout'; then
+      finding medium "WEB-SESSION-STORAGE-UNSAFE" "Sensitive session data leaked or not cleared" "Clear sessionStorage explicitly on user logout or session expiration to prevent data lingering across tabs."
+    fi
+  fi
+  if grep_has 'google-analytics\.com|googletagmanager\.com|connect\.facebook\.net|fbq'; then
+    if ! grep_has 'consentApproved|loadTracking|trackingConsent'; then
+      finding high "WEB-TRACKING-TECHNOLOGIES" "Web tracking technologies loaded without user opt-out" "Load tracking technologies and analytic scripts conditionally only after user consent is granted."
+    fi
+  fi
 fi
 
 # ===== summary and exit =====

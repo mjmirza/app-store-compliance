@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+16 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -98,6 +98,55 @@ How to detect.
 grep -rn 'com.google.android.gms.ads\|applovin\|unity.*ads\|ironsource' --include='*.gradle' . && grep -rni 'children\|families\|kids' --include='AndroidManifest.xml' .
 ```
 
+## ANDROID-USER-DATA-DISCLOSURE
+
+- Title. Prominent disclosure missing for user data collection
+- Platform. google
+- Guideline or policy. User Data Policy
+- Severity. critical
+- What triggers it. Accessing or uploading personal user data (like contacts or phone states) without an in-app prominent disclosure before accessing.
+- How to fix it. Add a prominent in-app disclosure before requesting access or collecting personal user data, detailing what data is collected and why.
+- Detection signals. READ_CONTACTS, WRITE_CONTACTS, GET_ACCOUNTS, READ_PHONE_STATE
+
+How to detect.
+
+```bash
+grep -rn 'READ_CONTACTS\|WRITE_CONTACTS\|GET_ACCOUNTS\|READ_PHONE_STATE' --include='AndroidManifest.xml' .
+```
+
+## ANDROID-RUNTIME-PERMISSIONS
+
+- Title. Missing runtime permission checks before accessing sensitive data
+- Platform. google
+- Guideline or policy. Runtime permissions
+- Severity. critical
+- What triggers it. Using sensitive runtime permissions (such as CAMERA, RECORD_AUDIO, or ACCESS_FINE_LOCATION) but failing to call runtime permission checks.
+- How to fix it. Check and request runtime permissions before calling APIs that access camera, location, microphone, or external storage.
+- Detection signals. android.permission.CAMERA, android.permission.RECORD_AUDIO, android.permission.ACCESS_FINE_LOCATION
+- Present means handled. checkSelfPermission, requestPermissions, registerForActivityResult
+
+How to detect.
+
+```bash
+grep -rn 'permission.CAMERA\|permission.RECORD_AUDIO\|permission.ACCESS_FINE_LOCATION' --include='AndroidManifest.xml' . && ! grep -rn 'checkSelfPermission\|requestPermissions\|registerForActivityResult' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-HEALTH-CONNECT-PERMISSIONS
+
+- Title. Health Connect permissions declared without declaration form or user consent
+- Platform. google
+- Guideline or policy. Health permissions
+- Severity. critical
+- What triggers it. Health Connect permissions (health.permission) are declared in AndroidManifest without a prominent disclosure or Health Connect compliance declaration.
+- How to fix it. Ensure you submit the Google Play Health Connect declaration form and obtain explicit, prominent user consent before accessing health data.
+- Detection signals. health.permission, HealthConnectClient
+
+How to detect.
+
+```bash
+grep -rn 'health.permission\|HealthConnectClient' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
 ## GOOGLE-TARGET-API
 
 - Title. App does not target the current required API level
@@ -178,4 +227,20 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-ADVERTISING-ID
+
+- Title. Android Advertising ID permission declaration missing
+- Platform. google
+- Guideline or policy. Advertising ID
+- Severity. high
+- What triggers it. Targeting Android 12 (API 31) or higher and referencing Advertising ID but missing the required AD_ID permission.
+- How to fix it. Declare the com.google.android.permission.AD_ID permission in AndroidManifest.xml when targeting Android 12 (API 31) or higher.
+- Detection signals. com.google.android.gms.ads.identifier.AdvertisingIdClient, advertisingId, AD_ID
+
+How to detect.
+
+```bash
+grep -rn 'com.google.android.gms.ads.identifier.AdvertisingIdClient\|advertisingId\|AD_ID' --include='*.kt' --include='*.java' --include='AndroidManifest.xml' .
 ```

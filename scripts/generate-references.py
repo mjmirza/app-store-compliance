@@ -48,6 +48,13 @@ CATEGORIES = [
             "FINGERPRINT",
             "AI-NO-CONSENT",
             "MANIFEST",
+            "GDPR",
+            "COOKIE",
+            "LOCAL-STORAGE",
+            "INDEXEDDB",
+            "SESSION-STORAGE",
+            "TRACKING-TECHNOLOGIES",
+            "WEB",
         ),
     ),
     (
