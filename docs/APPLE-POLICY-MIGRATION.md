@@ -1,0 +1,456 @@
+# Apple Policy Migration History
+
+This document tracks changes to Apple Developer Program requirements and App Store compliance policies.
+It is updated automatically by the Apple Developer Requirement Monitor.
+
+## Summary of Tracked Updates
+
+| Date | Update Title | Impact | Requirements | Status |
+|---|---|---|---|---|
+| 2026-06-25 | New Accessibility Mandates under European Accessibility Act | Medium | Accessibility requirements | Logged |
+| 2026-06-05 | App Review Guidelines Updated for AI Generated Content and Safety | High | App Store Review Guidelines, AI-related App Store policies, Child safety requirements | Logged |
+| 2026-05-15 | App Store Submissions Now Require Xcode 17 and Swift 6 | High | SDK requirements, Minimum SDK versions, Xcode requirements, Swift requirements | Logged |
+| 2026-05-01 | Integrating HealthKit and Human Interface Guidelines for iOS 18 | High | Human Interface Guidelines, HealthKit policies, Minimum SDK versions | Logged |
+| 2026-04-10 | Alternative Payment Options and DMA Compliance in the European Union | High | Alternative payment regulations, DMA compliance changes | Logged |
+| 2026-04-05 | Security Enhancements, Push Notifications, and Background Execution Policies | High | Human Interface Guidelines, Push Notification requirements, Background execution policies, Security updates | Logged |
+| 2026-03-20 | Privacy Updates for Location, Camera, Microphone, and App Tracking Transparency | Critical | App Tracking Transparency, Location permissions | Logged |
+| 2026-03-01 | Enforcing Privacy Manifests and Required Reason APIs | Critical | Privacy Manifests, Required Reason APIs, AI-related App Store policies | Logged |
+| 2026-02-15 | Apple Developer Program License Agreement Update and App Store Connect Enhancements | High | Apple Developer Program License Agreement, App Store Connect announcements | Logged |
+
+## Detailed Update Logs
+
+### New Accessibility Mandates under European Accessibility Act
+- **Announcement Date:** 2026-06-25
+- **Official Citation:** [https://developer.apple.com/news/?id=accessibility-eaa-2026](https://developer.apple.com/news/?id=accessibility-eaa-2026)
+- **Estimated Release Impact:** Medium - The update involves design, accessibility, language, or connective updates requiring alignment but unlikely to cause automated rejections.
+- **Triggered Apple Requirements:**
+  - Accessibility requirements
+- **Affected Codebase Files:**
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/commands/app-store-audit.md`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GOOGLE-PLAY.md`
+  - `docs/MISTAKE-PATTERNS.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `scripts/monitor-apple.py`
+- **Generated Migration Tasks:**
+  - Audit layout scaling with Dynamic Type enabled
+  - Ensure compliance with EN 301 549 standards
+  - Verify VoiceOver compatibility across main screens
+
+### App Review Guidelines Updated for AI Generated Content and Safety
+- **Announcement Date:** 2026-06-05
+- **Official Citation:** [https://developer.apple.com/news/?id=ai-safety-guidelines](https://developer.apple.com/news/?id=ai-safety-guidelines)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - App Store Review Guidelines
+  - AI-related App Store policies
+  - Child safety requirements
+- **Affected Codebase Files:**
+  - `.github/CONTRIBUTING.md`
+  - `.github/ISSUE_TEMPLATE/pattern-contribution.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/commands/app-store-audit.md`
+  - `agent-os/hooks/app-store-compliance-guard-test.sh`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/APPLE_COMPLIANCE_PR_DRAFT.md`
+  - `docs/BY-APP-TYPE.md`
+  - `docs/COMPETITIVE-GAP-ANALYSIS.md`
+  - `docs/CREDITS.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GAMBLING-MATRIX.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/GOOGLE-PLAY.md`
+  - `docs/MISTAKE-PATTERNS.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/OTHER-STORES.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_app_store_submissions_now_require_xcode_17_and_swift_6.md`
+  - `docs/apple_pr_draft_enforcing_privacy_manifests_and_required_reason_apis.md`
+  - `references/README.md`
+  - `references/guidelines/by-app-type/ai-and-generative-apps.md`
+  - `references/guidelines/by-app-type/health-fitness-and-medical.md`
+  - `references/guidelines/by-app-type/kids-category-and-families.md`
+  - `references/guidelines/by-app-type/macos-and-the-mac-app-store.md`
+  - `references/guidelines/by-app-type/social-and-user-generated-content.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `references/rules/entitlements.md`
+  - `references/rules/metadata.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/generate-references.py`
+  - `scripts/metadata-audit-test.sh`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple-test.sh`
+  - `scripts/monitor-apple.py`
+  - `scripts/pull-metadata.sh`
+  - `scripts/validate.py`
+  - `templates/REVIEW-NOTES-TEMPLATE.md`
+- **Generated Migration Tasks:**
+  - Audit data transmission to ensure no children's data is leaked
+  - Configure COPPA-compliant parental gate before outbound links
+  - Implement strict content filtering and reporting features
+  - Update docs/APPLE.md with new rules
+  - Verify review guidelines compliance
+  - Verify user consent modal naming the AI provider is active
+
+### App Store Submissions Now Require Xcode 17 and Swift 6
+- **Announcement Date:** 2026-05-15
+- **Official Citation:** [https://developer.apple.com/news/?id=xcode-17-swift-6](https://developer.apple.com/news/?id=xcode-17-swift-6)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - SDK requirements
+  - Minimum SDK versions
+  - Xcode requirements
+  - Swift requirements
+- **Affected Codebase Files:**
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/hooks/app-store-compliance-guard-test.sh`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE_COMPLIANCE_PR_DRAFT.md`
+  - `docs/BY-APP-TYPE.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_enforcing_privacy_manifests_and_required_reason_apis.md`
+  - `references/guidelines/by-app-type/macos-and-the-mac-app-store.md`
+  - `references/rules/design.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/monitor-apple.py`
+- **Generated Migration Tasks:**
+  - Audit Swift package configurations for deprecations
+  - Audit Xcode settings and deprecated compiler flags
+  - Check Swift language version and concurrency warnings in Xcode
+  - Identify third-party SDKs requiring mandatory updates
+  - Update minimum supported iOS version in CI/CD pipeline definitions
+  - Upgrade build machine/CI to the required Xcode version
+  - Verify compiled SDK version compatibility in Xcode build configuration
+  - Verify deployment target is set correctly in build configurations
+
+### Integrating HealthKit and Human Interface Guidelines for iOS 18
+- **Announcement Date:** 2026-05-01
+- **Official Citation:** [https://developer.apple.com/news/?id=healthkit-hig-ios18](https://developer.apple.com/news/?id=healthkit-hig-ios18)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - Human Interface Guidelines
+  - HealthKit policies
+  - Minimum SDK versions
+- **Affected Codebase Files:**
+  - `README.md`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/APPLE_COMPLIANCE_PR_DRAFT.md`
+  - `docs/BY-APP-TYPE.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_app_review_guidelines_updated_for_ai_generated_content_and_safety.md`
+  - `docs/apple_pr_draft_app_store_submissions_now_require_xcode_17_and_swift_6.md`
+  - `docs/apple_pr_draft_apple_developer_program_license_agreement_update_and_app_store_connect_enhancements.md`
+  - `docs/apple_pr_draft_enforcing_privacy_manifests_and_required_reason_apis.md`
+  - `docs/apple_pr_draft_new_accessibility_mandates_under_european_accessibility_act.md`
+  - `docs/apple_pr_draft_privacy_updates_for_location__camera__microphone__and_app_tracking_transparency.md`
+  - `docs/apple_pr_draft_security_enhancements__push_notifications__and_background_execution_policies.md`
+  - `references/guidelines/by-app-type/ai-and-generative-apps.md`
+  - `references/guidelines/by-app-type/health-fitness-and-medical.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `references/rules/entitlements.md`
+  - `references/rules/export.md`
+  - `references/rules/metadata.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/generate-references.py`
+  - `scripts/metadata-audit-test.sh`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple-test.sh`
+  - `scripts/monitor-apple.py`
+  - `scripts/validate.py`
+- **Generated Migration Tasks:**
+  - Add NSHealthShareUsageDescription and NSHealthUpdateUsageDescription in Info.plist
+  - Audit layout and interaction design against HIG recommendations
+  - Ensure clinical health data usage conforms to privacy policies
+  - Update minimum supported iOS version in CI/CD pipeline definitions
+  - Verify deployment target is set correctly in build configurations
+
+### Alternative Payment Options and DMA Compliance in the European Union
+- **Announcement Date:** 2026-04-10
+- **Official Citation:** [https://developer.apple.com/news/?id=dma-alternative-payments](https://developer.apple.com/news/?id=dma-alternative-payments)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - Alternative payment regulations
+  - DMA compliance changes
+- **Affected Codebase Files:**
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/commands/app-store-audit.md`
+  - `agent-os/hooks/app-store-compliance-guard-test.sh`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `references/rules/android.md`
+  - `references/rules/payments.md`
+  - `scripts/monitor-apple.py`
+- **Generated Migration Tasks:**
+  - Configure entitlement for external links or alternative payments if eligible
+  - Ensure compliance with alternative distribution rules in the EU
+  - Implement appropriate in-app warnings and modals
+  - Review Core Technology Fee (CTF) implications
+
+### Security Enhancements, Push Notifications, and Background Execution Policies
+- **Announcement Date:** 2026-04-05
+- **Official Citation:** [https://developer.apple.com/news/?id=security-notifications-background](https://developer.apple.com/news/?id=security-notifications-background)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - Human Interface Guidelines
+  - Push Notification requirements
+  - Background execution policies
+  - Security updates
+- **Affected Codebase Files:**
+  - `README.md`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/BY-APP-TYPE.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_app_review_guidelines_updated_for_ai_generated_content_and_safety.md`
+  - `docs/apple_pr_draft_app_store_submissions_now_require_xcode_17_and_swift_6.md`
+  - `docs/apple_pr_draft_apple_developer_program_license_agreement_update_and_app_store_connect_enhancements.md`
+  - `references/guidelines/by-app-type/ai-and-generative-apps.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `references/rules/entitlements.md`
+  - `references/rules/export.md`
+  - `references/rules/metadata.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/generate-references.py`
+  - `scripts/metadata-audit-test.sh`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple-test.sh`
+  - `scripts/monitor-apple.py`
+  - `scripts/validate.py`
+- **Generated Migration Tasks:**
+  - Audit background task processing to prevent excessive background battery drain
+  - Audit layout and interaction design against HIG recommendations
+  - Audit payload sizes and notification extensions in code
+  - Perform a dependency security scan
+  - Verify APNs certificates and provisioning profiles are up to date
+  - Verify background modes declared in Info.plist align with app usage
+  - Verify secure data is written only to the iOS Keychain with strict access control
+
+### Privacy Updates for Location, Camera, Microphone, and App Tracking Transparency
+- **Announcement Date:** 2026-03-20
+- **Official Citation:** [https://developer.apple.com/news/?id=privacy-att-permissions](https://developer.apple.com/news/?id=privacy-att-permissions)
+- **Estimated Release Impact:** Critical - The update affects features that could trigger immediate automatic upload rejection or app submission blocks.
+- **Triggered Apple Requirements:**
+  - App Tracking Transparency
+  - Location permissions
+- **Affected Codebase Files:**
+  - `.github/CONTRIBUTING.md`
+  - `.github/ISSUE_TEMPLATE/pattern-contribution.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/commands/app-store-audit.md`
+  - `agent-os/hooks/app-store-compliance-guard-test.sh`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/APPLE_COMPLIANCE_PR_DRAFT.md`
+  - `docs/COMPETITIVE-GAP-ANALYSIS.md`
+  - `docs/CREDITS.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GOOGLE-PLAY.md`
+  - `docs/MISTAKE-PATTERNS.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/OTHER-STORES.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_app_review_guidelines_updated_for_ai_generated_content_and_safety.md`
+  - `docs/apple_pr_draft_app_store_submissions_now_require_xcode_17_and_swift_6.md`
+  - `docs/apple_pr_draft_apple_developer_program_license_agreement_update_and_app_store_connect_enhancements.md`
+  - `docs/apple_pr_draft_enforcing_privacy_manifests_and_required_reason_apis.md`
+  - `docs/apple_pr_draft_new_accessibility_mandates_under_european_accessibility_act.md`
+  - `references/README.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `references/rules/entitlements.md`
+  - `references/rules/export.md`
+  - `references/rules/metadata.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/generate-references.py`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple-test.sh`
+  - `scripts/monitor-apple.py`
+  - `scripts/validate.py`
+  - `templates/REVIEW-NOTES-TEMPLATE.md`
+- **Generated Migration Tasks:**
+  - Audit location requests to ensure they are triggered only when needed
+  - Ensure NSLocationWhenInUseUsageDescription is set in Info.plist
+  - Ensure NSUserTrackingUsageDescription is set in Info.plist
+  - Verify ATTrackingManager.requestTrackingAuthorization call is implemented
+
+### Enforcing Privacy Manifests and Required Reason APIs
+- **Announcement Date:** 2026-03-01
+- **Official Citation:** [https://developer.apple.com/news/?id=privacy-manifests-enforcement](https://developer.apple.com/news/?id=privacy-manifests-enforcement)
+- **Estimated Release Impact:** Critical - The update affects features that could trigger immediate automatic upload rejection or app submission blocks.
+- **Triggered Apple Requirements:**
+  - Privacy Manifests
+  - Required Reason APIs
+  - AI-related App Store policies
+- **Affected Codebase Files:**
+  - `.github/CONTRIBUTING.md`
+  - `.github/ISSUE_TEMPLATE/pattern-contribution.md`
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/commands/app-store-audit.md`
+  - `agent-os/hooks/app-store-compliance-guard-test.sh`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/detection-recipes.json`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/BY-APP-TYPE.md`
+  - `docs/COMPETITIVE-GAP-ANALYSIS.md`
+  - `docs/CREDITS.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GAMBLING-MATRIX.md`
+  - `docs/GLOBAL-REGULATORY-2026.md`
+  - `docs/GOOGLE-PLAY.md`
+  - `docs/MISTAKE-PATTERNS.md`
+  - `docs/OPEN-SOURCE-PATTERNS.md`
+  - `docs/OTHER-STORES.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `references/README.md`
+  - `references/guidelines/by-app-type/ai-and-generative-apps.md`
+  - `references/guidelines/by-app-type/health-fitness-and-medical.md`
+  - `references/guidelines/by-app-type/macos-and-the-mac-app-store.md`
+  - `references/guidelines/by-app-type/social-and-user-generated-content.md`
+  - `references/guidelines/by-app-type/universal-every-app.md`
+  - `references/rules/android.md`
+  - `references/rules/design.md`
+  - `references/rules/entitlements.md`
+  - `references/rules/metadata.md`
+  - `references/rules/payments.md`
+  - `references/rules/performance.md`
+  - `references/rules/privacy.md`
+  - `references/rules/safety.md`
+  - `scripts/generate-references.py`
+  - `scripts/metadata-audit-test.sh`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple-test.sh`
+  - `scripts/monitor-apple.py`
+  - `scripts/pull-metadata.sh`
+  - `scripts/validate.py`
+  - `templates/REVIEW-NOTES-TEMPLATE.md`
+- **Generated Migration Tasks:**
+  - Audit and update PrivacyInfo.xcprivacy manifest file
+  - Declare approved reasons in the Privacy Manifest
+  - Implement strict content filtering and reporting features
+  - Inspect usage of UserDefaults, systemUptime, or processInfo in code
+  - Verify third-party SDK manifests are bundled
+  - Verify user consent modal naming the AI provider is active
+
+### Apple Developer Program License Agreement Update and App Store Connect Enhancements
+- **Announcement Date:** 2026-02-15
+- **Official Citation:** [https://developer.apple.com/news/?id=adpla-asc-update](https://developer.apple.com/news/?id=adpla-asc-update)
+- **Estimated Release Impact:** High - The update involves regulatory, legal, or review guidelines changes that could result in rejection during human review.
+- **Triggered Apple Requirements:**
+  - Apple Developer Program License Agreement
+  - App Store Connect announcements
+- **Affected Codebase Files:**
+  - `CHANGELOG.md`
+  - `README.md`
+  - `agent-os/hooks/app-store-compliance-guard.sh`
+  - `agent-os/skill/SKILL.md`
+  - `data/rejection-patterns.json`
+  - `docs/ADVANCED-2026.md`
+  - `docs/APPLE.md`
+  - `docs/APPLE_COMPLIANCE_PR_DRAFT.md`
+  - `docs/COMPETITIVE-GAP-ANALYSIS.md`
+  - `docs/CREDITS.md`
+  - `docs/EU-REGULATORY-2026.md`
+  - `docs/GOOGLE-PLAY.md`
+  - `docs/PLATFORM-MECHANICS-2026.md`
+  - `docs/PRE-SUBMISSION-CHECKLIST.md`
+  - `docs/apple_pr_draft_alternative_payment_options_and_dma_compliance_in_the_european_union.md`
+  - `docs/apple_pr_draft_app_review_guidelines_updated_for_ai_generated_content_and_safety.md`
+  - `docs/apple_pr_draft_app_store_submissions_now_require_xcode_17_and_swift_6.md`
+  - `docs/apple_pr_draft_enforcing_privacy_manifests_and_required_reason_apis.md`
+  - `docs/apple_pr_draft_new_accessibility_mandates_under_european_accessibility_act.md`
+  - `references/rules/android.md`
+  - `references/rules/metadata.md`
+  - `references/rules/privacy.md`
+  - `scripts/metadata-audit.py`
+  - `scripts/monitor-apple.py`
+  - `scripts/pull-metadata.sh`
+  - `templates/REVIEW-NOTES-TEMPLATE.md`
+- **Generated Migration Tasks:**
+  - Confirm TestFlight external tester criteria updates
+  - Review and accept updated ADPLA terms in App Store Connect
+  - Review and complete new questionnaire screens in App Store Connect
