@@ -1,0 +1,241 @@
+{
+  "deadlines": [
+    {
+      "jurisdiction": "European Union",
+      "law": "EU AI Act, Regulation (EU) 2024/1689",
+      "requirement": "Article 4 AI literacy",
+      "effective_date": "2025-02-02",
+      "grace_period": "None",
+      "mandatory_date": "2025-02-02",
+      "enforcement_date": "2025-02-02",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "European Union",
+      "law": "EU AI Act, Regulation (EU) 2024/1689",
+      "requirement": "Article 5 prohibited practices",
+      "effective_date": "2025-02-02",
+      "grace_period": "None",
+      "mandatory_date": "2025-02-02",
+      "enforcement_date": "2025-02-02",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md"
+      ],
+      "priority": "Critical"
+    },
+    {
+      "jurisdiction": "European Union",
+      "law": "EU AI Act, Regulation (EU) 2024/1689",
+      "requirement": "Article 50 transparency",
+      "effective_date": "2026-08-02",
+      "grace_period": "None",
+      "mandatory_date": "2026-08-02",
+      "enforcement_date": "2026-08-02",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "European Union",
+      "law": "European Accessibility Act (EAA), Directive (EU) 2019/882",
+      "requirement": "Accessibility compliance via EN 301 549 and WCAG 2.1 AA",
+      "effective_date": "2025-06-28",
+      "grace_period": "None",
+      "mandatory_date": "2025-06-28",
+      "enforcement_date": "2025-06-28",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "European Union",
+      "law": "EU Digital Services Act (DSA), Articles 30 and 31",
+      "requirement": "Trader status declaration and verification",
+      "effective_date": "2025-02-17",
+      "grace_period": "None",
+      "mandatory_date": "2025-02-17",
+      "enforcement_date": "2025-02-17",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md"
+      ],
+      "priority": "Critical"
+    },
+    {
+      "jurisdiction": "Global (Apple Store)",
+      "law": "Apple Developer Policy",
+      "requirement": "Answer updated age rating questionnaire (new 13+, 16+, 18+ tiers)",
+      "effective_date": "2026-01-31",
+      "grace_period": "None",
+      "mandatory_date": "2026-01-31",
+      "enforcement_date": "2026-01-31",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md",
+        "docs/APPLE.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Global (Apple Store)",
+      "law": "Apple Developer Policy",
+      "requirement": "New uploads built with Xcode 26 and iOS 26 SDK",
+      "effective_date": "2026-04-28",
+      "grace_period": "None",
+      "mandatory_date": "2026-04-28",
+      "enforcement_date": "2026-04-28",
+      "affected_repository_sections": [
+        "docs/EU-REGULATORY-2026.md",
+        "docs/PLATFORM-MECHANICS-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Global (Google Play)",
+      "law": "Google Play Developer Policy",
+      "requirement": "New apps and updates must target API level 36 (Android 16)",
+      "effective_date": "2026-08-31",
+      "grace_period": "None",
+      "mandatory_date": "2026-08-31",
+      "enforcement_date": "2026-08-31",
+      "affected_repository_sections": [
+        "docs/PLATFORM-MECHANICS-2026.md",
+        "docs/PRE-SUBMISSION-CHECKLIST.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Global (Google Play)",
+      "law": "Google Play Developer Policy",
+      "requirement": "New apps and updates must use Play Billing Library version 8 or later",
+      "effective_date": "2026-08-31",
+      "grace_period": "2 months",
+      "mandatory_date": "2026-08-31",
+      "enforcement_date": "2026-11-01",
+      "affected_repository_sections": [
+        "docs/PLATFORM-MECHANICS-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Brazil, Indonesia, Singapore, Thailand",
+      "law": "Google Play Developer Policy",
+      "requirement": "Registration by a verified developer required to install or update apps",
+      "effective_date": "2026-09-30",
+      "grace_period": "None",
+      "mandatory_date": "2026-09-30",
+      "enforcement_date": "2026-09-30",
+      "affected_repository_sections": [
+        "docs/PLATFORM-MECHANICS-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "United States",
+      "law": "COPPA (16 CFR Part 312)",
+      "requirement": "Comply with Amended COPPA Rule (biometric personal info, data retention limits, security program, separate ad consent)",
+      "effective_date": "2025-06-23",
+      "grace_period": "10 months",
+      "mandatory_date": "2026-04-22",
+      "enforcement_date": "2026-04-22",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "Critical"
+    },
+    {
+      "jurisdiction": "Texas, United States",
+      "law": "SB 2420 (Texas App Store Accountability Act)",
+      "requirement": "Age assurance plus parent consent for under-18",
+      "effective_date": "2026-01-01",
+      "grace_period": "5 months",
+      "mandatory_date": "2026-06-04",
+      "enforcement_date": "2026-06-04",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Utah, United States",
+      "law": "SB 142 (Utah App Store Accountability Act)",
+      "requirement": "Age category via Declared Age Range API, consent and revocation",
+      "effective_date": "2026-05-06",
+      "grace_period": "None",
+      "mandatory_date": "2026-05-06",
+      "enforcement_date": "2026-05-06",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Louisiana, United States",
+      "law": "HB 570 (Louisiana App Store Accountability Act)",
+      "requirement": "Same tool set as Utah (age assurance/consent)",
+      "effective_date": "2025-06-30",
+      "grace_period": "2 years",
+      "mandatory_date": "2027-07-01",
+      "enforcement_date": "2027-07-01",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "Medium"
+    },
+    {
+      "jurisdiction": "United Kingdom",
+      "law": "Online Safety Act 2023",
+      "requirement": "Highly Effective Age Assurance for harmful content",
+      "effective_date": "2025-07-25",
+      "grace_period": "None",
+      "mandatory_date": "2025-07-25",
+      "enforcement_date": "2025-07-25",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Brazil",
+      "law": "Digital ECA (Law 15,211/2025)",
+      "requirement": "Document, biometric, or government-database age verification (not a checkbox)",
+      "effective_date": "2026-03-17",
+      "grace_period": "None",
+      "mandatory_date": "2026-03-17",
+      "enforcement_date": "2026-03-17",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "India",
+      "law": "Digital Personal Data Protection Act 2023 (DPDP Rules 2025)",
+      "requirement": "Verifiable parental consent for under-18; ban on child behavioral tracking/targeted ads",
+      "effective_date": "2025-11-13",
+      "grace_period": "18 months",
+      "mandatory_date": "2027-05-13",
+      "enforcement_date": "2027-05-13",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    },
+    {
+      "jurisdiction": "Singapore",
+      "law": "IMDA Code of Practice for Online Safety",
+      "requirement": "Age-assurance measures to screen and stop under-18 from downloading age-inappropriate apps",
+      "effective_date": "2026-04-01",
+      "grace_period": "None",
+      "mandatory_date": "2026-04-01",
+      "enforcement_date": "2026-04-01",
+      "affected_repository_sections": [
+        "docs/GLOBAL-REGULATORY-2026.md"
+      ],
+      "priority": "High"
+    }
+  ]
+}

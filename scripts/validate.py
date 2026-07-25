@@ -10,18 +10,70 @@ Exit code 0 on pass, 1 on any error.
 """
 import json, os, sys
 
+from datetime import datetime
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")
 RECIPES = os.path.join(ROOT, "data", "detection-recipes.json")
+DEADLINES = os.path.join(ROOT, "data", "regulatory-deadlines.json")
 
 REQUIRED = ["id", "platform", "guideline", "title", "severity", "detection", "fix"]
 SEVERITIES = {"critical", "high", "medium", "low"}
 PLATFORMS = {"apple", "google", "both"}
 
+DEADLINE_REQUIRED = [
+    "jurisdiction", "law", "requirement", "effective_date",
+    "grace_period", "mandatory_date", "enforcement_date",
+    "affected_repository_sections", "priority"
+]
+DEADLINE_PRIORITIES = {"critical", "high", "medium", "low"}
+
 errors = []
 warnings = []
 
+def validate_date(date_str, field, law):
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        errors.append(f"Deadline for law '{law}' has invalid date format in {field}: '{date_str}'. Expected YYYY-MM-DD.")
+
 def main():
+    # Validate deadlines
+    if not os.path.exists(DEADLINES):
+        errors.append("regulatory-deadlines.json not found")
+    else:
+        try:
+            dl_data = json.load(open(DEADLINES))
+            deadlines = dl_data.get("deadlines", [])
+            for dl in deadlines:
+                law_name = dl.get("law", "<no law>")
+                for f in DEADLINE_REQUIRED:
+                    if f not in dl:
+                        errors.append(f"Deadline for law '{law_name}' missing field: {f}")
+                priority = dl.get("priority", "").lower()
+                if priority not in DEADLINE_PRIORITIES:
+                    errors.append(f"Deadline for law '{law_name}' has invalid priority: '{priority}'")
+
+                # Validate date fields format
+                if "effective_date" in dl:
+                    validate_date(dl["effective_date"], "effective_date", law_name)
+                if "mandatory_date" in dl:
+                    validate_date(dl["mandatory_date"], "mandatory_date", law_name)
+                if "enforcement_date" in dl:
+                    validate_date(dl["enforcement_date"], "enforcement_date", law_name)
+
+                # Validate affected repository sections exist
+                if "affected_repository_sections" in dl:
+                    sections = dl["affected_repository_sections"]
+                    if not isinstance(sections, list):
+                        errors.append(f"Deadline for law '{law_name}': affected_repository_sections must be a list")
+                    else:
+                        for s in sections:
+                            if not os.path.exists(os.path.join(ROOT, s)):
+                                errors.append(f"Deadline for law '{law_name}': affected section path does not exist: '{s}'")
+        except Exception as e:
+            errors.append(f"Failed to parse regulatory-deadlines.json: {e}")
+
     data = json.load(open(PATTERNS))
     patterns = data.get("patterns", [])
     if not patterns:

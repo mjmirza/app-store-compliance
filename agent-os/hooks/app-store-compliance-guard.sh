@@ -227,6 +227,10 @@ if [ "$IS_AND" -eq 1 ]; then
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
 fi
 
+# ===== regulatory deadlines check =====
+echo ""
+python3 "$(dirname "$0")/../../scripts/deadline-checker.py" 2>/dev/null || true
+
 # ===== summary and exit =====
 echo ""
 echo "Summary. critical=$CRIT high=$HIGH medium=$MED"
