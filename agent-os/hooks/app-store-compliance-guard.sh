@@ -172,6 +172,16 @@ if [ "$IS_IOS" -eq 1 ]; then
   if ! grep_has 'privacyPolicy|privacy-policy|PrivacyPolicy'; then
     finding high "APPLE-5.1.1-MISSING-PRIVACY-POLICY" "No privacy policy reference found in sources" "Publish a privacy policy, link it in App Store Connect, and reach it from inside the app."
   fi
+  if grep_has 'UserDefaults\.standard'; then
+    if grep_has 'token|password|credential|secret|jwt' && ! grep_has 'Keychain|SecItemAdd|SecItemUpdate'; then
+      finding high "BOTH-SECURE-STORAGE" "Plain UserDefaults storage is used for sensitive credentials" "Store access tokens and sensitive credentials in iOS Keychain instead."
+    fi
+  fi
+  if grep_has 'CFBundleURLSchemes'; then
+    if ! grep_has 'apple-app-site-association'; then
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking."
+    fi
+  fi
   # Privacy manifest, the top modern Apple upload rejection since 2024
   if grep_has 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'; then
     if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
@@ -217,6 +227,21 @@ if [ "$IS_AND" -eq 1 ]; then
   fi
   if grep_has 'DexClassLoader|PathClassLoader|loadDex'; then
     finding high "ANDROID-DYNAMIC-CODE-LOADING" "Dynamic code loading at runtime" "Ship all code in the package. Server changes are data, not executable code."
+  fi
+  if grep_has 'getSharedPreferences'; then
+    if grep_has 'token|password|credential|secret|jwt' && ! grep_has 'EncryptedSharedPreferences|KeyStore|SQLCipher'; then
+      finding high "BOTH-SECURE-STORAGE" "Plain SharedPreferences storage is used for sensitive credentials" "Store access tokens and sensitive credentials in Android EncryptedSharedPreferences / Keystore instead."
+    fi
+  fi
+  if grep_has 'allowBackup="true"'; then
+    if ! grep_has 'dataExtractionRules|fullBackupContent|allowBackup="false"'; then
+      finding high "ANDROID-INSECURE-BACKUP" "Android allowBackup is enabled without strict filters" "Disable backups using android:allowBackup=\"false\", or restrict backup folders using dataExtractionRules."
+    fi
+  fi
+  if grep_has 'android:scheme'; then
+    if ! grep_has 'assetlinks.json'; then
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking."
+    fi
   fi
   if grep_has 'QUERY_ALL_PACKAGES'; then
     finding high "ANDROID-QUERY-ALL-PACKAGES" "QUERY_ALL_PACKAGES without a permitted use case" "Declare specific packages with a queries element, or qualify for a permitted use case."
