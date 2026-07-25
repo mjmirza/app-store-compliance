@@ -16,7 +16,7 @@ RECIPES = os.path.join(ROOT, "data", "detection-recipes.json")
 
 REQUIRED = ["id", "platform", "guideline", "title", "severity", "detection", "fix"]
 SEVERITIES = {"critical", "high", "medium", "low"}
-PLATFORMS = {"apple", "google", "both"}
+PLATFORMS = {"apple", "google", "both", "web"}
 
 errors = []
 warnings = []

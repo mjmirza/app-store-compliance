@@ -1,6 +1,6 @@
 # Rules. Design and login
 
-3 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+2 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-4.8-SOCIAL-LOGIN-ONLY
 
@@ -17,22 +17,6 @@ How to detect.
 
 ```bash
 grep -rn 'FacebookLogin\|GoogleSignIn\|GIDSignIn' --include='*.swift' . && ! grep -rn 'SignInWithApple\|ASAuthorizationAppleIDProvider' --include='*.swift' .
-```
-
-## APPLE-4.2-WEB-WRAPPER
-
-- Title. Thin web wrapper with no added value
-- Platform. apple
-- Guideline or policy. 4.2
-- Severity. high
-- What triggers it. The app is mostly a single web view loading a website with little native code.
-- How to fix it. Add native capability, offline value, device integration, or content the web version lacks.
-- Detection signals. WKWebView loadRequest, single WebView, Capacitor, Cordova
-
-How to detect.
-
-```bash
-grep -rn 'WKWebView\|loadRequest\|Capacitor\|Cordova' --include='*.swift' . | wc -l   # a high count with little native code is a thin wrapper
 ```
 
 ## APPLE-4.0-SIWA-UX

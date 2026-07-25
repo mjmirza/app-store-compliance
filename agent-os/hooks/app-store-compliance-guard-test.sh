@@ -30,6 +30,20 @@ mk_android_bad() {
   printf 'android { defaultConfig { targetSdkVersion 30 } }\n' > "$d/app/build.gradle"
   echo "$d"
 }
+mk_web_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d"
+  printf '<html><body><h1>Web App</h1></body></html>' > "$d/index.html"
+  printf '{}' > "$d/package.json"
+  printf 'document.cookie = "session=123"; localStorage.setItem("token", "secret"); sessionStorage.setItem("data", "val");' > "$d/app.js"
+  echo "$d"
+}
+mk_web_clean() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d"
+  printf '<html><body><h1>Web App</h1></body></html>' > "$d/index.html"
+  printf '{}' > "$d/package.json"
+  printf 'document.cookie = "session=123"; localStorage.setItem("token", "secret"); sessionStorage.setItem("data", "val"); // gdpr consent cookieConsent encrypt sessionStorage.clear' > "$d/app.js"
+  echo "$d"
+}
 
 # The four known FALSE-POSITIVE scenarios, which must all stay SILENT: a localhost only inside
 # #if DEBUG (never shipped), a location usage description in the modern INFOPLIST_KEY build-setting
@@ -108,6 +122,16 @@ for pat in STAGING-BACKEND MISSING-USAGE-DESCRIPTION BOTH-PLACEHOLDER MISSING-AT
   echo "$OUT" | grep -q "$pat" || MISS="$MISS $pat"
 done
 [ -z "$MISS" ] && ok "No blind spot: release localhost, no-usage location, AdjustConfig, lorem ipsum all still fire" || bad "No blind spot: missed$MISS"
+rm -rf "$D"
+
+# 12 positive. Web bad blocks on critical GDPR / Cookie consent
+D="$(mk_web_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'WEB-GDPR-COMPLIANCE' && [ "$RC" -eq 2 ] && ok "Web bad blocks (exit 2, has GDPR finding)" || bad "Web bad blocks"
+rm -rf "$D"
+
+# 13 negative. Web clean passes
+D="$(mk_web_clean)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "Web clean passes (exit 0)"; else bad "Web clean passes (got $RC)"; fi
 rm -rf "$D"
 
 echo ""

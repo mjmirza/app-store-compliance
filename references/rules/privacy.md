@@ -1,6 +1,6 @@
 # Rules. Privacy and data
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+20 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-5.1.1-MISSING-PRIVACY-POLICY
 
@@ -84,6 +84,40 @@ How to detect.
 find . -name 'PrivacyInfo.xcprivacy' | grep -q . || echo 'MISSING PrivacyInfo.xcprivacy'; find . -path '*/*.framework/*' -name 'PrivacyInfo.xcprivacy'   # each bundled SDK should ship one
 ```
 
+## WEB-GDPR-COMPLIANCE
+
+- Title. Web platform lacking GDPR compliant user controls or delete account options
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. critical
+- What triggers it. User identification, cookies, or local data is used on the web page, but no GDPR consent, opt-out, or user data deletion options are presented.
+- How to fix it. Implement a GDPR-compliant opt-out option, user data deletion controls, and clear data protection contacts.
+- Detection signals. cookie, localStorage, sessionStorage
+- Present means handled. gdpr, consent, opt-out, delete, clearUserData
+
+How to detect.
+
+```bash
+grep -rn 'cookie\|localStorage\|sessionStorage' --include='*.html' --include='*.js' --include='*.ts' . && ! grep -rn 'gdpr\|consent\|opt-out\|delete\|clearUserData' --include='*.html' --include='*.js' --include='*.ts' .
+```
+
+## WEB-COOKIE-CONSENT
+
+- Title. Cookie consent banner or preferences modal missing
+- Platform. web
+- Guideline or policy. Cookie consent
+- Severity. critical
+- What triggers it. Writing to document.cookie or setting tracking cookies without a visible cookie consent banner or modal.
+- How to fix it. Add a prominent cookie consent banner that blocks non-essential cookies until the user provides explicit consent.
+- Detection signals. document.cookie, setCookie
+- Present means handled. cookieConsent, cookie-banner, CookieConsentBanner, acceptCookies
+
+How to detect.
+
+```bash
+grep -rn 'document.cookie\|setCookie' --include='*.js' --include='*.ts' . && ! grep -rn 'cookieConsent\|cookie-banner\|CookieConsentBanner\|acceptCookies' --include='*.js' --include='*.ts' --include='*.html' .
+```
+
 ## APPLE-5.1.1-VAGUE-PURPOSE-STRING
 
 - Title. Generic or empty permission purpose string
@@ -115,6 +149,22 @@ How to detect.
 
 ```bash
 grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' --include='*.swift' . && ! grep -rn 'ATTrackingManager\|NSUserTrackingUsageDescription' .
+```
+
+## APPLE-4.2-WEB-WRAPPER
+
+- Title. Thin web wrapper with no added value
+- Platform. apple
+- Guideline or policy. 4.2
+- Severity. high
+- What triggers it. The app is mostly a single web view loading a website with little native code.
+- How to fix it. Add native capability, offline value, device integration, or content the web version lacks.
+- Detection signals. WKWebView loadRequest, single WebView, Capacitor, Cordova
+
+How to detect.
+
+```bash
+grep -rn 'WKWebView\|loadRequest\|Capacitor\|Cordova' --include='*.swift' . | wc -l   # a high count with little native code is a thin wrapper
 ```
 
 ## APPLE-5.1.2-AI-NO-CONSENT-MODAL
@@ -197,4 +247,88 @@ How to detect.
 
 ```bash
 grep -rni 'phone\|gender\|marital\|date.of.birth\|birthdate\|address' --include='*.swift' . | grep -i 'required\|validator\|isRequired'
+```
+
+## APPLE-PRIVACY-NUTRITION-LABELS
+
+- Title. Privacy Nutrition Labels mismatch with runtime behavior
+- Platform. apple
+- Guideline or policy. 5.1.1
+- Severity. high
+- What triggers it. Common tracking or analytics SDKs are imported but the required Privacy Nutrition Labels questionnaire is not completed or is blank in App Store Connect.
+- How to fix it. Complete the privacy nutrition questionnaire in App Store Connect declaring all collected data categories matching the SDKs.
+- Detection signals. FirebaseAnalytics, GoogleMobileAds, Adjust, AppsFlyerLib, Mixpanel
+
+How to detect.
+
+```bash
+grep -rn 'FirebaseAnalytics\|GoogleMobileAds\|Adjust\|AppsFlyerLib\|Mixpanel' --include='*.swift' --include='*.kt' .
+```
+
+## WEB-LOCAL-STORAGE-UNSAFE
+
+- Title. Unprotected sensitive data in localStorage
+- Platform. web
+- Guideline or policy. Local storage
+- Severity. high
+- What triggers it. Storing sensitive auth tokens, passwords, or personal credentials in Web LocalStorage, which is vulnerable to XSS.
+- How to fix it. Avoid storing highly sensitive data like access tokens or passwords in localStorage. Use secure HttpOnly cookies instead.
+- Detection signals. localStorage.setItem, localStorage
+- Present means handled. encrypt, secureStore, SessionStorage, HttpOnly
+
+How to detect.
+
+```bash
+grep -rn 'localStorage.setItem\|localStorage' --include='*.js' --include='*.ts' . && ! grep -rn 'encrypt\|secureStore\|SessionStorage\|HttpOnly' --include='*.js' --include='*.ts' .
+```
+
+## WEB-INDEXEDDB-UNSAFE
+
+- Title. Unencrypted personal data in IndexedDB
+- Platform. web
+- Guideline or policy. IndexedDB
+- Severity. high
+- What triggers it. Storing unstructured personal or sensitive health/financial data in unencrypted IndexedDB stores.
+- How to fix it. Encrypt sensitive user data using standard cryptographic APIs (e.g., Web Crypto API) before storing it in IndexedDB.
+- Detection signals. indexedDB, indexedDB.open, IDBDatabase
+- Present means handled. encrypt, crypto.subtle, AES
+
+How to detect.
+
+```bash
+grep -rn 'indexedDB\|indexedDB.open\|IDBDatabase' --include='*.js' --include='*.ts' . && ! grep -rn 'encrypt\|crypto.subtle\|AES' --include='*.js' --include='*.ts' .
+```
+
+## WEB-TRACKING-TECHNOLOGIES
+
+- Title. Web tracking technologies loaded without user opt-out
+- Platform. web
+- Guideline or policy. Tracking technologies
+- Severity. high
+- What triggers it. Loading tracking scripts (e.g., Google Analytics, Facebook Pixel) directly without conditional loading based on cookie consent.
+- How to fix it. Load tracking technologies and analytic scripts conditionally only after user consent is granted.
+- Detection signals. google-analytics.com, googletagmanager.com, connect.facebook.net, fbq
+- Present means handled. consentApproved, loadTracking, trackingConsent
+
+How to detect.
+
+```bash
+grep -rn 'google-analytics.com\|googletagmanager.com\|connect.facebook.net\|fbq' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentApproved\|loadTracking\|trackingConsent' --include='*.js' --include='*.ts' .
+```
+
+## WEB-SESSION-STORAGE-UNSAFE
+
+- Title. Sensitive session data leaked or not cleared
+- Platform. web
+- Guideline or policy. Session storage
+- Severity. medium
+- What triggers it. Using sessionStorage for session tracking without clear sign-out handlers or data clearing routines.
+- How to fix it. Clear sessionStorage explicitly on user logout or session expiration to prevent data lingering across tabs.
+- Detection signals. sessionStorage.setItem, sessionStorage
+- Present means handled. sessionStorage.clear, removeItem, logout
+
+How to detect.
+
+```bash
+grep -rn 'sessionStorage.setItem\|sessionStorage' --include='*.js' --include='*.ts' . && ! grep -rn 'sessionStorage.clear\|removeItem\|logout' --include='*.js' --include='*.ts' .
 ```
