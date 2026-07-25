@@ -185,6 +185,34 @@ if [ "$IS_IOS" -eq 1 ]; then
   if grep_has 'deleteAccount|delete account'; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form."
   fi
+  if grep_has 'Image\('; then
+    if ! grep_has 'accessibilityLabel|accessibilityIdentifier|accessibilityHidden|accessibilityElement'; then
+      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has '\.system\(size:'; then
+    finding medium "APPLE-ACCESSIBILITY-DYNAMICTYPE" "Hardcoded system font size detected" "Use relative SwiftUI font styles or preferredFont APIs to support Dynamic Type (Apple Design - Accessibility)."
+  fi
+  if grep_has 'withAnimation|UIView\.animate'; then
+    if ! grep_has 'isReduceMotionEnabled|accessibilityReduceMotion'; then
+      finding medium "APPLE-ACCESSIBILITY-REDUCEMOTION" "Animations implemented without checking Reduce Motion" "Respect the Reduce Motion accessibility setting before executing complex custom animations (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'UIColor\(\s*red:'; then
+    if ! grep_has 'isDarkerSystemColorsEnabled|darkerSystemColors'; then
+      finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'onTapGesture|Button'; then
+    if ! grep_has 'FeedbackGenerator|CoreHaptics'; then
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'focusable'; then
+    if ! grep_has 'FocusState|focused'; then
+      finding medium "APPLE-ACCESSIBILITY-KEYBOARD" "Focusable controls declared without focus state tracking" "Support physical keyboards with FocusState tracking (Apple Design - Accessibility)."
+    fi
+  fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
 fi
 
@@ -223,6 +251,22 @@ if [ "$IS_AND" -eq 1 ]; then
   fi
   if grep_has 'SYSTEM_ALERT_WINDOW|TYPE_APPLICATION_OVERLAY'; then
     finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
+  fi
+  if grep_has '<ImageView|<ImageButton'; then
+    if ! grep_has 'contentDescription'; then
+      finding medium "ANDROID-ACCESSIBILITY-TALKBACK" "XML ImageView or ImageButton missing contentDescription" "Add an android:contentDescription attribute (Google User Experience - Accessibility)."
+    fi
+  fi
+  if grep_has 'android:textSize=.*dp'; then
+    finding medium "ANDROID-ACCESSIBILITY-FONTSCALING" "Text size defined in dp instead of sp" "Always define text size in sp to allow system font scaling to work correctly (Google User Experience - Accessibility)."
+  fi
+  if grep_has 'android:(textColor|background)=.*#'; then
+    finding medium "ANDROID-ACCESSIBILITY-HIGHCONTRAST" "Hardcoded hex colors ignoring high contrast settings" "Use semantic theme references or color resources instead of hardcoded hex values (Google User Experience - Accessibility)."
+  fi
+  if grep_has 'android:(layout_width|layout_height|minWidth|minHeight)=.*dp'; then
+    if grep_has 'clickable|onClick'; then
+      finding medium "ANDROID-ACCESSIBILITY-SCANNER" "Interactive controls with hardcoded dimensions" "Verify touch target sizes are at least 48dp (Google User Experience - Accessibility)."
+    fi
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
 fi

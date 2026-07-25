@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+16 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -178,4 +178,68 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-ACCESSIBILITY-TALKBACK
+
+- Title. TalkBack support missing or disabled
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Views or graphic components missing contentDescription or setting importantForAccessibility inappropriately.
+- How to fix it. Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly.
+- Detection signals. contentDescription, importantForAccessibility
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-TALKBACK
+```
+
+## ANDROID-ACCESSIBILITY-FONTSCALING
+
+- Title. Font scaling disabled due to dp text sizing
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded text sizes specified in dp instead of sp in Android XML layouts or Jetpack Compose files.
+- How to fix it. Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly.
+- Detection signals. textSize, dp
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-FONTSCALING
+```
+
+## ANDROID-ACCESSIBILITY-HIGHCONTRAST
+
+- Title. Hardcoded colors ignoring high contrast settings
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded hex color strings in layout files or hardcoded Color objects in Compose without using theme attributes.
+- How to fix it. Reference semantic colors or color resources so the app automatically respects high contrast themes.
+- Detection signals. color, textColor, Color(0xFF
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-HIGHCONTRAST
+```
+
+## ANDROID-ACCESSIBILITY-SCANNER
+
+- Title. Touch target sizes below 48dp
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Clickable items or buttons defined with layout_width, layout_height, or padding that results in touch targets smaller than 48dp.
+- How to fix it. Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight.
+- Detection signals. clickable, onClick, 48dp, 48.dp
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-SCANNER
 ```

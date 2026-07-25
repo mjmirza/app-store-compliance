@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+14 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -120,4 +120,100 @@ How to detect.
 
 ```bash
 use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
+```
+
+## APPLE-ACCESSIBILITY-VOICEOVER
+
+- Title. VoiceOver support missing or incomplete
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.
+- How to fix it. Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned.
+- Detection signals. UIAccessibility, accessibilityLabel, accessibilityIdentifier, isAccessibilityElement
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+```
+
+## APPLE-ACCESSIBILITY-DYNAMICTYPE
+
+- Title. Dynamic Type support missing or overridden
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded font sizes or styles used without matching scaling or preferredFont APIs, or adjustsFontForContentSizeCategory set to false.
+- How to fix it. Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled.
+- Detection signals. UIFont.systemFont, preferredFont, adjustsFontForContentSizeCategory
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-DYNAMICTYPE
+```
+
+## APPLE-ACCESSIBILITY-REDUCEMOTION
+
+- Title. Reduce Motion accessibility setting ignored
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.
+- How to fix it. Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user.
+- Detection signals. isReduceMotionEnabled, accessibilityReduceMotion
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-REDUCEMOTION
+```
+
+## APPLE-ACCESSIBILITY-COLORCONTRAST
+
+- Title. Color Contrast and system settings ignored
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.
+- How to fix it. Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically.
+- Detection signals. isDarkerSystemColorsEnabled, darkerSystemColors
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-COLORCONTRAST
+```
+
+## APPLE-ACCESSIBILITY-HAPTICS
+
+- Title. Haptics tactile feedback missing on interactions
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Interactive elements, buttons, or custom controls lacking feedback generators or CoreHaptics calls.
+- How to fix it. Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback.
+- Detection signals. UIImpactFeedbackGenerator, UINotificationFeedbackGenerator, UISelectionFeedbackGenerator, CHHapticEngine
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-HAPTICS
+```
+
+## APPLE-ACCESSIBILITY-KEYBOARD
+
+- Title. Keyboard navigation and focus state support missing
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Custom text editors or complex navigation flows missing keyCommands, focusState, or focusable modifiers.
+- How to fix it. Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI.
+- Detection signals. keyCommands, UIKeyCommand, FocusState, focusable
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-KEYBOARD
 ```
