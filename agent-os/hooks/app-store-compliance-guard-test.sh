@@ -171,6 +171,26 @@ else
 fi
 rm -rf "$D"
 
+# 16 Subscription hard-cancel block (phone/mail/in-person only)
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Your subscription auto-renews monthly. Call us to cancel at 1-800-555-0100.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'BOTH-SUBSCRIPTION-HARD-CANCEL' && ok "Subscription phone-only cancel blocks" || bad "Subscription phone-only cancel blocks"
+rm -rf "$D"
+
+# 17 Subscription self-service cancel stays silent
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Your membership auto-renews monthly. Cancel any time from Account Settings.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -q 'BOTH-SUBSCRIPTION-HARD-CANCEL'; then
+  ok "Subscription self-service cancel stays silent"
+else
+  bad "Subscription self-service cancel stays silent"
+fi
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

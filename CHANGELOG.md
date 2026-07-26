@@ -6,6 +6,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Added
 
+- docs/GLOBAL-REGULATORY-2026.md section 2.7 and data/rejection-patterns.json BOTH-SUBSCRIPTION-HARD-CANCEL. US subscription cancellation (negative option) coverage was completely absent. Live-verified the federal FTC click-to-cancel rule's vacatur by the Eighth Circuit (8 July 2025) and its reopened rulemaking (ANPRM, 11 March 2026), documented that California, New York, and Massachusetts have their own binding negative-option statutes regardless, and that the FTC retains Section 5 and ROSCA authority. Added a matching guard check and detection recipe for a subscription flow that requires a phone call, mail, or an in-person visit to cancel.
 - AGENTS.md. Release review guidelines for AI agents (a 14-item checklist) plus a strict source trust hierarchy and verification rules every monitor script follows before citing a claim as fact.
 - scripts/monitor-regulatory.py. The Regulatory Intelligence Agent, tracking EU/UK/US/CA/AU/SG regulatory developments through a source trust hierarchy classifier, with its own test suite.
 - scripts/monitor-android.py and docs/ANDROID-POLICY-MIGRATION.md. Android and Google Play requirements compliance monitoring, with its own test suite.

@@ -136,6 +136,10 @@ fi
 if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
   finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content."
 fi
+# ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
+if grep_has 'subscri(be|ption)|auto.renew|membership' && grep_has '[Cc]all.{0,25}[Cc]ancel|[Cc]ancel.{0,25}[Cc]all|[Mm]ail.{0,25}[Cc]ancel|[Ww]rite.{0,25}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'; then
+  finding high "BOTH-SUBSCRIPTION-HARD-CANCEL" "Subscription cancellation appears to require a phone call, mail, or an in-person visit" "Provide a self-service cancellation path at least as easy as sign-up (FTC Section 5, ROSCA, and CA/NY/MA negative-option laws)."
+fi
 # fastlane precheck derived metadata checks
 if grep_has 'coming soon|coming-soon|will be available|in a future update|stay tuned'; then
   finding medium "APPLE-2.3-FUTURE-FUNCTIONALITY" "Future functionality language found (coming soon, beta)" "Describe only what the build does today (fastlane precheck future_functionality, Apple 2.3.1)."
