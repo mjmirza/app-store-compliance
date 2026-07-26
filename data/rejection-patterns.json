@@ -551,6 +551,26 @@
       "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
       "signals": [],
       "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
+    },
+    {
+      "id": "APPLE-GAMBLING-BRAZIL-LICENSE",
+      "platform": "apple",
+      "guideline": "3.1.1",
+      "title": "Missing Brazilian fixed-odds betting license",
+      "severity": "critical",
+      "detection": "An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.",
+      "signals": ["gambling", "fixed-odds betting", "Secretariat of Prizes and Bets", "SPA license"],
+      "fix": "Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification."
+    },
+    {
+      "id": "GOOGLE-PLAY-AGE-SIGNALS-MISUSE",
+      "platform": "google",
+      "guideline": "User Data",
+      "title": "Misuse of Play Age Signals API",
+      "severity": "critical",
+      "detection": "Usage of the Play Age Signals API (com.google.android.play:age-signals) in conjunction with advertising, marketing, user profiling, or analytics libraries, which violates Google Play's strict Terms of Service.",
+      "signals": ["com.google.android.play:age-signals", "AgeSignalsManager", "AgeSignalsRequest"],
+      "fix": "Ensure that information from the Play Age Signals API is solely used to provide age-appropriate content and experiences in compliance with laws. Do not use the API or its returned signals for advertising, marketing, user profiling, or analytics."
     }
   ]
 }
