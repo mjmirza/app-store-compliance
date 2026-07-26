@@ -21,6 +21,46 @@ Every factual claim must trace to a live canonical source.
 
 A pull request that adds a guideline number without a source link will be asked for the source before merge.
 
+## Source Hierarchy and Trust Priorities
+
+To maintain the highest level of accuracy and regulatory alignment, all references and citations within this playbook must be evaluated and verified according to the following strict hierarchy of sources.
+
+### Trust Levels
+
+Priority 1: Official Regulatory and Standardization Bodies
+- European Commission
+- EUR-Lex
+- Official Journal of the European Union
+- ENISA (European Union Agency for Cybersecurity)
+- EDPB (European Data Protection Board)
+- FTC (Federal Trade Commission)
+- NIST (National Institute of Standards and Technology)
+- CISA (Cybersecurity and Infrastructure Security Agency)
+- ICO (Information Commissioner's Office)
+- Government publications
+
+Priority 2: Reputable News Agencies
+- Reuters
+- AP (Associated Press)
+- Bloomberg
+
+Priority 3: Academic Publications
+- Academic papers and peer-reviewed journals
+
+Priority 4: Industry Material
+- Industry blogs and vendor publications
+
+Priority 5: Social Media and AI Summaries
+- LinkedIn
+- Reddit
+- Twitter
+- AI generated summaries
+
+### Core Guidelines and Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
+
 ## How to add a rejection pattern
 
 1. Add the human facing entry to the matching doc in `docs/`.

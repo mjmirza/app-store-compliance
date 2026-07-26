@@ -205,6 +205,21 @@ Verify. if the app takes EU or UK card payments for real goods, SCA and 3D Secur
 
 Apple facts cite developer.apple.com. Android and Google Play facts cite developer.android.com and the Play Console help. legal facts cite the statute, the regulator, or the standards body. Where a government or Apple page rendered as a client-side app that resisted an automated read, the fact was cross-checked across reputable sources and is flagged here.
 
+### Source Trust Hierarchy
+
+All sources used for establishing regulatory requirements must adhere to the following priority guidelines:
+
+- Priority 1 (Primary Official): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
+- Priority 2 (Highly Reputable News): Reuters, AP (Associated Press), Bloomberg.
+- Priority 3 (Academic): Academic papers and peer-reviewed journals.
+- Priority 4 (Industry): Industry blogs and vendor publications.
+- Priority 5 (Social & Unverified): LinkedIn, Reddit, Twitter, and AI generated summaries.
+
+### Compliance Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
+
 Marked unverified, confirm against the primary source before relying on a figure. the 2026 Android target API 36 date (widely reported, consistent with the annual release pattern, but the official target-sdk page still showed the 2025 text at fetch time). the exact `codesign`, `notarytool`, and `stapler` command strings (corroborated across sources, not copied from a rendered Apple page). the exact visionOS, watchOS, and tvOS per-device screenshot pixel dimensions (pull live from the App Store Connect screenshot page). the exact date Apple's Accessibility Nutrition Labels become mandatory (Apple says over time, no date published). the Google real-money-games India final rollout status. the EU CSA Regulation final form (in trilogue). the US BIS annual self-classification report specifics. and the PSD3 timing.
 
 Treat this document as HARD on the existence and direction of each obligation, and advisory on any specific number, version, or date until re-verified against the cited source.

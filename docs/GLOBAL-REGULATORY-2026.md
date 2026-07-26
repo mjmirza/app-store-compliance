@@ -186,6 +186,21 @@ Common app duties. a privacy notice, an opt-out of targeted advertising, sale, a
 
 Apple facts cite developer.apple.com and apple.com. US federal dates cite the Federal Register and the FTC. state and global facts cite the legislature, the regulator, or a reputable law-firm source, cross-checked where a government page could not be machine-read.
 
+### Source Trust Hierarchy
+
+All sources used for establishing regulatory requirements must adhere to the following priority guidelines:
+
+- Priority 1 (Primary Official): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
+- Priority 2 (Highly Reputable News): Reuters, AP (Associated Press), Bloomberg.
+- Priority 3 (Academic): Academic papers and peer-reviewed journals.
+- Priority 4 (Industry): Industry blogs and vendor publications.
+- Priority 5 (Social & Unverified): LinkedIn, Reddit, Twitter, and AI generated summaries.
+
+### Compliance Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
+
 Marked unverified, confirm against the primary source before relying on a figure. the South Korea PIPA effective date and the CEO-liability and 10-percent-turnover specifics. the Alabama HB 161 exact effective date. the exact Declared Age Range enum brackets (the Apple doc page renders as a client-side app that resisted an automated read, so the bands rest on Apple's Texas worked example). the California AADC partial-enforcement start date. the exact per-state Global Privacy Control required list and the 2026 penalty figures. the Australia Children's Online Privacy Code date. the Canada federal reform bill status. and the Google Android developer-verification rollout scope.
 
 The genuinely unsettled areas an audit treats as moving targets. the current US external-purchase commission (pending the Supreme Court, argument October 2026), the ASAA effective dates (all under litigation or delay), the California AADC scope, and the per-state Global Privacy Control list. Treat this document as HARD on the existence and direction of each obligation, and advisory on any specific number or date until re-verified against the cited source.
