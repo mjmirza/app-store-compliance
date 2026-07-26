@@ -810,7 +810,12 @@
       "title": "Missing Brazilian fixed-odds betting license",
       "severity": "critical",
       "detection": "An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.",
-      "signals": ["gambling", "fixed-odds betting", "Secretariat of Prizes and Bets", "SPA license"],
+      "signals": [
+        "gambling",
+        "fixed-odds betting",
+        "Secretariat of Prizes and Bets",
+        "SPA license"
+      ],
       "fix": "Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification."
     },
     {
@@ -820,9 +825,13 @@
       "title": "Misuse of Play Age Signals API",
       "severity": "critical",
       "detection": "Usage of the Play Age Signals API (com.google.android.play:age-signals) in conjunction with advertising, marketing, user profiling, or analytics libraries, which violates Google Play's strict Terms of Service.",
-      "signals": ["com.google.android.play:age-signals", "AgeSignalsManager", "AgeSignalsRequest"],
+      "signals": [
+        "com.google.android.play:age-signals",
+        "AgeSignalsManager",
+        "AgeSignalsRequest"
+      ],
       "fix": "Ensure that information from the Play Age Signals API is solely used to provide age-appropriate content and experiences in compliance with laws. Do not use the API or its returned signals for advertising, marketing, user profiling, or analytics."
-      },
+    },
     {
       "id": "APPLE-PRIVACY-NUTRITION-LABELS",
       "platform": "apple",
@@ -1047,7 +1056,7 @@
         "trackingPreferences"
       ],
       "fix": "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
-      },
+    },
     {
       "id": "BOTH-SECURE-STORAGE",
       "platform": "both",
@@ -1055,7 +1064,10 @@
       "title": "Sensitive tokens or credentials stored in insecure unencrypted formats",
       "severity": "high",
       "detection": "Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.",
-      "signals": ["UserDefaults.standard.set", "getSharedPreferences"],
+      "signals": [
+        "UserDefaults.standard.set",
+        "getSharedPreferences"
+      ],
       "fix": "Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences."
     },
     {
@@ -1065,8 +1077,14 @@
       "title": "Android backup is enabled without filtering sensitive data",
       "severity": "high",
       "detection": "android:allowBackup is set to true in AndroidManifest.xml without setting data extraction rules to exclude credentials/databases.",
-      "signals": ["allowBackup=\"true\""],
-      "counterSignals": ["dataExtractionRules", "fullBackupContent", "allowBackup=\"false\""],
+      "signals": [
+        "allowBackup=\"true\""
+      ],
+      "counterSignals": [
+        "dataExtractionRules",
+        "fullBackupContent",
+        "allowBackup=\"false\""
+      ],
       "fix": "Disable backups with allowBackup=\"false\", or configure dataExtractionRules / fullBackupContent to exclude sensitive credentials and SQLite databases."
     },
     {
@@ -1076,8 +1094,14 @@
       "title": "Unsafe or unvalidated custom deep link URL schemes used for sensitive operations",
       "severity": "high",
       "detection": "Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.",
-      "signals": ["CFBundleURLSchemes", "android:scheme"],
-      "counterSignals": ["apple-app-site-association", "assetlinks.json"],
+      "signals": [
+        "CFBundleURLSchemes",
+        "android:scheme"
+      ],
+      "counterSignals": [
+        "apple-app-site-association",
+        "assetlinks.json"
+      ],
       "fix": "Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters."
     },
     {
@@ -1087,7 +1111,12 @@
       "title": "VoiceOver support missing or incomplete",
       "severity": "medium",
       "detection": "Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.",
-      "signals": ["UIAccessibility", "accessibilityLabel", "accessibilityIdentifier", "isAccessibilityElement"],
+      "signals": [
+        "UIAccessibility",
+        "accessibilityLabel",
+        "accessibilityIdentifier",
+        "isAccessibilityElement"
+      ],
       "fix": "Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned."
     },
     {
@@ -1097,7 +1126,11 @@
       "title": "Dynamic Type support missing or overridden",
       "severity": "medium",
       "detection": "Hardcoded font sizes or styles used without matching scaling or preferredFont APIs, or adjustsFontForContentSizeCategory set to false.",
-      "signals": ["UIFont.systemFont", "preferredFont", "adjustsFontForContentSizeCategory"],
+      "signals": [
+        "UIFont.systemFont",
+        "preferredFont",
+        "adjustsFontForContentSizeCategory"
+      ],
       "fix": "Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled."
     },
     {
@@ -1107,7 +1140,10 @@
       "title": "Reduce Motion accessibility setting ignored",
       "severity": "medium",
       "detection": "Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.",
-      "signals": ["isReduceMotionEnabled", "accessibilityReduceMotion"],
+      "signals": [
+        "isReduceMotionEnabled",
+        "accessibilityReduceMotion"
+      ],
       "fix": "Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user."
     },
     {
@@ -1117,7 +1153,10 @@
       "title": "Color Contrast and system settings ignored",
       "severity": "medium",
       "detection": "Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.",
-      "signals": ["isDarkerSystemColorsEnabled", "darkerSystemColors"],
+      "signals": [
+        "isDarkerSystemColorsEnabled",
+        "darkerSystemColors"
+      ],
       "fix": "Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically."
     },
     {
@@ -1127,7 +1166,12 @@
       "title": "Haptics tactile feedback missing on interactions",
       "severity": "medium",
       "detection": "Interactive elements, buttons, or custom controls lacking feedback generators or CoreHaptics calls.",
-      "signals": ["UIImpactFeedbackGenerator", "UINotificationFeedbackGenerator", "UISelectionFeedbackGenerator", "CHHapticEngine"],
+      "signals": [
+        "UIImpactFeedbackGenerator",
+        "UINotificationFeedbackGenerator",
+        "UISelectionFeedbackGenerator",
+        "CHHapticEngine"
+      ],
       "fix": "Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback."
     },
     {
@@ -1137,7 +1181,12 @@
       "title": "Keyboard navigation and focus state support missing",
       "severity": "medium",
       "detection": "Custom text editors or complex navigation flows missing keyCommands, focusState, or focusable modifiers.",
-      "signals": ["keyCommands", "UIKeyCommand", "FocusState", "focusable"],
+      "signals": [
+        "keyCommands",
+        "UIKeyCommand",
+        "FocusState",
+        "focusable"
+      ],
       "fix": "Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI."
     },
     {
@@ -1147,7 +1196,10 @@
       "title": "TalkBack support missing or disabled",
       "severity": "medium",
       "detection": "Views or graphic components missing contentDescription or setting importantForAccessibility inappropriately.",
-      "signals": ["contentDescription", "importantForAccessibility"],
+      "signals": [
+        "contentDescription",
+        "importantForAccessibility"
+      ],
       "fix": "Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly."
     },
     {
@@ -1157,7 +1209,10 @@
       "title": "Font scaling disabled due to dp text sizing",
       "severity": "medium",
       "detection": "Hardcoded text sizes specified in dp instead of sp in Android XML layouts or Jetpack Compose files.",
-      "signals": ["textSize", "dp"],
+      "signals": [
+        "textSize",
+        "dp"
+      ],
       "fix": "Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly."
     },
     {
@@ -1167,7 +1222,11 @@
       "title": "Hardcoded colors ignoring high contrast settings",
       "severity": "medium",
       "detection": "Hardcoded hex color strings in layout files or hardcoded Color objects in Compose without using theme attributes.",
-      "signals": ["color", "textColor", "Color(0xFF"],
+      "signals": [
+        "color",
+        "textColor",
+        "Color(0xFF"
+      ],
       "fix": "Reference semantic colors or color resources so the app automatically respects high contrast themes."
     },
     {
@@ -1177,8 +1236,31 @@
       "title": "Touch target sizes below 48dp",
       "severity": "medium",
       "detection": "Clickable items or buttons defined with layout_width, layout_height, or padding that results in touch targets smaller than 48dp.",
-      "signals": ["clickable", "onClick", "48dp", "48.dp"],
+      "signals": [
+        "clickable",
+        "onClick",
+        "48dp",
+        "48.dp"
+      ],
       "fix": "Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight."
+    },
+    {
+      "id": "BOTH-SUBSCRIPTION-HARD-CANCEL",
+      "platform": "both",
+      "guideline": "Apple 3.1.2 subscription terms, US FTC Section 5 / ROSCA, state subscription-cancellation statutes (California, New York, Massachusetts)",
+      "title": "Subscription cancellation requires a phone call, mail, or in-person visit while sign-up is a single tap",
+      "severity": "high",
+      "detection": "A subscription billed outside Apple in-app purchase or Google Play Billing (a web or account-settings cancellation path) directs the person to call, mail, or visit in person to cancel, instead of a self-service in-app or web cancel action. The federal FTC click-to-cancel rule was vacated in 2025 but California, New York, and Massachusetts have their own negative-option statutes in force, and the FTC retains Section 5 and ROSCA authority regardless.",
+      "signals": [
+        "call us to cancel",
+        "call to cancel",
+        "cancel your subscription by calling",
+        "mail a letter to cancel",
+        "write to cancel",
+        "cancel in person",
+        "visit a store to cancel"
+      ],
+      "fix": "Provide a self-service cancellation path (in-app button or account-settings web page) that is at least as easy as sign-up. Never require a phone call, a mailed letter, or an in-person visit to cancel a subscription billed outside the app stores' own billing."
     }
   ]
 }

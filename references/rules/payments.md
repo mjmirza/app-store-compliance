@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-6 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+7 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -98,4 +98,20 @@ How to detect.
 
 ```bash
 python3 scripts/metadata-audit.py ./metadata
+```
+
+## BOTH-SUBSCRIPTION-HARD-CANCEL
+
+- Title. Subscription cancellation requires a phone call, mail, or in-person visit while sign-up is a single tap
+- Platform. both
+- Guideline or policy. Apple 3.1.2 subscription terms, US FTC Section 5 / ROSCA, state subscription-cancellation statutes (California, New York, Massachusetts)
+- Severity. high
+- What triggers it. A subscription billed outside Apple in-app purchase or Google Play Billing (a web or account-settings cancellation path) directs the person to call, mail, or visit in person to cancel, instead of a self-service in-app or web cancel action. The federal FTC click-to-cancel rule was vacated in 2025 but California, New York, and Massachusetts have their own negative-option statutes in force, and the FTC retains Section 5 and ROSCA authority regardless.
+- How to fix it. Provide a self-service cancellation path (in-app button or account-settings web page) that is at least as easy as sign-up. Never require a phone call, a mailed letter, or an in-person visit to cancel a subscription billed outside the app stores' own billing.
+- Detection signals. call us to cancel, call to cancel, cancel your subscription by calling, mail a letter to cancel, write to cancel, cancel in person, visit a store to cancel
+
+How to detect.
+
+```bash
+grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
 ```
