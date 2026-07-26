@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+13 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -48,6 +48,23 @@ How to detect.
 
 ```bash
 grep -rn 'CKContainer\|CloudKit\|NSUbiquitousKeyValueStore' --include='*.swift' .   # then confirm the CloudKit schema is deployed to production in the CloudKit console
+```
+
+## WEB-GDPR-COMPLIANCE
+
+- Title. Processing web personal data without GDPR compliance controls
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. critical
+- What triggers it. Collecting or processing personal web data without explicit opt-in controls, privacy policy links, or right to be forgotten (delete) options.
+- How to fix it. Integrate standard GDPR compliance gates including explicit opt-in for data processing and a mechanism for data deletion.
+- Detection signals. processData, personalData, submitForm, registerWeb, webForm
+- Present means handled. GDPR, opt-in, privacyConsent, deletePersonalData, exportData
+
+How to detect.
+
+```bash
+grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\|opt-in\|privacyConsent\|deletePersonalData\|exportData' .
 ```
 
 ## APPLE-2.1-PLACEHOLDER-CONTENT
@@ -120,4 +137,72 @@ How to detect.
 
 ```bash
 use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
+```
+
+## WEB-LOCAL-STORAGE
+
+- Title. Unencrypted sensitive personal data stored in localStorage
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing sensitive details or JWT tokens in plain text in localStorage without encryption or user consent check.
+- How to fix it. Avoid storing plain sensitive personal info in localStorage, encrypt any stored tokens, and respect storage preferences.
+- Detection signals. localStorage.setItem, localStorage
+- Present means handled. encryptedStorage, encryptToken, consentLocalStorage, clearLocalStorage
+
+How to detect.
+
+```bash
+grep -rn 'localStorage.setItem\|localStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedStorage\|encryptToken\|consentLocalStorage\|clearLocalStorage' .
+```
+
+## WEB-SESSION-STORAGE
+
+- Title. Sensitive session details stored in sessionStorage without protection
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing raw authentication or session keys in sessionStorage without encryption or clean-up logic.
+- How to fix it. Limit and secure the data written to sessionStorage, apply encryption, and ensure data is deleted at session end.
+- Detection signals. sessionStorage.setItem, sessionStorage
+- Present means handled. encryptedSession, clearSessionStorage
+
+How to detect.
+
+```bash
+grep -rn 'sessionStorage.setItem\|sessionStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedSession\|clearSessionStorage' .
+```
+
+## WEB-INDEXEDDB
+
+- Title. Structured personal data stored in IndexedDB without security controls
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing user records in IndexedDB without user consent, encryption, or proper deletion lifecycles.
+- How to fix it. Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout.
+- Detection signals. indexedDB.open, indexedDB, createObjectStore
+- Present means handled. encryptDatabase, deleteDatabase, consentIndexedDB
+
+How to detect.
+
+```bash
+grep -rn 'indexedDB.open\|indexedDB\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\|deleteDatabase\|consentIndexedDB' .
+```
+
+## WEB-TRACKING-TECHNOLOGIES
+
+- Title. Third-party tracking technologies loaded without consent
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Integrating analytic pixels or tracking scripts (Google Analytics, Facebook Pixel, Hotjar) without consent validation.
+- How to fix it. Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent.
+- Detection signals. gtag, fbq, google-analytics, trackingPixel, analytics.js, hotjar
+- Present means handled. consentTracking, disableTracking, optOutTracking, trackingPreferences
+
+How to detect.
+
+```bash
+grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
 ```

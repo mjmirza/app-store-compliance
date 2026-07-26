@@ -53,7 +53,7 @@ find "$DIR" -type f \( \
   -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
   -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
   -o -name '*.json' -o -name '*.js' -o -name '*.ts' -o -name '*.dart' -o -name '*.xcconfig' \
-  -o -name '*.pbxproj' -o -name '*.entitlements' \
+  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' \
   \) 2>/dev/null \
   | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
   > "$FILELIST"
@@ -104,14 +104,15 @@ finding() {  # severity id title fix
 }
 
 # ----- platform detection -----
-IS_IOS=0; IS_AND=0
+IS_IOS=0; IS_AND=0; IS_WEB=0
 find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
+find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep -q . && IS_WEB=1
 
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
-echo "Platforms. iOS=$IS_IOS Android=$IS_AND"
+echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 echo ""
 
 # ----- run regulatory deadlines check -----
@@ -196,6 +197,11 @@ if [ "$IS_IOS" -eq 1 ]; then
     finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)."
   fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
+  if grep_has 'email|phoneNumber|userName|location|coordinates'; then
+    if ! grep_has 'NSPrivacyCollectedDataTypes|privacyNutritionLabels|privacy-nutrition-labels'; then
+      finding high "APPLE-PRIVACY-NUTRITION-LABELS" "Missing Privacy Nutrition Labels data type declarations" "Update the app privacy manifest (PrivacyInfo.xcprivacy) with NSPrivacyCollectedDataTypes and complete corresponding Nutrition Labels in App Store Connect."
+    fi
+  fi
 fi
 
 # ===== Android checks =====
@@ -238,6 +244,60 @@ if [ "$IS_AND" -eq 1 ]; then
     finding critical "GOOGLE-PLAY-AGE-SIGNALS-MISUSE" "Play Age Signals API dependency found" "Ensure age signals are ONLY used to provide age-appropriate experiences. Using them for advertising, marketing, user profiling, or analytics is a direct ToS violation that can result in immediate app suspension or takedown."
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
+  if grep_has 'contacts|SMS|device accounts|files|personalData'; then
+    if ! grep_has 'prominent disclosure|user consent|privacy consent|accept policy'; then
+      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent."
+    fi
+  fi
+  if grep_has 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'; then
+    if ! grep_has 'opt-out|reset AD_ID|advertisingIdConsent|delete AD_ID'; then
+      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy."
+    fi
+  fi
+  if grep_has 'requestPermissions|checkSelfPermission|shouldShowRequestPermissionRationale'; then
+    if ! grep_has 'permission explanation|showPermissionRationale|explainPermission'; then
+      finding high "ANDROID-RUNTIME-PERMISSIONS" "Sensitive runtime permissions requested without validation" "Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully."
+    fi
+  fi
+  if grep_has 'HealthConnectClient|com\.google\.android\.gms\.permission\.HealthConnect|READ_STEPS|READ_HEART_RATE'; then
+    if ! grep_has 'healthConnectConsent|healthPrivacyPolicy|Health Connect'; then
+      finding critical "ANDROID-HEALTH-PERMISSIONS" "Health or fitness data access without Health Connect declaration" "Declare Health Connect permissions, complete the console Health Connect form, and maintain a dedicated health privacy policy."
+    fi
+  fi
+fi
+
+# ===== Web checks =====
+if [ "$IS_WEB" -eq 1 ]; then
+  if grep_has 'processData|personalData|submitForm|registerWeb|webForm'; then
+    if ! grep_has 'GDPR|opt-in|privacyConsent|deletePersonalData|exportData'; then
+      finding critical "WEB-GDPR-COMPLIANCE" "Processing web personal data without GDPR compliance controls" "Integrate standard GDPR compliance gates including explicit opt-in for data processing and a mechanism for data deletion."
+    fi
+  fi
+  if grep_has 'document\.cookie|setCookie|cookieStore|js-cookie|cookieConsent'; then
+    if ! grep_has 'cookieBanner|cookieConsentBanner|acceptCookies|cookiePreferences'; then
+      finding critical "WEB-COOKIE-CONSENT" "Setting non-essential cookies without prior cookie consent" "Implement a compliant Cookie Consent banner that blocks non-essential cookies until the user gives explicit consent."
+    fi
+  fi
+  if grep_has 'localStorage\.setItem|localStorage'; then
+    if ! grep_has 'encryptedStorage|encryptToken|consentLocalStorage|clearLocalStorage'; then
+      finding high "WEB-LOCAL-STORAGE" "Unencrypted sensitive personal data stored in localStorage" "Avoid storing plain sensitive personal info in localStorage, encrypt any stored tokens, and respect storage preferences."
+    fi
+  fi
+  if grep_has 'sessionStorage\.setItem|sessionStorage'; then
+    if ! grep_has 'encryptedSession|clearSessionStorage'; then
+      finding high "WEB-SESSION-STORAGE" "Sensitive session details stored in sessionStorage without protection" "Limit and secure the data written to sessionStorage, apply encryption, and ensure data is deleted at session end."
+    fi
+  fi
+  if grep_has 'indexedDB\.open|indexedDB|createObjectStore'; then
+    if ! grep_has 'encryptDatabase|deleteDatabase|consentIndexedDB'; then
+      finding high "WEB-INDEXEDDB" "Structured personal data stored in IndexedDB without security controls" "Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout."
+    fi
+  fi
+  if grep_has 'gtag|fbq|google-analytics|trackingPixel|analytics\.js|hotjar'; then
+    if ! grep_has 'consentTracking|disableTracking|optOutTracking|trackingPreferences'; then
+      finding high "WEB-TRACKING-TECHNOLOGIES" "Third-party tracking technologies loaded without consent" "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
+    fi
+  fi
 fi
 
 # ===== summary and exit =====

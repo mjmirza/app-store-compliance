@@ -19,7 +19,7 @@ REQUIRED_PATTERN = [
     "fix",
 ]
 SEVERITIES = {"critical", "high", "medium", "low"}
-PLATFORMS = {"apple", "google", "both"}
+PLATFORMS = {"apple", "google", "both", "web"}
 
 REQUIRED_DEADLINE = [
     "id",
