@@ -551,6 +551,38 @@
       "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
       "signals": [],
       "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
+    },
+    {
+      "id": "BOTH-SECURE-STORAGE",
+      "platform": "both",
+      "guideline": "Data Security",
+      "title": "Sensitive tokens or credentials stored in insecure unencrypted formats",
+      "severity": "high",
+      "detection": "Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.",
+      "signals": ["UserDefaults.standard.set", "getSharedPreferences"],
+      "fix": "Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences."
+    },
+    {
+      "id": "ANDROID-INSECURE-BACKUP",
+      "platform": "google",
+      "guideline": "Device and Network Abuse",
+      "title": "Android backup is enabled without filtering sensitive data",
+      "severity": "high",
+      "detection": "android:allowBackup is set to true in AndroidManifest.xml without setting data extraction rules to exclude credentials/databases.",
+      "signals": ["allowBackup=\"true\""],
+      "counterSignals": ["dataExtractionRules", "fullBackupContent", "allowBackup=\"false\""],
+      "fix": "Disable backups with allowBackup=\"false\", or configure dataExtractionRules / fullBackupContent to exclude sensitive credentials and SQLite databases."
+    },
+    {
+      "id": "BOTH-UNSAFE-DEEPLINK",
+      "platform": "both",
+      "guideline": "Data Security",
+      "title": "Unsafe or unvalidated custom deep link URL schemes used for sensitive operations",
+      "severity": "high",
+      "detection": "Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.",
+      "signals": ["CFBundleURLSchemes", "android:scheme"],
+      "counterSignals": ["apple-app-site-association", "assetlinks.json"],
+      "fix": "Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters."
     }
   ]
 }
