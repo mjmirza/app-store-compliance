@@ -62,6 +62,16 @@
     "WEB-TRACKING-TECHNOLOGIES": "grep -rn 'gtag\\|fbq\\|google-analytics\\|trackingPixel\\|analytics.js\\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\\|disableTracking\\|optOutTracking\\|trackingPreferences' .",
     "BOTH-SECURE-STORAGE": "grep -rn 'UserDefaults.standard.set\\|getSharedPreferences' . | grep -i 'token\\|password\\|credential\\|secret\\|jwt' && ! grep -rn 'Keychain\\|SecItemAdd\\|SecItemUpdate\\|EncryptedSharedPreferences\\|KeyStore\\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent",
     "ANDROID-INSECURE-BACKUP": "grep -rn 'allowBackup=\"true\"' . && ! grep -rn 'dataExtractionRules\\|fullBackupContent\\|allowBackup=\"false\"' .",
-    "BOTH-UNSAFE-DEEPLINK": "grep -rn 'CFBundleURLSchemes\\|android:scheme' . && ! grep -rn 'apple-app-site-association\\|assetlinks.json' ."
+    "BOTH-UNSAFE-DEEPLINK": "grep -rn 'CFBundleURLSchemes\\|android:scheme' . && ! grep -rn 'apple-app-site-association\\|assetlinks.json' .",
+    "APPLE-ACCESSIBILITY-VOICEOVER": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER",
+    "APPLE-ACCESSIBILITY-DYNAMICTYPE": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-DYNAMICTYPE",
+    "APPLE-ACCESSIBILITY-REDUCEMOTION": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-REDUCEMOTION",
+    "APPLE-ACCESSIBILITY-COLORCONTRAST": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-COLORCONTRAST",
+    "APPLE-ACCESSIBILITY-HAPTICS": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-HAPTICS",
+    "APPLE-ACCESSIBILITY-KEYBOARD": "python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-KEYBOARD",
+    "ANDROID-ACCESSIBILITY-TALKBACK": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-TALKBACK",
+    "ANDROID-ACCESSIBILITY-FONTSCALING": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-FONTSCALING",
+    "ANDROID-ACCESSIBILITY-HIGHCONTRAST": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-HIGHCONTRAST",
+    "ANDROID-ACCESSIBILITY-SCANNER": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-SCANNER"
   }
 }

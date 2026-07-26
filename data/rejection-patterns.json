@@ -1079,6 +1079,106 @@
       "signals": ["CFBundleURLSchemes", "android:scheme"],
       "counterSignals": ["apple-app-site-association", "assetlinks.json"],
       "fix": "Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-VOICEOVER",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "VoiceOver support missing or incomplete",
+      "severity": "medium",
+      "detection": "Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.",
+      "signals": ["UIAccessibility", "accessibilityLabel", "accessibilityIdentifier", "isAccessibilityElement"],
+      "fix": "Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-DYNAMICTYPE",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "Dynamic Type support missing or overridden",
+      "severity": "medium",
+      "detection": "Hardcoded font sizes or styles used without matching scaling or preferredFont APIs, or adjustsFontForContentSizeCategory set to false.",
+      "signals": ["UIFont.systemFont", "preferredFont", "adjustsFontForContentSizeCategory"],
+      "fix": "Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-REDUCEMOTION",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "Reduce Motion accessibility setting ignored",
+      "severity": "medium",
+      "detection": "Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.",
+      "signals": ["isReduceMotionEnabled", "accessibilityReduceMotion"],
+      "fix": "Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-COLORCONTRAST",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "Color Contrast and system settings ignored",
+      "severity": "medium",
+      "detection": "Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.",
+      "signals": ["isDarkerSystemColorsEnabled", "darkerSystemColors"],
+      "fix": "Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-HAPTICS",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "Haptics tactile feedback missing on interactions",
+      "severity": "medium",
+      "detection": "Interactive elements, buttons, or custom controls lacking feedback generators or CoreHaptics calls.",
+      "signals": ["UIImpactFeedbackGenerator", "UINotificationFeedbackGenerator", "UISelectionFeedbackGenerator", "CHHapticEngine"],
+      "fix": "Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback."
+    },
+    {
+      "id": "APPLE-ACCESSIBILITY-KEYBOARD",
+      "platform": "apple",
+      "guideline": "Design - Accessibility",
+      "title": "Keyboard navigation and focus state support missing",
+      "severity": "medium",
+      "detection": "Custom text editors or complex navigation flows missing keyCommands, focusState, or focusable modifiers.",
+      "signals": ["keyCommands", "UIKeyCommand", "FocusState", "focusable"],
+      "fix": "Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI."
+    },
+    {
+      "id": "ANDROID-ACCESSIBILITY-TALKBACK",
+      "platform": "google",
+      "guideline": "User Experience - Accessibility",
+      "title": "TalkBack support missing or disabled",
+      "severity": "medium",
+      "detection": "Views or graphic components missing contentDescription or setting importantForAccessibility inappropriately.",
+      "signals": ["contentDescription", "importantForAccessibility"],
+      "fix": "Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly."
+    },
+    {
+      "id": "ANDROID-ACCESSIBILITY-FONTSCALING",
+      "platform": "google",
+      "guideline": "User Experience - Accessibility",
+      "title": "Font scaling disabled due to dp text sizing",
+      "severity": "medium",
+      "detection": "Hardcoded text sizes specified in dp instead of sp in Android XML layouts or Jetpack Compose files.",
+      "signals": ["textSize", "dp"],
+      "fix": "Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly."
+    },
+    {
+      "id": "ANDROID-ACCESSIBILITY-HIGHCONTRAST",
+      "platform": "google",
+      "guideline": "User Experience - Accessibility",
+      "title": "Hardcoded colors ignoring high contrast settings",
+      "severity": "medium",
+      "detection": "Hardcoded hex color strings in layout files or hardcoded Color objects in Compose without using theme attributes.",
+      "signals": ["color", "textColor", "Color(0xFF"],
+      "fix": "Reference semantic colors or color resources so the app automatically respects high contrast themes."
+    },
+    {
+      "id": "ANDROID-ACCESSIBILITY-SCANNER",
+      "platform": "google",
+      "guideline": "User Experience - Accessibility",
+      "title": "Touch target sizes below 48dp",
+      "severity": "medium",
+      "detection": "Clickable items or buttons defined with layout_width, layout_height, or padding that results in touch targets smaller than 48dp.",
+      "signals": ["clickable", "onClick", "48dp", "48.dp"],
+      "fix": "Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight."
     }
   ]
 }

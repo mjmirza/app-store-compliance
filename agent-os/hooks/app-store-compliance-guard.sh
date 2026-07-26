@@ -206,6 +206,34 @@ if [ "$IS_IOS" -eq 1 ]; then
   if grep_has 'fixed-odds|betting'; then
     finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)."
   fi
+  if grep_has 'Image\('; then
+    if ! grep_has 'accessibilityLabel|accessibilityIdentifier|accessibilityHidden|accessibilityElement'; then
+      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has '\.system\(size:'; then
+    finding medium "APPLE-ACCESSIBILITY-DYNAMICTYPE" "Hardcoded system font size detected" "Use relative SwiftUI font styles or preferredFont APIs to support Dynamic Type (Apple Design - Accessibility)."
+  fi
+  if grep_has 'withAnimation|UIView\.animate'; then
+    if ! grep_has 'isReduceMotionEnabled|accessibilityReduceMotion'; then
+      finding medium "APPLE-ACCESSIBILITY-REDUCEMOTION" "Animations implemented without checking Reduce Motion" "Respect the Reduce Motion accessibility setting before executing complex custom animations (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'UIColor\(\s*red:'; then
+    if ! grep_has 'isDarkerSystemColorsEnabled|darkerSystemColors'; then
+      finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'onTapGesture|Button'; then
+    if ! grep_has 'FeedbackGenerator|CoreHaptics'; then
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)."
+    fi
+  fi
+  if grep_has 'focusable'; then
+    if ! grep_has 'FocusState|focused'; then
+      finding medium "APPLE-ACCESSIBILITY-KEYBOARD" "Focusable controls declared without focus state tracking" "Support physical keyboards with FocusState tracking (Apple Design - Accessibility)."
+    fi
+  fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
   if grep_has 'email|phoneNumber|userName|location|coordinates'; then
     if ! grep_has 'NSPrivacyCollectedDataTypes|privacyNutritionLabels|privacy-nutrition-labels'; then
@@ -267,6 +295,22 @@ if [ "$IS_AND" -eq 1 ]; then
   fi
   if grep_has 'com\.google\.android\.play:age-signals|AgeSignalsManager|AgeSignalsRequest'; then
     finding critical "GOOGLE-PLAY-AGE-SIGNALS-MISUSE" "Play Age Signals API dependency found" "Ensure age signals are ONLY used to provide age-appropriate experiences. Using them for advertising, marketing, user profiling, or analytics is a direct ToS violation that can result in immediate app suspension or takedown."
+  fi
+  if grep_has '<ImageView|<ImageButton'; then
+    if ! grep_has 'contentDescription'; then
+      finding medium "ANDROID-ACCESSIBILITY-TALKBACK" "XML ImageView or ImageButton missing contentDescription" "Add an android:contentDescription attribute (Google User Experience - Accessibility)."
+    fi
+  fi
+  if grep_has 'android:textSize=.*dp'; then
+    finding medium "ANDROID-ACCESSIBILITY-FONTSCALING" "Text size defined in dp instead of sp" "Always define text size in sp to allow system font scaling to work correctly (Google User Experience - Accessibility)."
+  fi
+  if grep_has 'android:(textColor|background)=.*#'; then
+    finding medium "ANDROID-ACCESSIBILITY-HIGHCONTRAST" "Hardcoded hex colors ignoring high contrast settings" "Use semantic theme references or color resources instead of hardcoded hex values (Google User Experience - Accessibility)."
+  fi
+  if grep_has 'android:(layout_width|layout_height|minWidth|minHeight)=.*dp'; then
+    if grep_has 'clickable|onClick'; then
+      finding medium "ANDROID-ACCESSIBILITY-SCANNER" "Interactive controls with hardcoded dimensions" "Verify touch target sizes are at least 48dp (Google User Experience - Accessibility)."
+    fi
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
   if grep_has 'contacts|SMS|device accounts|files|personalData'; then
