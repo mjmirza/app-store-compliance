@@ -20,6 +20,8 @@ bash ~/.claude/hooks/app-store-compliance-guard.sh <project-path>
 
 2c. Run the metadata layer. If the user pulled the listing into a metadata directory, run `python3 ~/.claude/skills/app-store-compliance/scripts/metadata-audit.py <metadata-dir>` to audit the real store listing, and `--propose` to write suggested fixes. The pull step is `scripts/pull-metadata.sh apple`. A large share of rejections live in the listing text.
 
+2d. Run the Apple Developer requirements monitor. Run `python3 ~/.claude/skills/app-store-compliance/scripts/monitor.py --project <project-path>` to monitor updates to 25 critical tracks against Apple Developer announcements, identify affected files, generate migration tasks, estimate release impact, and draft pull requests.
+
 3. Run the human checks the scanner cannot see, from `~/.claude/skills/app-store-compliance/docs/PRE-SUBMISSION-CHECKLIST.md`.
    - The production backend is live and stays up during review.
    - A working demo account exists, with no 2FA the reviewer cannot pass, not expired, pre populated with data.

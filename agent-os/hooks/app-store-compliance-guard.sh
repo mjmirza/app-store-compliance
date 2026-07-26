@@ -114,6 +114,13 @@ echo "Project. $DIR"
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND"
 echo ""
 
+# ----- run regulatory deadlines check -----
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [ -f "$REPO_ROOT/scripts/deadline-checker.py" ]; then
+  python3 "$REPO_ROOT/scripts/deadline-checker.py"
+  echo ""
+fi
+
 # ===== shared checks =====
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
