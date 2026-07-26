@@ -551,6 +551,56 @@
       "detection": "New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.",
       "signals": [],
       "fix": "Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules."
+    },
+    {
+      "id": "APPLE-ACC-VOICEOVER-EMPTY-LABEL",
+      "platform": "apple",
+      "guideline": "4.0",
+      "title": "Empty or nil accessibility label found in iOS code",
+      "severity": "critical",
+      "detection": "Empty label modifier (.accessibilityLabel(\"\")) or assignment (accessibilityLabel = \"\") in Swift or Objective-C sources.",
+      "signals": [".accessibilityLabel(\"\")", "accessibilityLabel = \"\""],
+      "fix": "Provide a descriptive, localized string for the accessibility label so screen readers can read it."
+    },
+    {
+      "id": "APPLE-ACC-DYNAMIC-TYPE",
+      "platform": "apple",
+      "guideline": "4.0",
+      "title": "Hardcoded system font size used without dynamic scaling",
+      "severity": "high",
+      "detection": "Hardcoded .system(size:) font declarations or systemFont(ofSize:) in UIKit/SwiftUI sources.",
+      "signals": [".system(size:", "systemFont(ofSize:"],
+      "fix": "Use relativeTo text styles or UIFontMetrics to ensure fonts scale with system Dynamic Type preferences."
+    },
+    {
+      "id": "GOOGLE-ACC-TALKBACK-EMPTY-DESC",
+      "platform": "google",
+      "guideline": "Accessibility",
+      "title": "Empty or null contentDescription found on interactive/image element",
+      "severity": "critical",
+      "detection": "Empty contentDescription in XML layout files or Compose Image controls.",
+      "signals": ["contentDescription = \"\"", "android:contentDescription=\"\""],
+      "fix": "Provide a descriptive, localized contentDescription string for interactive and graphical elements."
+    },
+    {
+      "id": "GOOGLE-ACC-FONTSCALING-DP",
+      "platform": "google",
+      "guideline": "Accessibility",
+      "title": "Hardcoded font size using dp, dip, or px instead of sp",
+      "severity": "critical",
+      "detection": "android:textSize set to a dp or px value in Android layout XML resources.",
+      "signals": ["android:textSize"],
+      "fix": "Use the scale-independent pixel (sp) unit for text sizes to respect system-wide font scaling preferences."
+    },
+    {
+      "id": "GOOGLE-ACC-SCANNER-SMALL-TARGET",
+      "platform": "google",
+      "guideline": "Accessibility",
+      "title": "Clickable control or button has touch target under 48dp",
+      "severity": "high",
+      "detection": "Layout size under 48dp on standard XML Button/ImageButton controls or custom clickable components.",
+      "signals": ["android:layout_width", "android:layout_height"],
+      "fix": "Enlarge touch targets to a minimum of 48dp by 48dp to assist users with motor skill difficulties."
     }
   ]
 }

@@ -227,6 +227,24 @@ if [ "$IS_AND" -eq 1 ]; then
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
 fi
 
+# ===== accessibility checks =====
+echo ""
+ACC_SCRIPT=""
+if [ -f "$DIR/scripts/accessibility-audit.py" ]; then
+  ACC_SCRIPT="$DIR/scripts/accessibility-audit.py"
+elif [ -f "$(dirname "$0")/../../scripts/accessibility-audit.py" ]; then
+  ACC_SCRIPT="$(dirname "$0")/../../scripts/accessibility-audit.py"
+fi
+
+if [ -n "$ACC_SCRIPT" ]; then
+  ACC_OUT="$(python3 "$ACC_SCRIPT" "$DIR" 2>&1)"
+  ACC_RC=$?
+  echo "$ACC_OUT"
+  if [ "$ACC_RC" -eq 2 ]; then
+    CRIT=$((CRIT+1))
+  fi
+fi
+
 # ===== summary and exit =====
 echo ""
 echo "Summary. critical=$CRIT high=$HIGH medium=$MED"
