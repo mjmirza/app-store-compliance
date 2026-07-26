@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+21 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -48,6 +48,23 @@ How to detect.
 
 ```bash
 grep -rn 'CKContainer\|CloudKit\|NSUbiquitousKeyValueStore' --include='*.swift' .   # then confirm the CloudKit schema is deployed to production in the CloudKit console
+```
+
+## WEB-GDPR-COMPLIANCE
+
+- Title. Processing web personal data without GDPR compliance controls
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. critical
+- What triggers it. Collecting or processing personal web data without explicit opt-in controls, privacy policy links, or right to be forgotten (delete) options.
+- How to fix it. Integrate standard GDPR compliance gates including explicit opt-in for data processing and a mechanism for data deletion.
+- Detection signals. processData, personalData, submitForm, registerWeb, webForm
+- Present means handled. GDPR, opt-in, privacyConsent, deletePersonalData, exportData
+
+How to detect.
+
+```bash
+grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\|opt-in\|privacyConsent\|deletePersonalData\|exportData' .
 ```
 
 ## APPLE-2.1-PLACEHOLDER-CONTENT
@@ -120,4 +137,201 @@ How to detect.
 
 ```bash
 use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
+```
+
+## WEB-LOCAL-STORAGE
+
+- Title. Unencrypted sensitive personal data stored in localStorage
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing sensitive details or JWT tokens in plain text in localStorage without encryption or user consent check.
+- How to fix it. Avoid storing plain sensitive personal info in localStorage, encrypt any stored tokens, and respect storage preferences.
+- Detection signals. localStorage.setItem, localStorage
+- Present means handled. encryptedStorage, encryptToken, consentLocalStorage, clearLocalStorage
+
+How to detect.
+
+```bash
+grep -rn 'localStorage.setItem\|localStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedStorage\|encryptToken\|consentLocalStorage\|clearLocalStorage' .
+```
+
+## WEB-SESSION-STORAGE
+
+- Title. Sensitive session details stored in sessionStorage without protection
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing raw authentication or session keys in sessionStorage without encryption or clean-up logic.
+- How to fix it. Limit and secure the data written to sessionStorage, apply encryption, and ensure data is deleted at session end.
+- Detection signals. sessionStorage.setItem, sessionStorage
+- Present means handled. encryptedSession, clearSessionStorage
+
+How to detect.
+
+```bash
+grep -rn 'sessionStorage.setItem\|sessionStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedSession\|clearSessionStorage' .
+```
+
+## WEB-INDEXEDDB
+
+- Title. Structured personal data stored in IndexedDB without security controls
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing user records in IndexedDB without user consent, encryption, or proper deletion lifecycles.
+- How to fix it. Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout.
+- Detection signals. indexedDB.open, indexedDB, createObjectStore
+- Present means handled. encryptDatabase, deleteDatabase, consentIndexedDB
+
+How to detect.
+
+```bash
+grep -rn 'indexedDB.open\|indexedDB\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\|deleteDatabase\|consentIndexedDB' .
+```
+
+## WEB-TRACKING-TECHNOLOGIES
+
+- Title. Third-party tracking technologies loaded without consent
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Integrating analytic pixels or tracking scripts (Google Analytics, Facebook Pixel, Hotjar) without consent validation.
+- How to fix it. Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent.
+- Detection signals. gtag, fbq, google-analytics, trackingPixel, analytics.js, hotjar
+- Present means handled. consentTracking, disableTracking, optOutTracking, trackingPreferences
+
+How to detect.
+
+```bash
+grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
+```
+
+## BOTH-SECURE-STORAGE
+
+- Title. Sensitive tokens or credentials stored in insecure unencrypted formats
+- Platform. both
+- Guideline or policy. Data Security
+- Severity. high
+- What triggers it. Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.
+- How to fix it. Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences.
+- Detection signals. UserDefaults.standard.set, getSharedPreferences
+
+How to detect.
+
+```bash
+grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|password\|credential\|secret\|jwt' && ! grep -rn 'Keychain\|SecItemAdd\|SecItemUpdate\|EncryptedSharedPreferences\|KeyStore\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent
+```
+
+## BOTH-UNSAFE-DEEPLINK
+
+- Title. Unsafe or unvalidated custom deep link URL schemes used for sensitive operations
+- Platform. both
+- Guideline or policy. Data Security
+- Severity. high
+- What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
+- How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
+- Detection signals. CFBundleURLSchemes, android:scheme
+- Present means handled. apple-app-site-association, assetlinks.json
+
+How to detect.
+
+```bash
+grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
+```
+
+## APPLE-ACCESSIBILITY-VOICEOVER
+
+- Title. VoiceOver support missing or incomplete
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.
+- How to fix it. Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned.
+- Detection signals. UIAccessibility, accessibilityLabel, accessibilityIdentifier, isAccessibilityElement
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+```
+
+## APPLE-ACCESSIBILITY-DYNAMICTYPE
+
+- Title. Dynamic Type support missing or overridden
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded font sizes or styles used without matching scaling or preferredFont APIs, or adjustsFontForContentSizeCategory set to false.
+- How to fix it. Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled.
+- Detection signals. UIFont.systemFont, preferredFont, adjustsFontForContentSizeCategory
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-DYNAMICTYPE
+```
+
+## APPLE-ACCESSIBILITY-REDUCEMOTION
+
+- Title. Reduce Motion accessibility setting ignored
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.
+- How to fix it. Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user.
+- Detection signals. isReduceMotionEnabled, accessibilityReduceMotion
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-REDUCEMOTION
+```
+
+## APPLE-ACCESSIBILITY-COLORCONTRAST
+
+- Title. Color Contrast and system settings ignored
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.
+- How to fix it. Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically.
+- Detection signals. isDarkerSystemColorsEnabled, darkerSystemColors
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-COLORCONTRAST
+```
+
+## APPLE-ACCESSIBILITY-HAPTICS
+
+- Title. Haptics tactile feedback missing on interactions
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Interactive elements, buttons, or custom controls lacking feedback generators or CoreHaptics calls.
+- How to fix it. Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback.
+- Detection signals. UIImpactFeedbackGenerator, UINotificationFeedbackGenerator, UISelectionFeedbackGenerator, CHHapticEngine
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-HAPTICS
+```
+
+## APPLE-ACCESSIBILITY-KEYBOARD
+
+- Title. Keyboard navigation and focus state support missing
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Custom text editors or complex navigation flows missing keyCommands, focusState, or focusable modifiers.
+- How to fix it. Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI.
+- Detection signals. keyCommands, UIKeyCommand, FocusState, focusable
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-KEYBOARD
 ```

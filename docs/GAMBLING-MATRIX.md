@@ -26,6 +26,7 @@ Two rules sit above the whole matrix.
 | Category | Treatment | What you must do |
 |---|---|---|
 | Real money casino and betting | Licensed and geo restricted per country, free to download | Hold the license per region, restrict to licensed regions, free download |
+| Brazil fixed-odds betting (sports & virtual) | Regulated by the Secretariat of Prizes and Bets (SPA); license required for distribution in Brazil (enforced since May 8, 2026) | Provide a valid SPA license in the App Review Information section, submit a new app version for verification, and set the age rating to A18. |
 | Social casino and simulated gambling | A distinct category from real money, with its own age rating, allowed more widely but still rated | Rate it correctly, no real money payout |
 | Sweepstakes and dual currency sweeps coins | Frequently treated as gambling depending on the prize and consideration | Get legal review per market, geo restrict where it counts as gambling |
 | Cash prize skill tournaments and daily fantasy | Often regulated as gambling or as a regulated contest per state or country | License or restrict per jurisdiction |

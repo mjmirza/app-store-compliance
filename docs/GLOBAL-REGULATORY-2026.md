@@ -4,9 +4,11 @@ This document is the non-EU legal layer for App Store and Google Play compliance
 
 Every item is a HARD rule for any app that reaches users in the named market. Each carries a date and a source. Apple-backed items cite developer.apple.com so the reference stays Apple-anchored. Many US and global dates are under active litigation or legislative delay, so treat each effective date as the statutory date subject to injunction or amendment, and re-verify against the cited source before relying on it. Items that could not be confirmed against a primary source are labelled unverified in the last section.
 
-## 1. Apple's cross-region age-assurance spine (Apple-backed, check this first)
+## 1. Storefront-backed age-assurance spines (Apple and Google-backed)
 
-Several national and US-state laws are operated through Apple's own age-assurance machinery, so an audit checks this layer first.
+Several national and US-state laws are operated through storefront-specific age-assurance machinery, so an audit checks this layer first.
+
+### 1.1 Apple's cross-region age-assurance spine
 
 - Declared Age Range API. It returns a user's age band, not a birthdate, plus a signal for how age was confirmed (`governmentIDChecked`, `paymentChecked`, `selfDeclared`, `guardianDeclared`). The entitlement is `com.apple.developer.declared-age-range`. Version map. iOS and iPadOS 26 add the base self-declared and guardian-declared range. 26.2 adds verification methods and PermissionKit. 26.4 adds regulatory-requirement signals and a parental-acknowledgement sheet for a major app update. Full features build against the iOS 26.2 SDK with Xcode 26.2 or later. The API is available worldwide. Sources. [Apple age assurance](https://developer.apple.com/support/age-assurance/), [Apple Declared Age Range](https://developer.apple.com/documentation/declaredagerange/).
 - Apple names no specific law on the age-assurance page. it says "in certain regions, where legally required" and "consult your legal counsel". The country and state list lives in Apple's dated news posts, not the evergreen page. An audit must not read the region list off the support page.
@@ -25,6 +27,22 @@ Per-region storefront dates Apple has published.
 | Singapore | 24 February 2026 | 18-plus download block | not named |
 
 Sources. [Apple region age requirements](https://developer.apple.com/news/?id=f5zj08ey), [Apple Texas SB 2420](https://developer.apple.com/news/?id=btkirlj8).
+
+### 1.2 Google Play Age Signals API (v3 / beta)
+
+To help developers meet compliance obligations under age verification laws in jurisdictions such as Texas, Utah, Louisiana, and Brazil, Google Play provides a runtime client-side age signal interface.
+
+- **Purpose and Scope**: The Play Age Signals API retrieves age-related signals for users, notifies Google Play of significant app changes requiring parental approval, and receives notifications about revoked approvals. It only returns data for users based in regions where Play is required by law to provide age category data.
+- **Terms of Service (ToS)**: Usage is heavily restricted. Developers may only use information from the Play Age Signals API to provide age-appropriate content and experiences in compliance with laws. You **MUST NOT** use the API for any other purpose including, but not limited to, advertising, marketing, user profiling, or analytics. Misuse will result in the termination of API access and immediate app suspension or takedown.
+- **Integration & Dependency**: Integrate using `com.google.android.play:age-signals:0.0.3` (or subsequent versions). Supported on Android 6.0 (API level 23) and higher.
+- **Bands**: Default returned categories are 0-12, 13-15, 16-17, and 18+ (custom age ranges can also be received). Cached age signals are updated by Play within 2 to 8 weeks after the user's birthday.
+- **Data Safety**: No user data is collected, stored, or shared by the client-side library itself. Google Play's background services handle data governed by the Google Play ToS.
+- **Rollout Timeline**:
+  - **Brazil**: Started rolling out on March 17, 2026, to meet requirements under Brazil's Digital ECA.
+  - **Texas**: Started returning signals on May 28, 2026, for users who created accounts after that date to comply with Texas SB2420.
+  - Ongoing updates are provided for other US states (Utah, Louisiana).
+
+Sources. [Google Play Age Signals overview](https://developer.android.com/google/play/age-signals/v3/overview), [Use Play Age Signals API (beta)](https://developer.android.com/google/play/age-signals/v3/use-age-signals-api), [Google Play Developer Help](https://support.google.com/googleplay/android-developer/answer/16569691).
 
 ## 2. United States
 
@@ -53,7 +71,7 @@ These put duties on both the store and the developer, separate from broader soci
 | Louisiana | HB 570 | 30 June 2025 | delayed one year to 1 July 2027 |
 | Alabama | HB 161 | 9 March 2026 | 2027, exact date unverified |
 
-Common developer duties. request and receive an age category from the store. confirm whether verifiable parental consent exists for a minor account before use. assign an accurate age and suitability rating. re-request consent on a major change. limit use of age and consent data to compliance and delete it after verification (Texas is explicit on deletion). Sources. [Utah SB 142](https://le.utah.gov/~2025/bills/static/SB0142.html), [FPF comparison of the ASAAs](https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/), [Wiley ASAA developments](https://www.wiley.law/alert-Key-Developments-With-State-App-Store-Accountability-Acts-as-Texas-Act-Takes-Effect).
+Common developer duties. request and receive an age category from the store. confirm whether verifiable parental consent exists for a minor account before use. assign an accurate age and suitability rating. re-request consent on a major change. limit use of age and consent data to compliance and delete it after verification (Texas is explicit on deletion). For Android apps, Google Play supports this via the Play Age Signals API, which began returning signals for eligible Texas accounts created after May 28, 2026. Sources. [Utah SB 142](https://le.utah.gov/~2025/bills/static/SB0142.html), [FPF comparison of the ASAAs](https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/), [Wiley ASAA developments](https://www.wiley.law/alert-Key-Developments-With-State-App-Store-Accountability-Acts-as-Texas-Act-Takes-Effect).
 
 Apple discrepancy to flag. Apple's storefront date for Louisiana is 1 July 2026, while the statute was delayed to 1 July 2027. An audit flags the gap rather than assuming either date. Sources. [Apple region age requirements](https://developer.apple.com/news/?id=f5zj08ey), [Alston on the Louisiana delay](https://www.alstonprivacy.com/louisiana-delays-app-store-accountability-effective-date-to-july-2027/).
 
@@ -114,6 +132,7 @@ Common app duties. a privacy notice, an opt-out of targeted advertising, sale, a
 
 - Digital ECA (Law 15,211/2025), enforceable from 17 March 2026, on top of the LGPD and enforced by the ANPD. Accepted age-verification methods include document verification, facial age estimation, facial matching, and a CPF database check. a self-declaration checkbox no longer counts. The ANPD 2026 enforcement plan prioritises app stores and operating systems as gatekeepers. Penalty up to 50 million reais per violation or 10 percent of Brazilian revenue. Sources. [Digital ECA timeline](https://inplp.com/latest-news/article/the-digital-eca-brazils-new-age-verification-framework-and-enforcement-timeline/).
 - Apple blocks 18-plus downloads in Brazil from 24 February 2026, and loot-box apps auto-rate 18-plus on the Brazil storefront.
+- Google Play rolled out support for the Digital ECA on March 17, 2026, returning age signals for eligible Brazilian users through the Play Age Signals API.
 
 ### 3.4 Canada
 
@@ -166,6 +185,21 @@ Common app duties. a privacy notice, an opt-out of targeted advertising, sale, a
 ## 6. Sources and verification note
 
 Apple facts cite developer.apple.com and apple.com. US federal dates cite the Federal Register and the FTC. state and global facts cite the legislature, the regulator, or a reputable law-firm source, cross-checked where a government page could not be machine-read.
+
+### Source Trust Hierarchy
+
+All sources used for establishing regulatory requirements must adhere to the following priority guidelines:
+
+- Priority 1 (Primary Official): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
+- Priority 2 (Highly Reputable News): Reuters, AP (Associated Press), Bloomberg.
+- Priority 3 (Academic): Academic papers and peer-reviewed journals.
+- Priority 4 (Industry): Industry blogs and vendor publications.
+- Priority 5 (Social & Unverified): LinkedIn, Reddit, Twitter, and AI generated summaries.
+
+### Compliance Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
 
 Marked unverified, confirm against the primary source before relying on a figure. the South Korea PIPA effective date and the CEO-liability and 10-percent-turnover specifics. the Alabama HB 161 exact effective date. the exact Declared Age Range enum brackets (the Apple doc page renders as a client-side app that resisted an automated read, so the bands rest on Apple's Texas worked example). the California AADC partial-enforcement start date. the exact per-state Global Privacy Control required list and the 2026 penalty figures. the Australia Children's Online Privacy Code date. the Canada federal reform bill status. and the Google Android developer-verification rollout scope.
 

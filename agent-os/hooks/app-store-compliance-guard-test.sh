@@ -53,6 +53,35 @@ mk_ios_precision_real() {
   echo "$d"
 }
 
+mk_ios_bad_nutrition() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  printf '<plist><dict></dict></plist>' > "$d/App/Info.plist"
+  printf 'import Foundation\nlet email = "test@example.com"\n' > "$d/App/X.swift"
+  echo "$d"
+}
+
+mk_android_bad_privacy() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/app/src/main"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="com.google.android.gms.permission.AD_ID"/><uses-permission android:name="android.permission.READ_STEPS"/></manifest>' > "$d/app/src/main/AndroidManifest.xml"
+  printf 'android { defaultConfig { targetSdkVersion 34 } }\n' > "$d/app/build.gradle"
+  printf 'class MyActivity { void test() { requestPermissions(new String[]{"camera"}, 1); HealthConnectClient client = null; contacts = "john"; } }\n' > "$d/app/src/main/MyActivity.java"
+  echo "$d"
+}
+
+mk_web_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d"
+  printf '{"name": "test-web"}' > "$d/package.json"
+  printf '<html><body><script>localStorage.setItem("token", "secret"); sessionStorage.setItem("session", "xyz"); indexedDB.open("db"); gtag("event", "test"); document.cookie = "user=john"; processData("sensitivedata");</script></body></html>' > "$d/index.html"
+  echo "$d"
+}
+
+mk_web_clean() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d"
+  printf '{"name": "test-web"}' > "$d/package.json"
+  printf '<html><body><script>encryptedStorage("token"); clearSessionStorage(); encryptDatabase(); consentTracking(); cookieBanner(); GDPR();</script></body></html>' > "$d/index.html"
+  echo "$d"
+}
+
 # 1 positive. iOS with violations blocks
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "iOS violations block (exit 2, has CRITICAL)" || bad "iOS violations block"
@@ -108,6 +137,38 @@ for pat in STAGING-BACKEND MISSING-USAGE-DESCRIPTION BOTH-PLACEHOLDER MISSING-AT
   echo "$OUT" | grep -q "$pat" || MISS="$MISS $pat"
 done
 [ -z "$MISS" ] && ok "No blind spot: release localhost, no-usage location, AdjustConfig, lorem ipsum all still fire" || bad "No blind spot: missed$MISS"
+rm -rf "$D"
+
+# 12 Apple Privacy Nutrition Labels violation blocks
+D="$(mk_ios_bad_nutrition)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-PRIVACY-NUTRITION-LABELS' && ok "Apple missing nutrition labels blocks" || bad "Apple missing nutrition labels blocks"
+rm -rf "$D"
+
+# 13 Android user disclosures, AD_ID, runtime permission checks, health permissions block
+D="$(mk_android_bad_privacy)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+MISS_AND=""
+for pat in ANDROID-USER-DATA-DISCLOSURE ANDROID-ADVERTISING-ID ANDROID-RUNTIME-PERMISSIONS ANDROID-HEALTH-PERMISSIONS; do
+  echo "$OUT" | grep -q "$pat" || MISS_AND="$MISS_AND $pat"
+done
+[ -z "$MISS_AND" ] && ok "Android bad privacy checks all fire" || bad "Android bad privacy checks missed:$MISS_AND"
+rm -rf "$D"
+
+# 14 Web bad privacy checks (GDPR, cookie, localStorage, sessionStorage, IndexedDB, tracking)
+D="$(mk_web_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+MISS_WEB=""
+for pat in WEB-GDPR-COMPLIANCE WEB-COOKIE-CONSENT WEB-LOCAL-STORAGE WEB-SESSION-STORAGE WEB-INDEXEDDB WEB-TRACKING-TECHNOLOGIES; do
+  echo "$OUT" | grep -q "$pat" || MISS_WEB="$MISS_WEB $pat"
+done
+[ -z "$MISS_WEB" ] && [ "$RC" -eq 2 ] && ok "Web bad privacy checks all fire (exit 2)" || bad "Web bad privacy checks missed:$MISS_WEB or wrong exit code ($RC)"
+rm -rf "$D"
+
+# 15 Web clean privacy checks pass
+D="$(mk_web_clean)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q 'WEB-'; then
+  ok "Web clean privacy passes (exit 0)"
+else
+  bad "Web clean privacy passes (got $RC) :: $(echo "$OUT" | grep -E 'WEB-')"
+fi
 rm -rf "$D"
 
 echo ""

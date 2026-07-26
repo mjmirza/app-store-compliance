@@ -106,11 +106,15 @@ A health app completes the Health Apps Declaration (the Health Connect declarati
 
 Sources. [Play Console Health content and services](https://support.google.com/googleplay/android-developer/answer/16679511?hl=en), [Play Console Health Connect permissions](https://support.google.com/googleplay/android-developer/answer/12991134?hl=en).
 
-### 2.8 Real-money games
+### 2.8 Real-money games and Brazilian betting license (HARD)
 
-Google historically allowed real-money games only where a government licensing regime exists. a 2024 pilot opened a program for real-money games not covered by an existing regime (first in India, Mexico, Brazil), then Google paused the expansion of new types citing the absence of a central approval authority in some regions. India moved toward a developer self-declaration model in mid-2025, status evolving. Verify a real-money-game app is in a supported country with an accepted license or a valid self-declaration, with the real-money-game declarations, age-gating, geo-restriction, and the correct service-fee model in place.
+- **Google Real-Money Games**: Google historically allowed real-money games only where a government licensing regime exists. a 2024 pilot opened a program for real-money games not covered by an existing regime (first in India, Mexico, Brazil), then Google paused the expansion of new types citing the absence of a central approval authority in some regions. India moved toward a developer self-declaration model in mid-2025, status evolving. Verify a real-money-game app is in a supported country with an accepted license or a valid self-declaration, with the real-money-game declarations, age-gating, geo-restriction, and the correct service-fee model in place.
+- **Apple Brazilian Betting License (May 8, 2026)**: Following changes to Brazil's fixed-odds betting regulation, apps with fixed-odds betting (gambling) features can only be distributed on the App Store in Brazil with a valid fixed-odds betting license from the **Secretariat of Prizes and Bets (SPA)**.
+  - Answering "Yes" to the gambling question in the age rating questionnaire in App Store Connect will automatically set the app's Brazil age rating to **A18**.
+  - To trigger the license verification process, **a new app version must be submitted** for review; simply updating the App Review Information section in App Store Connect alone is insufficient and will not start the verification review.
+  - License information must be explicitly provided in the App Review Information section during the submission of the new version.
 
-Sources. [Google real-money games approach](https://android-developers.googleblog.com/2024/01/a-new-approach-to-real-money-games-on-google-play.html), [Google pauses RMG expansion (NEXT.io)](https://next.io/news/regulation/google-halts-rmg-expansion-on-play-store/).
+Sources. [Google real-money games approach](https://android-developers.googleblog.com/2024/01/a-new-approach-to-real-money-games-on-google-play.html), [Google pauses RMG expansion (NEXT.io)](https://next.io/news/regulation/google-halts-rmg-expansion-on-play-store/), Apple Developer News, "Brazilian betting license requirement for App Store availability" (May 8, 2026).
 
 ### 2.9 Media permissions, exact alarm, package visibility, and account-deletion URL
 
@@ -200,6 +204,21 @@ Verify. if the app takes EU or UK card payments for real goods, SCA and 3D Secur
 ## 5. Sources and verification note
 
 Apple facts cite developer.apple.com. Android and Google Play facts cite developer.android.com and the Play Console help. legal facts cite the statute, the regulator, or the standards body. Where a government or Apple page rendered as a client-side app that resisted an automated read, the fact was cross-checked across reputable sources and is flagged here.
+
+### Source Trust Hierarchy
+
+All sources used for establishing regulatory requirements must adhere to the following priority guidelines:
+
+- Priority 1 (Primary Official): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
+- Priority 2 (Highly Reputable News): Reuters, AP (Associated Press), Bloomberg.
+- Priority 3 (Academic): Academic papers and peer-reviewed journals.
+- Priority 4 (Industry): Industry blogs and vendor publications.
+- Priority 5 (Social & Unverified): LinkedIn, Reddit, Twitter, and AI generated summaries.
+
+### Compliance Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
 
 Marked unverified, confirm against the primary source before relying on a figure. the 2026 Android target API 36 date (widely reported, consistent with the annual release pattern, but the official target-sdk page still showed the 2025 text at fetch time). the exact `codesign`, `notarytool`, and `stapler` command strings (corroborated across sources, not copied from a rendered Apple page). the exact visionOS, watchOS, and tvOS per-device screenshot pixel dimensions (pull live from the App Store Connect screenshot page). the exact date Apple's Accessibility Nutrition Labels become mandatory (Apple says over time, no date published). the Google real-money-games India final rollout status. the EU CSA Regulation final form (in trilogue). the US BIS annual self-classification report specifics. and the PSD3 timing.
 

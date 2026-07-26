@@ -1,6 +1,6 @@
 # Rules. Privacy and data
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+14 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-5.1.1-MISSING-PRIVACY-POLICY
 
@@ -82,6 +82,23 @@ How to detect.
 
 ```bash
 find . -name 'PrivacyInfo.xcprivacy' | grep -q . || echo 'MISSING PrivacyInfo.xcprivacy'; find . -path '*/*.framework/*' -name 'PrivacyInfo.xcprivacy'   # each bundled SDK should ship one
+```
+
+## WEB-COOKIE-CONSENT
+
+- Title. Setting non-essential cookies without prior cookie consent
+- Platform. web
+- Guideline or policy. ePrivacy Directive
+- Severity. critical
+- What triggers it. Writing to document.cookie or cookieStore without checking if the user accepted cookies via a cookie consent banner.
+- How to fix it. Implement a compliant Cookie Consent banner that blocks non-essential cookies until the user gives explicit consent.
+- Detection signals. document.cookie, setCookie, cookieStore, js-cookie, cookieConsent
+- Present means handled. cookieBanner, cookieConsentBanner, acceptCookies, cookiePreferences
+
+How to detect.
+
+```bash
+grep -rn 'document.cookie\|setCookie\|cookieStore\|js-cookie\|cookieConsent' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'cookieBanner\|cookieConsentBanner\|acceptCookies\|cookiePreferences' .
 ```
 
 ## APPLE-5.1.1-VAGUE-PURPOSE-STRING
@@ -197,4 +214,21 @@ How to detect.
 
 ```bash
 grep -rni 'phone\|gender\|marital\|date.of.birth\|birthdate\|address' --include='*.swift' . | grep -i 'required\|validator\|isRequired'
+```
+
+## APPLE-PRIVACY-NUTRITION-LABELS
+
+- Title. Missing Privacy Nutrition Labels data type declarations
+- Platform. apple
+- Guideline or policy. 5.1.1
+- Severity. high
+- What triggers it. Collecting sensitive user data (e.g. email, phone, name, coordinates) but missing the privacyNutritionLabels declaration or proper nutrition disclosure references.
+- How to fix it. Update the app privacy manifest (PrivacyInfo.xcprivacy) with NSPrivacyCollectedDataTypes and complete corresponding Nutrition Labels in App Store Connect.
+- Detection signals. email, phoneNumber, userName, location, coordinates
+- Present means handled. NSPrivacyCollectedDataTypes, privacyNutritionLabels, privacy-nutrition-labels
+
+How to detect.
+
+```bash
+grep -rn 'email\|phoneNumber\|userName\|location\|coordinates' --include='*.swift' . && ! grep -rn 'NSPrivacyCollectedDataTypes\|privacyNutritionLabels\|privacy-nutrition-labels' .
 ```
