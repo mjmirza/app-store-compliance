@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-13 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+15 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -205,4 +205,37 @@ How to detect.
 
 ```bash
 grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
+```
+
+## BOTH-SECURE-STORAGE
+
+- Title. Sensitive tokens or credentials stored in insecure unencrypted formats
+- Platform. both
+- Guideline or policy. Data Security
+- Severity. high
+- What triggers it. Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.
+- How to fix it. Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences.
+- Detection signals. UserDefaults.standard.set, getSharedPreferences
+
+How to detect.
+
+```bash
+grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|password\|credential\|secret\|jwt' && ! grep -rn 'Keychain\|SecItemAdd\|SecItemUpdate\|EncryptedSharedPreferences\|KeyStore\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent
+```
+
+## BOTH-UNSAFE-DEEPLINK
+
+- Title. Unsafe or unvalidated custom deep link URL schemes used for sensitive operations
+- Platform. both
+- Guideline or policy. Data Security
+- Severity. high
+- What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
+- How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
+- Detection signals. CFBundleURLSchemes, android:scheme
+- Present means handled. apple-app-site-association, assetlinks.json
+
+How to detect.
+
+```bash
+grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
 ```

@@ -20,6 +20,16 @@ Treat every unchecked box as a release blocker. Run this before any upload to Ap
 - [ ] Users can withdraw consent and the app still works for non core features.
 - [ ] Every third party SDK and its data behavior is known and declared.
 
+### Mobile Security and Best Practices
+For a deep-dive reference across platform best practices, see `docs/MOBILE-SECURITY-2026.md`.
+- [ ] **Secure Storage:** Sensitive items (session tokens, passwords, keys) are stored securely (iOS Keychain or Android EncryptedSharedPreferences/Keystore) and never in plaintext files, plain SharedPreferences, or unencrypted local databases.
+- [ ] **Biometrics:** Biometric login (FaceID, TouchID, BiometricPrompt) is crypto-backed, requiring biometric validation to unlock a secure cryptographic key rather than just returning a bypassable boolean.
+- [ ] **Jailbreak and Root Detection:** Device environment check is implemented locally (and backed by Google Play Integrity on Android) to block or gracefully degrade app features when run on compromised/rooted/jailbroken devices.
+- [ ] **Certificate Pinning and SSL:** SSL/TLS cleartext traffic is completely disabled. Public key pinning (SPKI hashes) is implemented on critical endpoints with valid backup pins configured.
+- [ ] **Backup Exclusion:** Sensitive private directory files (database files, token preferences) are explicitly excluded from automatic iOS iCloud/iTunes backups and Android ADB/Google Drive backups.
+- [ ] **Deep Link and URL Schemes Verification:** Inputs from deep links, Universal Links, and App Links are treated as untrusted, sanitized, and thoroughly validated. Secure Universal Links (iOS) and verified App Links (Android) are used instead of easily hijackable custom schemes.
+- [ ] **Secure Auth and Session Flows:** Standard modern flows like OAuth 2.1 or OIDC with PKCE are used without hardcoded client secrets. Session timeouts are enforced, and all local tokens, databases, and caches are thoroughly destroyed on logout or session expiration.
+
 ### Metadata and listing
 - [ ] The app name, description, and screenshots match what the app actually does.
 - [ ] Screenshots show the app in use, not a splash or login screen.

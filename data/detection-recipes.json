@@ -59,6 +59,9 @@
     "WEB-LOCAL-STORAGE": "grep -rn 'localStorage.setItem\\|localStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedStorage\\|encryptToken\\|consentLocalStorage\\|clearLocalStorage' .",
     "WEB-SESSION-STORAGE": "grep -rn 'sessionStorage.setItem\\|sessionStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedSession\\|clearSessionStorage' .",
     "WEB-INDEXEDDB": "grep -rn 'indexedDB.open\\|indexedDB\\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\\|deleteDatabase\\|consentIndexedDB' .",
-    "WEB-TRACKING-TECHNOLOGIES": "grep -rn 'gtag\\|fbq\\|google-analytics\\|trackingPixel\\|analytics.js\\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\\|disableTracking\\|optOutTracking\\|trackingPreferences' ."
+    "WEB-TRACKING-TECHNOLOGIES": "grep -rn 'gtag\\|fbq\\|google-analytics\\|trackingPixel\\|analytics.js\\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\\|disableTracking\\|optOutTracking\\|trackingPreferences' .",
+    "BOTH-SECURE-STORAGE": "grep -rn 'UserDefaults.standard.set\\|getSharedPreferences' . | grep -i 'token\\|password\\|credential\\|secret\\|jwt' && ! grep -rn 'Keychain\\|SecItemAdd\\|SecItemUpdate\\|EncryptedSharedPreferences\\|KeyStore\\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent",
+    "ANDROID-INSECURE-BACKUP": "grep -rn 'allowBackup=\"true\"' . && ! grep -rn 'dataExtractionRules\\|fullBackupContent\\|allowBackup=\"false\"' .",
+    "BOTH-UNSAFE-DEEPLINK": "grep -rn 'CFBundleURLSchemes\\|android:scheme' . && ! grep -rn 'apple-app-site-association\\|assetlinks.json' ."
   }
 }
