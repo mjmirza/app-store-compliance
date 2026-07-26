@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+22 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## GOOGLE-DATASAFETY-MISMATCH
 
@@ -98,6 +98,56 @@ How to detect.
 grep -rn 'com.google.android.gms.ads\|applovin\|unity.*ads\|ironsource' --include='*.gradle' . && grep -rni 'children\|families\|kids' --include='AndroidManifest.xml' .
 ```
 
+## GOOGLE-PLAY-AGE-SIGNALS-MISUSE
+
+- Title. Misuse of Play Age Signals API
+- Platform. google
+- Guideline or policy. User Data
+- Severity. critical
+- What triggers it. Usage of the Play Age Signals API (com.google.android.play:age-signals) in conjunction with advertising, marketing, user profiling, or analytics libraries, which violates Google Play's strict Terms of Service.
+- How to fix it. Ensure that information from the Play Age Signals API is solely used to provide age-appropriate content and experiences in compliance with laws. Do not use the API or its returned signals for advertising, marketing, user profiling, or analytics.
+- Detection signals. com.google.android.play:age-signals, AgeSignalsManager, AgeSignalsRequest
+
+How to detect.
+
+```bash
+grep -rn 'com.google.android.play:age-signals\|AgeSignalsManager\|AgeSignalsRequest' --include='*.gradle' --include='*.kts' --include='*.kt' --include='*.java' .   # if present, confirm age signals are never passed to ad, marketing, profiling, or analytics SDKs
+```
+
+## ANDROID-USER-DATA-DISCLOSURE
+
+- Title. Missing prominent disclosure for sensitive user data
+- Platform. google
+- Guideline or policy. User Data
+- Severity. critical
+- What triggers it. Collecting personal user data (e.g. contacts, SMS, device accounts, files) without a prominent disclosure and explicit user consent block.
+- How to fix it. Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent.
+- Detection signals. contacts, SMS, device accounts, files, personalData
+- Present means handled. prominent disclosure, user consent, privacy consent, accept policy
+
+How to detect.
+
+```bash
+grep -rn 'contacts\|SMS\|device accounts\|files\|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\|user consent\|privacy consent\|accept policy' .
+```
+
+## ANDROID-HEALTH-PERMISSIONS
+
+- Title. Health or fitness data access without Health Connect declaration
+- Platform. google
+- Guideline or policy. Permissions and APIs
+- Severity. critical
+- What triggers it. Accessing Health Connect client or querying health permissions (e.g. steps, heart rate) without proper declaration or dedicated health privacy policy.
+- How to fix it. Declare Health Connect permissions, complete the console Health Connect form, and maintain a dedicated health privacy policy.
+- Detection signals. HealthConnectClient, com.google.android.gms.permission.HealthConnect, READ_STEPS, READ_HEART_RATE
+- Present means handled. healthConnectConsent, healthPrivacyPolicy, Health Connect
+
+How to detect.
+
+```bash
+grep -rn 'HealthConnectClient\|com.google.android.gms.permission.HealthConnect\|READ_STEPS\|READ_HEART_RATE' --include='*.kt' --include='*.java' --include='AndroidManifest.xml' . && ! grep -rn 'healthConnectConsent\|healthPrivacyPolicy\|Health Connect' .
+```
+
 ## GOOGLE-TARGET-API
 
 - Title. App does not target the current required API level
@@ -178,4 +228,119 @@ How to detect.
 
 ```bash
 grep -rn 'SYSTEM_ALERT_WINDOW\|TYPE_APPLICATION_OVERLAY' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' .
+```
+
+## ANDROID-ADVERTISING-ID
+
+- Title. Google Play Advertising ID usage without disclosure or opt-out
+- Platform. google
+- Guideline or policy. User Data
+- Severity. high
+- What triggers it. Using com.google.android.gms.permission.AD_ID permission or querying GAID but lacking opt-out support or user deletion pathways in code/privacy policy.
+- How to fix it. Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy.
+- Detection signals. com.google.android.gms.permission.AD_ID, AD_ID, getAdvertisingIdInfo
+- Present means handled. opt-out, reset AD_ID, advertisingIdConsent, delete AD_ID
+
+How to detect.
+
+```bash
+grep -rn 'com.google.android.gms.permission.AD_ID\|AD_ID\|getAdvertisingIdInfo' --include='AndroidManifest.xml' --include='*.kt' --include='*.java' . && ! grep -rn 'opt-out\|reset AD_ID\|advertisingIdConsent\|delete AD_ID' .
+```
+
+## ANDROID-RUNTIME-PERMISSIONS
+
+- Title. Sensitive runtime permissions requested without validation
+- Platform. google
+- Guideline or policy. Permissions and APIs
+- Severity. high
+- What triggers it. Requesting critical permissions (camera, contacts, storage) without dynamic checks or explicit explanation/rationale to the user.
+- How to fix it. Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully.
+- Detection signals. requestPermissions, checkSelfPermission, shouldShowRequestPermissionRationale
+- Present means handled. permission explanation, showPermissionRationale, explainPermission
+
+How to detect.
+
+```bash
+grep -rn 'requestPermissions\|checkSelfPermission\|shouldShowRequestPermissionRationale' --include='*.kt' --include='*.java' . && ! grep -rn 'permission explanation\|showPermissionRationale\|explainPermission' .
+```
+
+## ANDROID-INSECURE-BACKUP
+
+- Title. Android backup is enabled without filtering sensitive data
+- Platform. google
+- Guideline or policy. Device and Network Abuse
+- Severity. high
+- What triggers it. android:allowBackup is set to true in AndroidManifest.xml without setting data extraction rules to exclude credentials/databases.
+- How to fix it. Disable backups with allowBackup="false", or configure dataExtractionRules / fullBackupContent to exclude sensitive credentials and SQLite databases.
+- Detection signals. allowBackup="true"
+- Present means handled. dataExtractionRules, fullBackupContent, allowBackup="false"
+
+How to detect.
+
+```bash
+grep -rn 'allowBackup="true"' . && ! grep -rn 'dataExtractionRules\|fullBackupContent\|allowBackup="false"' .
+```
+
+## ANDROID-ACCESSIBILITY-TALKBACK
+
+- Title. TalkBack support missing or disabled
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Views or graphic components missing contentDescription or setting importantForAccessibility inappropriately.
+- How to fix it. Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly.
+- Detection signals. contentDescription, importantForAccessibility
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-TALKBACK
+```
+
+## ANDROID-ACCESSIBILITY-FONTSCALING
+
+- Title. Font scaling disabled due to dp text sizing
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded text sizes specified in dp instead of sp in Android XML layouts or Jetpack Compose files.
+- How to fix it. Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly.
+- Detection signals. textSize, dp
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-FONTSCALING
+```
+
+## ANDROID-ACCESSIBILITY-HIGHCONTRAST
+
+- Title. Hardcoded colors ignoring high contrast settings
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Hardcoded hex color strings in layout files or hardcoded Color objects in Compose without using theme attributes.
+- How to fix it. Reference semantic colors or color resources so the app automatically respects high contrast themes.
+- Detection signals. color, textColor, Color(0xFF
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-HIGHCONTRAST
+```
+
+## ANDROID-ACCESSIBILITY-SCANNER
+
+- Title. Touch target sizes below 48dp
+- Platform. google
+- Guideline or policy. User Experience - Accessibility
+- Severity. medium
+- What triggers it. Clickable items or buttons defined with layout_width, layout_height, or padding that results in touch targets smaller than 48dp.
+- How to fix it. Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight.
+- Detection signals. clickable, onClick, 48dp, 48.dp
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-SCANNER
 ```

@@ -201,6 +201,21 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 
 The inline links above are the primary and secondary sources. The authoritative pages to re-check for currency are the Apple developer support pages (DMA, external offers, Core Technology Fee, DSA trader, age ratings, upcoming requirements), the EU Commission digital-strategy pages, EUR-Lex for the regulation texts, and artificialintelligenceact.eu for the AI Act article texts.
 
+### Source Trust Hierarchy
+
+All sources used for establishing regulatory requirements must adhere to the following priority guidelines:
+
+- Priority 1 (Primary Official): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
+- Priority 2 (Highly Reputable News): Reuters, AP (Associated Press), Bloomberg.
+- Priority 3 (Academic): Academic papers and peer-reviewed journals.
+- Priority 4 (Industry): Industry blogs and vendor publications.
+- Priority 5 (Social & Unverified): LinkedIn, Reddit, Twitter, and AI generated summaries.
+
+### Compliance Pull Request Rules
+
+- Never trust secondary sources before official sources.
+- Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
+
 ## 9. Verification and honesty note
 
 Confidence is high on the core dates and the sourced facts. Confirmed against primary or law-firm sources. the AI Act timeline and Article 50 and Article 99 figures, the DMA 500,000,000 euro fine dated 23 April 2025, Apple's DSA trader fields and the 17 February 2025 removal, the EAA date of 28 June 2025 and EN 301 549 and WCAG 2.1 AA, and the Apple 2025-2026 guideline and deadline dates.

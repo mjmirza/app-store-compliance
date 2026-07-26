@@ -20,6 +20,16 @@ Treat every unchecked box as a release blocker. Run this before any upload to Ap
 - [ ] Users can withdraw consent and the app still works for non core features.
 - [ ] Every third party SDK and its data behavior is known and declared.
 
+### Mobile Security and Best Practices
+For a deep-dive reference across platform best practices, see `docs/MOBILE-SECURITY-2026.md`.
+- [ ] **Secure Storage:** Sensitive items (session tokens, passwords, keys) are stored securely (iOS Keychain or Android EncryptedSharedPreferences/Keystore) and never in plaintext files, plain SharedPreferences, or unencrypted local databases.
+- [ ] **Biometrics:** Biometric login (FaceID, TouchID, BiometricPrompt) is crypto-backed, requiring biometric validation to unlock a secure cryptographic key rather than just returning a bypassable boolean.
+- [ ] **Jailbreak and Root Detection:** Device environment check is implemented locally (and backed by Google Play Integrity on Android) to block or gracefully degrade app features when run on compromised/rooted/jailbroken devices.
+- [ ] **Certificate Pinning and SSL:** SSL/TLS cleartext traffic is completely disabled. Public key pinning (SPKI hashes) is implemented on critical endpoints with valid backup pins configured.
+- [ ] **Backup Exclusion:** Sensitive private directory files (database files, token preferences) are explicitly excluded from automatic iOS iCloud/iTunes backups and Android ADB/Google Drive backups.
+- [ ] **Deep Link and URL Schemes Verification:** Inputs from deep links, Universal Links, and App Links are treated as untrusted, sanitized, and thoroughly validated. Secure Universal Links (iOS) and verified App Links (Android) are used instead of easily hijackable custom schemes.
+- [ ] **Secure Auth and Session Flows:** Standard modern flows like OAuth 2.1 or OIDC with PKCE are used without hardcoded client secrets. Session timeouts are enforced, and all local tokens, databases, and caches are thoroughly destroyed on logout or session expiration.
+
 ### Metadata and listing
 - [ ] The app name, description, and screenshots match what the app actually does.
 - [ ] Screenshots show the app in use, not a splash or login screen.
@@ -77,13 +87,13 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 The full hard rules and sources are in docs/GLOBAL-REGULATORY-2026.md. This is legal, on top of App Review. Several dates are under active litigation, so re-verify each against the cited source.
 
 - [ ] Child-directed or under-13 data. COPPA verifiable parental consent, a separate opt-in for ad or third-party disclosure, a written retention policy and a written security program (general compliance date 22 April 2026).
-- [ ] US state App Store Accountability Acts (Utah, Texas, Louisiana, Alabama). the app requests an age category from the store, confirms parental consent for a minor, and re-requests on a major change, wired through the Declared Age Range API.
+- [ ] US state App Store Accountability Acts (Utah, Texas, Louisiana, Alabama). the app requests an age category from the store, confirms parental consent for a minor, and re-requests on a major change, wired through the Declared Age Range API (iOS) or the Play Age Signals API (Android, ensuring strict ToS compliance prohibiting ads, marketing, user profiling, or analytics use of age data).
 - [ ] Age rating set to 4-plus, 9-plus, 13-plus, 16-plus, or 18-plus, never Unrated, questionnaire re-answered by 31 January 2026.
 - [ ] US storefront external links are allowed with no entitlement and no disclosure sheet, no in-app alternative payment, and the commission question is treated as unsettled.
 - [ ] California and US state privacy. a privacy policy, notice at collection, know, delete, correct, "Do Not Sell or Share", "Limit Use of Sensitive PI", and honoring Global Privacy Control.
 - [ ] Biometric. written consent before capture, a public retention and destruction schedule, and no sale (Illinois BIPA, Texas CUBI).
 - [ ] Health app. the HIPAA gate, else the FTC Health Breach Notification Rule with a 60-day breach notice.
-- [ ] 18-plus download gating handled for Brazil, Australia, and Singapore for the Apple block of 24 February 2026.
+- [ ] 18-plus download gating handled for Brazil, Australia, and Singapore for the Apple block of 24 February 2026, and Google Play's Digital ECA age-assurance rollout for Brazil via the Play Age Signals API starting 17 March 2026.
 - [ ] UK Online Safety Act Highly Effective Age Assurance and the Children's-Code defaults for a likely-child service.
 - [ ] Australia under-16 age assurance for an age-restricted social media platform.
 - [ ] South Korea Korea-only binary with an approved payment provider if alternative billing is used.
@@ -101,6 +111,7 @@ Apple.
 - [ ] France ANSSI encryption declaration uploaded in App Store Connect if the app uses non-exempt encryption and ships on the French App Store.
 - [ ] App Store Connect content-rights question answered, with proof of rights available for any third-party content.
 - [ ] visionOS App Motion declared, and watchOS and tvOS built with the platform-26 SDK and Xcode 26 by 28 April 2026.
+- [ ] Fixed-odds betting apps distributed in Brazil provide a valid Secretariat of Prizes and Bets (SPA) license in the App Review Information, set the Brazil age rating to A18 via the questionnaire, and are submitted under a new app version for verification (since May 8, 2026).
 
 Android.
 
@@ -111,6 +122,7 @@ Android.
 - [ ] `targetSdkVersion` at least 35 today, planned for at least 36 by the 2026 deadline.
 - [ ] No unexpected launch-time or mid-task full-screen interstitial, and every interstitial is closable by 15 seconds.
 - [ ] Health app has the Health Apps Declaration, a core-function justification per Health Connect permission, the migrated Organization Account, and the correct medical-device label or disclaimer.
+- [ ] Real-money game apps in supported countries have the required licenses or self-declarations, geo-restrictions, age-gating, and comply with any relevant Play Age Signals API terms.
 
 Cross-cutting.
 

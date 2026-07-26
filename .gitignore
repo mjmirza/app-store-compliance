@@ -3,3 +3,6 @@
 node_modules/
 .vercel/
 .claude/
+__pycache__/
+*.pyc
+RELEASE-READINESS-REPORT.md
