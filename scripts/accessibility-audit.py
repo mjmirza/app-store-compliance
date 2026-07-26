@@ -409,7 +409,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "line": line_no,
                         "rule_id": rule_id,
                         "match": match.group(0),
-                        "message": f"Compose view size is below the recommended 48dp touch target threshold.",
+                        "message": "Compose view size is below the recommended 48dp touch target threshold.",
                         "fix": "Enlarge the touch target size of the clickable control to at least 48dp x 48dp."
                     })
 
