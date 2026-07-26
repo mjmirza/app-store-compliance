@@ -116,9 +116,16 @@ echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 echo ""
 
 # ----- run regulatory deadlines check -----
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if [ -f "$REPO_ROOT/scripts/deadline-checker.py" ]; then
-  python3 "$REPO_ROOT/scripts/deadline-checker.py"
+# Tries both ship shapes. nested repo (agent-os/hooks/) and flat ~/.claude.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEADLINE_PY=""
+for candidate in \
+  "$HOOK_DIR/../../scripts/deadline-checker.py" \
+  "$HOOK_DIR/../skills/app-store-compliance/scripts/deadline-checker.py"; do
+  if [ -f "$candidate" ]; then DEADLINE_PY="$candidate"; break; fi
+done
+if [ -n "$DEADLINE_PY" ]; then
+  python3 "$DEADLINE_PY"
   echo ""
 fi
 
