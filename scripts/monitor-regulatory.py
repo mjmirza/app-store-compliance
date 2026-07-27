@@ -3,6 +3,7 @@
 (EU/UK/US/CA/AU/SG/intl) against a source trust hierarchy. See README.md."""
 
 import os
+import sys
 import re
 import json
 import argparse
@@ -1057,6 +1058,68 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+def update_documentation(report_items, output_filepath):
+    """
+    Appends the latest regulatory policy findings and migration tasks directly to the output compliance file.
+    """
+    report_content = [
+        "<!-- REGULATORY_POLICY_MONITOR_START -->",
+        "# Regulatory Policy Monitoring & Compliance Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to keep track of global regulatory changes.",
+        "",
+        "## Latest Monitored Policy Changes",
+        "",
+    ]
+
+    for item in report_items:
+        report_content.append(f"### {item['announcement_title']} ({item['track']})")
+        report_content.append(f"- **Published**: {item['announcement_pubDate']}")
+        report_content.append(f"- **Official Link**: [{item['announcement_link']}]({item['announcement_link']})")
+        report_content.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        report_content.append(f"- **Impact Level**: {item['compliance_impact']}")
+        report_content.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        report_content.append("- **Suggested Migration Tasks**:")
+        for task in item["migration_tasks"]:
+            report_content.append(f"    - [ ] {task}")
+        report_content.append("")
+
+    report_content.append("<!-- REGULATORY_POLICY_MONITOR_END -->")
+
+    # Write to the output file
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(report_content))
+        print(f"Documentation updated/created successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def generate_and_save_pr_draft(report_items, output_filepath):
+    """
+    Compiles all non-blocked proposed pull requests into a single PR draft file.
+    """
+    pr_drafts = []
+    for item in report_items:
+        pr = item.get("proposed_pull_request")
+        if pr:
+            pr_drafts.append(pr["description"])
+
+    if not pr_drafts:
+        content = "# PULL REQUEST DRAFT: Regulatory Compliance Update\n\nNo active or verified regulatory compliance pull requests generated."
+    else:
+        content = "\n\n---\n\n".join(pr_drafts)
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"PR draft written successfully to: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing PR draft to {output_filepath}: {e}", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regulatory Intelligence Agent Monitor."
@@ -1073,6 +1136,18 @@ def main():
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
+        "--output-docs",
+        type=str,
+        default="docs/REGULATORY-POLICY-MIGRATION.md",
+        help="Filepath to write migration tasks / docs updates",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        default="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
+    )
+    parser.add_argument(
         "--verbose", action="store_true", help="Print verbose execution logs"
     )
 
@@ -1086,6 +1161,9 @@ def main():
         print(json.dumps(report_items, indent=2))
     else:
         print_text_report(report_items, args.project)
+        if report_items:
+            update_documentation(report_items, args.output_docs)
+            generate_and_save_pr_draft(report_items, args.pr_output)
 
 
 if __name__ == "__main__":

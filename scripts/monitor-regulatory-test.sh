@@ -109,6 +109,36 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify file-writing capabilities and 15-section check in output files
+echo "[TEST] Verifying output file creation and contents..."
+TEST_MIG="/tmp/test_migration.md"
+TEST_PR="/tmp/test_pr_draft.md"
+rm -f "$TEST_MIG" "$TEST_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_MIG" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_MIG" ] || [ ! -s "$TEST_MIG" ]; then
+  echo "[ERROR] Failed to create or write to $TEST_MIG"
+  exit 1
+fi
+echo "[PASS] Successfully created and wrote documentation to $TEST_MIG"
+
+if [ ! -f "$TEST_PR" ] || [ ! -s "$TEST_PR" ]; then
+  echo "[ERROR] Failed to create or write to $TEST_PR"
+  exit 1
+fi
+echo "[PASS] Successfully created and wrote PR draft to $TEST_PR"
+
+for sect in "${SECTIONS[@]}"; do
+  if ! grep -q "## $sect" "$TEST_PR"; then
+    echo "[ERROR] Missing expected section $sect in written file: $TEST_PR"
+    exit 1
+  fi
+done
+echo "[PASS] All 15 required sections verified inside the written PR draft file"
+
+rm -f "$TEST_MIG" "$TEST_PR"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
