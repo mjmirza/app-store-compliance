@@ -434,6 +434,78 @@
       "enforcement_date": "2025-03-19",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md",
       "priority": "critical"
+    },
+    {
+      "id": "EU-AI-ACT-ART-6",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689",
+      "requirement": "Article 6(1) High-risk AI systems classification and conformity assessment.",
+      "effective_date": "2024-08-01",
+      "grace_period": "36 months",
+      "mandatory_date": "2027-08-02",
+      "enforcement_date": "2027-08-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, section 1.5",
+      "priority": "high"
+    },
+    {
+      "id": "EU-AI-ACT-HIGH-RISK-ANNEX-3",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 (as amended by Digital Omnibus simplification package)",
+      "requirement": "Annex III high-risk AI system compliance and certification requirements (postponed by the Digital Omnibus simplification package).",
+      "effective_date": "2024-08-01",
+      "grace_period": "40 months",
+      "mandatory_date": "2027-12-02",
+      "enforcement_date": "2027-12-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1",
+      "priority": "high"
+    },
+    {
+      "id": "APPLE-AI-THIRD-PARTY-CONSENT",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple App Store Review Guidelines (Guideline 5.1.2(i))",
+      "requirement": "Obtain explicit opt-in consent before sharing personal data with third-party AI models (OpenAI, Anthropic, Gemini, etc.), clearly identifying the AI provider and data types.",
+      "effective_date": "2025-11-13",
+      "grace_period": "none",
+      "mandatory_date": "2025-11-13",
+      "enforcement_date": "2025-11-13",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.7, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "priority": "high"
+    },
+    {
+      "id": "US-CA-SB-976",
+      "jurisdiction": "California (USA State)",
+      "law": "California SB 976 (Social-Media Addiction)",
+      "requirement": "Age-verification for minor access to social-media platforms and restriction of addictive feeds.",
+      "effective_date": "2024-09-27",
+      "grace_period": "27 months",
+      "mandatory_date": "2027-01-01",
+      "enforcement_date": "2027-01-01",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/safety.md",
+      "priority": "high"
+    },
+    {
+      "id": "US-TX-TDPSA-GPC",
+      "jurisdiction": "Texas (USA State)",
+      "law": "Texas Data Privacy and Security Act (TDPSA)",
+      "requirement": "Universal Opt-Out Mechanism / Global Privacy Control (GPC) support.",
+      "effective_date": "2024-07-01",
+      "grace_period": "6 months",
+      "mandatory_date": "2025-01-01",
+      "enforcement_date": "2025-01-01",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/rules/privacy.md",
+      "priority": "high"
+    },
+    {
+      "id": "US-OR-OCPA-GPC",
+      "jurisdiction": "Oregon (USA State)",
+      "law": "Oregon Consumer Privacy Act (OCPA)",
+      "requirement": "Support for user-selected universal opt-out signals (GPC).",
+      "effective_date": "2024-07-01",
+      "grace_period": "18 months",
+      "mandatory_date": "2026-01-01",
+      "enforcement_date": "2026-01-01",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/rules/privacy.md",
+      "priority": "high"
     }
   ]
 }
