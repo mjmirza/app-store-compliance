@@ -422,6 +422,65 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
+    "EU e-Evidence Package": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal", "EUR-Lex"],
+        "citations": [
+            "Regulation (EU) 2023/1543 on European Production and Preservation Orders for electronic evidence",
+            "Directive (EU) 2023/1544 on harmonised rules on the designation of designated establishments and the appointment of legal representatives"
+        ],
+        "keywords": [
+            "e-evidence",
+            "european production order",
+            "european preservation order",
+            "emergency data production",
+            "law enforcement request",
+            "legal representative",
+        ],
+        "patterns": [
+            r"e-evidence",
+            r"european[ -]production[ -]order",
+            r"european[ -]preservation[ -]order",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
+        "detect_regex": r"e-evidence|european production order|european preservation order|emergency data production",
+        "impact_desc": "The EU e-Evidence Package mandates direct cross-border production and preservation of electronic evidence, requiring legal representatives and an 8-hour turnaround for emergency requests.",
+        "migration_steps": [
+            "Designate an establishment or appoint an official legal representative in the EU.",
+            "Formulate and notify the designated Member State authority of representative details by August 18, 2026.",
+            "Establish secure internal processes to execute European Production/Preservation Orders within 10 days, and within 8 hours for critical emergencies."
+        ],
+        "compliance_impact": "High",
+    },
+    "EU Contract Withdrawal Button": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2023/2673 amending Directive 2011/83/EU as regards distance contracts for financial services"
+        ],
+        "keywords": [
+            "withdrawal button",
+            "withdrawal function",
+            "withdraw from contract",
+            "distance contract withdrawal",
+            "revoke contract",
+            "cancel subscription",
+        ],
+        "patterns": [
+            r"withdrawal[ -]button",
+            r"withdrawal[ -]function",
+            r"withdraw[ -]from[ -]contract",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
+        "detect_regex": r"withdrawal button|withdrawal function|withdraw from contract|distance contract",
+        "impact_desc": "The Distance Marketing Directive requires service providers to implement a prominent and frictionless withdrawal button/function on online interfaces (websites and apps) for consumer contracts concluded online.",
+        "migration_steps": [
+            "Add a prominent and easily accessible 'withdrawal button' or 'withdrawal function' on the subscription or settings interface.",
+            "Ensure the cancellation/withdrawal path is frictionless, self-service, and direct, without requiring phone calls or letters.",
+            "Display clear notices regarding the 14-day statutory right of withdrawal."
+        ],
+        "compliance_impact": "High",
+    },
 }
 
 # Pre-defined Simulated Regulatory Announcements
@@ -431,6 +490,18 @@ SIMULATED_DEVELOPMENTS = [
         "description": "The European Commission published draft implementation guidelines on transparency obligations under Article 50 of the AI Act. Developers of chatbot systems and synthetic content generators must implement interaction disclosure and watermarking.",
         "pubDate": "Fri, 08 May 2026 12:00:00 GMT",
         "link": "https://digital-strategy.ec.europa.eu/en/library/draft-guidelines-implementation-transparency-obligations-certain-ai-systems-under-article-50-ai-act",
+    },
+    {
+        "title": "Transposition and Implementation of the EU e-Evidence Package (Regulation 2023/1543)",
+        "description": "EU Member States have completed transposition of Directive 2023/1544, and Regulation 2023/1543 is directly applicable starting August 2026, requiring designate legal representatives and 8-hour response windows for emergency data requests.",
+        "pubDate": "Sun, 28 Jun 2026 12:00:00 GMT",
+        "link": "https://eur-lex.europa.eu/eli/reg/2023/1543/oj",
+    },
+    {
+        "title": "Distance Marketing of Financial Services Directive requirements for Withdrawal Buttons on online interfaces",
+        "description": "Directive 2023/2673 requires that any distance contracts concluded online must feature an easily accessible and frictionless withdrawal button on the interface by June 2026.",
+        "pubDate": "Fri, 15 May 2026 12:00:00 GMT",
+        "link": "https://eur-lex.europa.eu/eli/dir/2023/2673/oj",
     },
     {
         "title": "FTC issues final updates to the COPPA Children's Online Privacy Rule",

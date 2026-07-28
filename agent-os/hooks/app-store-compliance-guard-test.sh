@@ -191,6 +191,46 @@ else
 fi
 rm -rf "$D"
 
+# 18 e-Evidence violation blocks
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>We process EU e-evidence and comply with production orders.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'BOTH-E-EVIDENCE-COMPLIANCE-MISSING' && ok "e-Evidence violation blocks" || bad "e-Evidence violation blocks"
+rm -rf "$D"
+
+# 19 e-Evidence clean stays silent
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>We process EU e-evidence with our legal representative.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -q 'BOTH-E-EVIDENCE-COMPLIANCE-MISSING'; then
+  ok "e-Evidence clean stays silent"
+else
+  bad "e-Evidence clean stays silent"
+fi
+rm -rf "$D"
+
+# 20 Contract withdrawal button missing blocks
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Get a premium subscription today.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'BOTH-WITHDRAWAL-BUTTON-MISSING' && ok "Contract withdrawal button missing blocks" || bad "Contract withdrawal button missing blocks"
+rm -rf "$D"
+
+# 21 Contract withdrawal button clean stays silent
+D="$(mktemp -d)"; mkdir -p "$D"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Get a premium subscription today. Click our withdrawal button to cancel.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -q 'BOTH-WITHDRAWAL-BUTTON-MISSING'; then
+  ok "Contract withdrawal button clean stays silent"
+else
+  bad "Contract withdrawal button clean stays silent"
+fi
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

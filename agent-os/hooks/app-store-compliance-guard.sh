@@ -140,6 +140,14 @@ fi
 if grep_has 'subscri(be|ption)|auto.renew|membership' && grep_has '[Cc]all.{0,25}[Cc]ancel|[Cc]ancel.{0,25}[Cc]all|[Mm]ail.{0,25}[Cc]ancel|[Ww]rite.{0,25}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'; then
   finding high "BOTH-SUBSCRIPTION-HARD-CANCEL" "Subscription cancellation appears to require a phone call, mail, or an in-person visit" "Provide a self-service cancellation path at least as easy as sign-up (FTC Section 5, ROSCA, and CA/NY/MA negative-option laws)."
 fi
+# e-Evidence Package compliance
+if grep_has 'e-[Ee]vidence|[Ee]uropean [Pp]roduction [Oo]rder|[Ee]uropean [Pp]reservation [Oo]rder|[Ee]mergency [Dd]ata [Pp]roduction' && ! grep_has '[Ll]egal [Rr]epresentative|[Ll]aw [Ee]nforcement [Rr]equest'; then
+  finding high "BOTH-E-EVIDENCE-COMPLIANCE-MISSING" "Missing legal representative or emergency data-production response procedures for the EU e-Evidence Package" "Designate an establishment or appoint a legal representative in the EU, and establish internal protocols to deliver user data securely within 8 hours in emergency situations."
+fi
+# Contract withdrawal button compliance
+if grep_has 'subscri(be|ption)|auto.renew|membership' && ! grep_has '[Ww]ithdrawal [Bb]utton|[Ww]ithdrawal [Ff]unction|[Ww]ithdraw [Ff]rom [Cc]ontract|[Dd]istance [Cc]ontract'; then
+  finding high "BOTH-WITHDRAWAL-BUTTON-MISSING" "Prominent contract withdrawal button or function missing for EU consumer contracts" "Add a prominent, dedicated, and easily accessible withdrawal button or function on the user interface, allowing consumers to withdraw from contracts/subscriptions within 14 days."
+fi
 # fastlane precheck derived metadata checks
 if grep_has 'coming soon|coming-soon|will be available|in a future update|stay tuned'; then
   finding medium "APPLE-2.3-FUTURE-FUNCTIONALITY" "Future functionality language found (coming soon, beta)" "Describe only what the build does today (fastlane precheck future_functionality, Apple 2.3.1)."

@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-21 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+22 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -238,6 +238,22 @@ How to detect.
 
 ```bash
 grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
+```
+
+## BOTH-E-EVIDENCE-COMPLIANCE-MISSING
+
+- Title. Missing legal representative or emergency data-production response procedures for the EU e-Evidence Package
+- Platform. both
+- Guideline or policy. Regulation (EU) 2023/1543 & Directive (EU) 2023/1544 (EU e-Evidence Package)
+- Severity. high
+- What triggers it. Apps/services processing user data in the EU that fail to designate a legal representative or lack internal procedures to respond to European Production/Preservation Orders within 10 days (or 8 hours for emergencies).
+- How to fix it. Designate an establishment or appoint a legal representative in the EU, notify contact details by August 18, 2026, and establish internal protocols to deliver user data securely within 8 hours in emergency situations.
+- Detection signals. e-Evidence, European Production Order, European Preservation Order, emergency data production, law enforcement request, legal representative
+
+How to detect.
+
+```bash
+grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null
 ```
 
 ## APPLE-ACCESSIBILITY-VOICEOVER
