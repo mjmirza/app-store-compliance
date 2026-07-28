@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Static continuous accessibility compliance auditor.
+Scans project files for critical accessibility compliance issues across
+Apple (iOS) and Android (Google Play) platforms.
+"""
 import os
 import sys
 import re
