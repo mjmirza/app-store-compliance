@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""
+Accessibility Compliance Audit Tool.
+Provides static analysis/linting checks for iOS and Android platforms.
+Checks include VoiceOver, Dynamic Type, Reduce Motion, Color Contrast,
+Haptics, Keyboard Navigation, TalkBack, Font Scaling, High Contrast,
+and Touch Target sizes.
+"""
 import os
 import sys
 import re
