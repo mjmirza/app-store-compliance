@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Static continuous accessibility compliance auditor.
+Supports Apple (VoiceOver, Dynamic Type, Reduce Motion, Color Contrast, Haptics, Keyboard Navigation)
+and Android (TalkBack, Font Scaling, High Contrast, Accessibility Scanner Recommendations).
+"""
 import os
 import sys
 import re
