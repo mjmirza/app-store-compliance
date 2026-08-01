@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Continuous accessibility compliance auditing script.
+Evaluates iOS/Apple and Android accessibility guidelines.
+Verified by: scripts/accessibility-audit-test.sh
+Reported in: docs/ACCESSIBILITY-COMPLIANCE-REPORT.md
+"""
 import os
 import sys
 import re
