@@ -1261,6 +1261,40 @@
         "visit a store to cancel"
       ],
       "fix": "Provide a self-service cancellation path (in-app button or account-settings web page) that is at least as easy as sign-up. Never require a phone call, a mailed letter, or an in-person visit to cancel a subscription billed outside the app stores' own billing."
+    },
+    {
+      "id": "BOTH-E-EVIDENCE-COMPLIANCE-MISSING",
+      "platform": "both",
+      "guideline": "Regulation (EU) 2023/1543 & Directive (EU) 2023/1544 (EU e-Evidence Package)",
+      "title": "Missing legal representative or emergency data-production response procedures for the EU e-Evidence Package",
+      "severity": "high",
+      "detection": "Apps/services processing user data in the EU that fail to designate a legal representative or lack internal procedures to respond to European Production/Preservation Orders within 10 days (or 8 hours for emergencies).",
+      "signals": [
+        "e-Evidence",
+        "European Production Order",
+        "European Preservation Order",
+        "emergency data production",
+        "law enforcement request",
+        "legal representative"
+      ],
+      "fix": "Designate an establishment or appoint a legal representative in the EU, notify contact details by August 18, 2026, and establish internal protocols to deliver user data securely within 8 hours in emergency situations."
+    },
+    {
+      "id": "BOTH-WITHDRAWAL-BUTTON-MISSING",
+      "platform": "both",
+      "guideline": "Apple Guideline 3.1.2, Directive (EU) 2023/2673 Distance Marketing of Financial Services Directive",
+      "title": "Prominent contract withdrawal button or function missing for EU consumer contracts",
+      "severity": "high",
+      "detection": "Apps offering digital subscriptions or distance contracts to EU consumers that fail to provide a prominent, easily accessible 'withdrawal button' or 'withdrawal function' on their online user interface to cancel/withdraw within 14 days.",
+      "signals": [
+        "withdrawal button",
+        "withdrawal function",
+        "withdraw from contract",
+        "distance contract withdrawal",
+        "revoke contract",
+        "cancel subscription"
+      ],
+      "fix": "Add a prominent, dedicated, and easily accessible withdrawal button or function on the user interface, allowing consumers to withdraw from contracts/subscriptions without undue friction."
     }
   ]
 }

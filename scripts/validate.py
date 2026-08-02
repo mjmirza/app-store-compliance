@@ -2,7 +2,10 @@
 """Validates patterns/recipes/deadlines data files for CI. Exit 0 on
 pass, 1 on error; see README.md and AGENTS.md for the check list."""
 
-import json, os, sys, datetime
+import json
+import os
+import sys
+import datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")

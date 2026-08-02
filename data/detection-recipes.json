@@ -73,6 +73,8 @@
     "ANDROID-ACCESSIBILITY-FONTSCALING": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-FONTSCALING",
     "ANDROID-ACCESSIBILITY-HIGHCONTRAST": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-HIGHCONTRAST",
     "ANDROID-ACCESSIBILITY-SCANNER": "python3 scripts/accessibility-audit.py . --rule ANDROID-ACCESSIBILITY-SCANNER",
-    "BOTH-SUBSCRIPTION-HARD-CANCEL": "grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'"
+    "BOTH-SUBSCRIPTION-HARD-CANCEL": "grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'",
+    "BOTH-E-EVIDENCE-COMPLIANCE-MISSING": "grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null",
+    "BOTH-WITHDRAWAL-BUTTON-MISSING": "grep -rniE 'withdrawal button|withdrawal function|withdraw from contract|distance contract' . 2>/dev/null"
   }
 }

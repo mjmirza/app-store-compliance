@@ -1,0 +1,21 @@
+# URLs intentionally unreachable. One per line.
+# Every entry must be a documentation placeholder or a deliberate test fixture,
+# never a real citation that happens to be broken.
+
+# Documentation placeholders. Not real endpoints by design.
+https://mycompany.com/profile
+https://yourdomain.com/.well-known/apple-app-site-association
+https://yourdomain.com/.well-known/assetlinks.json
+
+# Deliberate low-trust fixture. Proves the monitor rejects Priority 5 sources.
+https://randomblogsite.com/gdpr-rumor
+
+# Gauntlet fixtures for verify-citations.py itself. Must stay broken to test the gate.
+https://support.google.com/googleplay/android-developer/answer/datasafety
+https://developer.apple.com/news/?id=required-reason-apis
+
+# Real government site that refuses all automated clients (geo/bot filtered).
+https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
+
+# Fixture app domain used by metadata-audit-test.sh.
+https://lumina.app/privacy
