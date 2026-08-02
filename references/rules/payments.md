@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-7 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -114,4 +114,20 @@ How to detect.
 
 ```bash
 grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
+```
+
+## BOTH-WITHDRAWAL-BUTTON-MISSING
+
+- Title. Prominent contract withdrawal button or function missing for EU consumer contracts
+- Platform. both
+- Guideline or policy. Apple Guideline 3.1.2, Directive (EU) 2023/2673 Distance Marketing of Financial Services Directive
+- Severity. high
+- What triggers it. Apps offering digital subscriptions or distance contracts to EU consumers that fail to provide a prominent, easily accessible 'withdrawal button' or 'withdrawal function' on their online user interface to cancel/withdraw within 14 days.
+- How to fix it. Add a prominent, dedicated, and easily accessible withdrawal button or function on the user interface, allowing consumers to withdraw from contracts/subscriptions without undue friction.
+- Detection signals. withdrawal button, withdrawal function, withdraw from contract, distance contract withdrawal, revoke contract, cancel subscription
+
+How to detect.
+
+```bash
+grep -rniE 'withdrawal button|withdrawal function|withdraw from contract|distance contract' . 2>/dev/null
 ```

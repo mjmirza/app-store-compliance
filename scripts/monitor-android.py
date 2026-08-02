@@ -322,7 +322,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "Play Console announcements",
         "title": "New Play Console Mandatory Identity Verification for Personal Accounts",
         "description": "To foster user trust, Google Play requires all personal developer accounts created before recent policy updates to complete mandatory identity verification by September 30, 2026. Failure to verify will result in update blockages and eventual listing removals.",
-        "link": "https://support.google.com/googleplay/android-developer/answer/113289",
+        "link": "https://support.google.com/googleplay/android-developer/answer/10788890",
         "pubDate": "Mon, 15 Jun 2026 09:00:00 PDT",
     },
     {
@@ -346,7 +346,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "Android API deprecations",
         "title": "Legacy SafetyNet Attestation APIs Deprecation & Shutdown Schedule",
         "description": "As announced previously, the Legacy SafetyNet Attestation APIs are fully deprecated and shut down. All anti-abuse, security check, and integrity verification flows must migrate to the modern Play Integrity API.",
-        "link": "https://developer.android.com/google/play/integrity/deprecation-guide",
+        "link": "https://developer.android.com/google/play/integrity/overview",
         "pubDate": "Fri, 20 Mar 2026 12:00:00 PDT",
     },
     {
@@ -378,7 +378,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "Privacy Sandbox",
         "title": "Google Play Privacy Sandbox Beta Rollout and Advertising ID Phase-Out",
         "description": "Google is expanding the Privacy Sandbox Beta on Android, initiating the gradual phase-out of the legacy persistent Advertising ID (GAID) in favor of the privacy-preserving Topics API, Attribution Reporting, and SDK Runtime environments.",
-        "link": "https://developer.android.com/design-guidelines/privacy/sandbox",
+        "link": "https://developer.android.com/design-for-safety/privacy-sandbox",
         "pubDate": "Wed, 01 Apr 2026 10:00:00 PDT",
     },
     {
@@ -434,7 +434,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "Device compatibility requirements",
         "title": "Device Compatibility and Foldable Layout Guidelines Update",
         "description": "Android releases update guidelines enforcing screen and aspect-ratio compatibility across multi-window systems, tablets, and foldable devices. Apps must support dynamic resizing and avoid fixed orientation limits where feasible.",
-        "link": "https://developer.android.com/guide/topics/large-screens/foldable-devices",
+        "link": "https://developer.android.com/guide/topics/large-screens/get-started-with-large-screens",
         "pubDate": "Fri, 24 Apr 2026 17:00:00 PDT",
     },
     {
@@ -1049,10 +1049,8 @@ def main():
                 "https://android-developers.googleblog.com/feeds/posts/default"
             )
         )
-        # Android security bulletin feed
-        announcements.extend(
-            parse_rss_feed("https://source.android.com/security/bulletin.xml")
-        )
+        # Android Security Bulletins publish no RSS feed. The canonical page is
+        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:

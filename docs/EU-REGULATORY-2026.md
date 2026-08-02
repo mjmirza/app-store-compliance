@@ -164,6 +164,31 @@ These map onto the Apple accessibility discipline the setup already carries (Dyn
 - DSA protection of minors and age verification. Commission Guidelines on Protection of Minors published 14 July 2025. an EU age-verification blueprint became feature-ready 15 April 2026, with Member States urged to roll out by 31 December 2026.
 - GDPR children's data. EDPB Statement 1/2025 on age assurance (adopted 11 February 2025) sets ten principles, and age assurance must still respect data minimisation and purpose limitation.
 
+### 5.1 EU e-Evidence Package (Regulation (EU) 2023/1543 & Directive (EU) 2023/1544) (HARD, NEW)
+
+The EU e-Evidence Package fundamentally reshapes cross-border law enforcement access to electronic data by allowing judicial authorities of one Member State to directly compel service providers in another Member State to preserve or produce data, bypassing traditional mutual legal assistance frameworks.
+
+- **Scope:** Applies to electronic communications service providers (instant messaging, VoIP, email), internet domain registries, and other information society services that facilitate intra-user communication (such as online marketplaces) or store/process data on behalf of users (such as cloud hosting and SaaS applications). This applies to any provider offering services in the EU, regardless of where they are headquartered.
+- **Key Obligations:**
+  - **Designation/Appointment of Addressees:** Under Directive (EU) 2023/1544, EU-established service providers must designate an establishment, and non-EU-established service providers must appoint a legal representative in the EU, to receive and execute European Production and Preservation Orders.
+  - **Notification Requirement:** Providers must notify the designated central authority of their representative's details and languages. The notification deadline is **18 August 2026**, or within six months of commencing services in the EU.
+  - **European Production Order Execution:** Compels providers to produce electronic evidence. The default compliance window is **10 days**, but in critical emergency situations, providers MUST produce the requested data within **8 hours**.
+  - **European Preservation Order Execution:** Compels providers to preserve electronic evidence for **60 days** to prevent deletion.
+- **Penalties:** Joint and several liability applies to the provider and their designated legal representative. Non-compliance can result in administrative fines of up to **2% of the provider's total annual global turnover** under national implementing legislation.
+- **Sources:** [Regulation (EU) 2023/1543 (EUR-Lex)](https://eur-lex.europa.eu/eli/reg/2023/1543/oj), [Directive (EU) 2023/1544 (EUR-Lex)](https://eur-lex.europa.eu/eli/dir/2023/1544/oj), [Bird & Bird EU e-Evidence Package Guide](https://www.twobirds.com/en/insights/2026/germany/e-evidence-richtlinie-umsetzungsfrist-abgelaufen--implementierungsstatus-und-handlungsbedarf).
+
+### 5.2 EU Contract Withdrawal Button (Distance Marketing of Financial Services Directive (EU) 2023/2673) (HARD, NEW)
+
+The Distance Marketing of Financial Services Directive introduces amendments to the Consumer Rights Directive (Directive 2011/83/EU), ensuring that consumers can easily exercise their statutory right of withdrawal from online contracts.
+
+- **Scope:** Applies to all distance contracts concluded via an online user interface, including websites and mobile applications, that offer retail financial services or other consumer contracts and subscriptions.
+- **Key Obligations:**
+  - **Withdrawal Button/Function:** Service providers must ensure that where a contract is concluded online, consumers can withdraw from it via a prominent, dedicated, and easily accessible "withdrawal button" or "withdrawal function" on the online interface.
+  - **Frictionless Experience:** The cancellation/withdrawal path must be direct and cannot be buried behind multiple steps, contact forms, phone calls, or administrative obstacles. It must be at least as simple as the contract sign-up/subscription process.
+  - **Information Requirements:** The interface must clearly state the 14-day statutory withdrawal period and outline the consequences of withdrawal.
+- **Timelines:** Member States are expected to transpose and implement these requirements by **19 June 2026**.
+- **Sources:** [Directive (EU) 2023/2673 (EUR-Lex)](https://eur-lex.europa.eu/eli/dir/2023/2673/oj), [Reed Smith 2026 EU Regulations Overview](https://www.reedsmith.com/our-insights/blogs/viewpoints/102lyiv/2026-update-eu-regulations-for-tech-and-online-businesses/).
+
 Sources. [Morgan Lewis Data Act](https://www.morganlewis.com/blogs/sourcingatmorganlewis/2025/09/eu-data-act-begins-september-12-impacting-cloud-services-connected-products-and-other-data-industries), [Commission Cyber Resilience Act](https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act), [Commission age verification](https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification).
 
 ## 6. Apple platform changes 2025 and 2026 (beyond the base map)
@@ -196,6 +221,8 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | DMA external purchase | Entitlement declared, disclosure sheet wired, no IAP mix, reporting wired | live |
 | Notarization | Any non-App-Store build notarized | live |
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
+| EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |
+| EU Contract Withdrawal | Prominent, Frictionless contract withdrawal button on user interface | 19 Jun 2026 |
 
 ## 8. Sources
 

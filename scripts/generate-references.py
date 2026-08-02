@@ -8,7 +8,9 @@ Reads data/rejection-patterns.json and docs/BY-APP-TYPE.md and writes:
 Source of truth stays the JSON and the by-app-type doc. Re-run after either changes.
 """
 
-import json, os, re, sys
+import json
+import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")

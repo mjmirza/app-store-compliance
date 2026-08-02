@@ -45,7 +45,7 @@ cat << 'EOF' > "$MOCK_JSON"
     "platform": "Google Play",
     "title": "Google Play Policy Revision: Disclosure for AI-Generated Media",
     "description": "All developers utilizing generative AI for user-generated content must implement prominent safety safeguards and disclosures.",
-    "link": "https://android-developers.googleblog.com/2026/03/google-play-ai-generated-media.html",
+    "link": "https://android-developers.googleblog.com/",
     "pubDate": "Wed, 12 Mar 2026 11:00:00 PDT"
   }
 ]

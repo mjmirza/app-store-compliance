@@ -10,11 +10,11 @@ from datetime import datetime
 
 # Source Trust Hierarchy Definitions
 TRUST_HIERARCHY = {
-    "Priority 1": "Official sources (European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications)",
-    "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
+    "Priority 1": "European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications",
+    "Priority 2": "Reuters, AP, Bloomberg",
     "Priority 3": "Academic papers",
     "Priority 4": "Industry blogs",
-    "Priority 5": "Social media & AI summaries",
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries",
 }
 
 # Database of global jurisdictions, authorities, laws and their tracking keywords/signatures
@@ -711,7 +711,7 @@ def generate_pull_request(track_name, affected_files, announcement):
 
     # Strict source trust hierarchy formatting
     citations_list = []
-    citations_list.append("Priority 1: Official Sources (Authoritative)")
+    citations_list.append("Priority 1: European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications")
     for auth in meta["authorities"]:
         citations_list.append(f"- Authority: {auth}")
     for cit in meta["citations"]:
@@ -719,13 +719,13 @@ def generate_pull_request(track_name, affected_files, announcement):
     citations_list.append(
         f"- Official Announcement Reference Link: {announcement.get('link', 'https://eur-lex.europa.eu')}"
     )
-    citations_list.append("Priority 2: Reputable News (Supporting Context Only)")
+    citations_list.append("Priority 2: Reuters, AP, Bloomberg")
     citations_list.append("- Reuters Legal Regulatory Watch Feed (2026)")
-    citations_list.append("Priority 3: Academic Papers (Theoretical Context Only)")
+    citations_list.append("Priority 3: Academic papers")
     citations_list.append("- Global Privacy and Tech Standards Annual Digest (2026)")
-    citations_list.append("Priority 4: Industry blogs (Consultative Reference Only)")
+    citations_list.append("Priority 4: Industry blogs")
     citations_list.append("- Enterprise Compliance & Risk Playbook Summaries")
-    citations_list.append("Priority 5: Social media and AI summaries")
+    citations_list.append("Priority 5: LinkedIn, Reddit, Twitter, AI generated summaries")
     citations_list.append(
         "- Verified against Priority 1 prior to compilation. No unverified Priority 4 or 5 information is used."
     )
