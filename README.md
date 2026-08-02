@@ -215,6 +215,7 @@ python3 scripts/deadline-checker.py
 | `docs/PLATFORM-MECHANICS-2026.md` | The platform-mechanics and newer-policy hard rules with dated sources. macOS notarization, Guideline 4.2 and 4.3 with the June 2026 saturation tightening, reader-app entitlement, France ANSSI encryption, visionOS and watchOS and tvOS specifics, plus Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, sanctions, and PCI items |
 | `docs/BY-APP-TYPE.md` | The rejection map routed by app type. Universal, subscriptions, social, kids, health, games, macOS, AI, crypto and finance, VPN |
 | `docs/COMPETITIVE-GAP-ANALYSIS.md` | A survey of the other open source compliance repositories, what each publishes and why, the gaps they surfaced, and what was folded in here |
+| `docs/REGULATORY-GAP-REPORT-2026.md` | Global and regional regulatory compliance gap analysis prepared by the Senior Compliance Officer, evaluating modern and upcoming frameworks |
 | `docs/OPEN-SOURCE-PATTERNS.md` | What the community already codified. The fastlane precheck metadata rule set, the Android Play Policy Insights and security lints, community rejection repositories, and the Google Play pre-launch report, folded in |
 | `docs/OTHER-STORES.md` | Huawei AppGallery, the Chinese stores, Samsung, Amazon, Microsoft, and RuStore, plus the cross store patterns worth adopting |
 | `docs/GAMBLING-MATRIX.md` | Per country loot box and real money gambling rules, for games that ship worldwide |
