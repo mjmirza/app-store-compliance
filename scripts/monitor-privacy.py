@@ -11,7 +11,6 @@ import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
-from datetime import datetime
 
 # The 16 tracked privacy requirement categories
 CATEGORIES = [

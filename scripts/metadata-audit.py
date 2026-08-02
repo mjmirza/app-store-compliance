@@ -22,7 +22,11 @@ Usage:
 
 Exit codes: 0 clean or advisory, 2 a critical finding.
 """
-import os, sys, re, json, glob
+import os
+import sys
+import re
+import json
+import glob
 
 FIELD_LIMITS = {"name": 30, "subtitle": 30, "keywords": 100, "promotional_text": 170, "description": 4000}
 # fastlane / asc field file name aliases -> canonical field

@@ -162,7 +162,7 @@ def main():
     allow_path = os.path.join(root, args.allow)
     if os.path.exists(allow_path):
         with open(allow_path, encoding="utf-8") as fh:
-            allow = {l.strip() for l in fh if l.strip() and not l.startswith("#")}
+            allow = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
 
     urls = collect_urls(root, args.files)
     if not urls:
