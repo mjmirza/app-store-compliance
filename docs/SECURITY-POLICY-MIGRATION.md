@@ -42,7 +42,7 @@ This report is continuously generated and updated by `scripts/monitor-security.p
 
 ### 8. [jailbreak detection] iOS Jailbreak Detection: Comprehensive Dynamic Linker and Sandbox Write Auditing
 - **Published Date**: Fri, 26 Jun 2026 15:00:00 PDT
-- **Official Resource**: [https://masvs.owasp.org](https://masvs.owasp.org)
+- **Official Resource**: [https://mas.owasp.org/MASVS/](https://mas.owasp.org/MASVS/)
 - **Description**: Static file existence checks are easily bypassed. Jailbreak detection must combine dynamic library (dyld) inspection, directory permission checking, and symlink integrity checks.
 
 ### 9. [root detection] Android Root Detection: Mandating Play Integrity API Attestation in Production
@@ -97,12 +97,12 @@ This report is continuously generated and updated by `scripts/monitor-security.p
 
 ### 19. [Keychain] Token Storage Policies: Securing Long-Lived Refresh Tokens and Session Credentials
 - **Published Date**: Wed, 22 Jul 2026 13:00:00 PDT
-- **Official Resource**: [https://masvs.owasp.org](https://masvs.owasp.org)
+- **Official Resource**: [https://mas.owasp.org/MASVS/](https://mas.owasp.org/MASVS/)
 - **Description**: Session and refresh tokens must be stored in encrypted enclaves (Keychain/Keystore) rather than local cache directories or standard plists. Access tokens must be short-lived.
 
 ### 20. [token storage] Token Storage Policies: Securing Long-Lived Refresh Tokens and Session Credentials
 - **Published Date**: Wed, 22 Jul 2026 13:00:00 PDT
-- **Official Resource**: [https://masvs.owasp.org](https://masvs.owasp.org)
+- **Official Resource**: [https://mas.owasp.org/MASVS/](https://mas.owasp.org/MASVS/)
 - **Description**: Session and refresh tokens must be stored in encrypted enclaves (Keychain/Keystore) rather than local cache directories or standard plists. Access tokens must be short-lived.
 
 ## Automated Migration Recommendations & Implementation Tasks

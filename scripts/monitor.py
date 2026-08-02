@@ -495,25 +495,26 @@ TRACK_METADATA = {
     },
 }
 
-# Pre-defined mock announcements to allow simulation and self-testing
+# Mock announcements for simulation and self-testing. Links use the RFC 2606
+# .invalid TLD so a fixture can never be mistaken for a real Apple citation.
 MOCK_ANNOUNCEMENTS = [
     {
         "title": "Upcoming Requirements for Privacy Manifests and Required Reason APIs",
         "description": "Starting late spring, all new apps and app updates submitted to the App Store must include a Privacy Info manifest declaring reasons for accessing specific APIs such as UserDefaults or systemUptime.",
         "pubDate": "Wed, 15 May 2026 10:00:00 GMT",
-        "link": "https://developer.apple.com/news/?id=privacy-requirements",
+        "link": "https://mock.invalid/apple-news/privacy-requirements",
     },
     {
         "title": "Updates to In-App Purchase Policies and Alternative Payment Options",
         "description": "To comply with recent global regulations, developers can now direct users to external purchase options on their website. Ensure transparent billing disclosures and subscription terms are met.",
         "pubDate": "Mon, 01 Jun 2026 09:00:00 GMT",
-        "link": "https://developer.apple.com/news/?id=iap-updates",
+        "link": "https://mock.invalid/apple-news/iap-updates",
     },
     {
         "title": "App Store Review Guidelines and 4.3 Saturated Categories Update",
         "description": "App Review Guideline 4.3 has been updated. Low-quality apps or duplicates in saturated categories like flashlight or wallpaper will face direct rejection unless they offer distinct user value.",
         "pubDate": "Tue, 09 Jun 2026 14:00:00 GMT",
-        "link": "https://developer.apple.com/news/?id=review-guidelines-update",
+        "link": "https://mock.invalid/apple-news/review-guidelines-update",
     },
     {
         "title": "Xcode 26 and Minimum iOS SDK Requirements for Submission",
@@ -971,7 +972,7 @@ def run_monitor(
                         "title": f"Important updates concerning {track_name}",
                         "description": f"Apple has announced critical modifications to the specifications for {track_name}. Please review the updated rules.",
                         "pubDate": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                        "link": f"https://developer.apple.com/news/?id=simulated-{re.sub(r'[^a-z0-9]+', '-', track_name.lower())}",
+                        "link": f"https://mock.invalid/apple-news/simulated-{re.sub(r'[^a-z0-9]+', '-', track_name.lower())}",
                     }
                 )
         else:
@@ -988,7 +989,7 @@ def run_monitor(
                         "title": f"Simulated Update: New requirements for {matched_name}",
                         "description": f"This is a simulated announcement to trigger monitoring and scanning for {matched_name}.",
                         "pubDate": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                        "link": f"https://developer.apple.com/news/?id=simulated-{re.sub(r'[^a-z0-9]+', '-', matched_name.lower())}",
+                        "link": f"https://mock.invalid/apple-news/simulated-{re.sub(r'[^a-z0-9]+', '-', matched_name.lower())}",
                     }
                 )
             else:
@@ -998,7 +999,7 @@ def run_monitor(
                         "title": f"Simulated Announcement mentioning {simulate_track}",
                         "description": f"A custom announcement containing the keyword {simulate_track}.",
                         "pubDate": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                        "link": "https://developer.apple.com/news/?id=simulated-custom",
+                        "link": "https://mock.invalid/apple-news/simulated-custom",
                     }
                 )
 

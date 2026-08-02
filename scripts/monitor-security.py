@@ -300,7 +300,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "jailbreak detection",
         "title": "iOS Jailbreak Detection: Comprehensive Dynamic Linker and Sandbox Write Auditing",
         "description": "Static file existence checks are easily bypassed. Jailbreak detection must combine dynamic library (dyld) inspection, directory permission checking, and symlink integrity checks.",
-        "link": "https://masvs.owasp.org",
+        "link": "https://mas.owasp.org/MASVS/",
         "pubDate": "Fri, 26 Jun 2026 15:00:00 PDT",
     },
     {
@@ -388,7 +388,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "token storage",
         "title": "Token Storage Policies: Securing Long-Lived Refresh Tokens and Session Credentials",
         "description": "Session and refresh tokens must be stored in encrypted enclaves (Keychain/Keystore) rather than local cache directories or standard plists. Access tokens must be short-lived.",
-        "link": "https://masvs.owasp.org",
+        "link": "https://mas.owasp.org/MASVS/",
         "pubDate": "Wed, 22 Jul 2026 13:00:00 PDT",
     },
 ]
@@ -932,10 +932,8 @@ def main():
 
     if args.live:
         print("Fetching live Security RSS feeds...")
-        # Android security bulletin feed
-        announcements.extend(
-            parse_rss_feed("https://source.android.com/security/bulletin.xml")
-        )
+        # Android Security Bulletins publish no RSS feed. The canonical page is
+        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:

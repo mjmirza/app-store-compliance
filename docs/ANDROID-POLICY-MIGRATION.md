@@ -12,7 +12,7 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### 2. [Play Console announcements] New Play Console Mandatory Identity Verification for Personal Accounts
 - **Published Date**: Mon, 15 Jun 2026 09:00:00 PDT
-- **Official Resource**: [https://support.google.com/googleplay/android-developer/answer/113289](https://support.google.com/googleplay/android-developer/answer/113289)
+- **Official Resource**: [https://support.google.com/googleplay/android-developer/answer/10788890](https://support.google.com/googleplay/android-developer/answer/10788890)
 - **Description**: To foster user trust, Google Play requires all personal developer accounts created before recent policy updates to complete mandatory identity verification by September 30, 2026. Failure to verify will result in update blockages and eventual listing removals.
 
 ### 3. [Target SDK requirements] Google Play Target SDK Policy: Support Android 16 (API 36) by August 31, 2026
@@ -32,17 +32,17 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### 6. [Play Console announcements] Legacy SafetyNet Attestation APIs Deprecation & Shutdown Schedule
 - **Published Date**: Fri, 20 Mar 2026 12:00:00 PDT
-- **Official Resource**: [https://developer.android.com/google/play/integrity/deprecation-guide](https://developer.android.com/google/play/integrity/deprecation-guide)
+- **Official Resource**: [https://developer.android.com/google/play/integrity/overview](https://developer.android.com/google/play/integrity/overview)
 - **Description**: As announced previously, the Legacy SafetyNet Attestation APIs are fully deprecated and shut down. All anti-abuse, security check, and integrity verification flows must migrate to the modern Play Integrity API.
 
 ### 7. [Android API deprecations] Legacy SafetyNet Attestation APIs Deprecation & Shutdown Schedule
 - **Published Date**: Fri, 20 Mar 2026 12:00:00 PDT
-- **Official Resource**: [https://developer.android.com/google/play/integrity/deprecation-guide](https://developer.android.com/google/play/integrity/deprecation-guide)
+- **Official Resource**: [https://developer.android.com/google/play/integrity/overview](https://developer.android.com/google/play/integrity/overview)
 - **Description**: As announced previously, the Legacy SafetyNet Attestation APIs are fully deprecated and shut down. All anti-abuse, security check, and integrity verification flows must migrate to the modern Play Integrity API.
 
 ### 8. [Play Integrity API] Legacy SafetyNet Attestation APIs Deprecation & Shutdown Schedule
 - **Published Date**: Fri, 20 Mar 2026 12:00:00 PDT
-- **Official Resource**: [https://developer.android.com/google/play/integrity/deprecation-guide](https://developer.android.com/google/play/integrity/deprecation-guide)
+- **Official Resource**: [https://developer.android.com/google/play/integrity/overview](https://developer.android.com/google/play/integrity/overview)
 - **Description**: As announced previously, the Legacy SafetyNet Attestation APIs are fully deprecated and shut down. All anti-abuse, security check, and integrity verification flows must migrate to the modern Play Integrity API.
 
 ### 9. [Play Console announcements] Android Permission Model Update: Scoped Media and Storage Consent
@@ -77,7 +77,7 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### 15. [Privacy Sandbox] Google Play Privacy Sandbox Beta Rollout and Advertising ID Phase-Out
 - **Published Date**: Wed, 01 Apr 2026 10:00:00 PDT
-- **Official Resource**: [https://developer.android.com/design-guidelines/privacy/sandbox](https://developer.android.com/design-guidelines/privacy/sandbox)
+- **Official Resource**: [https://developer.android.com/design-for-safety/privacy-sandbox](https://developer.android.com/design-for-safety/privacy-sandbox)
 - **Description**: Google is expanding the Privacy Sandbox Beta on Android, initiating the gradual phase-out of the legacy persistent Advertising ID (GAID) in favor of the privacy-preserving Topics API, Attribution Reporting, and SDK Runtime environments.
 
 ### 16. [Google Play Developer Policies] Play Integrity API Update: Nonce Verification and Integrity Token Enforcement
@@ -137,7 +137,7 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### 27. [Device compatibility requirements] Device Compatibility and Foldable Layout Guidelines Update
 - **Published Date**: Fri, 24 Apr 2026 17:00:00 PDT
-- **Official Resource**: [https://developer.android.com/guide/topics/large-screens/foldable-devices](https://developer.android.com/guide/topics/large-screens/foldable-devices)
+- **Official Resource**: [https://developer.android.com/guide/topics/large-screens/get-started-with-large-screens](https://developer.android.com/guide/topics/large-screens/get-started-with-large-screens)
 - **Description**: Android releases update guidelines enforcing screen and aspect-ratio compatibility across multi-window systems, tablets, and foldable devices. Apps must support dynamic resizing and avoid fixed orientation limits where feasible.
 
 ### 28. [Google Play Developer Policies] Android Security Bulletin: Cryptographic Keystore Isolation Mandate

@@ -43,7 +43,7 @@ This report is continuously generated and updated by `scripts/monitor-privacy.py
 
 ### 7. [GDPR] European Union General Data Protection Regulation Enforcement Guidelines
 - **Published Date**: Thu, 25 Jun 2026 20:00:00 PDT
-- **Official Resource**: [https://edpb.europa.eu/our-work-tools/general-guidance/gdpr-guidelines_en](https://edpb.europa.eu/our-work-tools/general-guidance/gdpr-guidelines_en)
+- **Official Resource**: [https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en](https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en)
 - **Verification Status**: Priority 1 (Verified)
 - **Description**: The EDPB issues guidance on valid GDPR consent. Processing EU residents' personal data requires explicit opt-in, clear information, data portability, and a functional right to be forgotten (data erasure).
 
@@ -127,7 +127,7 @@ This report is continuously generated and updated by `scripts/monitor-privacy.py
 
 ### 21. [Tracking technologies] Tracking Technologies, Scripts, and Invisible Pixels Consent Management
 - **Published Date**: Tue, 30 Jun 2026 10:00:00 PDT
-- **Official Resource**: [https://edpb.europa.eu/our-work-tools/general-guidance_en](https://edpb.europa.eu/our-work-tools/general-guidance_en)
+- **Official Resource**: [https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en](https://www.edpb.europa.eu/our-work-tools/general-guidance/guidelines-recommendations-best-practices_en)
 - **Verification Status**: Priority 1 (Verified)
 - **Description**: Third-party analytical scripts (Google Analytics, Facebook Pixel, Hotjar) must be explicitly controlled and completely disabled by default until the user accepts cookie or tracking preferences.
 
