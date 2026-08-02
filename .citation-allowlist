@@ -19,3 +19,6 @@ https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restric
 
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
+
+# Real landing page flagged as fabricated due to Apple's soft-404 behavior.
+https://developer.apple.com/news/
