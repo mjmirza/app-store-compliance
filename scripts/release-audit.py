@@ -282,6 +282,7 @@ def find_affected_files(target_dir, patterns_dict):
                             "rejection-patterns.json" not in rel_path
                             and "release-audit.py" not in rel_path
                             and "app-store-compliance-guard.sh" not in rel_path
+                            and "RELEASE-READINESS-REPORT.md" not in rel_path
                         ):
                             affected[pid].append(rel_path)
 
