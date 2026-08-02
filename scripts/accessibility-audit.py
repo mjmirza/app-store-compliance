@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Continuous Accessibility Compliance Auditor.
+Performs static analysis to detect accessibility regressions across iOS and Android.
+Verified by scripts/accessibility-audit-test.sh.
+Documented in docs/ACCESSIBILITY-COMPLIANCE-REPORT.md.
+"""
 import os
 import sys
 import re
