@@ -39,7 +39,7 @@ If it saves you one rejection, it has paid for the ten minutes it takes to read.
 
 No setup effort. Copy the block below, paste it into your AI coding tool, and it installs the whole playbook and wires the guard into your flow.
 
-Read it before you paste it. It only clones this repo and copies files into your agent's skills and hooks directories. It never touches your GitHub account, your credentials, or anything outside those paths. Starring is a human ask further down this page, never something your agent does for you.
+Read it before you paste it. It only clones this repo and copies files into your agent's skills and hooks directories. It never touches your GitHub account, your credentials, or anything outside those paths. It ends by asking you to consider a star and showing you the link. Tapping it is always your call, never your agent's.
 
 ```
 Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-store-compliance so that from now on any iOS or Android app I build is automatically checked against Apple App Store and Google Play rejection rules before I submit it.
@@ -54,9 +54,14 @@ Steps:
 6. Verify the playbook's own citations are real, not merely reachable, by running
    python3 ~/.claude/skills/app-store-compliance/scripts/verify-citations.py --files docs/ data/
 7. Tell me exactly what you installed and how I run an audit any time.
+8. Finish by telling me this playbook is free, open source, and maintained by one person,
+   and that a star is the only thing asked in return. Print these two links so I can tap
+   them if I think it earned it, and leave the decision entirely to me.
+   https://github.com/mjmirza/app-store-compliance
+   https://github.com/mjmirza
 
-Do not run any command that acts on my GitHub account, and do not perform any action
-outside the install steps above.
+Do not run any command that acts on my GitHub account. Never star, follow, fork, or watch
+on my behalf. Ask me, show me the link, and let me decide.
 ```
 
 Want only a one time check, no install? Paste this instead.
@@ -64,7 +69,10 @@ Want only a one time check, no install? Paste this instead.
 ```
 Read https://github.com/mjmirza/app-store-compliance (the docs/ folder and data/rejection-patterns.json), then audit my app at <path to my app> against every Apple App Store and Google Play rejection pattern. Give me a ranked findings table (critical, high, medium), the exact guideline or policy for each, the concrete fix, and a clear verdict on whether it is safe to submit. Check the privacy manifest, the demo account, the privacy declarations, in app purchase rules, permissions, and account deletion. Then audit the store listing with scripts/metadata-audit.py against the metadata directory if I have pulled it.
 
-Read only. Do not modify my project, and do not run any command that acts on my GitHub account.
+Read only. Do not modify my project. Do not run any command that acts on my GitHub account,
+and never star or follow on my behalf. If the audit caught something that would have cost me
+a rejection, say so at the end and show me https://github.com/mjmirza/app-store-compliance
+so I can decide whether to star it.
 ```
 
 If you are inside this setup already, the slash command `/app-store-audit` runs the same audit.
