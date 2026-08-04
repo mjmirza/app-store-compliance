@@ -1,7 +1,7 @@
 # Global Regulatory Compliance Timeline
 
 This document compiles every registered global regulatory deadline tracking regional, national, and platform requirements.
-Last compiled: 2026-08-04 06:49:05 UTC
+Last compiled: 2026-08-04 08:33:40 UTC
 
 ## Active and Approaching Compliance Warnings
 

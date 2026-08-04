@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Checks data/regulatory-deadlines.json against today's UTC date.
-Prints active/passed deadlines and upcoming ones within 90 days."""
+Prints active/passed deadlines and upcoming ones within 90 days.
+This script implements the automatic warning system for regulatory deadlines."""
 
 import json
 import os
