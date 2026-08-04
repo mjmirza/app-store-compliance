@@ -491,7 +491,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
     )
 
     args = parser.parse_args()
