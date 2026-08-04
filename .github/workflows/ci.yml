@@ -20,6 +20,9 @@ jobs:
       - name: Validate data files and consistency
         run: python3 scripts/validate.py
 
+      - name: Check approaching and overdue regulatory deadlines
+        run: python3 scripts/deadline-checker.py
+
       - name: Guard test suite
         run: bash agent-os/hooks/app-store-compliance-guard-test.sh
 

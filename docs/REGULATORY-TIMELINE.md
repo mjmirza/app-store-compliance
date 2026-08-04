@@ -1,7 +1,7 @@
 # Global Regulatory Compliance Timeline
 
 This document compiles every registered global regulatory deadline tracking regional, national, and platform requirements.
-Last compiled: 2026-08-04 06:49:05 UTC
+Last compiled: 2026-08-04 06:10:06 UTC
 
 ## Active and Approaching Compliance Warnings
 
@@ -15,7 +15,6 @@ Last compiled: 2026-08-04 06:49:05 UTC
 | HIGH | European Union (EU) | EU Digital Markets Act (DMA) | External purchase links and alternative payments (com.apple.developer.storekit.external-purchase-link entitlement, custom link sheet, CTC 5% reporting). | 2024-03-07 | 881 days | docs/EU-REGULATORY-2026.md section 2 |
 | CRITICAL | China | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | 2024-03-31 | 857 days | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
 | HIGH | United States (Federal) | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | 2024-06-25 | 771 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
-| HIGH | European Union (EU) | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | 2024-12-13 | 600 days | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
 | HIGH | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 4 AI Literacy (providers and deployers must ensure team/solo AI literacy, maintain policy, induction, and log). | 2025-02-02 | 549 days | docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md |
 | CRITICAL | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 5 Prohibited Practices (ban on subliminal manipulation, child exploitation, social scoring, biometric trait categorization, etc.). | 2025-02-02 | 549 days | docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md |
 | CRITICAL | European Union (EU) | EU Digital Services Act (DSA) | Trader status declaration and verification (D-U-N-S, phone, email publish, 2FA verified) or app removal from EU storefront. | 2025-02-17 | 534 days | docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md |
@@ -61,7 +60,6 @@ Last compiled: 2026-08-04 06:49:05 UTC
 | 2024-03-07 | EU Digital Markets Act (DMA) | External purchase links and alternative payments (com.apple.developer.storekit.external-purchase-link entitlement, custom link sheet, CTC 5% reporting). | European Union (EU) | none | 2024-03-07 | HIGH | docs/EU-REGULATORY-2026.md section 2 |
 | 2024-03-31 | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | China | 7 months | 2024-03-31 | CRITICAL | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
 | 2024-06-25 | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | United States (Federal) | none | 2024-06-25 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
-| 2024-12-13 | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | European Union (EU) | 18 months | 2024-12-13 | HIGH | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
 | 2025-02-02 | EU AI Act, Regulation (EU) 2024/1689 | Article 4 AI Literacy (providers and deployers must ensure team/solo AI literacy, maintain policy, induction, and log). | European Union (EU) | 6 months | 2025-02-02 | HIGH | docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md |
 | 2025-02-02 | EU AI Act, Regulation (EU) 2024/1689 | Article 5 Prohibited Practices (ban on subliminal manipulation, child exploitation, social scoring, biometric trait categorization, etc.). | European Union (EU) | 6 months | 2025-02-02 | CRITICAL | docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md |
 | 2025-02-17 | EU Digital Services Act (DSA) | Trader status declaration and verification (D-U-N-S, phone, email publish, 2FA verified) or app removal from EU storefront. | European Union (EU) | 12 months | 2025-02-17 | CRITICAL | docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md |
@@ -168,18 +166,6 @@ Last compiled: 2026-08-04 06:49:05 UTC
 - **Enforcement Date:** 2024-06-25
 - **Priority:** HIGH
 - **Affected Repository Sections:** docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md
-
-### ID: EU-GPSR-SAFETY
-
-- **Jurisdiction:** European Union (EU)
-- **Law:** General Product Safety Regulation (GPSR), Regulation (EU) 2023/988
-- **Requirement:** Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products.
-- **Effective Date:** 2023-06-12
-- **Grace Period:** 18 months
-- **Mandatory Date:** 2024-12-13
-- **Enforcement Date:** 2024-12-13
-- **Priority:** HIGH
-- **Affected Repository Sections:** docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md
 
 ### ID: EU-AI-ACT-ART-4
 
