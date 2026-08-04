@@ -152,7 +152,7 @@ TRUST_HIERARCHY = {
     "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
     "Priority 3": "Academic papers",
     "Priority 4": "Industry blogs",
-    "Priority 5": "Social media & AI summaries"
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries"
 }
 
 # 16 Comprehensive Mock Announcements for all 16 categories
@@ -330,7 +330,7 @@ def classify_source_and_verify(announcement, all_announcements=None):
     p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
 
     p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
-    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary", "ai generated summaries", "chatgpt summary"]
 
     priority = 4  # Default to 4 if nothing matches
 
