@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: App Store Compliance Playbook
+message: If you use this playbook in your work, please cite it.
+type: software
+authors:
+  - alias: mjmirza
+    name: Mirza Iqbal
+repository-code: https://github.com/mjmirza/app-store-compliance
+url: https://github.com/mjmirza/app-store-compliance
+abstract: >-
+  An enterprise reference and automated guard that maps Apple App Store and
+  Google Play rejection patterns to the exact guideline and the concrete fix,
+  with machine-readable rejection data, a pre-submission guard, and continuous
+  monitors for Apple, Android, privacy, security, AI policy, accessibility, and
+  global regulatory deadlines.
+keywords:
+  - app store review
+  - google play policy
+  - mobile compliance
+  - app store rejection
+  - privacy manifest
+  - regulatory compliance
+license: MIT
