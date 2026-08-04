@@ -55,6 +55,36 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
+    "EU GPSR": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal", "EUR-Lex"],
+        "citations": [
+            "Regulation (EU) 2023/988 of the European Parliament and of the Council of 10 May 2023 on general product safety (OJ L 135, 23.5.2023)"
+        ],
+        "keywords": [
+            "gpsr",
+            "general product safety regulation",
+            "product safety",
+            "manufacturer details",
+            "responsible person",
+            "safety warning"
+        ],
+        "patterns": [
+            r"gpsr",
+            r"general[ -]product[ -]safety[ -]regulation",
+            r"product[ -]safety"
+        ],
+        "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
+        "detect_regex": r"productListing|buyProduct|checkout|e-commerce|manufacturerInfo|safetyWarning|manufacturerEmail|manufacturerAddress|safetyLabel|productSafety|responsiblePerson",
+        "impact_desc": "The EU GPSR (Regulation (EU) 2023/988) mandates that e-commerce applications and digital marketplaces distributed in the EU display manufacturer contact information and product safety warnings directly on the interface.",
+        "migration_steps": [
+            "Ensure e-commerce product detail templates display manufacturer identity (name, registered trade name/trademark).",
+            "Provide manufacturer postal address and electronic address (email or website) directly on the interface.",
+            "Display relevant product safety warnings or instructions in languages accepted by the member states of distribution.",
+            "Formally verify that an EU-based Responsible Person is designated for any products sold to EU consumers."
+        ],
+        "compliance_impact": "High"
+    },
     "GDPR": {
         "jurisdiction": "European Union",
         "authorities": ["EDPB", "European Commission", "EUR-Lex"],
@@ -431,6 +461,12 @@ SIMULATED_DEVELOPMENTS = [
         "description": "The European Commission published draft implementation guidelines on transparency obligations under Article 50 of the AI Act. Developers of chatbot systems and synthetic content generators must implement interaction disclosure and watermarking.",
         "pubDate": "Fri, 08 May 2026 12:00:00 GMT",
         "link": "https://digital-strategy.ec.europa.eu/en/library/draft-guidelines-implementation-transparency-obligations-certain-ai-systems-under-article-50-ai-act",
+    },
+    {
+        "title": "EU General Product Safety Regulation (GPSR) enforcement fully applicable across EU Member States",
+        "description": "Regulation (EU) 2023/988 (GPSR) replaces the old General Product Safety Directive, requiring digital platforms and e-commerce applications to clearly display manufacturer identity, importer details, and product safety warnings directly on online product listings.",
+        "pubDate": "Fri, 13 Dec 2024 09:00:00 GMT",
+        "link": "https://eur-lex.europa.eu/eli/reg/2023/988/oj",
     },
     {
         "title": "FTC issues final updates to the COPPA Children's Online Privacy Rule",

@@ -1,6 +1,6 @@
 # Rules. Safety and user generated content
 
-2 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+3 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-1.2-UGC-24H-ACTION
 
@@ -34,4 +34,21 @@ How to detect.
 
 ```bash
 grep -rni 'api.openai.com\|anthropic\|generativelanguage\|stable diffusion\|text-to-image' . && ! grep -rni 'moderation\|report\|block user\|content filter' .
+```
+
+## BOTH-GPSR-COMPLIANCE-MISSING
+
+- Title. Missing EU GPSR manufacturer info or product safety warning disclosures
+- Platform. both
+- Guideline or policy. Regulation (EU) 2023/988 (EU General Product Safety Regulation)
+- Severity. high
+- What triggers it. E-commerce or digital product listing present but missing manufacturer email, postal address, or product safety warnings on the interface.
+- How to fix it. Provide prominent manufacturer contact details (email and postal address) and any applicable product safety warnings directly on the product listing or online interface for any consumer goods distributed in the EU.
+- Detection signals. productListing, buyProduct, checkout, e-commerce, manufacturerInfo, safetyWarning
+- Present means handled. manufacturerEmail, manufacturerAddress, safetyLabel, productSafety, responsiblePerson
+
+How to detect.
+
+```bash
+grep -rniE 'gpsr|general product safety|product safety|manufacturerInfo|safetyWarning' . 2>/dev/null
 ```

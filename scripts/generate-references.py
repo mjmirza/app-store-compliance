@@ -85,7 +85,7 @@ CATEGORIES = [
         ),
     ),
     ("entitlements", "Entitlements", ("ENTITLEMENT",)),
-    ("safety", "Safety and user generated content", ("1.2", "UGC", "AI-GENERATED")),
+    ("safety", "Safety and user generated content", ("1.2", "UGC", "AI-GENERATED", "GPSR")),
     ("android", "Google Play specific", ("GOOGLE", "ANDROID")),
     ("export", "Export and build", ("EXPORT-COMPLIANCE",)),
 ]
