@@ -458,6 +458,18 @@
       "enforcement_date": "2026-06-19",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md",
       "priority": "high"
+    },
+    {
+      "id": "EU-GPSR-SAFETY",
+      "jurisdiction": "European Union (EU)",
+      "law": "General Product Safety Regulation (GPSR), Regulation (EU) 2023/988",
+      "requirement": "Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products.",
+      "effective_date": "2023-06-12",
+      "grace_period": "18 months",
+      "mandatory_date": "2024-12-13",
+      "enforcement_date": "2024-12-13",
+      "affected_repository_sections": "docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md",
+      "priority": "high"
     }
   ]
 }

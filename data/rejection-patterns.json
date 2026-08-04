@@ -1295,6 +1295,30 @@
         "cancel subscription"
       ],
       "fix": "Add a prominent, dedicated, and easily accessible withdrawal button or function on the user interface, allowing consumers to withdraw from contracts/subscriptions without undue friction."
+    },
+    {
+      "id": "BOTH-GPSR-COMPLIANCE-MISSING",
+      "platform": "both",
+      "guideline": "Regulation (EU) 2023/988 (EU General Product Safety Regulation)",
+      "title": "Missing EU GPSR manufacturer info or product safety warning disclosures",
+      "severity": "high",
+      "detection": "E-commerce or digital product listing present but missing manufacturer email, postal address, or product safety warnings on the interface.",
+      "signals": [
+        "productListing",
+        "buyProduct",
+        "checkout",
+        "e-commerce",
+        "manufacturerInfo",
+        "safetyWarning"
+      ],
+      "counterSignals": [
+        "manufacturerEmail",
+        "manufacturerAddress",
+        "safetyLabel",
+        "productSafety",
+        "responsiblePerson"
+      ],
+      "fix": "Provide prominent manufacturer contact details (email and postal address) and any applicable product safety warnings directly on the product listing or online interface for any consumer goods distributed in the EU."
     }
   ]
 }
