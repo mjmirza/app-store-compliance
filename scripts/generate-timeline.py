@@ -3,7 +3,8 @@
 Loads regulatory deadlines from data/regulatory-deadlines.json, sorts them
 chronologically, evaluates active/overdue and approaching deadlines within
 90 days relative to today's UTC date, prints warnings to stderr, and writes
-a clean, emoji-free markdown timeline document to docs/REGULATORY-TIMELINE.md."""
+a clean, emoji-free markdown timeline document to docs/REGULATORY-TIMELINE.md.
+This script automatically regenerates and compiles the timeline of every regulatory deadline."""
 
 import os
 import sys
