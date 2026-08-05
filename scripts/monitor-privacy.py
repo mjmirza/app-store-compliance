@@ -537,24 +537,31 @@ def generate_pull_request_draft(updates, scan_results):
     Generates a draft of a pull request complying with the exact 15 required sections.
     """
     citations_list = []
+    citations_seen = set()
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    categories_processed = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
         status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
-        )
+        citation_text = f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
+        if citation_text not in citations_seen:
+            citations_seen.add(citation_text)
+            citations_list.append(citation_text)
 
         # Pull affected files
         files = scan_results.get(cat, [])
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in categories_processed:
+            continue
+        categories_processed.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,9 +762,15 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_tasks = set()
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
+        task_key = (cat, priority, is_verified)
+        if task_key in processed_tasks:
+            continue
+        processed_tasks.add(task_key)
+
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
             lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
