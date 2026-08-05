@@ -82,6 +82,82 @@ mk_web_clean() {
   echo "$d"
 }
 
+# Flutter with a required-reason plugin and no PrivacyInfo.xcprivacy anywhere.
+mk_flutter_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/lib"
+  printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/lib/main.dart"
+  printf '<plist><dict></dict></plist>' > "$d/ios/Runner/Info.plist"
+  echo "$d"
+}
+
+# React Native + an undisclosed OTA updater (CodePush).
+mk_rn_bad() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App"
+  printf '{"dependencies":{"react-native":"0.74.0","react-native-code-push":"^8.0.0"}}' > "$d/package.json"
+  printf 'import codePush from "react-native-code-push";\ncodePush.sync();\n' > "$d/App.tsx"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  echo "$d"
+}
+
+# Ionic/Capacitor thin wrapper. WebView present, fewer than 2 native-feel plugins.
+mk_ionic_thin_wrapper() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '{"dependencies":{"@capacitor/core":"^6.0.0","@ionic/angular":"^8.0.0"}}' > "$d/package.json"
+  printf 'export default {};' > "$d/capacitor.config.ts"
+  printf "import { Capacitor } from '@capacitor/core';\nconst wv = new WKWebView();\n" > "$d/src/app.ts"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  echo "$d"
+}
+
+# Same shape but with 3 distinct native-feel plugins. Thin-wrapper must NOT fire.
+mk_ionic_native_shell() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '{"dependencies":{"@capacitor/core":"^6.0.0","@ionic/angular":"^8.0.0"}}' > "$d/package.json"
+  printf 'export default {};' > "$d/capacitor.config.ts"
+  printf "import { Capacitor } from '@capacitor/core';\nimport '@capacitor/status-bar';\nimport '@capacitor/splash-screen';\nimport '@capacitor/push-notifications';\nconst wv = new WKWebView();\n" > "$d/src/app.ts"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  echo "$d"
+}
+
+# Flutter, Android-only (no ios/ folder at all). The iOS-only privacy-manifest check must
+# NOT fire, since flutter build appbundle/apk never touches Info.plist or PrivacyInfo.xcprivacy.
+mk_flutter_android_only() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/lib/main.dart"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+
+# Monorepo layout: root package.json is tooling-only, the real RN app lives at apps/mobile/.
+mk_rn_monorepo() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/mobile/ios/App"
+  printf '{"name":"tooling-root","private":true}' > "$d/package.json"
+  printf '{"dependencies":{"react-native":"0.74.0"}}' > "$d/apps/mobile/package.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/mobile/ios/App/Info.plist"
+  echo "$d"
+}
+
+# A config.xml that is NOT Cordova (no <widget>/xmlns:cdv marker). Must not flip IS_IONIC.
+mk_unrelated_config_xml() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App"
+  printf '<configuration><appSettings></appSettings></configuration>' > "$d/config.xml"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  echo "$d"
+}
+
+# The real-world Codex-found scenario: a full cross-platform Flutter repo with BOTH ios/ and
+# android/ folders committed (the normal case), building only for Android.
+mk_flutter_both_platforms() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/lib/main.dart"
+  printf '<plist><dict></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+
 # 1 positive. iOS with violations blocks
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "iOS violations block (exit 2, has CRITICAL)" || bad "iOS violations block"
@@ -188,6 +264,89 @@ if ! echo "$OUT" | grep -q 'BOTH-SUBSCRIPTION-HARD-CANCEL'; then
   ok "Subscription self-service cancel stays silent"
 else
   bad "Subscription self-service cancel stays silent"
+fi
+rm -rf "$D"
+
+# 18 Flutter framework detected + privacy manifest gap blocks
+D="$(mk_flutter_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if echo "$OUT" | grep -q 'Flutter=1' && echo "$OUT" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING' && [ "$RC" -eq 2 ]; then
+  ok "Flutter detected, missing privacy manifest blocks"
+else
+  bad "Flutter detected, missing privacy manifest blocks (rc=$RC)"
+fi
+rm -rf "$D"
+
+# 19 React Native + undisclosed CodePush OTA fires (non-critical, does not block alone)
+D="$(mk_rn_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'ReactNative/Expo=1' && echo "$OUT" | grep -q 'RN-OTA-UNDECLARED'; then
+  ok "React Native detected, undisclosed CodePush OTA fires"
+else
+  bad "React Native detected, undisclosed CodePush OTA fires"
+fi
+rm -rf "$D"
+
+# 20 Ionic thin wrapper (WebView, <2 native plugins) fires as HIGH (advisory heuristic, not a
+# hard blocker per council review, since plugin-count is a proxy, not the real Apple 4.2 test)
+D="$(mk_ionic_thin_wrapper)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=1' && echo "$OUT" | grep -q 'IONIC-4.2-THIN-WRAPPER'; then
+  ok "Ionic thin wrapper fires as high-severity advisory on 4.2 minimum functionality"
+else
+  bad "Ionic thin wrapper fires as high-severity advisory on 4.2 minimum functionality"
+fi
+rm -rf "$D"
+
+# 21 Ionic with 3 distinct native-feel plugins does NOT trip the thin-wrapper false positive
+D="$(mk_ionic_native_shell)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if ! echo "$OUT" | grep -q 'IONIC-4.2-THIN-WRAPPER'; then
+  ok "Ionic with real native plugin shell stays silent on thin-wrapper"
+else
+  bad "Ionic with real native plugin shell stays silent on thin-wrapper (false positive)"
+fi
+rm -rf "$D"
+
+# 22 Submission-command regex now catches Flutter, Capacitor, Ionic, EAS, Cordova build commands
+MISS_CMD=""
+for cmd in "flutter build ipa --release" "npx cap sync ios" "ionic capacitor build ios --prod" "eas build --platform ios" "cordova build ios --release"; do
+  OUT="$(printf '{"tool_input":{"command":"%s"}}' "$cmd" | bash "$GUARD" 2>&1)"
+  echo "$OUT" | grep -q 'App Store Compliance Guard' || MISS_CMD="$MISS_CMD [$cmd]"
+done
+[ -z "$MISS_CMD" ] && ok "Submission regex catches flutter/cap/ionic/eas/cordova build commands" || bad "Submission regex missed:$MISS_CMD"
+
+# 23 Council-found bug fix: Flutter Android-only build must NOT trigger the iOS-only privacy check
+D="$(mk_flutter_android_only)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING'; then
+  ok "Flutter Android-only build stays silent on iOS-only privacy check"
+else
+  bad "Flutter Android-only build wrongly fired the iOS-only privacy check (rc=$RC)"
+fi
+rm -rf "$D"
+
+# 24 Council-found bug fix: monorepo detection scans every package.json, not just the first
+D="$(mk_rn_monorepo)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'ReactNative/Expo=1'; then
+  ok "Monorepo React Native detected via nested apps/mobile/package.json"
+else
+  bad "Monorepo React Native detected via nested apps/mobile/package.json"
+fi
+rm -rf "$D"
+
+# 25 Council-found bug fix: an unrelated config.xml (no Cordova widget marker) must not flip IS_IONIC
+D="$(mk_unrelated_config_xml)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=0'; then
+  ok "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
+else
+  bad "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
+fi
+rm -rf "$D"
+
+# 26 Command overrides file-tree presence for a both-platforms repo (docs/CROSS-PLATFORM-FRAMEWORKS.md)
+D="$(mk_flutter_both_platforms)"
+OUT_APK="$(printf '{"tool_input":{"command":"flutter build apk --release"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"
+OUT_IPA="$(printf '{"tool_input":{"command":"flutter build ipa --release"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"
+if ! echo "$OUT_APK" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING' && echo "$OUT_IPA" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING'; then
+  ok "Command-aware gate: apk build silent, ipa build fires, on the SAME both-platforms repo"
+else
+  bad "Command-aware gate: apk build silent, ipa build fires, on the SAME both-platforms repo"
 fi
 rm -rf "$D"
 

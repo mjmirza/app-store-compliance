@@ -76,6 +76,12 @@
     "BOTH-SUBSCRIPTION-HARD-CANCEL": "grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'",
     "BOTH-E-EVIDENCE-COMPLIANCE-MISSING": "grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null",
     "BOTH-WITHDRAWAL-BUTTON-MISSING": "grep -rniE 'withdrawal button|withdrawal function|withdraw from contract|distance contract' . 2>/dev/null",
-    "BOTH-GPSR-COMPLIANCE-MISSING": "grep -rniE 'gpsr|general product safety|product safety|manufacturerInfo|safetyWarning' . 2>/dev/null"
+    "BOTH-GPSR-COMPLIANCE-MISSING": "grep -rniE 'gpsr|general product safety|product safety|manufacturerInfo|safetyWarning' . 2>/dev/null",
+    "FLUTTER-PRIVACY-MANIFEST-MISSING": "grep -q 'permission_handler\\|image_picker\\|geolocator\\|firebase_' pubspec.yaml 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
+    "RN-OTA-UNDECLARED": "grep -rn 'react-native-code-push\\|CodePush\\.\\|expo-updates' --include='*.ts' --include='*.tsx' --include='*.js' . 2>/dev/null",
+    "RN-PRIVACY-MANIFEST-MISSING": "grep -qE '\"react-native\"|\"expo\"' package.json 2>/dev/null && grep -rn 'Firebase\\|AsyncStorage\\|expo-file-system' --include='*.ts' --include='*.tsx' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
+    "IONIC-4.2-THIN-WRAPPER": "grep -rlE 'WKWebView|loadRequest|Capacitor|Cordova' --include='*.ts' --include='*.js' --include='*.swift' . 2>/dev/null | wc -l   # then count distinct @capacitor/(status-bar|splash-screen|push-notifications|haptics) markers, fewer than 2 is a thin wrapper",
+    "IONIC-UIWEBVIEW-DEPRECATED": "grep -rn 'UIWebView' --include='*.swift' --include='*.m' . 2>/dev/null",
+    "IONIC-PRIVACY-MANIFEST-MISSING": "grep -rq '@capacitor/\\|Capacitor\\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q ."
   }
 }
