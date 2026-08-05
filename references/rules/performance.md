@@ -1,6 +1,22 @@
 # Rules. Performance and completeness
 
-22 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+24 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+
+## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
+
+- Title. iCloud or CloudKit schema not deployed to production
+- Platform. apple
+- Guideline or policy. 2.1
+- Severity. critical
+- What triggers it. The app uses CloudKit or iCloud but the schema and containers are only in the development environment, so the feature fails for the reviewer on the production build.
+- How to fix it. Deploy the CloudKit schema and containers to production before submitting. Source. lukylab checklist.
+- Detection signals. CKContainer, CloudKit, NSUbiquitousKeyValueStore, iCloud
+
+How to detect.
+
+```bash
+grep -rn 'CKContainer\|CloudKit\|NSUbiquitousKeyValueStore' --include='*.swift' .   # then confirm the CloudKit schema is deployed to production in the CloudKit console
+```
 
 ## APPLE-2.1-MISSING-DEMO-ACCOUNT
 
@@ -34,20 +50,20 @@ How to detect.
 grep -rn 'localhost\|127.0.0.1\|staging\.\|ngrok\|http://' --include='*.swift' --include='*.plist' . | grep -v https
 ```
 
-## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
+## IONIC-UIWEBVIEW-DEPRECATED
 
-- Title. iCloud or CloudKit schema not deployed to production
+- Title. Deprecated UIWebView symbol statically linked
 - Platform. apple
-- Guideline or policy. 2.1
+- Guideline or policy. 2.5.1
 - Severity. critical
-- What triggers it. The app uses CloudKit or iCloud but the schema and containers are only in the development environment, so the feature fails for the reviewer on the production build.
-- How to fix it. Deploy the CloudKit schema and containers to production before submitting. Source. lukylab checklist.
-- Detection signals. CKContainer, CloudKit, NSUbiquitousKeyValueStore, iCloud
+- What triggers it. The literal UIWebView symbol appears anywhere in the built sources, often pulled in transitively by a stale Capacitor or Cordova plugin.
+- How to fix it. Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every plugin to a WKWebView-based version.
+- Detection signals. UIWebView
 
 How to detect.
 
 ```bash
-grep -rn 'CKContainer\|CloudKit\|NSUbiquitousKeyValueStore' --include='*.swift' .   # then confirm the CloudKit schema is deployed to production in the CloudKit console
+grep -rn 'UIWebView' --include='*.swift' --include='*.m' . 2>/dev/null
 ```
 
 ## WEB-GDPR-COMPLIANCE
@@ -67,6 +83,22 @@ How to detect.
 grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\|opt-in\|privacyConsent\|deletePersonalData\|exportData' .
 ```
 
+## APPLE-2.1-DEBUG-FEATURES
+
+- Title. Debug or test features shipped in the production build
+- Platform. apple
+- Guideline or policy. 2.1
+- Severity. high
+- What triggers it. Debug menus, test logins, or developer backdoors left visible in the release build rather than gated behind a debug only flag.
+- How to fix it. Hide debug and test features behind a debug only compile flag so they never ship in production. Source. lukylab checklist.
+- Detection signals. debug menu, debugMenu, test login, skip login, bypass auth, DEBUG_BYPASS
+
+How to detect.
+
+```bash
+grep -rni 'debug menu\|debugMenu\|skip login\|bypass auth\|DEBUG_BYPASS' --include='*.swift' .
+```
+
 ## APPLE-2.1-PLACEHOLDER-CONTENT
 
 - Title. Placeholder content in the build
@@ -81,6 +113,21 @@ How to detect.
 
 ```bash
 grep -rni 'lorem ipsum\|placeholder\|TODO\|FIXME\|example.com' --include='*.swift' --include='*.strings' .
+```
+
+## APPLE-2.1-REVIEW-NOTES-INCOMPLETE
+
+- Title. Review notes missing a required section for a new submission
+- Platform. apple
+- Guideline or policy. 2.1
+- Severity. high
+- What triggers it. New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.
+- How to fix it. Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules.
+
+How to detect.
+
+```bash
+use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
 ```
 
 ## APPLE-2.5.1-PRIVATE-API
@@ -99,6 +146,22 @@ How to detect.
 grep -rn 'UIWebView\|performSelector\|valueForKey' --include='*.swift' --include='*.m' .   # review any reflection or deprecated framework use
 ```
 
+## BOTH-E-EVIDENCE-COMPLIANCE-MISSING
+
+- Title. Missing legal representative or emergency data-production response procedures for the EU e-Evidence Package
+- Platform. both
+- Guideline or policy. Regulation (EU) 2023/1543 & Directive (EU) 2023/1544 (EU e-Evidence Package)
+- Severity. high
+- What triggers it. Apps/services processing user data in the EU that fail to designate a legal representative or lack internal procedures to respond to European Production/Preservation Orders within 10 days (or 8 hours for emergencies).
+- How to fix it. Designate an establishment or appoint a legal representative in the EU, notify contact details by August 18, 2026, and establish internal protocols to deliver user data securely within 8 hours in emergency situations.
+- Detection signals. e-Evidence, European Production Order, European Preservation Order, emergency data production, law enforcement request, legal representative
+
+How to detect.
+
+```bash
+grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null
+```
+
 ## BOTH-SDK-SUPPLY-CHAIN
 
 - Title. Third party SDK violates policy on the developer's behalf
@@ -108,35 +171,70 @@ grep -rn 'UIWebView\|performSelector\|valueForKey' --include='*.swift' --include
 - What triggers it. A bundled SDK requests permissions, tracks users, or behaves in ways the app does not declare. The developer is responsible for SDK behavior.
 - How to fix it. Vet every SDK, keep them current, and remove any that collect or share data the app does not declare.
 
-## APPLE-2.1-DEBUG-FEATURES
+## BOTH-SECURE-STORAGE
 
-- Title. Debug or test features shipped in the production build
-- Platform. apple
-- Guideline or policy. 2.1
+- Title. Sensitive tokens or credentials stored in insecure unencrypted formats
+- Platform. both
+- Guideline or policy. Data Security
 - Severity. high
-- What triggers it. Debug menus, test logins, or developer backdoors left visible in the release build rather than gated behind a debug only flag.
-- How to fix it. Hide debug and test features behind a debug only compile flag so they never ship in production. Source. lukylab checklist.
-- Detection signals. debug menu, debugMenu, test login, skip login, bypass auth, DEBUG_BYPASS
+- What triggers it. Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.
+- How to fix it. Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences.
+- Detection signals. UserDefaults.standard.set, getSharedPreferences
 
 How to detect.
 
 ```bash
-grep -rni 'debug menu\|debugMenu\|skip login\|bypass auth\|DEBUG_BYPASS' --include='*.swift' .
+grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|password\|credential\|secret\|jwt' && ! grep -rn 'Keychain\|SecItemAdd\|SecItemUpdate\|EncryptedSharedPreferences\|KeyStore\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent
 ```
 
-## APPLE-2.1-REVIEW-NOTES-INCOMPLETE
+## BOTH-UNSAFE-DEEPLINK
 
-- Title. Review notes missing a required section for a new submission
-- Platform. apple
-- Guideline or policy. 2.1
+- Title. Unsafe or unvalidated custom deep link URL schemes used for sensitive operations
+- Platform. both
+- Guideline or policy. Data Security
 - Severity. high
-- What triggers it. New submission review notes omit one of the six sections. Screen recording on a physical device, app purpose, access instructions and test credentials, external services list, regional differences, and regulated industry documentation.
-- How to fix it. Fill all six review notes sections using templates/REVIEW-NOTES-TEMPLATE.md. Source. truongduy2611 review_notes rules.
+- What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
+- How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
+- Detection signals. CFBundleURLSchemes, android:scheme
+- Present means handled. apple-app-site-association, assetlinks.json
 
 How to detect.
 
 ```bash
-use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections
+grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
+```
+
+## RN-OTA-UNDECLARED
+
+- Title. Undisclosed over-the-air JS bundle updater
+- Platform. apple
+- Guideline or policy. 3.3.2
+- Severity. high
+- What triggers it. package.json depends on react-native or expo, and an OTA updater (react-native-code-push, expo-updates, react-native-ota-hot-update, Stallion) is present with no App Review disclosure of bug-fix-only scope.
+- How to fix it. Name the OTA mechanism in App Review notes and restrict it to bug fixes that do not change purpose, UI, or features beyond what was reviewed (Apple 3.3.2, 2.5.2).
+- Detection signals. react-native-code-push, CodePush., expo-updates, Stallion
+
+How to detect.
+
+```bash
+grep -rn 'react-native-code-push\|CodePush\.\|expo-updates' --include='*.ts' --include='*.tsx' --include='*.js' . 2>/dev/null
+```
+
+## WEB-INDEXEDDB
+
+- Title. Structured personal data stored in IndexedDB without security controls
+- Platform. web
+- Guideline or policy. GDPR
+- Severity. high
+- What triggers it. Storing user records in IndexedDB without user consent, encryption, or proper deletion lifecycles.
+- How to fix it. Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout.
+- Detection signals. indexedDB.open, indexedDB, createObjectStore
+- Present means handled. encryptDatabase, deleteDatabase, consentIndexedDB
+
+How to detect.
+
+```bash
+grep -rn 'indexedDB.open\|indexedDB\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\|deleteDatabase\|consentIndexedDB' .
 ```
 
 ## WEB-LOCAL-STORAGE
@@ -173,23 +271,6 @@ How to detect.
 grep -rn 'sessionStorage.setItem\|sessionStorage' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptedSession\|clearSessionStorage' .
 ```
 
-## WEB-INDEXEDDB
-
-- Title. Structured personal data stored in IndexedDB without security controls
-- Platform. web
-- Guideline or policy. GDPR
-- Severity. high
-- What triggers it. Storing user records in IndexedDB without user consent, encryption, or proper deletion lifecycles.
-- How to fix it. Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout.
-- Detection signals. indexedDB.open, indexedDB, createObjectStore
-- Present means handled. encryptDatabase, deleteDatabase, consentIndexedDB
-
-How to detect.
-
-```bash
-grep -rn 'indexedDB.open\|indexedDB\|createObjectStore' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'encryptDatabase\|deleteDatabase\|consentIndexedDB' .
-```
-
 ## WEB-TRACKING-TECHNOLOGIES
 
 - Title. Third-party tracking technologies loaded without consent
@@ -207,69 +288,20 @@ How to detect.
 grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
 ```
 
-## BOTH-SECURE-STORAGE
+## APPLE-ACCESSIBILITY-COLORCONTRAST
 
-- Title. Sensitive tokens or credentials stored in insecure unencrypted formats
-- Platform. both
-- Guideline or policy. Data Security
-- Severity. high
-- What triggers it. Sensitive session credentials or tokens are saved directly to unencrypted plist, UserDefaults, or SharedPreferences instead of Keychain or Android Keystore / EncryptedSharedPreferences.
-- How to fix it. Store all sensitive data and access tokens in iOS Keychain or Android EncryptedSharedPreferences.
-- Detection signals. UserDefaults.standard.set, getSharedPreferences
-
-How to detect.
-
-```bash
-grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|password\|credential\|secret\|jwt' && ! grep -rn 'Keychain\|SecItemAdd\|SecItemUpdate\|EncryptedSharedPreferences\|KeyStore\|SQLCipher' .   # matches guard.sh: fires only when a sensitive keyword is present AND a secure-storage API is absent
-```
-
-## BOTH-UNSAFE-DEEPLINK
-
-- Title. Unsafe or unvalidated custom deep link URL schemes used for sensitive operations
-- Platform. both
-- Guideline or policy. Data Security
-- Severity. high
-- What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
-- How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
-- Detection signals. CFBundleURLSchemes, android:scheme
-- Present means handled. apple-app-site-association, assetlinks.json
-
-How to detect.
-
-```bash
-grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
-```
-
-## BOTH-E-EVIDENCE-COMPLIANCE-MISSING
-
-- Title. Missing legal representative or emergency data-production response procedures for the EU e-Evidence Package
-- Platform. both
-- Guideline or policy. Regulation (EU) 2023/1543 & Directive (EU) 2023/1544 (EU e-Evidence Package)
-- Severity. high
-- What triggers it. Apps/services processing user data in the EU that fail to designate a legal representative or lack internal procedures to respond to European Production/Preservation Orders within 10 days (or 8 hours for emergencies).
-- How to fix it. Designate an establishment or appoint a legal representative in the EU, notify contact details by August 18, 2026, and establish internal protocols to deliver user data securely within 8 hours in emergency situations.
-- Detection signals. e-Evidence, European Production Order, European Preservation Order, emergency data production, law enforcement request, legal representative
-
-How to detect.
-
-```bash
-grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null
-```
-
-## APPLE-ACCESSIBILITY-VOICEOVER
-
-- Title. VoiceOver support missing or incomplete
+- Title. Color Contrast and system settings ignored
 - Platform. apple
 - Guideline or policy. Design - Accessibility
 - Severity. medium
-- What triggers it. Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.
-- How to fix it. Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned.
-- Detection signals. UIAccessibility, accessibilityLabel, accessibilityIdentifier, isAccessibilityElement
+- What triggers it. Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.
+- How to fix it. Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically.
+- Detection signals. isDarkerSystemColorsEnabled, darkerSystemColors
 
 How to detect.
 
 ```bash
-python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-COLORCONTRAST
 ```
 
 ## APPLE-ACCESSIBILITY-DYNAMICTYPE
@@ -286,38 +318,6 @@ How to detect.
 
 ```bash
 python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-DYNAMICTYPE
-```
-
-## APPLE-ACCESSIBILITY-REDUCEMOTION
-
-- Title. Reduce Motion accessibility setting ignored
-- Platform. apple
-- Guideline or policy. Design - Accessibility
-- Severity. medium
-- What triggers it. Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.
-- How to fix it. Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user.
-- Detection signals. isReduceMotionEnabled, accessibilityReduceMotion
-
-How to detect.
-
-```bash
-python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-REDUCEMOTION
-```
-
-## APPLE-ACCESSIBILITY-COLORCONTRAST
-
-- Title. Color Contrast and system settings ignored
-- Platform. apple
-- Guideline or policy. Design - Accessibility
-- Severity. medium
-- What triggers it. Hardcoded custom colors used without supporting dark/light mode, high-contrast settings, or checking isDarkerSystemColorsEnabled.
-- How to fix it. Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically.
-- Detection signals. isDarkerSystemColorsEnabled, darkerSystemColors
-
-How to detect.
-
-```bash
-python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-COLORCONTRAST
 ```
 
 ## APPLE-ACCESSIBILITY-HAPTICS
@@ -350,4 +350,36 @@ How to detect.
 
 ```bash
 python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-KEYBOARD
+```
+
+## APPLE-ACCESSIBILITY-REDUCEMOTION
+
+- Title. Reduce Motion accessibility setting ignored
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Custom animations or transitions without checks for UIAccessibility.isReduceMotionEnabled or environment accessibilityReduceMotion.
+- How to fix it. Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user.
+- Detection signals. isReduceMotionEnabled, accessibilityReduceMotion
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-REDUCEMOTION
+```
+
+## APPLE-ACCESSIBILITY-VOICEOVER
+
+- Title. VoiceOver support missing or incomplete
+- Platform. apple
+- Guideline or policy. Design - Accessibility
+- Severity. medium
+- What triggers it. Interactive views or images without accessibilityLabel, accessibilityIdentifier, isAccessibilityElement, or accessibilityElement(children:) properties.
+- How to fix it. Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned.
+- Detection signals. UIAccessibility, accessibilityLabel, accessibilityIdentifier, isAccessibilityElement
+
+How to detect.
+
+```bash
+python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
 ```

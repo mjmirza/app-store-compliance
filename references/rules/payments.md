@@ -19,6 +19,22 @@ How to detect.
 grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' . && ! grep -rn 'StoreKit\|SKProduct\|Product.purchase' --include='*.swift' .
 ```
 
+## APPLE-GAMBLING-BRAZIL-LICENSE
+
+- Title. Missing Brazilian fixed-odds betting license
+- Platform. apple
+- Guideline or policy. 3.1.1
+- Severity. critical
+- What triggers it. An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.
+- How to fix it. Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification.
+- Detection signals. gambling, fixed-odds betting, Secretariat of Prizes and Bets, SPA license
+
+How to detect.
+
+```bash
+grep -rni 'gambling\|fixed-odds\|betting' --include='*.swift' .   # then verify the SPA license is provided in App Review Information for Brazil storefront
+```
+
 ## GOOGLE-PLAY-BILLING
 
 - Title. Digital goods sold without Play Billing
@@ -36,36 +52,19 @@ How to detect.
 grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' . && ! grep -rn 'BillingClient\|com.android.billingclient' .
 ```
 
-## APPLE-GAMBLING-BRAZIL-LICENSE
+## APPLE-3.1.2-MISLEADING-PRICING
 
-- Title. Missing Brazilian fixed-odds betting license
+- Title. Subscription shows the per month price more prominently than the billed amount
 - Platform. apple
-- Guideline or policy. 3.1.1
-- Severity. critical
-- What triggers it. An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.
-- How to fix it. Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification.
-- Detection signals. gambling, fixed-odds betting, Secretariat of Prizes and Bets, SPA license
-
-How to detect.
-
-```bash
-grep -rni 'gambling\|fixed-odds\|betting' --include='*.swift' .   # then verify the SPA license is provided in App Review Information for Brazil storefront
-```
-
-## BOTH-LOOTBOX-ODDS
-
-- Title. Random reward mechanic without disclosed odds
-- Platform. both
-- Guideline or policy. Apple 3.1.1, Google gambling
+- Guideline or policy. 3.1.2
 - Severity. high
-- What triggers it. Loot box, gacha, or random reward purchase present without odds disclosed before purchase.
-- How to fix it. Disclose the odds for every random reward before the user purchases.
-- Detection signals. lootbox, loot box, gacha, random reward, mystery box
+- What triggers it. Manual paywall check. An annual subscription shows a small per month figure large and the actual billed total small.
+- How to fix it. Show the actual amount the user will be charged at least as prominently as any per month figure. Source. truongduy2611 misleading_pricing rule.
 
 How to detect.
 
 ```bash
-grep -rni 'lootbox\|loot box\|gacha\|mystery box\|random reward' .
+python3 scripts/metadata-audit.py ./metadata
 ```
 
 ## APPLE-RESTORE-PURCHASES-MISSING
@@ -85,19 +84,20 @@ How to detect.
 grep -rn 'SKProduct\|Product.purchase\|StoreKit' --include='*.swift' . && ! grep -rn 'restorePurchases\|restoreCompletedTransactions\|AppStore.sync' --include='*.swift' .
 ```
 
-## APPLE-3.1.2-MISLEADING-PRICING
+## BOTH-LOOTBOX-ODDS
 
-- Title. Subscription shows the per month price more prominently than the billed amount
-- Platform. apple
-- Guideline or policy. 3.1.2
+- Title. Random reward mechanic without disclosed odds
+- Platform. both
+- Guideline or policy. Apple 3.1.1, Google gambling
 - Severity. high
-- What triggers it. Manual paywall check. An annual subscription shows a small per month figure large and the actual billed total small.
-- How to fix it. Show the actual amount the user will be charged at least as prominently as any per month figure. Source. truongduy2611 misleading_pricing rule.
+- What triggers it. Loot box, gacha, or random reward purchase present without odds disclosed before purchase.
+- How to fix it. Disclose the odds for every random reward before the user purchases.
+- Detection signals. lootbox, loot box, gacha, random reward, mystery box
 
 How to detect.
 
 ```bash
-python3 scripts/metadata-audit.py ./metadata
+grep -rni 'lootbox\|loot box\|gacha\|mystery box\|random reward' .
 ```
 
 ## BOTH-SUBSCRIPTION-HARD-CANCEL

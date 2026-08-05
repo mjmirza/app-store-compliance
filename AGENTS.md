@@ -106,6 +106,13 @@ Before certifying a release as clear to submit/ship, verify every item below. Ma
   * Rules Reference: `references/rules/export.md`
   * Platform Mechanics: `docs/PLATFORM-MECHANICS-2026.md`
 
+### 15. Cross-Platform Framework Coverage
+* **Verify.** If the project is Flutter (`pubspec.yaml`), React Native/Expo (`package.json` deps), or Ionic/Capacitor/Cordova (`capacitor.config.*`, `config.xml`, or matching deps), confirm the framework-specific findings are addressed. Watch for privacy manifest aggregation gaps for plugin-wrapped native SDKs, undisclosed OTA JS-bundle updaters, the Guideline 4.2 thin-WebView-wrapper rejection, and deprecated UIWebView linkage.
+* **Playbook Mapping**
+  - Doc. `docs/CROSS-PLATFORM-FRAMEWORKS.md`
+  - Guard. `agent-os/hooks/app-store-compliance-guard.sh` (Flutter/React Native/Ionic detection and checks)
+  - Patterns. `data/rejection-patterns.json` -> `FLUTTER-PRIVACY-MANIFEST-MISSING`, `RN-OTA-UNDECLARED`, `RN-PRIVACY-MANIFEST-MISSING`, `IONIC-4.2-THIN-WRAPPER`, `IONIC-UIWEBVIEW-DEPRECATED`, `IONIC-PRIVACY-MANIFEST-MISSING`
+
 ## Release-Time Action Flow
 
 For any software release, in this order:
