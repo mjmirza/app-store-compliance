@@ -1,17 +1,6 @@
 #!/usr/bin/env bash
-# App Store Compliance Guard
-# Scans a mobile app project for the rejection patterns that cause most App Store
-# and Google Play rejections, before a build is uploaded.
-#
-# Two modes.
-#   1. Standalone.  app-store-compliance-guard.sh /path/to/project
-#   2. agent-os PreToolUse hook on Bash. Fires only when the command looks like an
-#      app submission (fastlane, eas submit, xcrun altool, gradle bundleRelease,
-#      bundletool, xcodebuild archive). Blocks on a critical finding.
-#
-# Exit codes. 0 clean or advisory, 2 critical finding (blocks the submission).
-# Override the block with APP_STORE_GUARD_OK=1.
-#
+# App Store Compliance Guard. Native and cross-platform (Flutter, RN/Expo, Ionic/Capacitor).
+# Standalone or PreToolUse Bash hook on a submit command. See docs/CROSS-PLATFORM-FRAMEWORKS.md.
 # @event: PreToolUse
 # @matcher: Bash
 set -uo pipefail
@@ -38,7 +27,7 @@ fi
 if [ -n "$STDIN_JSON" ]; then
   CMD="$(printf '%s' "$STDIN_JSON" | grep -oE '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
   # Only act on submission style commands. Otherwise stay silent.
-  if ! printf '%s' "$CMD" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+submit|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive'; then
+  if ! printf '%s' "$CMD" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk)|(npx[[:space:]]+)?cap[[:space:]]+(sync|build|run)|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
@@ -52,7 +41,8 @@ FILELIST="$(mktemp 2>/dev/null || echo /tmp/ascg.$$)"
 find "$DIR" -type f \( \
   -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
   -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
-  -o -name '*.json' -o -name '*.js' -o -name '*.ts' -o -name '*.dart' -o -name '*.xcconfig' \
+  -o -name '*.json' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
+  -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
   -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' \
   \) 2>/dev/null \
   | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
@@ -110,9 +100,21 @@ find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
 find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
 find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep -q . && IS_WEB=1
 
+# ----- cross-platform framework detection -----
+# IS_IOS/IS_AND above still fire on the built artifact. This adds framework-specific checks.
+IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
+find "$DIR" -maxdepth 3 -name 'pubspec.yaml' 2>/dev/null | grep -q . && IS_FLUTTER=1
+PKGJSON="$(find "$DIR" -maxdepth 3 -name 'package.json' 2>/dev/null | grep -vE '/(node_modules|ios/Pods)/' | head -1)"
+if [ -n "$PKGJSON" ]; then
+  grep -qE '"react-native"|"expo"' "$PKGJSON" 2>/dev/null && IS_RN=1
+  grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$PKGJSON" 2>/dev/null && IS_IONIC=1
+fi
+find "$DIR" -maxdepth 3 \( -name 'capacitor.config.*' -o -name 'config.xml' \) 2>/dev/null | grep -q . && IS_IONIC=1
+
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
+echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC"
 echo ""
 
 # ----- run regulatory deadlines check -----
@@ -149,6 +151,49 @@ if grep_has 'iOS bug|apple bug|broken on iOS'; then
 fi
 if grep_has 'loot ?box|gacha|mystery box|random reward'; then
   finding high "BOTH-LOOTBOX-ODDS" "Random reward mechanic present" "Disclose the odds for every random reward before purchase (Apple 3.1.1, Google gambling)."
+fi
+
+# ===== Flutter checks =====
+if [ "$IS_FLUTTER" -eq 1 ]; then
+  if grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+      finding critical "FLUTTER-PRIVACY-MANIFEST-MISSING" "Flutter plugins that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere in the project" "Add an app-level PrivacyInfo.xcprivacy AND confirm each Flutter plugin ships its own (permission_handler, image_picker, and most first-party plugins added theirs from Flutter 3.19+). A missing plugin-level manifest is invisible to Apple's aggregator unless the app manifest also declares that plugin's reason codes."
+    fi
+  fi
+  if [ "$IS_IOS" -eq 0 ]; then
+    finding medium "FLUTTER-NO-IOS-RUNNER-FOUND" "No ios/Runner target detected next to pubspec.yaml" "Run flutter create . or confirm the ios/ platform folder exists before an iOS submission; this guard skipped every iOS-specific check because no Info.plist was found."
+  fi
+fi
+
+# ===== React Native / Expo checks =====
+if [ "$IS_RN" -eq 1 ]; then
+  if grep_has 'react-native-code-push|CodePush\.|expo-updates|Updates\.checkForUpdate|react-native-ota-hot-update|@stallion-js|Stallion\.'; then
+    if ! grep_has 'reviewNotes|App Review|bug.fix.only|bugfix.only'; then
+      finding high "RN-OTA-UNDECLARED" "An over-the-air JS bundle updater (CodePush, Expo Updates, or similar) is present" "Disclose the OTA mechanism by name in App Review notes, restrict its use to bug fixes that do not change the app's purpose, UI, or add features beyond what was reviewed (Apple 3.3.2, 2.5.2)."
+    fi
+  fi
+  if grep_has 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+      finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side."
+    fi
+  fi
+fi
+
+# ===== Ionic / Capacitor / Cordova checks =====
+if [ "$IS_IONIC" -eq 1 ]; then
+  WRAPPER_COUNT="$( [ -s "$FILELIST" ] && tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e 'WKWebView|loadRequest|Capacitor|Cordova' 2>/dev/null | wc -l | tr -d '[:space:]' || echo 0)"
+  NATIVE_PLUGIN_COUNT="$( [ -s "$FILELIST" ] && tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIho -e '@capacitor/(push-notifications|status-bar|splash-screen|haptics|share|camera|local-notifications)|cordova-plugin-(statusbar|splashscreen|push)' 2>/dev/null | sort -u | wc -l | tr -d '[:space:]' || echo 0)"
+  if [ "${WRAPPER_COUNT:-0}" -gt 0 ] && [ "${NATIVE_PLUGIN_COUNT:-0}" -lt 2 ]; then
+    finding critical "IONIC-4.2-THIN-WRAPPER" "WebView/Capacitor/Cordova present with fewer than 2 native-feel plugins (status bar, splash screen, push, haptics)" "Apple 4.2 Minimum Functionality is the single most common Ionic rejection: a full-screen webview with no native chrome reads as a website, not an app. Add native Capacitor/Cordova plugins for status bar, splash transition, push notifications, and haptics, or ship as an installable PWA to skip App Review entirely."
+  fi
+  if grep_has 'UIWebView'; then
+    finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it."
+  fi
+  if grep_has '@capacitor/|Capacitor\.'; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+      finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one."
+    fi
+  fi
 fi
 
 # ===== iOS checks =====

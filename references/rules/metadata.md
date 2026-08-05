@@ -11,6 +11,15 @@
 - What triggers it. Manual check. The updated age rating questions (13 plus, 16 plus, 18 plus) must be answered by 31 January 2026 to submit updates.
 - How to fix it. Answer the updated age rating questionnaire in App Store Connect for every app.
 
+## APPLE-5.2.5-APPLE-DEVICE-IMAGE
+
+- Title. Apple device image or Apple trademark in the icon or screenshots
+- Platform. apple
+- Guideline or policy. 5.2.5
+- Severity. high
+- What triggers it. Manual metadata check. The app icon or screenshots show an Apple device, the Apple logo, or imply Apple endorsement.
+- How to fix it. Remove Apple device images and Apple marks from the icon and screenshots. Source. truongduy2611 apple_trademark rule.
+
 ## BOTH-UNREACHABLE-METADATA-URL
 
 - Title. Broken support, marketing, or privacy URL in the listing
@@ -25,15 +34,6 @@ How to detect.
 ```bash
 python3 scripts/metadata-audit.py ./metadata --check-urls
 ```
-
-## APPLE-5.2.5-APPLE-DEVICE-IMAGE
-
-- Title. Apple device image or Apple trademark in the icon or screenshots
-- Platform. apple
-- Guideline or policy. 5.2.5
-- Severity. high
-- What triggers it. Manual metadata check. The app icon or screenshots show an Apple device, the Apple logo, or imply Apple endorsement.
-- How to fix it. Remove Apple device images and Apple marks from the icon and screenshots. Source. truongduy2611 apple_trademark rule.
 
 ## CHINA-AI-REFERENCES
 
@@ -53,21 +53,6 @@ python3 scripts/metadata-audit.py ./metadata --check-urls
 - What triggers it. Strings such as Android, Google Play, or alternative marketplace names found in app facing copy or metadata.
 - How to fix it. Remove references to other platforms and marketplaces from the app and metadata.
 - Detection signals. Google Play, available on Android, download on the Play Store
-
-How to detect.
-
-```bash
-python3 scripts/metadata-audit.py ./metadata
-```
-
-## BOTH-METADATA-DECORATION
-
-- Title. Metadata field overflow or banned decoration
-- Platform. both
-- Guideline or policy. Apple 2.3.7, Google Store Listing
-- Severity. medium
-- What triggers it. App name over the limit (Apple 30, Google 30), emoji in the title, all caps, or ranking and price claims such as number one, best, top, or free in the title or icon.
-- How to fix it. Keep each metadata field within its limit and remove emoji, all caps, and ranking or price claims from the title and icon.
 
 How to detect.
 
@@ -115,3 +100,18 @@ python3 scripts/metadata-audit.py ./metadata
 - Severity. medium
 - What triggers it. Manual metadata check. The app preview video wraps the app in a device frame instead of showing the app full screen.
 - How to fix it. Capture the preview video full screen from the device, without a device frame overlay.
+
+## BOTH-METADATA-DECORATION
+
+- Title. Metadata field overflow or banned decoration
+- Platform. both
+- Guideline or policy. Apple 2.3.7, Google Store Listing
+- Severity. medium
+- What triggers it. App name over the limit (Apple 30, Google 30), emoji in the title, all caps, or ranking and price claims such as number one, best, top, or free in the title or icon.
+- How to fix it. Keep each metadata field within its limit and remove emoji, all caps, and ranking or price claims from the title and icon.
+
+How to detect.
+
+```bash
+python3 scripts/metadata-audit.py ./metadata
+```
