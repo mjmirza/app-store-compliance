@@ -1219,8 +1219,8 @@
       "guideline": "4.2",
       "framework": "ionic-capacitor",
       "title": "Thin WebView wrapper with insufficient native functionality",
-      "severity": "critical",
-      "detection": "A Capacitor/Cordova/WKWebView marker is present alongside fewer than 2 distinct native-feel plugins (status bar, splash screen, push notifications, haptics, share, camera, local notifications).",
+      "severity": "high",
+      "detection": "A Capacitor/Cordova/WKWebView marker is present alongside fewer than 2 distinct native-feel plugins (status bar, splash screen, push notifications, haptics, share, camera, local notifications). This is a heuristic proxy for the real Apple 4.2 test (features/content/UI beyond a repackaged website), reviewed manually before treating as a blocker.",
       "signals": [
         "WKWebView",
         "Capacitor",

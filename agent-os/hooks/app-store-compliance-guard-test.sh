@@ -120,6 +120,33 @@ mk_ionic_native_shell() {
   echo "$d"
 }
 
+# Flutter, Android-only (no ios/ folder at all). The iOS-only privacy-manifest check must
+# NOT fire, since flutter build appbundle/apk never touches Info.plist or PrivacyInfo.xcprivacy.
+mk_flutter_android_only() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/lib/main.dart"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+
+# Monorepo layout: root package.json is tooling-only, the real RN app lives at apps/mobile/.
+mk_rn_monorepo() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/mobile/ios/App"
+  printf '{"name":"tooling-root","private":true}' > "$d/package.json"
+  printf '{"dependencies":{"react-native":"0.74.0"}}' > "$d/apps/mobile/package.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/mobile/ios/App/Info.plist"
+  echo "$d"
+}
+
+# A config.xml that is NOT Cordova (no <widget>/xmlns:cdv marker). Must not flip IS_IONIC.
+mk_unrelated_config_xml() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App"
+  printf '<configuration><appSettings></appSettings></configuration>' > "$d/config.xml"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  echo "$d"
+}
+
 # 1 positive. iOS with violations blocks
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "iOS violations block (exit 2, has CRITICAL)" || bad "iOS violations block"
@@ -247,12 +274,13 @@ else
 fi
 rm -rf "$D"
 
-# 20 Ionic thin wrapper (WebView, <2 native plugins) blocks on 4.2
-D="$(mk_ionic_thin_wrapper)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=1' && echo "$OUT" | grep -q 'IONIC-4.2-THIN-WRAPPER' && [ "$RC" -eq 2 ]; then
-  ok "Ionic thin wrapper blocks on 4.2 minimum functionality"
+# 20 Ionic thin wrapper (WebView, <2 native plugins) fires as HIGH (advisory heuristic, not a
+# hard blocker per council review, since plugin-count is a proxy, not the real Apple 4.2 test)
+D="$(mk_ionic_thin_wrapper)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=1' && echo "$OUT" | grep -q 'IONIC-4.2-THIN-WRAPPER'; then
+  ok "Ionic thin wrapper fires as high-severity advisory on 4.2 minimum functionality"
 else
-  bad "Ionic thin wrapper blocks on 4.2 minimum functionality (rc=$RC)"
+  bad "Ionic thin wrapper fires as high-severity advisory on 4.2 minimum functionality"
 fi
 rm -rf "$D"
 
@@ -272,6 +300,33 @@ for cmd in "flutter build ipa --release" "npx cap sync ios" "ionic capacitor bui
   echo "$OUT" | grep -q 'App Store Compliance Guard' || MISS_CMD="$MISS_CMD [$cmd]"
 done
 [ -z "$MISS_CMD" ] && ok "Submission regex catches flutter/cap/ionic/eas/cordova build commands" || bad "Submission regex missed:$MISS_CMD"
+
+# 23 Council-found bug fix: Flutter Android-only build must NOT trigger the iOS-only privacy check
+D="$(mk_flutter_android_only)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING'; then
+  ok "Flutter Android-only build stays silent on iOS-only privacy check"
+else
+  bad "Flutter Android-only build wrongly fired the iOS-only privacy check (rc=$RC)"
+fi
+rm -rf "$D"
+
+# 24 Council-found bug fix: monorepo detection scans every package.json, not just the first
+D="$(mk_rn_monorepo)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'ReactNative/Expo=1'; then
+  ok "Monorepo React Native detected via nested apps/mobile/package.json"
+else
+  bad "Monorepo React Native detected via nested apps/mobile/package.json"
+fi
+rm -rf "$D"
+
+# 25 Council-found bug fix: an unrelated config.xml (no Cordova widget marker) must not flip IS_IONIC
+D="$(mk_unrelated_config_xml)"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=0'; then
+  ok "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
+else
+  bad "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
+fi
+rm -rf "$D"
 
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

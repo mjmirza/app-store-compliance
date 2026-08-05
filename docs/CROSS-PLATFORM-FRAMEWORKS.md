@@ -14,7 +14,16 @@ generated the app, on top of the native checks.
 | Ionic / Capacitor / Cordova | `package.json` dependency on `@capacitor/*`, `@ionic/*`, or `cordova-*`, OR a `capacitor.config.*` / `config.xml` file |
 
 A project can match more than one framework flag (a Capacitor app that also
-imports `expo` polyfills, for example); every matching check runs.
+imports `expo` polyfills, for example); every matching check runs. Detection scans
+EVERY `package.json`/`config.xml` within depth, not only the first, so a monorepo
+whose root `package.json` is tooling-only still finds the real app deeper in the
+tree. A `config.xml` only counts as Cordova evidence when it carries a `<widget>`
+or `xmlns:cdv` marker, since that filename collides with unrelated tooling configs.
+
+Every framework-specific finding below is gated on `IS_IOS` (an `Info.plist` or
+Xcode project detected). All of it is Apple-specific policy (Guideline 4.2,
+3.3.2, the PrivacyInfo.xcprivacy requirement), so an Android-only build such as
+`flutter build appbundle` or `flutter build apk` never trips these checks.
 
 ## Submission commands the guard recognizes
 
@@ -56,19 +65,48 @@ before submitting.
 
 ## Ionic / Capacitor / Cordova checks
 
-- `IONIC-4.2-THIN-WRAPPER` (critical). The single most common Ionic rejection.
-  A WebView/Capacitor/Cordova marker is present with fewer than 2 DISTINCT
-  native-feel plugins (status bar, splash screen, push notifications, haptics,
-  share, camera, local notifications). Counts distinct plugin identifiers, not
-  files, so multiple plugin imports in one bootstrap file are counted correctly.
-  Fix by adding native chrome plugins, or ship as an installable PWA to skip App
-  Review entirely.
+- `IONIC-4.2-THIN-WRAPPER` (high, advisory). The single most common Ionic
+  rejection reason in the wild, but this check is a HEURISTIC PROXY, not the
+  actual Apple 4.2 test, which is about features, content, and UI beyond a
+  repackaged website, not a plugin count. A real app using unmatched plugins
+  (`@capacitor/preferences`, private native plugins) can false-positive; a thin
+  wrapper that imports two matched plugins for cosmetic reasons can false-negative.
+  Review manually before treating this as a hard blocker. Counts distinct plugin
+  identifiers, not files, so multiple plugin imports in one bootstrap file are
+  counted correctly.
 - `IONIC-UIWEBVIEW-DEPRECATED` (critical). The literal `UIWebView` symbol,
   usually pulled in by a stale plugin even when app code never references it
   directly. Apple auto-rejects (ITMS-90809) any binary that statically links it.
 - `IONIC-PRIVACY-MANIFEST-MISSING` (high). Capacitor/Cordova plugin manifest
   support is less standardized than Flutter's. Verify each plugin wrapping a
   native SDK ships its own `PrivacyInfo.xcprivacy`.
+
+## Known gaps (found by a Codex adversarial review, not yet fixed)
+
+- **Android-side framework checks are absent.** Every check in this doc is
+  Apple-side. Flutter/RN/Ionic apps also ship to Google Play, where Data Safety
+  disclosure for bundled SDKs, WebView-controlled data collection, cleartext
+  traffic, and mixed-content/debug flags are real, framework-relevant risks this
+  guard does not yet check.
+- **The PrivacyInfo.xcprivacy presence check is both too loose and too strict.**
+  It accepts a manifest found anywhere, including inside `node_modules` or
+  `Pods`, which does not prove an APP-LEVEL manifest exists. It also has no
+  Expo-managed-workflow awareness (`expo.ios.privacyManifests` in `app.json`
+  can be valid with no `ios/PrivacyInfo.xcprivacy` on disk yet, since EAS
+  generates the native project remotely at build time).
+- **Expo Continuous Native Generation (CNG) is not modeled.** A managed Expo
+  project legitimately has no committed `ios/`/`android/` folder; treating that
+  as "no iOS target" is not always correct.
+- **Other cross-platform frameworks have no coverage.** NativeScript,
+  Xamarin/.NET MAUI, Kotlin Multiplatform, Unity (mobile export), and Tauri
+  Mobile are not detected at all.
+- **The submission regex still misses a few real commands**
+  (`eas build` with no platform flag, ambiguous local `cap run` without a
+  release intent) and can overfire on non-release local dev commands.
+
+These are logged, not hidden. Track them before treating this guard as complete
+coverage for a cross-platform team; the checks that exist are a real
+improvement over native-only, not a finished answer.
 
 ## The honest limit
 

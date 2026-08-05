@@ -2,22 +2,6 @@
 
 4 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
-## IONIC-4.2-THIN-WRAPPER
-
-- Title. Thin WebView wrapper with insufficient native functionality
-- Platform. apple
-- Guideline or policy. 4.2
-- Severity. critical
-- What triggers it. A Capacitor/Cordova/WKWebView marker is present alongside fewer than 2 distinct native-feel plugins (status bar, splash screen, push notifications, haptics, share, camera, local notifications).
-- How to fix it. Apple 4.2 Minimum Functionality is the single most common Ionic rejection. Add native Capacitor/Cordova plugins for status bar, splash transition, push, and haptics, or ship as an installable PWA to skip App Review.
-- Detection signals. WKWebView, Capacitor, Cordova
-
-How to detect.
-
-```bash
-grep -rlE 'WKWebView|loadRequest|Capacitor|Cordova' --include='*.ts' --include='*.js' --include='*.swift' . 2>/dev/null | wc -l   # then count distinct @capacitor/(status-bar|splash-screen|push-notifications|haptics) markers, fewer than 2 is a thin wrapper
-```
-
 ## APPLE-4.0-SIWA-UX
 
 - Title. Sign in with Apple UX violation
@@ -66,4 +50,20 @@ How to detect.
 
 ```bash
 grep -rn 'FacebookLogin\|GoogleSignIn\|GIDSignIn' --include='*.swift' . && ! grep -rn 'SignInWithApple\|ASAuthorizationAppleIDProvider' --include='*.swift' .
+```
+
+## IONIC-4.2-THIN-WRAPPER
+
+- Title. Thin WebView wrapper with insufficient native functionality
+- Platform. apple
+- Guideline or policy. 4.2
+- Severity. high
+- What triggers it. A Capacitor/Cordova/WKWebView marker is present alongside fewer than 2 distinct native-feel plugins (status bar, splash screen, push notifications, haptics, share, camera, local notifications). This is a heuristic proxy for the real Apple 4.2 test (features/content/UI beyond a repackaged website), reviewed manually before treating as a blocker.
+- How to fix it. Apple 4.2 Minimum Functionality is the single most common Ionic rejection. Add native Capacitor/Cordova plugins for status bar, splash transition, push, and haptics, or ship as an installable PWA to skip App Review.
+- Detection signals. WKWebView, Capacitor, Cordova
+
+How to detect.
+
+```bash
+grep -rlE 'WKWebView|loadRequest|Capacitor|Cordova' --include='*.ts' --include='*.js' --include='*.swift' . 2>/dev/null | wc -l   # then count distinct @capacitor/(status-bar|splash-screen|push-notifications|haptics) markers, fewer than 2 is a thin wrapper
 ```
