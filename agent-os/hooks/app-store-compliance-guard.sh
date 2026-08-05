@@ -18,6 +18,7 @@ trap cleanup EXIT
 # ----- resolve mode and project dir -----
 DIR=""
 STDIN_JSON=""
+CMD=""
 if [ "$#" -ge 1 ] && [ -d "$1" ]; then
   DIR="$1"                                   # standalone with explicit path
 elif [ ! -t 0 ]; then
@@ -31,6 +32,15 @@ if [ -n "$STDIN_JSON" ]; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+fi
+
+# See docs/CROSS-PLATFORM-FRAMEWORKS.md: an Android-only command beats a committed ios/
+# folder for the Apple-only checks below (standalone mode has no CMD, unaffected).
+CMD_TARGET_ANDROID_ONLY=0
+if [ -n "$CMD" ] \
+  && printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b' \
+  && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; then
+  CMD_TARGET_ANDROID_ONLY=1
 fi
 
 [ -z "$DIR" ] && DIR="$PWD"
@@ -117,10 +127,16 @@ while IFS= read -r cfg; do
   grep -qE '<widget|xmlns:cdv' "$cfg" 2>/dev/null && IS_IONIC=1
 done < <(find "$DIR" -maxdepth 4 -name 'config.xml' 2>/dev/null)
 
+# The actual gate the framework checks below use: a committed ios/ folder AND the
+# invoking command (when known) does not explicitly target Android-only.
+IOS_TARGET_ACTIVE=0
+[ "$IS_IOS" -eq 1 ] && [ "$CMD_TARGET_ANDROID_ONLY" -eq 0 ] && IOS_TARGET_ACTIVE=1
+
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC"
+[ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only framework checks suppressed for this run."
 echo ""
 
 # ----- run regulatory deadlines check -----
@@ -162,7 +178,7 @@ fi
 # ===== Flutter checks =====
 # iOS-only Apple requirement, gated on IS_IOS so an Android-only build is never blocked for it.
 if [ "$IS_FLUTTER" -eq 1 ]; then
-  if [ "$IS_IOS" -eq 1 ] && grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
+  if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
     if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
       finding critical "FLUTTER-PRIVACY-MANIFEST-MISSING" "Flutter plugins that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere in the project" "Add an app-level PrivacyInfo.xcprivacy AND confirm each Flutter plugin ships its own (permission_handler, image_picker, and most first-party plugins added theirs from Flutter 3.19+). A missing plugin-level manifest is invisible to Apple's aggregator unless the app manifest also declares that plugin's reason codes. This check only runs against an iOS target."
     fi
@@ -174,7 +190,7 @@ fi
 
 # ===== React Native / Expo checks =====
 # Both findings are Apple-specific (3.3.2/2.5.2 disclosure, iOS privacy manifest), IS_IOS-gated.
-if [ "$IS_RN" -eq 1 ] && [ "$IS_IOS" -eq 1 ]; then
+if [ "$IS_RN" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if grep_has 'react-native-code-push|CodePush\.|expo-updates|Updates\.checkForUpdate|react-native-ota-hot-update|@stallion-js|Stallion\.'; then
     if ! grep_has 'reviewNotes|App Review|bug.fix.only|bugfix.only'; then
       finding high "RN-OTA-UNDECLARED" "An over-the-air JS bundle updater (CodePush, Expo Updates, or similar) is present" "Disclose the OTA mechanism by name in App Review notes, restrict its use to bug fixes that do not change the app's purpose, UI, or add features beyond what was reviewed (Apple 3.3.2, 2.5.2)."
@@ -189,7 +205,7 @@ fi
 
 # ===== Ionic / Capacitor / Cordova checks =====
 # All three are Apple-side (4.2, UIWebView, iOS privacy manifest), IS_IOS-gated as above.
-if [ "$IS_IONIC" -eq 1 ] && [ "$IS_IOS" -eq 1 ]; then
+if [ "$IS_IONIC" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   WRAPPER_COUNT="$( [ -s "$FILELIST" ] && tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e 'WKWebView|loadRequest|Capacitor|Cordova' 2>/dev/null | wc -l | tr -d '[:space:]' || echo 0)"
   NATIVE_PLUGIN_COUNT="$( [ -s "$FILELIST" ] && tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIho -e '@capacitor/(push-notifications|status-bar|splash-screen|haptics|share|camera|local-notifications)|cordova-plugin-(statusbar|splashscreen|push)' 2>/dev/null | sort -u | wc -l | tr -d '[:space:]' || echo 0)"
   if [ "${WRAPPER_COUNT:-0}" -gt 0 ] && [ "${NATIVE_PLUGIN_COUNT:-0}" -lt 2 ]; then

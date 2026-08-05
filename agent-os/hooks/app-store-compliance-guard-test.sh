@@ -147,6 +147,17 @@ mk_unrelated_config_xml() {
   echo "$d"
 }
 
+# The real-world Codex-found scenario: a full cross-platform Flutter repo with BOTH ios/ and
+# android/ folders committed (the normal case), building only for Android.
+mk_flutter_both_platforms() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/lib/main.dart"
+  printf '<plist><dict></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+
 # 1 positive. iOS with violations blocks
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "iOS violations block (exit 2, has CRITICAL)" || bad "iOS violations block"
@@ -325,6 +336,17 @@ if echo "$OUT" | grep -q 'Ionic/Capacitor/Cordova=0'; then
   ok "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
 else
   bad "Unrelated config.xml (no widget marker) stays silent on Ionic detection"
+fi
+rm -rf "$D"
+
+# 26 Command overrides file-tree presence for a both-platforms repo (docs/CROSS-PLATFORM-FRAMEWORKS.md)
+D="$(mk_flutter_both_platforms)"
+OUT_APK="$(printf '{"tool_input":{"command":"flutter build apk --release"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"
+OUT_IPA="$(printf '{"tool_input":{"command":"flutter build ipa --release"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"
+if ! echo "$OUT_APK" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING' && echo "$OUT_IPA" | grep -q 'FLUTTER-PRIVACY-MANIFEST-MISSING'; then
+  ok "Command-aware gate: apk build silent, ipa build fires, on the SAME both-platforms repo"
+else
+  bad "Command-aware gate: apk build silent, ipa build fires, on the SAME both-platforms repo"
 fi
 rm -rf "$D"
 
