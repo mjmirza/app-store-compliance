@@ -46,6 +46,36 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of document generation (APPLE-POLICY-MIGRATION.md and APPLE_COMPLIANCE_PR_DRAFT.md)
+[ -f "docs/APPLE-POLICY-MIGRATION.md" ] && ok "APPLE-POLICY-MIGRATION.md was generated successfully" || bad "APPLE-POLICY-MIGRATION.md missing"
+[ -f "docs/APPLE_COMPLIANCE_PR_DRAFT.md" ] && ok "APPLE_COMPLIANCE_PR_DRAFT.md was generated successfully" || bad "APPLE_COMPLIANCE_PR_DRAFT.md missing"
+
+# Ensure 15 section headers are present in APPLE_COMPLIANCE_PR_DRAFT.md
+DRAFT="docs/APPLE_COMPLIANCE_PR_DRAFT.md"
+grep -q "## Summary" "$DRAFT" && \
+grep -q "## Background" "$DRAFT" && \
+grep -q "## Regulatory change" "$DRAFT" && \
+grep -q "## Official citations" "$DRAFT" && \
+grep -q "## Affected files" "$DRAFT" && \
+grep -q "## Risk assessment" "$DRAFT" && \
+grep -q "## Migration steps" "$DRAFT" && \
+grep -q "## Backward compatibility" "$DRAFT" && \
+grep -q "## Implementation checklist" "$DRAFT" && \
+grep -q "## Testing checklist" "$DRAFT" && \
+grep -q "## Documentation checklist" "$DRAFT" && \
+grep -q "## Compliance impact" "$DRAFT" && \
+grep -q "## Breaking changes" "$DRAFT" && \
+grep -q "## Review checklist" "$DRAFT" && \
+grep -q "## Approver recommendations" "$DRAFT" && \
+ok "APPLE_COMPLIANCE_PR_DRAFT.md contains exactly 15 required sections" || bad "APPLE_COMPLIANCE_PR_DRAFT.md sections count/presence"
+
+# Ensure no emojis in generated files
+python3 -c 'import sys; text = open("docs/APPLE_COMPLIANCE_PR_DRAFT.md").read() + open("docs/APPLE-POLICY-MIGRATION.md").read(); has_emoji = any(ord(char) > 0x1F000 for char in text); sys.exit(1 if has_emoji else 0)' && ok "Generated files are completely emoji-free" || bad "emoji present in generated files"
+
+# 8. Suppressed logs on stdout in JSON mode
+OUT_JSON_RAW="$($MONITOR --simulate "Privacy Manifests" --json)"
+echo "$OUT_JSON_RAW" | python3 -c "import sys, json; data = json.load(sys.stdin); assert len(data) > 0" 2>/dev/null && ok "stdout contains only valid JSON when running in JSON mode" || bad "stdout pollution or invalid JSON in JSON mode"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
