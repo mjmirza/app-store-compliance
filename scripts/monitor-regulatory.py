@@ -1093,6 +1093,52 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+def update_documentation_report(report_items, output_filepath, silent=False):
+    """
+    Writes or updates the migration report in docs/REGULATORY-POLICY-MIGRATION.md.
+    """
+    lines = [
+        "<!-- REGULATORY_POLICY_MONITOR_START -->",
+        "# Global Regulatory Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments and compliance requirements.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    for item in report_items:
+        track = item["track"]
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Regulatory Impact**: {item['compliance_impact']} priority. Action required to align with global distribution gates.")
+        for task in item["migration_tasks"]:
+            lines.append(f"- [ ] **Task**: {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        if not silent:
+            print(f"Regulatory documentation updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regulatory Intelligence Agent Monitor."
@@ -1111,12 +1157,52 @@ def main():
     parser.add_argument(
         "--verbose", action="store_true", help="Print verbose execution logs"
     )
+    parser.add_argument(
+        "--output-docs",
+        default="docs/REGULATORY-POLICY-MIGRATION.md",
+        help="Filepath to write migration tasks / docs updates",
+    )
+    parser.add_argument(
+        "--pr-output",
+        default="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
+    )
 
     args = parser.parse_args()
 
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    # Automatically generate files
+    if report_items:
+        # Write doc update
+        update_documentation_report(report_items, args.output_docs, silent=args.json)
+
+        # Write PR draft if a valid PR is proposed
+        pr_written = False
+        for item in report_items:
+            pr = item.get("proposed_pull_request")
+            if pr and pr.get("description"):
+                try:
+                    os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+                    with open(args.pr_output, "w", encoding="utf-8") as f:
+                        f.write(pr["description"])
+                    if not args.json:
+                        print(f"PR Draft successfully written to: {args.pr_output}")
+                    pr_written = True
+                    break
+                except Exception as e:
+                    print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
+
+        if not pr_written:
+            # If all were blocked, we can write a brief message or leave it blank
+            try:
+                os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write("# PR Draft Blocked\n\nAll detected regulatory announcements are from unverified sources.")
+            except Exception:
+                pass
 
     if args.json:
         print(json.dumps(report_items, indent=2))

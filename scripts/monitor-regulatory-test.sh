@@ -109,6 +109,37 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify file generation of regulatory report and PR draft
+echo "[TEST] Verifying generation of REGULATORY-POLICY-MIGRATION.md and REGULATORY_COMPLIANCE_PR_DRAFT.md..."
+# Clear previously generated files first
+rm -f "$REPO_ROOT/docs/REGULATORY-POLICY-MIGRATION.md" "$REPO_ROOT/docs/REGULATORY_COMPLIANCE_PR_DRAFT.md"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" > /dev/null
+
+if [ ! -f "$REPO_ROOT/docs/REGULATORY-POLICY-MIGRATION.md" ]; then
+  echo "[ERROR] REGULATORY-POLICY-MIGRATION.md was not generated"
+  exit 1
+fi
+if [ ! -f "$REPO_ROOT/docs/REGULATORY_COMPLIANCE_PR_DRAFT.md" ]; then
+  echo "[ERROR] REGULATORY_COMPLIANCE_PR_DRAFT.md was not generated"
+  exit 1
+fi
+
+# Verify REGULATORY-POLICY-MIGRATION.md content
+if ! grep -q "## Automated Migration Recommendations & Implementation Tasks" "$REPO_ROOT/docs/REGULATORY-POLICY-MIGRATION.md"; then
+  echo "[ERROR] REGULATORY-POLICY-MIGRATION.md content is incomplete or incorrect"
+  exit 1
+fi
+
+# Verify REGULATORY_COMPLIANCE_PR_DRAFT.md content
+for sect in "${SECTIONS[@]}"; do
+  if ! grep -q "## $sect" "$REPO_ROOT/docs/REGULATORY_COMPLIANCE_PR_DRAFT.md"; then
+    echo "[ERROR] Missing expected section in REGULATORY_COMPLIANCE_PR_DRAFT.md: $sect"
+    exit 1
+  fi
+done
+echo "[PASS] Successfully generated and verified REGULATORY-POLICY-MIGRATION.md and REGULATORY_COMPLIANCE_PR_DRAFT.md"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
