@@ -340,3 +340,20 @@ Tokens (Access Tokens, Refresh Tokens, JWTs) are sensitive authorization credent
 - **No Disk Leakage:** Never write tokens to regular files, unencrypted SQLite databases, standard logs, or console output (`NSLog`, `print`, `Log.d`).
 - **Secure Vaulting:** Store tokens strictly inside the **iOS Keychain** or **Android EncryptedSharedPreferences** / Keystore-encrypted database.
 - **Refresh Token Isolation:** Refresh tokens have long lifetimes and must be protected with additional security constraints (e.g., biometrics required or scoped to `ThisDeviceOnly`). Access tokens should be short-lived (e.g., 15 minutes), with refresh tokens rotated on each use.
+
+---
+
+## 18. Continuous Security Auditing & Verification
+
+To maintain complete compliance with these 17 mobile security domains and prevent regression, the repository integrates an automated compliance validation pipeline. This pipeline executes static analysis scans and policy monitoring before every release candidate submission.
+
+### 18.1 Automated Monitoring Utility
+The static security monitor script (`scripts/monitor-security.py`) programmatically evaluates codebase references against known security keyword signals. When executed, it checks for matches under all 17 security categories and automatically updates local migration paths and Pull Request draft proposals.
+
+### 18.2 Submission Guards and Rejection Scans
+The pre-submission compliance guard (`agent-os/hooks/app-store-compliance-guard.sh`) and the automated release auditor (`scripts/release-audit.py`) statically analyze local resource configurations. These checks flag:
+- Presence of unencrypted SharedPreferences or plain database write patterns (`BOTH-SECURE-STORAGE`).
+- Absence of backup exclusion parameters or data extraction rules (`ANDROID-INSECURE-BACKUP`).
+- Use of unvalidated custom URL scheme definitions instead of domain-validated routing (`BOTH-UNSAFE-DEEPLINK`).
+
+Developers must run these utilities locally before staging commits to ensure all platform requirements are fully validated.
