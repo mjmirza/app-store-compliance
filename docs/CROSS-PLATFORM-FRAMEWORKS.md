@@ -20,10 +20,16 @@ whose root `package.json` is tooling-only still finds the real app deeper in the
 tree. A `config.xml` only counts as Cordova evidence when it carries a `<widget>`
 or `xmlns:cdv` marker, since that filename collides with unrelated tooling configs.
 
-Every framework-specific finding below is gated on `IS_IOS` (an `Info.plist` or
-Xcode project detected). All of it is Apple-specific policy (Guideline 4.2,
-3.3.2, the PrivacyInfo.xcprivacy requirement), so an Android-only build such as
-`flutter build appbundle` or `flutter build apk` never trips these checks.
+Every framework-specific finding below is gated on `IOS_TARGET_ACTIVE`, not raw
+file-tree presence. A committed `ios/` folder is common in a real cross-platform
+repo even when the current build is Android-only, so file presence alone cannot
+tell `flutter build apk` apart from an iOS build. When the invoking command is
+known (hook mode) and clearly targets Android only (`build apk/appbundle`,
+`assembleRelease`, `bundleRelease`, `run-android`, `run:android`,
+`--platform android`, `capacitor android`, with no `ios`/`ipa`/`xcodebuild`
+token present), the command overrides the file-tree signal and these Apple-only
+checks stay silent. Standalone mode (no command context) falls back to plain
+file-tree detection.
 
 ## Submission commands the guard recognizes
 
@@ -81,8 +87,16 @@ before submitting.
   support is less standardized than Flutter's. Verify each plugin wrapping a
   native SDK ships its own `PrivacyInfo.xcprivacy`.
 
-## Known gaps (found by a Codex adversarial review, not yet fixed)
+## Known gaps (found by Codex and Qwen adversarial review, not yet fixed)
 
+- **Newline-containing file paths.** The `package.json`/`config.xml` scan loops
+  are safe against spaces and shell metacharacters (quoted `IFS= read -r`), but
+  not against a literal newline inside a path, which `find`'s newline-delimited
+  output cannot represent. Extremely unlikely in practice, and not proven safe.
+- **`config.xml` widget-marker check is spoofable by a comment.** A commented-out
+  `<!-- <widget ...> -->` or a look-alike tag like `<widgetConfig>` still counts
+  as Cordova evidence. Low severity, no realistic false negative on a real
+  Cordova project, though not a hard proof either.
 - **Android-side framework checks are absent.** Every check in this doc is
   Apple-side. Flutter/RN/Ionic apps also ship to Google Play, where Data Safety
   disclosure for bundled SDKs, WebView-controlled data collection, cleartext
