@@ -162,8 +162,16 @@ def main():
         md_lines.append("")
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    content_to_write = "\n".join(md_lines)
+
+    # Sanity check: programmatically guarantee no emoji or high-unicode character is written to the markdown timeline
+    for char in content_to_write:
+        if ord(char) >= 0x1F600:
+            print(f"CRITICAL ERROR: Emoji or high-unicode character '{char}' (code {ord(char)}) detected in timeline content!", file=sys.stderr)
+            return 1
+
     with open(OUTPUT_FILE, "w") as f:
-        f.write("\n".join(md_lines))
+        f.write(content_to_write)
 
     print(f"Compiled {len(parsed_items)} deadlines to {OUTPUT_FILE}")
     return 0
