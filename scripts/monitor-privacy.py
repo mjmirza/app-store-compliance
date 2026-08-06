@@ -507,15 +507,14 @@ def classify_announcements(announcements, keywords_filter=None):
 
         # Match against categories
         matched_categories = []
-        for cat, keywords in CATEGORY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_to_search:
-                    matched_categories.append(cat)
-                    break  # Break keyword loop for this category
-
-        # Fallback to predefined category if set
-        if not matched_categories and ann.get("category"):
+        if ann.get("category") in CATEGORIES:
             matched_categories.append(ann["category"])
+        else:
+            for cat, keywords in CATEGORY_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in text_to_search:
+                        matched_categories.append(cat)
+                        break  # Break keyword loop for this category
 
         if matched_categories:
             for cat in matched_categories:
@@ -542,6 +541,7 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    processed_categories = set()
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
@@ -555,6 +555,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,8 +759,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_categories_doc = set()
     for u in updates:
         cat = u["category"]
+        if cat in processed_categories_doc:
+            continue
+        processed_categories_doc.add(cat)
+
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
