@@ -46,6 +46,35 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of file output generation with --output-docs and --pr-output
+T_OUT=$(mktemp -d)
+DOCS_OUT="$T_OUT/custom-apple-migration.md"
+PR_OUT="$T_OUT/custom-apple-pr.md"
+
+OUT_FILES="$($MONITOR --simulate "Privacy Manifests" --output-docs "$DOCS_OUT" --pr-output "$PR_OUT" 2>&1)"
+if [ -f "$DOCS_OUT" ] && grep -q "Apple Policy Migration" "$DOCS_OUT"; then
+    ok "custom --output-docs generated correct markdown migration document"
+else
+    bad "custom --output-docs generation failed"
+fi
+
+if [ -f "$PR_OUT" ] && grep -q "## 1. Summary" "$PR_OUT" && grep -q "## 15. Approver recommendations" "$PR_OUT"; then
+    ok "custom --pr-output drafted correct 15-section markdown pull request"
+else
+    bad "custom --pr-output generation failed"
+fi
+
+# 8. Suppressed logs on JSON output
+OUT_JSON_LOGS="$($MONITOR --simulate "Privacy Manifests" --output-docs "$DOCS_OUT" --pr-output "$PR_OUT" --json 2>&1)"
+if echo "$OUT_JSON_LOGS" | grep -q "updated successfully"; then
+    bad "JSON output should suppress file generation logs"
+else
+    ok "JSON output correctly suppressed file generation status logs"
+fi
+
+# Clean up
+rm -rf "$T_OUT"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
