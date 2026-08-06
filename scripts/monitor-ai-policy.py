@@ -448,6 +448,28 @@ def update_documentation(policy_matches, output_filepath):
         report_content.append(f"- **Details**: {m['description']}")
         report_content.append("")
 
+    report_content.append("## Automated Migration Recommendations & Implementation Tasks")
+    report_content.append("")
+
+    platforms_triggered = set(m["platform"] for m in policy_matches)
+    if "Apple" in platforms_triggered:
+        report_content.append("### Tasks for Apple AI Compliance")
+        report_content.append("- **Regulatory Status**: High priority. Apple App Store compliance gate requirement.")
+        report_content.append("- [ ] **Task 1**: Implement real-time output filters and NSFW/objectionable content classifiers for any interactive AI feature.")
+        report_content.append("- [ ] **Task 2**: Add a prominent in-app consent modal detailing third-party LLM processors (e.g. OpenAI, Anthropic, Gemini) and list specific data types shared with them.")
+        report_content.append("- [ ] **Task 3**: Create an AI content reporting and flagging interface directly inside the chat/generation view allowing 24-hour moderation action.")
+        report_content.append("- [ ] **Task 4**: Recheck and re-answer the age rating questionnaire in App Store Connect to ensure AI content is accounted for.")
+        report_content.append("")
+
+    if "Google Play" in platforms_triggered or not platforms_triggered:
+        report_content.append("### Tasks for Google Play AI Compliance")
+        report_content.append("- **Regulatory Status**: High priority. Google Play Developer console requirement.")
+        report_content.append("- [ ] **Task 1**: Implement an in-app prominent disclosure dialog explaining generative AI features and content safety expectations.")
+        report_content.append("- [ ] **Task 2**: Add a simple, one-click content flagging/reporting action next to all AI outputs on Android.")
+        report_content.append("- [ ] **Task 3**: Ensure robust content guards to block synthesis of deepfakes, face-swaps, and non-consensual graphic or sexual media.")
+        report_content.append("- [ ] **Task 4**: Update the Google Play Console Data Safety form to declare any user-generated data processed or uploaded for LLM endpoints.")
+        report_content.append("")
+
     report_content.append("<!-- AI_POLICY_MONITOR_END -->")
 
     # Write or append to the output file
@@ -491,7 +513,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
     )
 
     args = parser.parse_args()
