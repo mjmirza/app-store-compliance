@@ -1,5 +1,6 @@
 name: CI
 
+# Continuous Integration workflow for validating data, deadlines, and security compliance.
 on:
   push:
     branches: [ master, main ]
