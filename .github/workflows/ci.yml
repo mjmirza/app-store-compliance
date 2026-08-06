@@ -1,6 +1,6 @@
 name: CI
 
-# Continuous Integration workflow for validating data, deadlines, and security compliance.
+# Continuous Integration workflow for validating taxonomy database files, upcoming regulatory deadlines, and security compliance protocols.
 on:
   push:
     branches: [ master, main ]
