@@ -22,3 +22,10 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Test URLs used in scripts/monitor-ai-policy-test.sh
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Real California privacy regulations URL that has changed/gone unreachable
+https://cppa.ca.gov/regulations/ccpa_updates.html
