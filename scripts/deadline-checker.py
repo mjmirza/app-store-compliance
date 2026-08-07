@@ -72,7 +72,10 @@ def main():
             "jurisdiction": d.get("jurisdiction", "Unknown"),
             "law": d.get("law", "Unknown"),
             "requirement": d.get("requirement", "Unknown"),
+            "effective_date": d.get("effective_date", "Unknown"),
+            "grace_period": d.get("grace_period", "Unknown"),
             "mandatory_date": d.get("mandatory_date"),
+            "enforcement_date": d.get("enforcement_date", "Unknown"),
             "priority": d.get("priority", "Medium"),
             "sections": sections_str,
             "remaining_days": remaining_days,
@@ -95,7 +98,10 @@ def main():
             print(f"[{item['priority'].upper()}] Jurisdiction: {item['jurisdiction']}")
             print(f"  Law:         {item['law']}")
             print(f"  Requirement: {item['requirement']}")
-            print(f"  Passed Date: {item['mandatory_date']} ({overdue} days overdue)")
+            print(f"  Effective:   {item['effective_date']}")
+            print(f"  Grace Period: {item['grace_period']}")
+            print(f"  Mandatory:   {item['mandatory_date']} ({overdue} days overdue)")
+            print(f"  Enforcement: {item['enforcement_date']}")
             print(f"  Impacted:    {item['sections']}")
             print()
 
@@ -109,9 +115,10 @@ def main():
             print(f"[{item['priority'].upper()}] Jurisdiction: {item['jurisdiction']}")
             print(f"  Law:         {item['law']}")
             print(f"  Requirement: {item['requirement']}")
-            print(
-                f"  Due Date:    {item['mandatory_date']} (in {item['remaining_days']} days)"
-            )
+            print(f"  Effective:   {item['effective_date']}")
+            print(f"  Grace Period: {item['grace_period']}")
+            print(f"  Due Date:    {item['mandatory_date']} (in {item['remaining_days']} days)")
+            print(f"  Enforcement: {item['enforcement_date']}")
             print(f"  Impacted:    {item['sections']}")
             print()
 
