@@ -1039,10 +1039,61 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
                     "affected_files": affected_files,
                     "migration_tasks": meta["migration_steps"],
                     "proposed_pull_request": pr_details,
+                    "priority": priority,
+                    "verified": is_verified,
                 }
             )
 
     return report_items, processed_tracks
+
+
+def update_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the migration report in docs/REGULATORY-POLICY-MIGRATION.md.
+    """
+    lines = [
+        "<!-- REGULATORY_POLICY_MONITOR_START -->",
+        "# Global Regulatory Requirements Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory compliance areas.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        status_str = f"Priority {item['priority']} " + ("(Verified)" if item['verified'] else "(Unverified)")
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Verification Status**: {status_str}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    for item in report_items:
+        track = item["track"]
+        if item["proposed_pull_request"] is None:
+            lines.append(f"### Tasks for {track} (BLOCKED: Announcement source is unverified)")
+            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+            lines.append("")
+            continue
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Regulatory Impact**: {item['compliance_impact']} priority compliance area.")
+        for task in item["migration_tasks"]:
+            lines.append(f"- [ ] {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_POLICY_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def print_text_report(report_items, project_path):
@@ -1109,6 +1160,16 @@ def main():
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
+        "--output-docs",
+        default="docs/REGULATORY-POLICY-MIGRATION.md",
+        help="Path to output migration report (default: docs/REGULATORY-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        default="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Path to output PR draft (default: docs/REGULATORY_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--verbose", action="store_true", help="Print verbose execution logs"
     )
 
@@ -1117,6 +1178,24 @@ def main():
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    # 4. Write/Update documentation
+    update_documentation_report(report_items, args.output_docs)
+
+    # 5. Generate and write Pull Request draft
+    valid_prs = [item["proposed_pull_request"] for item in report_items if item["proposed_pull_request"] is not None]
+
+    if valid_prs:
+        pr_content = "\n\n---\n\n".join(pr["description"] for pr in valid_prs)
+    else:
+        pr_content = "# No Active Compliance Pull Request Draft\n\nAll detected updates are blocked due to unverified secondary sources, or no updates were matched."
+
+    os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+    try:
+        with open(args.pr_output, "w", encoding="utf-8") as f:
+            f.write(pr_content + "\n")
+    except Exception as e:
+        print(f"Failed to write PR draft to {args.pr_output}: {e}")
 
     if args.json:
         print(json.dumps(report_items, indent=2))

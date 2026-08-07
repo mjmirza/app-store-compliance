@@ -109,6 +109,37 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output CLI parameters work as expected
+echo "[TEST] Verifying custom outputs using --output-docs and --pr-output..."
+TEST_DOCS="/tmp/test-reg-policy-migration.md"
+TEST_PR="/tmp/test-reg-compliance-pr-draft.md"
+rm -f "$TEST_DOCS" "$TEST_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_DOCS" ]; then
+  echo "[ERROR] Custom --output-docs file was not created"
+  exit 1
+fi
+if [ ! -f "$TEST_PR" ]; then
+  echo "[ERROR] Custom --pr-output file was not created"
+  exit 1
+fi
+
+if ! grep -q "Global Regulatory Requirements Migration" "$TEST_DOCS"; then
+  echo "[ERROR] Custom --output-docs file is missing expected content"
+  exit 1
+fi
+
+if ! grep -q "Regulatory Compliance Update: EU AI Act" "$TEST_PR"; then
+  echo "[ERROR] Custom --pr-output file is missing expected content"
+  exit 1
+fi
+
+# Clean up custom test files
+rm -f "$TEST_DOCS" "$TEST_PR"
+echo "[PASS] Custom --output-docs and --pr-output options verified successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
