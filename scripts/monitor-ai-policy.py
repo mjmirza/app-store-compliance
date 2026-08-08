@@ -448,6 +448,49 @@ def update_documentation(policy_matches, output_filepath):
         report_content.append(f"- **Details**: {m['description']}")
         report_content.append("")
 
+    report_content.append("## Automated Migration Recommendations & Implementation Tasks")
+    report_content.append("")
+
+    platforms_triggered = set(m["platform"] for m in policy_matches)
+
+    if "Apple" in platforms_triggered:
+        report_content.extend([
+            "### Apple AI Policy Migration Checklist",
+            "The latest Apple platform policy updates require the following compliance actions:",
+            "",
+            "- **AI-generated content requirements**:",
+            "  - [ ] Implement robust output watermarking or metadata tags indicating synthetic media creation.",
+            "  - [ ] Perform regular red-teaming and prompt-filtering evaluations of the underlying LLM.",
+            "- **App Review AI guidance**:",
+            "  - [ ] Add explicit developer notes in App Store Connect explaining the generative features and providing a demo account.",
+            "  - [ ] Verify that the app's interactive features do not violate copyright, IP, or Trademark guidelines.",
+            "- **Safety expectations**:",
+            "  - [ ] Implement mandatory, real-time client or server-side input and output moderation.",
+            "  - [ ] Include one-click user reporting/flagging buttons directly adjacent to all AI-generated content blocks.",
+            "  - [ ] Provide 24-hour moderation response channels to address user flags or abuse.",
+            "- **User disclosure requirements**:",
+            "  - [ ] Integrate a prominent in-app consent modal detailing third-party LLM data sharing prior to transmission.",
+            "  - [ ] Clearly display a disclosure indicating when the user is interacting with an AI (e.g., EU AI Act compliance).",
+            ""
+        ])
+
+    if "Google Play" in platforms_triggered:
+        report_content.extend([
+            "### Google Play AI Policy Migration Checklist",
+            "The latest Google Play platform policy updates require the following compliance actions:",
+            "",
+            "- **Google Play AI policies**:",
+            "  - [ ] Ensure that the app does not generate deepfakes, face-swaps, or non-consensual graphic sexual content.",
+            "  - [ ] Review Google Play Console Data Safety questionnaires and declare any AI-related data collection/sharing.",
+            "- **AI-generated content disclosures**:",
+            "  - [ ] Display an explicit, prominent in-app disclosure overlay indicating generative AI outputs are synthetic.",
+            "  - [ ] Provide a dedicated link explaining data processing and user privacy policies for the generative models.",
+            "- **User safety requirements**:",
+            "  - [ ] Provide one-click content flagging/reporting controls on all AI output screens on Android.",
+            "  - [ ] Implement automated blocking for malicious or abusive inputs (anti-abuse prompt filtering).",
+            ""
+        ])
+
     report_content.append("<!-- AI_POLICY_MONITOR_END -->")
 
     # Write or append to the output file
@@ -491,7 +534,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR (defaults to docs/AI_COMPLIANCE_PR_DRAFT.md)",
     )
 
     args = parser.parse_args()
