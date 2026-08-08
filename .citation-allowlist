@@ -22,3 +22,9 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Real but transient or unreachable endpoints as of 2026.
+https://developer.apple.com/news/upcoming-requirements/?id=02172025a
+https://developer.apple.com/news/upcoming-requirements/?id=07242025a
+https://stripe.com/guides/strong-customer-authentication
+https://www.cookieyes.com/blog/quebec-law-25/
