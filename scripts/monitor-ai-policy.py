@@ -491,7 +491,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
     )
 
     args = parser.parse_args()
@@ -548,6 +549,7 @@ def main():
 
     if args.pr_output:
         try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
             with open(args.pr_output, "w", encoding="utf-8") as f:
                 f.write(pr_draft)
             print(f"PR Draft successfully written to: {args.pr_output}")

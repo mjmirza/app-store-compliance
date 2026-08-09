@@ -17,7 +17,7 @@ OUT_PR="/tmp/test_ai_pr.md"
 
 # Cleanup files first
 cleanup() {
-  rm -f "$MOCK_JSON" "$OUT_DOCS" "$OUT_PR" 2>/dev/null || true
+  rm -f "$MOCK_JSON" "$OUT_DOCS" "$OUT_PR" "docs/AI_COMPLIANCE_PR_DRAFT.md" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -135,6 +135,74 @@ else
   bad "PR Draft file was not created"
 fi
 
+# 6. Assert that the default --pr-output behaves correctly
+echo "Testing default --pr-output behavior..."
+rm -f "docs/AI_COMPLIANCE_PR_DRAFT.md" 2>/dev/null || true
+
+python3 scripts/monitor-ai-policy.py --mock "$MOCK_JSON" --dir . --output-docs "$OUT_DOCS" > /tmp/monitor_run_default.log 2>&1
+RC=$?
+
+if [ "$RC" -ne 0 ]; then
+  bad "monitor-ai-policy.py with default --pr-output failed with exit code $RC. Output:"
+  cat /tmp/monitor_run_default.log
+  exit 1
+fi
+
+if [ -f "docs/AI_COMPLIANCE_PR_DRAFT.md" ]; then
+  ok "Default PR Draft output file created at docs/AI_COMPLIANCE_PR_DRAFT.md"
+
+  # Check 15 sections on default PR draft
+  MISSING=0
+  for idx in "${!SECTIONS[@]}"; do
+    sec_num=$((idx + 1))
+    sec_name="${SECTIONS[$idx]}"
+    if grep -q "## ${sec_num}\. ${sec_name}" "docs/AI_COMPLIANCE_PR_DRAFT.md"; then
+      true
+    else
+      echo "  Missing PR section in default draft: ## ${sec_num}. ${sec_name}"
+      MISSING=$((MISSING + 1))
+    fi
+  done
+
+  if [ "$MISSING" -eq 0 ]; then
+    ok "Default PR Draft contains exactly the 15 required compliance sections"
+  else
+    bad "Default PR Draft is missing $MISSING of the 15 required compliance sections"
+  fi
+else
+  bad "Default PR Draft file was not created"
+fi
+
+# 7. Assert no emojis are present in outputs or scripts
+echo "Checking for emojis in scripts and generated files..."
+has_emojis() {
+  python3 -c "
+import sys
+with open(sys.argv[1], 'r', encoding='utf-8') as f:
+    text = f.read()
+import re
+emojis = re.findall(r'[\U00010000-\U0010ffff]', text)
+if emojis:
+    print('Found emojis in', sys.argv[1], ':', emojis)
+    sys.exit(1)
+sys.exit(0)
+" "$1"
+}
+
+if has_emojis "scripts/monitor-ai-policy.py" && \
+   has_emojis "scripts/monitor-ai-policy-test.sh" && \
+   has_emojis "$OUT_DOCS" && \
+   has_emojis "$OUT_PR" && \
+   has_emojis "docs/AI_COMPLIANCE_PR_DRAFT.md"; then
+  ok "All scripts and generated markdown files are 100% emoji-free"
+else
+  bad "Emoji check failed: high-unicode emojis or symbols detected"
+fi
+
 echo ""
 echo "AI Policy Monitor test suite: $PASS passed, $FAIL failed"
-[ "$FAIL" -eq 0 ]
+if [ "$FAIL" -eq 0 ]; then
+  exit 0
+else
+  exit 1
+fi
