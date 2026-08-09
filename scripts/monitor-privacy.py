@@ -728,7 +728,7 @@ Verify that the published web-based data deletion URL functions correctly before
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, quiet=False):
     """
     Overwrites or updates the migration report in docs/PRIVACY-POLICY-MIGRATION.md.
     """
@@ -811,7 +811,8 @@ def update_documentation_report(updates, output_filepath):
     try:
         with open(output_filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-        print(f"Privacy documentation report updated successfully at: {output_filepath}")
+        if not quiet:
+            print(f"Privacy documentation report updated successfully at: {output_filepath}")
     except Exception as e:
         print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
 
@@ -859,7 +860,8 @@ def main():
     announcements = []
 
     if args.live:
-        print("Fetching live privacy regulatory RSS feeds...")
+        if not args.json:
+            print("Fetching live privacy regulatory RSS feeds...")
         announcements.extend(parse_rss_feed("https://developer.apple.com/news/rss/news.rss"))
         announcements.extend(parse_rss_feed("https://android-developers.googleblog.com/feeds/posts/default"))
         announcements.extend(parse_rss_feed("https://edpb.europa.eu/news/news/feed_en"))
@@ -902,22 +904,25 @@ def main():
         else:
             verified_updates.append(u)
 
-    print(f"Monitored and classified {len(classified_updates)} policy/requirement updates ({blocked_updates_count} blocked due to source trust validation):")
-    for idx, u in enumerate(classified_updates, 1):
-        priority, is_verified = classify_source_and_verify(u)
-        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
-        print(f" {idx}. [{u['category']}] {u['title']} - {status_str}")
+    if not args.json:
+        print(f"Monitored and classified {len(classified_updates)} policy/requirement updates ({blocked_updates_count} blocked due to source trust validation):")
+        for idx, u in enumerate(classified_updates, 1):
+            priority, is_verified = classify_source_and_verify(u)
+            status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+            print(f" {idx}. [{u['category']}] {u['title']} - {status_str}")
 
     # 3. Scan the codebase for signals related to these categories
-    print(f"Scanning codebase under '{args.dir}' for privacy integration signals...")
+    if not args.json:
+        print(f"Scanning codebase under '{args.dir}' for privacy integration signals...")
     scan_results = scan_codebase_for_privacy_signals(args.dir)
 
     total_matches = sum(len(matches) for matches in scan_results.values())
-    print(f"Found {total_matches} signal matches in code.")
+    if not args.json:
+        print(f"Found {total_matches} signal matches in code.")
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, quiet=args.json)
 
     # 5. Generate Pull Request draft using verified updates
     pr_draft = generate_pull_request_draft(verified_updates, scan_results)
@@ -927,7 +932,8 @@ def main():
     try:
         with open(args.pr_output, "w", encoding="utf-8") as f:
             f.write(pr_draft)
-        print(f"PR draft written successfully to: {args.pr_output}")
+        if not args.json:
+            print(f"PR draft written successfully to: {args.pr_output}")
     except Exception as e:
         print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
