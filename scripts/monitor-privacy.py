@@ -155,6 +155,25 @@ TRUST_HIERARCHY = {
     "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries"
 }
 
+
+def enforce_strict_source_trust_hierarchy(priority, is_verified, announcement_title):
+    """
+    Enforces strict compliance guidelines based on the source trust hierarchy:
+    1. Never trust secondary sources before official sources.
+    2. Never create compliance pull requests using Priority 4 or 5 sources unless verified by Priority 1.
+    """
+    import sys
+    if priority in (4, 5):
+        if not is_verified:
+            print(f"[-] STRICT BLOCKED: Creating compliance pull requests for '{announcement_title}' is prohibited.", file=sys.stderr)
+            print(f"    Source is classified as Priority {priority} and has not been verified/corroborated by Priority 1.", file=sys.stderr)
+            return False
+        else:
+            print(f"[+] VERIFIED: Priority {priority} source for '{announcement_title}' has been corroborated by Priority 1.", file=sys.stderr)
+    else:
+        print(f"[+] ALLOWED: Priority {priority} source is trusted for pull request generation.", file=sys.stderr)
+    return True
+
 # 16 Comprehensive Mock Announcements for all 16 categories
 MOCK_ANNOUNCEMENTS = [
     {
@@ -897,7 +916,8 @@ def main():
     blocked_updates_count = 0
     for u in classified_updates:
         priority, is_verified = classify_source_and_verify(u)
-        if priority in (4, 5) and not is_verified:
+        allowed_by_trust_policy = enforce_strict_source_trust_hierarchy(priority, is_verified, u["title"])
+        if not allowed_by_trust_policy:
             blocked_updates_count += 1
         else:
             verified_updates.append(u)

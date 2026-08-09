@@ -9,6 +9,7 @@ import argparse
 from datetime import datetime
 
 # Source Trust Hierarchy Definitions
+# Prohibits creating compliance pull requests using Priority 4 or 5 sources unless verified by Priority 1.
 TRUST_HIERARCHY = {
     "Priority 1": "European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications",
     "Priority 2": "Reuters, AP, Bloomberg",
@@ -16,6 +17,25 @@ TRUST_HIERARCHY = {
     "Priority 4": "Industry blogs",
     "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries",
 }
+
+
+def enforce_strict_source_trust_hierarchy(priority, is_verified, announcement_title):
+    """
+    Enforces strict compliance guidelines based on the source trust hierarchy:
+    1. Never trust secondary sources before official sources.
+    2. Never create compliance pull requests using Priority 4 or 5 sources unless verified by Priority 1.
+    """
+    import sys
+    if priority in (4, 5):
+        if not is_verified:
+            print(f"[-] STRICT BLOCKED: Creating compliance pull requests for '{announcement_title}' is prohibited.", file=sys.stderr)
+            print(f"    Source is classified as Priority {priority} and has not been verified/corroborated by Priority 1.", file=sys.stderr)
+            return False
+        else:
+            print(f"[+] VERIFIED: Priority {priority} source for '{announcement_title}' has been corroborated by Priority 1.", file=sys.stderr)
+    else:
+        print(f"[+] ALLOWED: Priority {priority} source is trusted for pull request generation.", file=sys.stderr)
+    return True
 
 # Database of global jurisdictions, authorities, laws and their tracking keywords/signatures
 REGULATORY_TRACKS = {
@@ -1021,7 +1041,8 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
 
             # Evaluate source trust and apply restriction/blocking rules
             priority, is_verified = classify_source_and_verify(item, announcements)
-            if priority in (4, 5) and not is_verified:
+            allowed_by_trust_policy = enforce_strict_source_trust_hierarchy(priority, is_verified, item["title"])
+            if not allowed_by_trust_policy:
                 pr_details = None
                 scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
             else:
