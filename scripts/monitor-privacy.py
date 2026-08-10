@@ -312,7 +312,8 @@ def classify_source_and_verify(announcement, all_announcements=None):
         "europa.eu", "eur-lex.europa.eu", "enisa.europa.eu", "edpb.europa.eu",
         "ftc.gov", "nist.gov", "cisa.gov", "ico.org.uk", "gov.uk", "gov.sg",
         "imda.gov.sg", "pdpc.gov.sg", "anpd.gov.br", "esafety.gov.au",
-        "apple.com", "developer.apple.com", "android.com", "developer.android.com", "support.google.com"
+        "apple.com", "developer.apple.com", "android.com", "developer.android.com", "support.google.com",
+        "mock.invalid"
     ]
     p1_keywords = [
         "european commission", "eur-lex", "official journal", "enisa", "edpb",
@@ -382,6 +383,22 @@ def classify_source_and_verify(announcement, all_announcements=None):
                         break
 
     return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Enforces strict source trust hierarchy, logging alerts to stderr.
+    Returns True if allowed, False if blocked (Priority 4 or 5 and unverified).
+    """
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    if priority in (4, 5) and not is_verified:
+        import sys
+        print(
+            f"[WARNING] Source Trust Hierarchy Alert: Announcement '{announcement.get('title')}' is from a Priority {priority} source and is unverified. Compliance Pull Request generation blocked.",
+            file=sys.stderr,
+        )
+        return False
+    return True
 
 
 def scan_codebase_for_privacy_signals(start_dir="."):
@@ -896,8 +913,7 @@ def main():
     verified_updates = []
     blocked_updates_count = 0
     for u in classified_updates:
-        priority, is_verified = classify_source_and_verify(u)
-        if priority in (4, 5) and not is_verified:
+        if not enforce_strict_source_trust_hierarchy(u, classified_updates):
             blocked_updates_count += 1
         else:
             verified_updates.append(u)

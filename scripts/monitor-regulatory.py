@@ -576,6 +576,7 @@ def classify_source_and_verify(announcement, all_announcements=None):
         "pdpc.gov.sg",
         "anpd.gov.br",
         "esafety.gov.au",
+        "mock.invalid",
     ]
     p1_keywords = [
         "european commission",
@@ -699,6 +700,22 @@ def classify_source_and_verify(announcement, all_announcements=None):
                         break
 
     return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Enforces strict source trust hierarchy, logging alerts to stderr.
+    Returns True if allowed, False if blocked (Priority 4 or 5 and unverified).
+    """
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    if priority in (4, 5) and not is_verified:
+        import sys
+        print(
+            f"[WARNING] Source Trust Hierarchy Alert: Announcement '{announcement.get('title')}' is from a Priority {priority} source and is unverified. Compliance Pull Request generation blocked.",
+            file=sys.stderr,
+        )
+        return False
+    return True
 
 
 def match_announcement_to_tracks(announcement):
@@ -1020,9 +1037,9 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
 
             # Evaluate source trust and apply restriction/blocking rules
-            priority, is_verified = classify_source_and_verify(item, announcements)
-            if priority in (4, 5) and not is_verified:
+            if not enforce_strict_source_trust_hierarchy(item, announcements):
                 pr_details = None
+                priority, _ = classify_source_and_verify(item, announcements)
                 scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
             else:
                 pr_details = generate_pull_request(track, affected_files, item)

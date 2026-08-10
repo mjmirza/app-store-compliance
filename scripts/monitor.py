@@ -531,6 +531,110 @@ def clean_xml_tag(tag):
     return tag
 
 
+def classify_source_and_verify(announcement, all_announcements=None):
+    """
+    Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower() if announcement.get("link") else ""
+    title = announcement.get("title", "").lower() if announcement.get("title") else ""
+    desc = announcement.get("description", "").lower() if announcement.get("description") else ""
+    combined = f"{title} {desc} {link}"
+
+    # Priority 1 official domains and keywords
+    p1_domains = [
+        "europa.eu", "eur-lex.europa.eu", "enisa.europa.eu", "edpb.europa.eu",
+        "ftc.gov", "nist.gov", "cisa.gov", "ico.org.uk", "gov.uk", "gov.sg",
+        "imda.gov.sg", "pdpc.gov.sg", "anpd.gov.br", "esafety.gov.au",
+        "apple.com", "developer.apple.com", "android.com", "developer.android.com", "support.google.com",
+        "mock.invalid"
+    ]
+    p1_keywords = [
+        "european commission", "eur-lex", "official journal", "enisa", "edpb",
+        "ftc", "nist", "cisa", "ico", "government publication", "imda", "pdpc",
+        "anpd", "esafety commissioner", "federal register", "apple developer", "android developer"
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study", "university research", "peer-reviewed"]
+
+    p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog"]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary", "ai generated summaries", "chatgpt summary"]
+
+    priority = 4  # Default to 4 if nothing matches
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        # Priority 4 or 5: Must be verified by a Priority 1 official source
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if ".gov" in combined:
+            has_p1_ref_in_text = True
+
+        if has_p1_ref_in_text:
+            is_verified = True
+        elif all_announcements:
+            words = set(re.findall(r"[a-z]+", combined))
+            for other in all_announcements:
+                if other == announcement:
+                    continue
+                other_p, _ = classify_source_and_verify(other, None)
+                if other_p == 1:
+                    other_combined = f"{other.get('title', '')} {other.get('description', '')} {other.get('link', '')}".lower()
+                    other_words = set(re.findall(r"[a-z]+", other_combined))
+                    common_terms = {"privacy", "guidelines", "consent", "android", "apple", "cookie"}
+                    overlap = words.intersection(other_words).intersection(common_terms)
+                    if overlap:
+                        is_verified = True
+                        break
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Enforces strict source trust hierarchy, logging alerts to stderr.
+    Returns True if allowed, False if blocked (Priority 4 or 5 and unverified).
+    """
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    if priority in (4, 5) and not is_verified:
+        import sys
+        print(
+            f"[WARNING] Source Trust Hierarchy Alert: Announcement '{announcement.get('title')}' is from a Priority {priority} source and is unverified. Compliance Pull Request generation blocked.",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
+
 def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose=False):
     if verbose:
         print(f"[*] Fetching Apple Developer News from {url}...")
@@ -1048,7 +1152,14 @@ def run_monitor(
             processed_tracks.add(track)
             meta = TRACK_METADATA[track]
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
-            pr_details = generate_pull_request(track, affected_files, item["title"])
+
+            # Evaluate source trust and apply restriction/blocking rules
+            if not enforce_strict_source_trust_hierarchy(item, announcements):
+                pr_details = None
+                priority, _ = classify_source_and_verify(item, announcements)
+                scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
+            else:
+                pr_details = generate_pull_request(track, affected_files, item["title"])
 
             report_items.append(
                 {
@@ -1105,9 +1216,14 @@ def print_text_report(report_items, project_path):
 
         pr = item["proposed_pull_request"]
         print("   - Proposed Pull Request Details:")
-        print(f"       * Branch Name:  {pr['branch_name']}")
-        print(f"       * PR Title:     {pr['title']}")
-        print("       * PR Description: (draft generated successfully)")
+        if pr is None:
+            print(
+                "       * BLOCKED: Compliance Pull Request generation blocked due to unverified secondary source."
+            )
+        else:
+            print(f"       * Branch Name:  {pr['branch_name']}")
+            print(f"       * PR Title:     {pr['title']}")
+            print("       * PR Description: (draft generated successfully)")
 
         print("-" * 80)
 
