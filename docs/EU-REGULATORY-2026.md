@@ -18,9 +18,11 @@ Scope. Any app whose AI feature reaches EU users is in scope, wherever the devel
 | 2 Feb 2025 | Article 5 prohibited practices, Article 4 AI literacy | live now |
 | 2 Aug 2025 | GPAI-model obligations, governance, penalties (Articles 99 and 100) | live now |
 | 2 Aug 2026 | Article 50 transparency, and most remaining provisions | in force from this date |
-| 2 Aug 2027 | Article 6(1), and compliance deadline for GPAI models placed on market before 2 Aug 2025 | future |
+| 12 Aug 2026 | Packaging and Packaging Waste Regulation (PPWR) mandatory compliance | in force from this date |
+| 2 Dec 2027 | Article 6(1) / Annex III High-risk AI systems (as deferred by AI Omnibus, July 2026) | future |
+| 2 Aug 2028 | Annex I High-risk AI embedded in physical products (as deferred by AI Omnibus, July 2026) | future |
 
-The Digital Omnibus simplification package was finalised in mid-2026 (Parliament 16 June 2026, Council final green light 29 June 2026). It postpones several high-risk deadlines (Annex III high-risk moved toward 2 Dec 2027), but **Article 50 transparency HOLDS at 2 August 2026**. Do not assume the transparency date moved. Sources. [artificialintelligenceact.eu timeline](https://artificialintelligenceact.eu/implementation-timeline/), [EUR-Lex 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng), [Council 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/).
+The Digital Omnibus simplification package (the AI Omnibus) was finalised in mid-2026 (Parliament 16 June 2026, Council final green light 29 June 2026, and entered into force on 27 July 2026). It postpones high-risk compliance deadlines (Annex III high-risk moved to 2 December 2027, Annex I physical high-risk moved to 2 August 2028), but **Article 50 transparency HOLDS at 2 August 2026**. Do not assume the transparency date moved. Sources. [artificialintelligenceact.eu timeline](https://artificialintelligenceact.eu/implementation-timeline/), [EUR-Lex 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng), [Council 29 June 2026](https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/), [EU Commission AI Omnibus Enters into Force 27 July 2026](https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force).
 
 ### 1.2 Article 50 transparency (HARD, from 2 Aug 2026)
 
@@ -223,6 +225,7 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
 | EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |
 | EU Contract Withdrawal | Prominent, Frictionless contract withdrawal button on user interface | 19 Jun 2026 |
+| Packaging Reform (PPWR) | Confirm packaging compliance via EU Declaration of Conformity and Technical Documentation | 12 Aug 2026 |
 
 ## 8. Sources
 

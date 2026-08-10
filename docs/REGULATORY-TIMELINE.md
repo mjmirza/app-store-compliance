@@ -1,7 +1,7 @@
 # Global Regulatory Compliance Timeline
 
 This document compiles every registered global regulatory deadline tracking regional, national, and platform requirements.
-Last compiled: 2026-08-04 08:33:40 UTC
+Last compiled: 2026-08-10 07:25:50 UTC
 
 ## Active and Approaching Compliance Warnings
 
@@ -9,47 +9,48 @@ Last compiled: 2026-08-04 08:33:40 UTC
 
 | Priority | Jurisdiction | Law | Requirement | Passed Date | Overdue Days | Affected Sections |
 |---|---|---|---|---|---|---|
-| CRITICAL | Illinois (USA State) | Biometric Information Privacy Act (BIPA), 740 ILCS 14 | Written notice and release before collecting biometric identifiers, public retention schedule, destruction within 3 years, and no sale. | 2008-06-01 | 6639 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md |
-| HIGH | United Kingdom (UK) | ICO Age Appropriate Design Code (Children's Code) | High privacy by default, data minimisation, geolocation off, profiling off by default, and a mandatory DPIA. | 2021-09-02 | 1798 days | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md |
-| HIGH | South Korea | Telecommunications Business Act | Approved billing providers, 26% commission, com.apple.developer.storekit.external-purchase entitlement, South Korea-only binary, modal sheet, reporting. | 2022-03-15 | 1604 days | docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md |
-| HIGH | European Union (EU) | EU Digital Markets Act (DMA) | External purchase links and alternative payments (com.apple.developer.storekit.external-purchase-link entitlement, custom link sheet, CTC 5% reporting). | 2024-03-07 | 881 days | docs/EU-REGULATORY-2026.md section 2 |
-| CRITICAL | China | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | 2024-03-31 | 857 days | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
-| HIGH | United States (Federal) | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | 2024-06-25 | 771 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
-| HIGH | European Union (EU) | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | 2024-12-13 | 600 days | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
-| HIGH | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 4 AI Literacy (providers and deployers must ensure team/solo AI literacy, maintain policy, induction, and log). | 2025-02-02 | 549 days | docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md |
-| CRITICAL | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 5 Prohibited Practices (ban on subliminal manipulation, child exploitation, social scoring, biometric trait categorization, etc.). | 2025-02-02 | 549 days | docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md |
-| CRITICAL | European Union (EU) | EU Digital Services Act (DSA) | Trader status declaration and verification (D-U-N-S, phone, email publish, 2FA verified) or app removal from EU storefront. | 2025-02-17 | 534 days | docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md |
-| CRITICAL | Google Play (Global) | Google Play Child Safety Standards Policy | Publish CSAE standards on globally reachable web page, in-app feedback, CSAM response protocol, named child-safety contact. | 2025-03-19 | 504 days | docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md |
-| CRITICAL | Google Play (Global) | Google Play Photo and Video Permissions Policy | Broad-access READ_MEDIA_IMAGES/READ_MEDIA_VIDEO restricted to broad-access apps; others must use Android Photo Picker. | 2025-05-28 | 434 days | docs/PLATFORM-MECHANICS-2026.md section 2.9, references/rules/android.md |
-| HIGH | European Union (EU) | European Accessibility Act (EAA), Directive (EU) 2019/882 | Harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA mobile accessibility compliance and published accessibility statement. | 2025-06-28 | 403 days | docs/EU-REGULATORY-2026.md section 4, references/rules/design.md |
-| CRITICAL | United Kingdom (UK) | UK Online Safety Act 2023 | Highly Effective Age Assurance methods (facial age estimation, open banking, credit-card checks) to protect children from harmful content. | 2025-07-25 | 376 days | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/safety.md |
-| HIGH | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | GPAI-model obligations, governance, and penalties (Articles 99 and 100). | 2025-08-02 | 368 days | docs/EU-REGULATORY-2026.md section 1.1, section 1.6 |
-| CRITICAL | Google Play (Global) | Google Play Target API Requirement | New apps and updates must target API level 35 (Android 15) or higher, and existing target API 34+. | 2025-08-31 | 339 days | docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md |
-| MEDIUM | European Union (EU) | EU Data Act, Regulation (EU) 2023/2854 | Core data access-by-design obligations when apps interact with connected products and wearables. | 2025-09-12 | 327 days | docs/EU-REGULATORY-2026.md section 5 |
-| CRITICAL | Australia | Online Safety Amendment (Social Media Minimum Age) Act 2024 | Stop under-16s holding accounts on social media via robust age assurance; ringfence and destroy age data. | 2025-12-10 | 238 days | docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md |
-| HIGH | California (USA State) | California CPRA (CPPA 2026 Regulations) | Honoring Global Privacy Control (GPC), privacy policy/notice at collection, opt-out of sale/sharing/profiling, and sensitive personal info limits. | 2026-01-01 | 216 days | docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md |
-| CRITICAL | Apple App Store (Global) | Apple App Store Review Guidelines (Guideline 2.3.6) | Every app must answer the updated age-rating questionnaire (13+, 16+, 18+ tiers, UGC/ Livestream indicators) or be blocked from updates. | 2026-01-31 | 186 days | docs/EU-REGULATORY-2026.md section 6, references/rules/metadata.md |
-| CRITICAL | Apple App Store (Brazil, Australia, Singapore) | Apple App Store Region Age Requirements | Blocks users in Brazil, Australia, and Singapore from downloading apps rated 18-plus unless age confirmed through reasonable methods. | 2026-02-24 | 162 days | docs/GLOBAL-REGULATORY-2026.md section 1, references/rules/privacy.md |
-| CRITICAL | Brazil | Digital ECA (Law 15,211/2025) | Accepted age verification (document check, facial estimation, CPF check); self-declaration check-box is prohibited. | 2026-03-17 | 141 days | docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md |
-| CRITICAL | Singapore | IMDA Code of Practice for Online Safety for App Distribution Services | App-store age assurance (screen and stop users under 18 from downloading age-inappropriate apps), age-assurance data destroyed. | 2026-04-01 | 126 days | docs/GLOBAL-REGULATORY-2026.md section 3.7, references/rules/privacy.md |
-| CRITICAL | United States (Federal) | Children's Online Privacy Protection Act (COPPA), 16 CFR Part 312 | Amended COPPA Rule compliance (biometric identifiers added to PII, separate opt-in consent for third-party disclosure/targeted-ads, written retention policy, written info-security program). | 2026-04-22 | 105 days | docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md |
-| CRITICAL | Apple App Store (Global) | Apple App Store Submission Requirements | New uploads must be built with Xcode 26 and the iOS 26, watchOS 26, tvOS 26, or visionOS 26 SDKs. | 2026-04-28 | 99 days | docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6 |
-| CRITICAL | Utah (USA State) | Utah SB 142 (App Store Accountability Act) | Request and receive age category from store, confirm parental consent for minor accounts, delete verification data. | 2026-05-06 | 91 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
-| CRITICAL | Texas (USA State) | Texas SB 2420 (App Store Accountability Act) | Age assurance and verifiable parental consent for minors on downloads, purchases, and major updates; delete age data; request age category. | 2026-06-04 | 62 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
-| HIGH | European Union (EU) | Distance Marketing of Financial Services, Directive (EU) 2023/2673 | Prominent, easily accessible 'withdrawal button' or 'withdrawal function' on the online interface (including apps) to withdraw from contracts. | 2026-06-19 | 47 days | docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md |
-| CRITICAL | Louisiana (USA State) | Louisiana HB 570 (App Store Accountability Act) | Age category request, parental consent, re-request consent on major updates (Note: Apple storefront date is 1 Jul 2026; statutory date delayed to 1 Jul 2027). | 2026-07-01 | 35 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
-| CRITICAL | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 50 Transparency Obligations (AI-interaction disclosure, synthetic content marking, and deepfake disclosure). | 2026-08-02 | 3 days | docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md |
+| CRITICAL | Illinois (USA State) | Biometric Information Privacy Act (BIPA), 740 ILCS 14 | Written notice and release before collecting biometric identifiers, public retention schedule, destruction within 3 years, and no sale. | 2008-06-01 | 6645 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md |
+| HIGH | United Kingdom (UK) | ICO Age Appropriate Design Code (Children's Code) | High privacy by default, data minimisation, geolocation off, profiling off by default, and a mandatory DPIA. | 2021-09-02 | 1804 days | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md |
+| HIGH | South Korea | Telecommunications Business Act | Approved billing providers, 26% commission, com.apple.developer.storekit.external-purchase entitlement, South Korea-only binary, modal sheet, reporting. | 2022-03-15 | 1610 days | docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md |
+| HIGH | European Union (EU) | EU Digital Markets Act (DMA) | External purchase links and alternative payments (com.apple.developer.storekit.external-purchase-link entitlement, custom link sheet, CTC 5% reporting). | 2024-03-07 | 887 days | docs/EU-REGULATORY-2026.md section 2 |
+| CRITICAL | China | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | 2024-03-31 | 863 days | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
+| HIGH | United States (Federal) | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | 2024-06-25 | 777 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
+| HIGH | European Union (EU) | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | 2024-12-13 | 606 days | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
+| HIGH | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 4 AI Literacy (providers and deployers must ensure team/solo AI literacy, maintain policy, induction, and log). | 2025-02-02 | 555 days | docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md |
+| CRITICAL | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 5 Prohibited Practices (ban on subliminal manipulation, child exploitation, social scoring, biometric trait categorization, etc.). | 2025-02-02 | 555 days | docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md |
+| CRITICAL | European Union (EU) | EU Digital Services Act (DSA) | Trader status declaration and verification (D-U-N-S, phone, email publish, 2FA verified) or app removal from EU storefront. | 2025-02-17 | 540 days | docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md |
+| CRITICAL | Google Play (Global) | Google Play Child Safety Standards Policy | Publish CSAE standards on globally reachable web page, in-app feedback, CSAM response protocol, named child-safety contact. | 2025-03-19 | 510 days | docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md |
+| CRITICAL | Google Play (Global) | Google Play Photo and Video Permissions Policy | Broad-access READ_MEDIA_IMAGES/READ_MEDIA_VIDEO restricted to broad-access apps; others must use Android Photo Picker. | 2025-05-28 | 440 days | docs/PLATFORM-MECHANICS-2026.md section 2.9, references/rules/android.md |
+| HIGH | European Union (EU) | European Accessibility Act (EAA), Directive (EU) 2019/882 | Harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA mobile accessibility compliance and published accessibility statement. | 2025-06-28 | 409 days | docs/EU-REGULATORY-2026.md section 4, references/rules/design.md |
+| CRITICAL | United Kingdom (UK) | UK Online Safety Act 2023 | Highly Effective Age Assurance methods (facial age estimation, open banking, credit-card checks) to protect children from harmful content. | 2025-07-25 | 382 days | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/safety.md |
+| HIGH | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | GPAI-model obligations, governance, and penalties (Articles 99 and 100). | 2025-08-02 | 374 days | docs/EU-REGULATORY-2026.md section 1.1, section 1.6 |
+| CRITICAL | Google Play (Global) | Google Play Target API Requirement | New apps and updates must target API level 35 (Android 15) or higher, and existing target API 34+. | 2025-08-31 | 345 days | docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md |
+| MEDIUM | European Union (EU) | EU Data Act, Regulation (EU) 2023/2854 | Core data access-by-design obligations when apps interact with connected products and wearables. | 2025-09-12 | 333 days | docs/EU-REGULATORY-2026.md section 5 |
+| CRITICAL | Australia | Online Safety Amendment (Social Media Minimum Age) Act 2024 | Stop under-16s holding accounts on social media via robust age assurance; ringfence and destroy age data. | 2025-12-10 | 244 days | docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md |
+| HIGH | California (USA State) | California CPRA (CPPA 2026 Regulations) | Honoring Global Privacy Control (GPC), privacy policy/notice at collection, opt-out of sale/sharing/profiling, and sensitive personal info limits. | 2026-01-01 | 222 days | docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md |
+| CRITICAL | Apple App Store (Global) | Apple App Store Review Guidelines (Guideline 2.3.6) | Every app must answer the updated age-rating questionnaire (13+, 16+, 18+ tiers, UGC/ Livestream indicators) or be blocked from updates. | 2026-01-31 | 192 days | docs/EU-REGULATORY-2026.md section 6, references/rules/metadata.md |
+| CRITICAL | Apple App Store (Brazil, Australia, Singapore) | Apple App Store Region Age Requirements | Blocks users in Brazil, Australia, and Singapore from downloading apps rated 18-plus unless age confirmed through reasonable methods. | 2026-02-24 | 168 days | docs/GLOBAL-REGULATORY-2026.md section 1, references/rules/privacy.md |
+| CRITICAL | Brazil | Digital ECA (Law 15,211/2025) | Accepted age verification (document check, facial estimation, CPF check); self-declaration check-box is prohibited. | 2026-03-17 | 147 days | docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md |
+| CRITICAL | Singapore | IMDA Code of Practice for Online Safety for App Distribution Services | App-store age assurance (screen and stop users under 18 from downloading age-inappropriate apps), age-assurance data destroyed. | 2026-04-01 | 132 days | docs/GLOBAL-REGULATORY-2026.md section 3.7, references/rules/privacy.md |
+| CRITICAL | United States (Federal) | Children's Online Privacy Protection Act (COPPA), 16 CFR Part 312 | Amended COPPA Rule compliance (biometric identifiers added to PII, separate opt-in consent for third-party disclosure/targeted-ads, written retention policy, written info-security program). | 2026-04-22 | 111 days | docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md |
+| CRITICAL | Apple App Store (Global) | Apple App Store Submission Requirements | New uploads must be built with Xcode 26 and the iOS 26, watchOS 26, tvOS 26, or visionOS 26 SDKs. | 2026-04-28 | 105 days | docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6 |
+| CRITICAL | Utah (USA State) | Utah SB 142 (App Store Accountability Act) | Request and receive age category from store, confirm parental consent for minor accounts, delete verification data. | 2026-05-06 | 97 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
+| CRITICAL | Texas (USA State) | Texas SB 2420 (App Store Accountability Act) | Age assurance and verifiable parental consent for minors on downloads, purchases, and major updates; delete age data; request age category. | 2026-06-04 | 68 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
+| HIGH | European Union (EU) | Distance Marketing of Financial Services, Directive (EU) 2023/2673 | Prominent, easily accessible 'withdrawal button' or 'withdrawal function' on the online interface (including apps) to withdraw from contracts. | 2026-06-19 | 53 days | docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md |
+| CRITICAL | Louisiana (USA State) | Louisiana HB 570 (App Store Accountability Act) | Age category request, parental consent, re-request consent on major updates (Note: Apple storefront date is 1 Jul 2026; statutory date delayed to 1 Jul 2027). | 2026-07-01 | 41 days | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
+| CRITICAL | European Union (EU) | EU AI Act, Regulation (EU) 2024/1689 | Article 50 Transparency Obligations (AI-interaction disclosure, synthetic content marking, and deepfake disclosure). | 2026-08-02 | 9 days | docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md |
 
 ### Approaching Deadlines (Within 90 Days)
 
 | Priority | Jurisdiction | Law | Requirement | Due Date | Days Remaining | Affected Sections |
 |---|---|---|---|---|---|---|
-| HIGH | European Union (EU) | e-Evidence Package, Regulation (EU) 2023/1543 | Cross-border law enforcement direct electronic evidence access (10 days response timeline, and a critical 8-hour emergency timeline). | 2026-08-18 | 13 days | docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md |
-| CRITICAL | Google Play (Global) | Google Play Billing Policy | All new apps and updates must migrate to Play Billing Library version 8 or later. | 2026-08-31 | 26 days | docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md |
-| HIGH | Google Play (Global) | Google Play Target API Requirement | New apps and updates must target API level 36 (Android 16) or higher, and existing target API 35+ (Annual bump schedule). | 2026-08-31 | 26 days | docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md |
-| MEDIUM | European Union (EU) | Cyber Resilience Act, Regulation (EU) 2024/2847 | Active vulnerability reporting and security incident notification obligations. | 2026-09-11 | 37 days | docs/EU-REGULATORY-2026.md section 5 |
-| MEDIUM | European Union (EU) | EU Data Act, Regulation (EU) 2023/2854 | Access-by-design technical implementation for connected wearables and devices. | 2026-09-12 | 38 days | docs/EU-REGULATORY-2026.md section 5 |
-| CRITICAL | Android (Brazil, Indonesia, Singapore, Thailand) | Android Developer Verification Policy | App must be registered to a verified developer identity to install/update on certified devices. | 2026-09-30 | 56 days | docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md |
+| HIGH | European Union (EU) | Packaging and Packaging Waste Regulation (PPWR), Regulation (EU) 2025/40 | Packaging rules harmonisation: EU Declaration of Conformity and Technical Documentation, heavy metals / PFAS limits, and compliance verification. | 2026-08-12 | 1 days | docs/PLATFORM-MECHANICS-2026.md section 3.4 |
+| HIGH | European Union (EU) | e-Evidence Package, Regulation (EU) 2023/1543 | Cross-border law enforcement direct electronic evidence access (10 days response timeline, and a critical 8-hour emergency timeline). | 2026-08-18 | 7 days | docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md |
+| CRITICAL | Google Play (Global) | Google Play Billing Policy | All new apps and updates must migrate to Play Billing Library version 8 or later. | 2026-08-31 | 20 days | docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md |
+| HIGH | Google Play (Global) | Google Play Target API Requirement | New apps and updates must target API level 36 (Android 16) or higher, and existing target API 35+ (Annual bump schedule). | 2026-08-31 | 20 days | docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md |
+| MEDIUM | European Union (EU) | Cyber Resilience Act, Regulation (EU) 2024/2847 | Active vulnerability reporting and security incident notification obligations. | 2026-09-11 | 31 days | docs/EU-REGULATORY-2026.md section 5 |
+| MEDIUM | European Union (EU) | EU Data Act, Regulation (EU) 2023/2854 | Access-by-design technical implementation for connected wearables and devices. | 2026-09-12 | 32 days | docs/EU-REGULATORY-2026.md section 5 |
+| CRITICAL | Android (Brazil, Indonesia, Singapore, Thailand) | Android Developer Verification Policy | App must be registered to a verified developer identity to install/update on certified devices. | 2026-09-30 | 50 days | docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md |
 
 ## Full Chronological Timeline
 
@@ -85,15 +86,18 @@ Last compiled: 2026-08-04 08:33:40 UTC
 | 2026-06-19 | Distance Marketing of Financial Services, Directive (EU) 2023/2673 | Prominent, easily accessible 'withdrawal button' or 'withdrawal function' on the online interface (including apps) to withdraw from contracts. | European Union (EU) | 30 months | 2026-06-19 | HIGH | docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md |
 | 2026-07-01 | Louisiana HB 570 (App Store Accountability Act) | Age category request, parental consent, re-request consent on major updates (Note: Apple storefront date is 1 Jul 2026; statutory date delayed to 1 Jul 2027). | Louisiana (USA State) | 12 months | 2026-07-01 | CRITICAL | docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md |
 | 2026-08-02 | EU AI Act, Regulation (EU) 2024/1689 | Article 50 Transparency Obligations (AI-interaction disclosure, synthetic content marking, and deepfake disclosure). | European Union (EU) | 24 months | 2026-08-02 | CRITICAL | docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md |
+| 2026-08-12 | Packaging and Packaging Waste Regulation (PPWR), Regulation (EU) 2025/40 | Packaging rules harmonisation: EU Declaration of Conformity and Technical Documentation, heavy metals / PFAS limits, and compliance verification. | European Union (EU) | 18 months | 2026-08-12 | HIGH | docs/PLATFORM-MECHANICS-2026.md section 3.4 |
 | 2026-08-18 | e-Evidence Package, Regulation (EU) 2023/1543 | Cross-border law enforcement direct electronic evidence access (10 days response timeline, and a critical 8-hour emergency timeline). | European Union (EU) | 36 months | 2026-08-18 | HIGH | docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md |
 | 2026-08-31 | Google Play Billing Policy | All new apps and updates must migrate to Play Billing Library version 8 or later. | Google Play (Global) | 3 months | 2026-08-31 | CRITICAL | docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md |
 | 2026-08-31 | Google Play Target API Requirement | New apps and updates must target API level 36 (Android 16) or higher, and existing target API 35+ (Annual bump schedule). | Google Play (Global) | none | 2026-08-31 | HIGH | docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md |
 | 2026-09-11 | Cyber Resilience Act, Regulation (EU) 2024/2847 | Active vulnerability reporting and security incident notification obligations. | European Union (EU) | 21 months | 2026-09-11 | MEDIUM | docs/EU-REGULATORY-2026.md section 5 |
 | 2026-09-12 | EU Data Act, Regulation (EU) 2023/2854 | Access-by-design technical implementation for connected wearables and devices. | European Union (EU) | 32 months | 2026-09-12 | MEDIUM | docs/EU-REGULATORY-2026.md section 5 |
-| 2026-09-30 | Android Developer Verification Policy | App must be registered to a verified developer identity to install/update on certified devices. | Android (Brazil, Indonesia, Singapore, Thailand) | 6 months | 2026-09-30 | CRITICAL | docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md |
+| 2026-09-30 | Android Developer Verification Policy | App must be registered to a verified developer identity to install/update on certified devices. | Android (Brazil, Indonesia, Singapore, Thailand) | none | 2026-09-30 | CRITICAL | docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md |
 | 2027-01-01 | Alabama HB 161 (App Store Accountability Act) | Store and developer age assurance and parental consent compliance. Exact 2027 effective date is unverified against the primary source (docs/GLOBAL-REGULATORY-2026.md flags the same gap); 2027-01-01 is a placeholder, confirm before relying on it. | Alabama (USA State) | none | 2027-01-01 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 2.2, references/rules/privacy.md |
 | 2027-05-13 | Digital Personal Data Protection Act (DPDPA) 2023 / DPDP Rules 2025 | Verifiable parental consent through government-backed system (e.g. DigiLocker) for under-18s; behavioral tracking/targeted ads prohibited. | India | 18 months | 2027-05-13 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 3.6, references/guidelines/by-app-type/kids-category-and-families.md |
+| 2027-12-02 | EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026) | High-risk AI systems (Annex III) obligations, compliance checks, and governance requirements deferred by the July 2026 AI Omnibus. | European Union (EU) | 40 months | 2027-12-02 | HIGH | docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md |
 | 2027-12-11 | Cyber Resilience Act, Regulation (EU) 2024/2847 | Main security-by-design and vulnerability handling obligations. | European Union (EU) | 36 months | 2027-12-11 | MEDIUM | docs/EU-REGULATORY-2026.md section 5 |
+| 2028-08-02 | EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026) | High-risk AI systems embedded in physical products (Annex I machinery, toys, lifts, etc.) compliance deferred by the July 2026 AI Omnibus. | European Union (EU) | 48 months | 2028-08-02 | HIGH | docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md |
 
 ## Detailed Compliance Records
 
@@ -457,6 +461,18 @@ Last compiled: 2026-08-04 08:33:40 UTC
 - **Priority:** CRITICAL
 - **Affected Repository Sections:** docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md
 
+### ID: EU-PPWR-PACKAGING
+
+- **Jurisdiction:** European Union (EU)
+- **Law:** Packaging and Packaging Waste Regulation (PPWR), Regulation (EU) 2025/40
+- **Requirement:** Packaging rules harmonisation: EU Declaration of Conformity and Technical Documentation, heavy metals / PFAS limits, and compliance verification.
+- **Effective Date:** 2025-02-12
+- **Grace Period:** 18 months
+- **Mandatory Date:** 2026-08-12
+- **Enforcement Date:** 2026-08-12
+- **Priority:** HIGH
+- **Affected Repository Sections:** docs/PLATFORM-MECHANICS-2026.md section 3.4
+
 ### ID: EU-E-EVIDENCE-REGULATION
 
 - **Jurisdiction:** European Union (EU)
@@ -522,8 +538,8 @@ Last compiled: 2026-08-04 08:33:40 UTC
 - **Jurisdiction:** Android (Brazil, Indonesia, Singapore, Thailand)
 - **Law:** Android Developer Verification Policy
 - **Requirement:** App must be registered to a verified developer identity to install/update on certified devices.
-- **Effective Date:** 2026-03-15
-- **Grace Period:** 6 months
+- **Effective Date:** 2026-09-30
+- **Grace Period:** none
 - **Mandatory Date:** 2026-09-30
 - **Enforcement Date:** 2026-09-30
 - **Priority:** CRITICAL
@@ -553,6 +569,18 @@ Last compiled: 2026-08-04 08:33:40 UTC
 - **Priority:** HIGH
 - **Affected Repository Sections:** docs/GLOBAL-REGULATORY-2026.md section 3.6, references/guidelines/by-app-type/kids-category-and-families.md
 
+### ID: EU-AI-ACT-HIGH-RISK-ANNEX-III
+
+- **Jurisdiction:** European Union (EU)
+- **Law:** EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026)
+- **Requirement:** High-risk AI systems (Annex III) obligations, compliance checks, and governance requirements deferred by the July 2026 AI Omnibus.
+- **Effective Date:** 2024-08-01
+- **Grace Period:** 40 months
+- **Mandatory Date:** 2027-12-02
+- **Enforcement Date:** 2027-12-02
+- **Priority:** HIGH
+- **Affected Repository Sections:** docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md
+
 ### ID: EU-CRA-MAIN
 
 - **Jurisdiction:** European Union (EU)
@@ -564,3 +592,15 @@ Last compiled: 2026-08-04 08:33:40 UTC
 - **Enforcement Date:** 2027-12-11
 - **Priority:** MEDIUM
 - **Affected Repository Sections:** docs/EU-REGULATORY-2026.md section 5
+
+### ID: EU-AI-ACT-HIGH-RISK-ANNEX-I
+
+- **Jurisdiction:** European Union (EU)
+- **Law:** EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026)
+- **Requirement:** High-risk AI systems embedded in physical products (Annex I machinery, toys, lifts, etc.) compliance deferred by the July 2026 AI Omnibus.
+- **Effective Date:** 2024-08-01
+- **Grace Period:** 48 months
+- **Mandatory Date:** 2028-08-02
+- **Enforcement Date:** 2028-08-02
+- **Priority:** HIGH
+- **Affected Repository Sections:** docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md

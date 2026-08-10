@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-06-06",
+  "updated": "2026-08-10",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -49,6 +49,30 @@
       "mandatory_date": "2025-08-02",
       "enforcement_date": "2025-08-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, section 1.6",
+      "priority": "high"
+    },
+    {
+      "id": "EU-AI-ACT-HIGH-RISK-ANNEX-III",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026)",
+      "requirement": "High-risk AI systems (Annex III) obligations, compliance checks, and governance requirements deferred by the July 2026 AI Omnibus.",
+      "effective_date": "2024-08-01",
+      "grace_period": "40 months",
+      "mandatory_date": "2027-12-02",
+      "enforcement_date": "2027-12-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "priority": "high"
+    },
+    {
+      "id": "EU-AI-ACT-HIGH-RISK-ANNEX-I",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, July 2026)",
+      "requirement": "High-risk AI systems embedded in physical products (Annex I machinery, toys, lifts, etc.) compliance deferred by the July 2026 AI Omnibus.",
+      "effective_date": "2024-08-01",
+      "grace_period": "48 months",
+      "mandatory_date": "2028-08-02",
+      "enforcement_date": "2028-08-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "high"
     },
     {
@@ -134,6 +158,18 @@
       "enforcement_date": "2027-12-11",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
       "priority": "medium"
+    },
+    {
+      "id": "EU-PPWR-PACKAGING",
+      "jurisdiction": "European Union (EU)",
+      "law": "Packaging and Packaging Waste Regulation (PPWR), Regulation (EU) 2025/40",
+      "requirement": "Packaging rules harmonisation: EU Declaration of Conformity and Technical Documentation, heavy metals / PFAS limits, and compliance verification.",
+      "effective_date": "2025-02-12",
+      "grace_period": "18 months",
+      "mandatory_date": "2026-08-12",
+      "enforcement_date": "2026-08-12",
+      "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 3.4",
+      "priority": "high"
     },
     {
       "id": "US-COPPA-AMENDED",
@@ -404,8 +440,8 @@
       "jurisdiction": "Android (Brazil, Indonesia, Singapore, Thailand)",
       "law": "Android Developer Verification Policy",
       "requirement": "App must be registered to a verified developer identity to install/update on certified devices.",
-      "effective_date": "2026-03-15",
-      "grace_period": "6 months",
+      "effective_date": "2026-09-30",
+      "grace_period": "none",
       "mandatory_date": "2026-09-30",
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",

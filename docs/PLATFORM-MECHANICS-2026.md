@@ -146,27 +146,39 @@ Sources. [Apple App Review Guidelines](https://developer.apple.com/app-store/rev
 
 Neither store hard-rejects for failing WCAG, so this is a medium store risk and a high legal risk (see 3.6 and the European Accessibility Act in the EU doc).
 
+### 3.4 EU Packaging and Packaging Waste Regulation (PPWR), Regulation (EU) 2025/40 (HARD, NEW)
+
+The Packaging and Packaging Waste Regulation (PPWR) applies across all 27 EU Member States from **12 August 2026**, establishing a harmonised regulatory framework for packaging compliance to replace the legacy directive (94/62/EC).
+
+- **Scope:** Applies directly to all economic operators present on the EU market or trading with the EU involved in manufacturing, importing, or distributing packaged products. Compliance with PPWR is a precondition for legally placing any packaged product on the EU market.
+- **Key Obligations:**
+  - **Compliance Documentation:** Companies must compile and maintain Technical Documentation and hold a valid EU Declaration of Conformity.
+  - **Substance Limits:** Operators must ensure and document that packaging conforms to substance restriction thresholds (such as PFAS and heavy metal limits).
+- **Sources:** [ETL Global PPWR 2026 Rules](https://www.etl-global.com/eu-sustainability-rules-2026-esg/), [EUR-Lex PPWR Text](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32025R0040).
+
+### 3.5 Accessibility labels (STORE)
+
 - Apple Accessibility Nutrition Labels, introduced 2025, appear on the product page and cover 9 features (VoiceOver, Voice Control, Larger Text, Dark Interface, Differentiate Without Color Alone, Sufficient Contrast, Reduced Motion, Captions, Audio Descriptions). they are voluntary now, and Apple states they will become required to submit over time. a claimed feature must let users complete all common tasks with it, and a misleading label is contacted under Guideline 2.3 (accurate metadata), which is the enforceable accessibility hook today.
 - Google Play provides tooling, not a gate. the Accessibility Scanner and TalkBack. checkable criteria include touch targets of at least 48dp, content descriptions on all interactive and graphical elements, and TalkBack-navigable controls.
 
 Verify. Apple Accessibility Nutrition Labels populated and not over-claimed, UIAccessibility labels and traits present, and on Android the 48dp targets, content descriptions, and a clean Accessibility Scanner run. Sources. [Apple Accessibility Nutrition Labels](https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels/), [Android accessibility testing](https://developer.android.com/guide/topics/ui/accessibility/testing).
 
-### 3.4 Account and data deletion, the web URL (STORE, commonly missed)
+### 3.6 Account and data deletion, the web URL (STORE, commonly missed)
 
 - Apple Guideline 5.1.1(v). an account-creating app lets users start account and associated-data deletion in-app (in force since 30 June 2022). a public web deletion or privacy-choices page is provided through the optional Privacy Choices URL in App Store Connect.
 - Google Play. an account-creating app provides both an in-app deletion path and a web-link resource for account and data deletion that works even after uninstall, both declared in the Data safety form. an invalid or unreachable deletion URL is a frequent rejection.
 
 Verify the in-app delete flow deletes data (not deactivate), and that a publicly reachable web deletion URL (returns 200, no login wall) is declared. Sources. [Apple offering account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app/), [Google Play account deletion](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en).
 
-### 3.5 OFAC sanctions and embargoed-territory availability (LEGAL)
+### 3.7 OFAC sanctions and embargoed-territory availability (LEGAL)
 
 US sanctions prohibit providing goods or services to blocked persons and embargoed territories. Apple itself settled with OFAC for 466,912 dollars in 2019 for hosting a blocked developer's apps, and 2025 reporting found sanctioned-linked apps slipping into both stores, so the developer's own compliance still matters. Verify the developer or entity is not on the OFAC SDN list, and the app's country availability in App Store Connect and Play Console excludes the embargoed territories (Cuba, Iran, North Korea, Syria, and the sanctioned regions of Ukraine). Source. [TTP on sanctioned apps in the stores](https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores).
 
-### 3.6 ADA Title III accessibility litigation (LEGAL, US)
+### 3.8 ADA Title III accessibility litigation (LEGAL, US)
 
 Federal Title III web-accessibility suits rose about 27 percent in 2025, and mobile-app suits are a growing share, with WCAG 2.1 AA as the de facto court standard, though there is no DOJ Title III technical rule for private businesses. the DOJ Title II final rule (2024) requires state and local government apps to meet WCAG 2.1 AA by 2026 or 2027 by population. Flag WCAG 2.1 AA as a legal risk-mitigation item for US consumer apps, and a hard deadline for government or public-entity apps. Source. [ABA on Title III digital accessibility](https://businesslawtoday.org/2025/08/digital-accessibility-under-title-iii-of-the-ada/).
 
-### 3.7 PSD2 SCA and PCI DSS for card payments outside store billing (LEGAL and contractual)
+### 3.9 PSD2 SCA and PCI DSS for card payments outside store billing (LEGAL and contractual)
 
 These apply only to legitimate non-store card payments for real-world goods and services. digital goods and subscriptions must still route through Apple in-app purchase or Google Play Billing.
 
@@ -200,6 +212,7 @@ Verify. if the app takes EU or UK card payments for real goods, SCA and 3D Secur
 | Sanctions | Entity not SDN-listed, availability excludes embargoed territories | Legal |
 | Card payments | SCA and 3D Secure on EU or UK real-goods card flows, no PAN stored, correct PCI SAQ | Legal |
 | Accessibility labels | Apple Accessibility Nutrition Labels populated and not over-claimed | Apple |
+| Packaging Reform (PPWR) | Confirm packaging compliance via EU Declaration of Conformity and Technical Documentation | Both |
 
 ## 5. Sources and verification note
 
