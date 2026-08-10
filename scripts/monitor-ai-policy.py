@@ -440,6 +440,7 @@ def update_documentation(policy_matches, output_filepath):
         "",
     ]
 
+    unique_review_items = set()
     for m in policy_matches:
         report_content.append(f"### {m['title']} ({m['platform']})")
         report_content.append(f"- **Published**: {m['pubDate']}")
@@ -447,6 +448,86 @@ def update_documentation(policy_matches, output_filepath):
         report_content.append(f"- **Key Topics**: {', '.join(m['review_items'])}")
         report_content.append(f"- **Details**: {m['description']}")
         report_content.append("")
+        for item in m.get("review_items", []):
+            unique_review_items.add(item)
+
+    report_content.append("## Automated Migration Recommendations & Implementation Tasks")
+    report_content.append("")
+
+    recommendations_map = {
+        "AI-generated content requirements": {
+            "rec": "Ensure that generative outputs are moderated to prevent inappropriate content.",
+            "tasks": [
+                "Implement prompt-level filtering for offensive language and inappropriate requests.",
+                "Use model-based moderation endpoints (e.g. OpenAI Moderation API) before presenting outputs to users."
+            ]
+        },
+        "App Review AI guidance": {
+            "rec": "Ensure compliance with Guideline 4.2 (Minimum Functionality) and Guideline 4.3 (Spam). Do not publish a thin AI wrapper.",
+            "tasks": [
+                "Review app features to ensure significant unique value-add beyond standard API responses.",
+                "Document custom templates, UI controls, or workflow integrations in review notes."
+            ]
+        },
+        "Safety expectations": {
+            "rec": "Provide robust safety filters and reporting mechanisms.",
+            "tasks": [
+                "Implement a 1-click 'Flag Content' or 'Report Output' button next to all AI-generated texts or images.",
+                "Establish a 24-hour response SLA for reviewed user reports on generated content."
+            ]
+        },
+        "User disclosure requirements": {
+            "rec": "Obtain explicit user consent and show disclosures before sharing user inputs with third-party LLM providers.",
+            "tasks": [
+                "Present an in-app consent modal detailing the third-party AI provider name and exact data shared.",
+                "Allow users to opt-out or decline sending personal data to external AI models."
+            ]
+        },
+        "Google Play AI policies": {
+            "rec": "Ensure compliance with overall Google Play Developer Policies on AI-generated content.",
+            "tasks": [
+                "Review Google Play Console declarations regarding AI features.",
+                "Update developer terms to reflect Google Play rules for generative outputs."
+            ]
+        },
+        "AI-generated content disclosures": {
+            "rec": "Provide a prominent in-app disclosure on Android explaining the AI interaction.",
+            "tasks": [
+                "Design and implement a prominent overlay or dialog disclosing AI capabilities prior to feature access.",
+                "Ensure the Data Safety form in Google Play Console discloses AI model data handling."
+            ]
+        },
+        "User safety requirements": {
+            "rec": "Protect users from harmful AI content, including deepfakes and non-consensual graphic generation.",
+            "tasks": [
+                "Implement strict safety controls to prevent deepfake, face-swap, or non-consensual media creation.",
+                "Maintain server-side logs of generated content with timestamps and user IDs for audit trail purposes."
+            ]
+        },
+        "General Apple AI policy": {
+            "rec": "Align app's AI integration with Apple's developer guidelines.",
+            "tasks": [
+                "Verify AI safety safeguards are active.",
+                "Review App Review notes to ensure clear AI instructions."
+            ]
+        },
+        "General Google Play AI policy": {
+            "rec": "Align app's AI features with Google Play Developer standards.",
+            "tasks": [
+                "Perform safety and privacy checks on AI libraries.",
+                "Ensure compliance with the Google Play Developer Content Policy."
+            ]
+        }
+    }
+
+    for item in sorted(list(unique_review_items)):
+        if item in recommendations_map:
+            rec_info = recommendations_map[item]
+            report_content.append(f"### Tasks for {item}")
+            report_content.append(f"- **Recommendation**: {rec_info['rec']}")
+            for t in rec_info["tasks"]:
+                report_content.append(f"- [ ] {t}")
+            report_content.append("")
 
     report_content.append("<!-- AI_POLICY_MONITOR_END -->")
 
@@ -491,7 +572,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
     )
 
     args = parser.parse_args()
