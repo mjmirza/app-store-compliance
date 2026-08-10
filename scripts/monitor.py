@@ -533,7 +533,7 @@ def clean_xml_tag(tag):
 
 def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose=False):
     if verbose:
-        print(f"[*] Fetching Apple Developer News from {url}...")
+        print(f"[*] Fetching Apple Developer News from {url}...", file=sys.stderr)
     try:
         req = urllib.request.Request(
             url,
@@ -545,7 +545,8 @@ def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose
     except Exception as e:
         if verbose:
             print(
-                f"[!] Warning: Failed to fetch live RSS: {e}. Falling back to default data."
+                f"[!] Warning: Failed to fetch live RSS: {e}. Falling back to default data.",
+                file=sys.stderr
             )
         return None
 
@@ -569,7 +570,7 @@ def parse_rss_items(xml_str):
                     items.append(item_dict)
         return items
     except Exception as e:
-        print(f"[!] Error parsing RSS XML: {e}")
+        print(f"[!] Error parsing RSS XML: {e}", file=sys.stderr)
         return []
 
 
@@ -692,6 +693,266 @@ def match_announcement_to_tracks(announcement):
             matched.append(track)
 
     return matched
+
+
+def classify_source_and_verify(announcement, all_announcements=None):
+    """Classifies announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified)."""
+    link = (announcement.get("link") or announcement.get("announcement_link") or "").lower()
+    title = (announcement.get("title") or announcement.get("announcement_title") or "").lower()
+    desc = (announcement.get("description") or announcement.get("repository_impact") or "").lower()
+    combined = f"{title} {desc} {link}"
+
+    # Priority 1 official domains and keywords
+    p1_domains = [
+        "europa.eu", "eur-lex.europa.eu", "enisa.europa.eu", "edpb.europa.eu",
+        "ftc.gov", "nist.gov", "cisa.gov", "ico.org.uk", "gov.uk", "gov.sg",
+        "imda.gov.sg", "pdpc.gov.sg", "anpd.gov.br", "esafety.gov.au",
+        "apple.com", "developer.apple.com", "android.com", "developer.android.com", "support.google.com"
+    ]
+    p1_keywords = [
+        "european commission", "eur-lex", "official journal", "enisa", "edpb",
+        "ftc", "nist", "cisa", "ico", "government publication", "imda", "pdpc",
+        "anpd", "esafety commissioner", "federal register", "apple developer", "android developer"
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study", "university research", "peer-reviewed"]
+
+    p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog", "randomblogsite.com"]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary", "ai generated summaries", "chatgpt summary"]
+
+    priority = 4  # Default to 4 if nothing matches
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        # Priority 4 or 5: Must be verified by a Priority 1 official source
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if ".gov" in combined:
+            has_p1_ref_in_text = True
+
+        if has_p1_ref_in_text:
+            is_verified = True
+        elif all_announcements:
+            words = set(re.findall(r"[a-z]+", combined))
+            for other in all_announcements:
+                if other == announcement:
+                    continue
+                other_p, _ = classify_source_and_verify(other, None)
+                if other_p == 1:
+                    other_combined = f"{other.get('title') or other.get('announcement_title') or ''} {other.get('description') or other.get('repository_impact') or ''} {other.get('link') or other.get('announcement_link') or ''}".lower()
+                    other_words = set(re.findall(r"[a-z]+", other_combined))
+                    common_terms = {"privacy", "gdpr", "consent", "android", "apple", "cookie"}
+                    overlap = words.intersection(other_words).intersection(common_terms)
+                    if overlap:
+                        is_verified = True
+                        break
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None, suppress=False):
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    if priority in (4, 5) and not is_verified:
+        if not suppress:
+            print(f"[!] Source Trust Hierarchy ALERT: Announcement '{announcement.get('announcement_title') or announcement.get('title')}' is from unverified source (Priority {priority}). Blocking PR.", file=sys.stderr)
+        return False
+    else:
+        if not suppress:
+            print(f"[*] Source Trust Hierarchy PASS: Announcement '{announcement.get('announcement_title') or announcement.get('title')}' is verified (Priority {priority}).", file=sys.stderr)
+        return True
+
+
+def update_documentation_report(updates, output_filepath, suppress=False):
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+        "# Apple Developer Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track Apple developer requirements.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ]
+
+    for idx, u in enumerate(updates, 1):
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        lines.append(f"### {idx}. [{u['track']}] {u['announcement_title']}")
+        lines.append(f"- **Published Date**: {u['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{u['announcement_link']}]({u['announcement_link']})")
+        lines.append(f"- **Verification Status**: {status_str}")
+        lines.append(f"- **Description**: {u['repository_impact']}")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    for u in updates:
+        track = u["track"]
+        priority, is_verified = classify_source_and_verify(u)
+        if priority in (4, 5) and not is_verified:
+            lines.append(f"### Tasks for {track} (BLOCKED: Announcement source is unverified)")
+            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+            lines.append("")
+            continue
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Regulatory Impact**: {u['severity_impact']} priority compliance area.")
+
+        for step_idx, step in enumerate(u["migration_tasks"], 1):
+            lines.append(f"- [ ] **Task {step_idx}**: {step}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        if not suppress:
+            print(f"Apple developer policy documentation updated successfully at: {output_filepath}", file=sys.stderr)
+    except Exception as e:
+        if not suppress:
+            print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def generate_pull_request_draft(updates, project_path):
+    citations_list = []
+    affected_files_set = set()
+    migration_steps = []
+    impl_checklist = []
+    risk_assessment = []
+    approvers = set()
+
+    for idx, u in enumerate(updates, 1):
+        track = u["track"]
+        meta = TRACK_METADATA.get(track, {})
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        citations_list.append(
+            f"- **{track}**: {u['announcement_title']} ({u['announcement_link']}) (Published: {u['announcement_pubDate']}, Source: {status_str})"
+        )
+
+        for f in u["affected_files"]:
+            affected_files_set.add(f)
+
+        for step in u["migration_tasks"]:
+            migration_steps.append(f"- **{track}**: {step}")
+            impl_checklist.append(f"- [ ] {track}: {step}")
+
+        risk_assessment.append(f"- **{track}**: {meta.get('release_impact', 'Medium')} Risk. {meta.get('impact_desc', '')}")
+
+        if meta.get("release_impact") in ["Critical", "High"]:
+            approvers.add("Lead Mobile Engineer / Architect")
+            approvers.add("Product / App Delivery Manager")
+            approvers.add("Legal & Privacy Compliance Officer")
+        else:
+            approvers.add("Senior iOS / Mobile Developer")
+            approvers.add("QA Team Lead")
+
+    citations_str = "\n".join(citations_list) if citations_list else "- *No updates cited.*"
+
+    if affected_files_set:
+        affected_files_str = "\n".join(f"- `{f}`" for f in sorted(list(affected_files_set)))
+    else:
+        affected_files_str = "- *No specific files containing matching category patterns were automatically detected. (Perform manual review of configuration variables).* "
+
+    migration_steps_str = "\n".join(migration_steps) if migration_steps else "- *No migration steps identified.*"
+    impl_checklist_str = "\n".join(impl_checklist) if impl_checklist else "- [ ] Perform generic verification of the Apple policy."
+    risk_assessment_str = "\n".join(risk_assessment) if risk_assessment else "- *Low identified risk.*"
+
+    approver_rec = "\n".join(f"- {a}" for a in sorted(list(approvers))) if approvers else "- Senior iOS / Mobile Developer"
+
+    pr_template = f"""# PULL REQUEST DRAFT: Apple Developer Requirements Compliance Update
+
+## 1. Summary
+This pull request introduces critical configuration, structural, and code modifications to bring the application into complete compliance with all monitored Apple Developer and App Store requirements. It addresses platform-specific guidelines and declarations to pass automated App Store Connect upload checks and human App Review.
+
+## 2. Background
+Keeping pace with platform developer guidelines is vital to prevent submission rejections and ensuring continuous, reliable application delivery. Apple continuously enforces tighter controls on privacy manifests, required reason APIs, custom external purchases, and user data protection. This PR proactively clears identified implementation gaps.
+
+## 3. Regulatory change
+- **Privacy and Data Protection**: Complete compliance with Apple's Privacy Manifest (PrivacyInfo.xcprivacy), Required Reason APIs declarations, and user tracking restrictions.
+- **In-App Purchases and Alternative Payments**: Safe integration of StoreKit-based billing or verified external purchase links meeting regional regulatory standards and anti-steering changes.
+- **App Completeness and Stability**: Addressing guidelines 2.1 and 4.3 (Completeness and Saturated Categories) by removing dead/placeholder code and supplying working demo capabilities.
+
+## 4. Official citations
+{citations_str}
+
+## 5. Affected files
+{affected_files_str}
+
+## 6. Risk assessment
+{risk_assessment_str}
+- **Overall Standing**: Immediate risk of App Store submission rejections or build upload rejections if these compliance milestones are not fully met.
+
+## 7. Migration steps
+{migration_steps_str}
+
+## 8. Backward compatibility
+All changes are fully backward-compatible. Deployment targets and minimum SDK settings are maintained or updated within supported thresholds, allowing legacy installations to function seamlessly.
+
+## 9. Implementation checklist
+{impl_checklist_str}
+- [ ] Run the repository-wide automated compliance guard.
+
+## 10. Testing checklist
+- [ ] Validate that PrivacyInfo.xcprivacy exists in the final iOS bundle output.
+- [ ] Verify that all Required Reason APIs called are mapped to valid reason codes in the manifest.
+- [ ] Run manual validation of affected UX flows (e.g., subscription terms display, Sign in with Apple button).
+- [ ] Execute the pre-submission guard script to confirm that the compliance threshold is fully satisfied.
+
+## 11. Documentation checklist
+- [ ] Update internal compliance documentation and requirements tracker.
+- [ ] Populate App Store Review Notes (following templates/REVIEW-NOTES-TEMPLATE.md) with working test accounts.
+- [ ] Update `docs/APPLE-POLICY-MIGRATION.md` with the completed actions.
+
+## 12. Compliance impact
+- **Storefront Reviews**: Eliminates high-frequency Apple privacy and completeness rejections, securing clean publishing passages.
+- **Regulatory Standing**: Aligns the application with regional frameworks (including DMA compliance where applicable), avoiding compliance debt.
+- **Developer Organization Credentials**: Minimizes compliance strikes, safeguarding the developer account from suspension.
+
+## 13. Breaking changes
+- There are no structural breaking changes or breaking API modifications introduced by this change. User tracking features are conditionally deferred until active permission is granted.
+
+## 14. Review checklist
+- [ ] Verify that the diff is completely emoji-free.
+- [ ] Verify that all official sources cited are correct and verified.
+- [ ] Ensure the app builds and runs successfully with no new warning logs.
+
+## 15. Approver recommendations
+{approver_rec}
+"""
+    return pr_template
 
 
 def generate_pull_request(track_name, affected_files, item_title):
@@ -963,7 +1224,7 @@ def run_monitor(
 
     if simulate_track:
         if verbose:
-            print(f"[*] Simulating update for track: {simulate_track}")
+            print(f"[*] Simulating update for track: {simulate_track}", file=sys.stderr)
         # Build simulated announcements
         if simulate_track == "all":
             for track_name in TRACK_METADATA:
@@ -1005,7 +1266,7 @@ def run_monitor(
 
     elif custom_news_file:
         if verbose:
-            print(f"[*] Loading announcements from custom file: {custom_news_file}")
+            print(f"[*] Loading announcements from custom file: {custom_news_file}", file=sys.stderr)
         try:
             with open(custom_news_file, "r", encoding="utf-8") as f:
                 if custom_news_file.endswith(".json"):
@@ -1013,12 +1274,12 @@ def run_monitor(
                 else:
                     announcements = parse_rss_items(f.read())
         except Exception as e:
-            print(f"[!] Error reading custom news file {custom_news_file}: {e}")
+            print(f"[!] Error reading custom news file {custom_news_file}: {e}", file=sys.stderr)
             sys.exit(1)
 
     elif use_mock:
         if verbose:
-            print("[*] Using pre-defined mock Apple Developer announcements...")
+            print("[*] Using pre-defined mock Apple Developer announcements...", file=sys.stderr)
         announcements = MOCK_ANNOUNCEMENTS
 
     else:
@@ -1029,12 +1290,13 @@ def run_monitor(
         else:
             if verbose:
                 print(
-                    "[*] Falling back to mock announcements due to missing or failed RSS fetch."
+                    "[*] Falling back to mock announcements due to missing or failed RSS fetch.",
+                    file=sys.stderr
                 )
             announcements = MOCK_ANNOUNCEMENTS
 
     if verbose:
-        print(f"[*] Loaded {len(announcements)} developer announcements.")
+        print(f"[*] Loaded {len(announcements)} developer announcements.", file=sys.stderr)
 
     report_items = []
     processed_tracks = set()
@@ -1044,11 +1306,19 @@ def run_monitor(
         if not matched_tracks:
             continue
 
+        priority, is_verified = classify_source_and_verify(item, announcements)
+        is_blocked = (priority in (4, 5) and not is_verified)
+
         for track in matched_tracks:
             processed_tracks.add(track)
             meta = TRACK_METADATA[track]
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
-            pr_details = generate_pull_request(track, affected_files, item["title"])
+
+            if is_blocked:
+                pr_details = None
+                scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
+            else:
+                pr_details = generate_pull_request(track, affected_files, item["title"])
 
             report_items.append(
                 {
@@ -1105,9 +1375,12 @@ def print_text_report(report_items, project_path):
 
         pr = item["proposed_pull_request"]
         print("   - Proposed Pull Request Details:")
-        print(f"       * Branch Name:  {pr['branch_name']}")
-        print(f"       * PR Title:     {pr['title']}")
-        print("       * PR Description: (draft generated successfully)")
+        if pr is None:
+            print("       * BLOCKED: Compliance Pull Request generation blocked due to unverified secondary source.")
+        else:
+            print(f"       * Branch Name:  {pr['branch_name']}")
+            print(f"       * PR Title:     {pr['title']}")
+            print("       * PR Description: (draft generated successfully)")
 
         print("-" * 80)
 
@@ -1137,6 +1410,16 @@ def main():
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
+        "--output-docs",
+        default="docs/APPLE-POLICY-MIGRATION.md",
+        help="Filepath to write migration tasks and logs (default: docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        default="docs/APPLE_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR (default: docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print verbose execution and scanning logs",
@@ -1151,6 +1434,29 @@ def main():
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    # Filter out updates with unverified sources for PR generation
+    verified_updates = []
+    for u in report_items:
+        if enforce_strict_source_trust_hierarchy(u, report_items, suppress=args.json):
+            verified_updates.append(u)
+
+    # Write documentation report if specified
+    if args.output_docs and report_items:
+        update_documentation_report(report_items, args.output_docs, suppress=args.json)
+
+    # Draft pull request using verified updates
+    if args.pr_output and verified_updates:
+        pr_draft = generate_pull_request_draft(verified_updates, args.project)
+        try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_draft)
+            if not args.json:
+                print(f"Apple compliance PR draft written successfully to: {args.pr_output}", file=sys.stderr)
+        except Exception as e:
+            if not args.json:
+                print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
