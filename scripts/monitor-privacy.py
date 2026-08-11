@@ -384,6 +384,35 @@ def classify_source_and_verify(announcement, all_announcements=None):
     return priority, is_verified
 
 
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Explicitly executes the strict source trust hierarchy check.
+    Logs verification alerts to stderr and returns (priority_level, is_verified, is_blocked).
+    Any Priority 4 or 5 source that is not verified by a Priority 1 source is blocked
+    for compliance pull request generation.
+    """
+    import sys
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    is_blocked = (priority in (4, 5) and not is_verified)
+
+    # Suppress output if --json is in command-line arguments to preserve valid JSON
+    is_json = "--json" in sys.argv
+    if not is_json:
+        source_info = announcement.get("link", announcement.get("title", "Unknown Source"))
+        if is_blocked:
+            sys.stderr.write(
+                f"[VERIFICATION ALERT] Blocked compliance Pull Request generation: "
+                f"Source '{source_info}' is Priority {priority} (unverified secondary source).\n"
+            )
+        else:
+            status_str = "Verified" if is_verified else "Unverified but allowed (Priority <= 3)"
+            sys.stderr.write(
+                f"[VERIFICATION SUCCESS] Source '{source_info}' is Priority {priority} ({status_str}).\n"
+            )
+
+    return priority, is_verified, is_blocked
+
+
 def scan_codebase_for_privacy_signals(start_dir="."):
     """
     Scans the codebase for files containing signals related to each of the 16 privacy categories.
@@ -896,15 +925,15 @@ def main():
     verified_updates = []
     blocked_updates_count = 0
     for u in classified_updates:
-        priority, is_verified = classify_source_and_verify(u)
-        if priority in (4, 5) and not is_verified:
+        priority, is_verified, is_blocked = enforce_strict_source_trust_hierarchy(u, classified_updates)
+        if is_blocked:
             blocked_updates_count += 1
         else:
             verified_updates.append(u)
 
     print(f"Monitored and classified {len(classified_updates)} policy/requirement updates ({blocked_updates_count} blocked due to source trust validation):")
     for idx, u in enumerate(classified_updates, 1):
-        priority, is_verified = classify_source_and_verify(u)
+        priority, is_verified, is_blocked = enforce_strict_source_trust_hierarchy(u, classified_updates)
         status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
         print(f" {idx}. [{u['category']}] {u['title']} - {status_str}")
 

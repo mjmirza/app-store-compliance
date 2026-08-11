@@ -701,6 +701,35 @@ def classify_source_and_verify(announcement, all_announcements=None):
     return priority, is_verified
 
 
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Explicitly executes the strict source trust hierarchy check.
+    Logs verification alerts to stderr and returns (priority_level, is_verified, is_blocked).
+    Any Priority 4 or 5 source that is not verified by a Priority 1 source is blocked
+    for compliance pull request generation.
+    """
+    import sys
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    is_blocked = (priority in (4, 5) and not is_verified)
+
+    # Suppress output if --json is in command-line arguments to preserve valid JSON
+    is_json = "--json" in sys.argv
+    if not is_json:
+        source_info = announcement.get("link", announcement.get("title", "Unknown Source"))
+        if is_blocked:
+            sys.stderr.write(
+                f"[VERIFICATION ALERT] Blocked compliance Pull Request generation: "
+                f"Source '{source_info}' is Priority {priority} (unverified secondary source).\n"
+            )
+        else:
+            status_str = "Verified" if is_verified else "Unverified but allowed (Priority <= 3)"
+            sys.stderr.write(
+                f"[VERIFICATION SUCCESS] Source '{source_info}' is Priority {priority} ({status_str}).\n"
+            )
+
+    return priority, is_verified, is_blocked
+
+
 def match_announcement_to_tracks(announcement):
     """
     Checks if a regulatory announcement text matches any of the tracking areas.
@@ -1020,8 +1049,8 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
 
             # Evaluate source trust and apply restriction/blocking rules
-            priority, is_verified = classify_source_and_verify(item, announcements)
-            if priority in (4, 5) and not is_verified:
+            priority, is_verified, is_blocked = enforce_strict_source_trust_hierarchy(item, announcements)
+            if is_blocked:
                 pr_details = None
                 scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
             else:
