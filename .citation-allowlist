@@ -14,6 +14,10 @@ https://randomblogsite.com/gdpr-rumor
 https://support.google.com/googleplay/android-developer/answer/datasafety
 https://developer.apple.com/news/?id=required-reason-apis
 
+# Mock/Test URLs from scripts/monitor-ai-policy-test.sh
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
 # Real government site that refuses all automated clients (geo/bot filtered).
 https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
 
