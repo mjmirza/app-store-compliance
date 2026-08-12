@@ -77,6 +77,22 @@ so I can decide whether to star it.
 
 If you are inside this setup already, the slash command `/app-store-audit` runs the same audit.
 
+## It works. Approved on the first try
+
+A developer on Reddit ran only the one time check above, with no install, before submitting. The audit surfaced weaknesses they had not caught. They fixed them, and the app went through on the first attempt.
+
+<div align="center">
+
+<img src="assets/first-try-approval.png" alt="Reddit thread in which a developer reports that after running the one time check and fixing what it found, their app was approved on the first attempt" width="640" />
+
+</div>
+
+> It noticed some weaknesses in my submission that I was able to fix. [...] My app was approved on first try!
+
+The same thread is worth reading for the part that is not praise. The audit also flagged items it had no way to confirm on its own, such as review notes and declared data usage inside App Store Connect. Those reads look like false positives. They are deliberate. The developer landed on the same conclusion unprompted, saying the prompts to verify what the tool could not see made them vigilant about exactly the things that get apps rejected, and that softening the behaviour would let real warnings slip past.
+
+An item that cannot be verified is surfaced rather than assumed clean. A missed warning costs a rejection. A surfaced one costs a minute.
+
 ## Found this useful? Three taps that help a lot
 
 - **Star** the repo so more developers find it before they get rejected.
