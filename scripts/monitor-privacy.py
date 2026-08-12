@@ -541,6 +541,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -555,6 +556,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
