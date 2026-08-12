@@ -340,3 +340,13 @@ Tokens (Access Tokens, Refresh Tokens, JWTs) are sensitive authorization credent
 - **No Disk Leakage:** Never write tokens to regular files, unencrypted SQLite databases, standard logs, or console output (`NSLog`, `print`, `Log.d`).
 - **Secure Vaulting:** Store tokens strictly inside the **iOS Keychain** or **Android EncryptedSharedPreferences** / Keystore-encrypted database.
 - **Refresh Token Isolation:** Refresh tokens have long lifetimes and must be protected with additional security constraints (e.g., biometrics required or scoped to `ThisDeviceOnly`). Access tokens should be short-lived (e.g., 15 minutes), with refresh tokens rotated on each use.
+
+---
+
+## 18. Continuous Security Auditing & Verification
+
+### 18.1 Static Analysis and Linting
+Regularly scan the codebase using automated checks (such as the App Store Compliance Guard or static analysis security testing tools) to detect forbidden patterns. This includes checking for cleartext HTTP configurations, unencrypted localized storage interfaces, or insecure backup configurations in platform manifests.
+
+### 18.2 Dynamic and Runtime Verification
+Incorporate automated security scanners or perform dynamic analysis on testing environments to verify root and jailbreak detection bypass resilience, TLS certificate pinning effectiveness, and runtime memory hygiene (such as ensuring that sensitive token values are cleared from memory immediately after use).
