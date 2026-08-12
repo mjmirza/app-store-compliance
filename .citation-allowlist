@@ -22,3 +22,22 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# New regulatory or government pages that are either restricted, geo-blocked, or rate-limited.
+https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
+https://egazette.gov.in/
+https://ico.org.uk/for-organisations/guide-to-data-protection/key-data-protection-themes/age-appropriate-design-a-code-of-practice-for-online-services/
+https://www.aph.gov.uk/Parliamentary_Business/Bills_Legislation/Bills_Search_Results/Result?bId=r7247
+
+# Apple news/arcade mock query IDs used in test scripts (and hence returned by soft-404 verification checks)
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Localhost, staging, and sample endpoints used in test environments
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://example.com/x
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://realbackend.io/privacy-policy
+https://staging.example.com
