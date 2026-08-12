@@ -1,0 +1,55 @@
+name: Continuous Platform AI Policy Monitor
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor-policies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run AI Policy Monitor in Live Mode
+        run: |
+          python3 scripts/monitor-ai-policy.py --live --output-docs docs/AI-POLICY-MIGRATION.md --pr-output docs/AI_COMPLIANCE_PR_DRAFT.md
+
+      - name: Check for policy changes
+        id: git_status
+        run: |
+          git status --porcelain
+          if [ -n "$(git status --porcelain docs/AI-POLICY-MIGRATION.md)" ]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Compliance Pull Request if changes detected
+        if: steps.git_status.outputs.changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH_NAME="compliance/ai-policy-update-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH_NAME"
+
+          git add docs/AI-POLICY-MIGRATION.md
+          git commit -m "compliance: update platform-specific AI policies"
+
+          git push origin "$BRANCH_NAME" --force
+
+          gh pr create \
+            --title "Compliance: Platform-Specific AI Policy Update" \
+            --body-file docs/AI_COMPLIANCE_PR_DRAFT.md \
+            --head "$BRANCH_NAME" \
+            --base main \
+            --draft
