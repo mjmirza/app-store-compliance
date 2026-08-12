@@ -113,34 +113,34 @@ def main():
         if overdue_warnings:
             md_lines.append("### Active / Overdue Deadlines (Action Required)")
             md_lines.append("")
-            md_lines.append("| Priority | Jurisdiction | Law | Requirement | Passed Date | Overdue Days | Affected Sections |")
-            md_lines.append("|---|---|---|---|---|---|---|")
+            md_lines.append("| Law | Requirement | Effective Date | Grace Period | Mandatory Date | Enforcement Date | Affected Sections | Priority | Jurisdiction | Overdue Days |")
+            md_lines.append("|---|---|---|---|---|---|---|---|---|---|")
             for item in overdue_warnings:
                 overdue_days = abs(item["remaining_days"])
                 md_lines.append(
-                    f"| {item['priority'].upper()} | {item['jurisdiction']} | {item['law']} | {item['requirement']} | {item['mandatory_date']} | {overdue_days} days | {item['affected_repository_sections']} |"
+                    f"| {item['law']} | {item['requirement']} | {item['effective_date']} | {item['grace_period']} | {item['mandatory_date']} | {item['enforcement_date']} | {item['affected_repository_sections']} | {item['priority'].upper()} | {item['jurisdiction']} | {overdue_days} days |"
                 )
             md_lines.append("")
 
         if approaching_warnings:
             md_lines.append("### Approaching Deadlines (Within 90 Days)")
             md_lines.append("")
-            md_lines.append("| Priority | Jurisdiction | Law | Requirement | Due Date | Days Remaining | Affected Sections |")
-            md_lines.append("|---|---|---|---|---|---|---|")
+            md_lines.append("| Law | Requirement | Effective Date | Grace Period | Mandatory Date | Enforcement Date | Affected Sections | Priority | Jurisdiction | Days Remaining |")
+            md_lines.append("|---|---|---|---|---|---|---|---|---|---|")
             for item in approaching_warnings:
                 md_lines.append(
-                    f"| {item['priority'].upper()} | {item['jurisdiction']} | {item['law']} | {item['requirement']} | {item['mandatory_date']} | {item['remaining_days']} days | {item['affected_repository_sections']} |"
+                    f"| {item['law']} | {item['requirement']} | {item['effective_date']} | {item['grace_period']} | {item['mandatory_date']} | {item['enforcement_date']} | {item['affected_repository_sections']} | {item['priority'].upper()} | {item['jurisdiction']} | {item['remaining_days']} days |"
                 )
             md_lines.append("")
 
     # Full chronological timeline
     md_lines.append("## Full Chronological Timeline")
     md_lines.append("")
-    md_lines.append("| Mandatory Date | Law | Requirement | Jurisdiction | Grace Period | Enforcement Date | Priority | Affected Sections |")
-    md_lines.append("|---|---|---|---|---|---|---|---|")
+    md_lines.append("| Mandatory Date | Law | Requirement | Effective Date | Grace Period | Enforcement Date | Affected Sections | Priority | Jurisdiction |")
+    md_lines.append("|---|---|---|---|---|---|---|---|---|")
     for item in parsed_items:
         md_lines.append(
-            f"| {item['mandatory_date']} | {item['law']} | {item['requirement']} | {item['jurisdiction']} | {item['grace_period']} | {item['enforcement_date']} | {item['priority'].upper()} | {item['affected_repository_sections']} |"
+            f"| {item['mandatory_date']} | {item['law']} | {item['requirement']} | {item['effective_date']} | {item['grace_period']} | {item['enforcement_date']} | {item['affected_repository_sections']} | {item['priority'].upper()} | {item['jurisdiction']} |"
         )
     md_lines.append("")
 
