@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-06-06",
+  "updated": "2026-08-10",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -49,6 +49,30 @@
       "mandatory_date": "2025-08-02",
       "enforcement_date": "2025-08-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, section 1.6",
+      "priority": "high"
+    },
+    {
+      "id": "EU-AI-ACT-HIGH-RISK-ANNEX-III",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, in force 27 July 2026)",
+      "requirement": "High-risk AI systems (Annex III) obligations, compliance checks, and governance requirements deferred by the AI Omnibus (in force 27 July 2026).",
+      "effective_date": "2024-08-01",
+      "grace_period": "40 months",
+      "mandatory_date": "2027-12-02",
+      "enforcement_date": "2027-12-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "priority": "high"
+    },
+    {
+      "id": "EU-AI-ACT-HIGH-RISK-ANNEX-I",
+      "jurisdiction": "European Union (EU)",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 (as amended by AI Omnibus, in force 27 July 2026)",
+      "requirement": "High-risk AI systems embedded in physical products (Annex I machinery, toys, lifts, etc.) compliance deferred by the AI Omnibus (in force 27 July 2026).",
+      "effective_date": "2024-08-01",
+      "grace_period": "48 months",
+      "mandatory_date": "2028-08-02",
+      "enforcement_date": "2028-08-02",
+      "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "high"
     },
     {
