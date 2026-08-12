@@ -72,7 +72,10 @@ def main():
             "jurisdiction": d.get("jurisdiction", "Unknown"),
             "law": d.get("law", "Unknown"),
             "requirement": d.get("requirement", "Unknown"),
-            "mandatory_date": d.get("mandatory_date"),
+            "effective_date": d.get("effective_date", "Unknown"),
+            "grace_period": d.get("grace_period", "Unknown"),
+            "mandatory_date": d.get("mandatory_date", "Unknown"),
+            "enforcement_date": d.get("enforcement_date", "Unknown"),
             "priority": d.get("priority", "Medium"),
             "sections": sections_str,
             "remaining_days": remaining_days,
@@ -93,10 +96,14 @@ def main():
         for item in passed_deadlines:
             overdue = abs(item["remaining_days"])
             print(f"[{item['priority'].upper()}] Jurisdiction: {item['jurisdiction']}")
-            print(f"  Law:         {item['law']}")
-            print(f"  Requirement: {item['requirement']}")
-            print(f"  Passed Date: {item['mandatory_date']} ({overdue} days overdue)")
-            print(f"  Impacted:    {item['sections']}")
+            print(f"  Law:                          {item['law']}")
+            print(f"  Requirement:                  {item['requirement']}")
+            print(f"  Effective date:               {item['effective_date']}")
+            print(f"  Grace period:                 {item['grace_period']}")
+            print(f"  Mandatory date:               {item['mandatory_date']} ({overdue} days overdue)")
+            print(f"  Enforcement date:             {item['enforcement_date']}")
+            print(f"  Affected repository sections: {item['sections']}")
+            print(f"  Priority:                     {item['priority'].upper()}")
             print()
 
     if upcoming_deadlines:
@@ -107,12 +114,14 @@ def main():
         upcoming_deadlines.sort(key=lambda x: x["remaining_days"])
         for item in upcoming_deadlines:
             print(f"[{item['priority'].upper()}] Jurisdiction: {item['jurisdiction']}")
-            print(f"  Law:         {item['law']}")
-            print(f"  Requirement: {item['requirement']}")
-            print(
-                f"  Due Date:    {item['mandatory_date']} (in {item['remaining_days']} days)"
-            )
-            print(f"  Impacted:    {item['sections']}")
+            print(f"  Law:                          {item['law']}")
+            print(f"  Requirement:                  {item['requirement']}")
+            print(f"  Effective date:               {item['effective_date']}")
+            print(f"  Grace period:                 {item['grace_period']}")
+            print(f"  Mandatory date:               {item['mandatory_date']} (in {item['remaining_days']} days)")
+            print(f"  Enforcement date:             {item['enforcement_date']}")
+            print(f"  Affected repository sections: {item['sections']}")
+            print(f"  Priority:                     {item['priority'].upper()}")
             print()
 
     if not warnings_found:

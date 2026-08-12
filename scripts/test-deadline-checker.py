@@ -97,6 +97,13 @@ class TestDeadlineChecker(unittest.TestCase):
             self.assertIn("Upcoming Regulation 2026", output)
             self.assertTrue("in " in output and " days" in output)
 
+            # Verify all requested fields are present in the output
+            self.assertIn("Effective date:", output)
+            self.assertIn("Grace period:", output)
+            self.assertIn("Enforcement date:", output)
+            self.assertIn("Affected repository sections:", output)
+            self.assertIn("Priority:", output)
+
             # Verify far future deadline is NOT in stdout
             self.assertNotIn("Far Future Law 2028", output)
 
