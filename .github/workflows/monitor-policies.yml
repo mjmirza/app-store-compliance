@@ -1,0 +1,52 @@
+name: Monitor Platform AI Policies
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily
+  workflow_dispatch:     # Allows manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor-ai:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run AI Policy Monitor in Live Mode
+        run: |
+          python3 scripts/monitor-ai-policy.py --live --output-docs docs/AI-POLICY-MIGRATION.md --pr-output docs/AI_COMPLIANCE_PR_DRAFT.md || echo "No policy changes detected or run failed."
+
+      - name: Commit changes and Draft Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "Compliance Bot"
+          git config --global user.email "compliance-bot@users.noreply.github.com"
+
+          # Detect if docs/AI-POLICY-MIGRATION.md has been modified
+          if ! git diff --quiet docs/AI-POLICY-MIGRATION.md; then
+            BRANCH_NAME="compliance/ai-policy-update-$(date +%Y%m%d%H%M%S)"
+            git checkout -b "$BRANCH_NAME"
+            git add docs/AI-POLICY-MIGRATION.md
+            git commit -m "docs: auto-update platform-specific AI policy migration docs"
+            git push origin "$BRANCH_NAME"
+
+            if [ -f docs/AI_COMPLIANCE_PR_DRAFT.md ]; then
+              gh pr create \
+                --title "compliance: platform-specific AI policy update" \
+                --body-file docs/AI_COMPLIANCE_PR_DRAFT.md \
+                --base main \
+                --head "$BRANCH_NAME" || echo "Pull request draft creation skipped or failed."
+            fi
+          else
+            echo "No policy changes detected."
+          fi
