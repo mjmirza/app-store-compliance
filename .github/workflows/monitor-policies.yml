@@ -1,0 +1,51 @@
+name: Monitor Platform AI Policies
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run AI Policy Monitor
+        run: |
+          python3 scripts/monitor-ai-policy.py --live --dir . --output-docs docs/AI-POLICY-MIGRATION.md --pr-output docs/AI_COMPLIANCE_PR_DRAFT.md
+
+      - name: Check for changes and create Pull Request
+        run: |
+          if [ -f docs/AI_COMPLIANCE_PR_DRAFT.md ]; then
+            TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+            BRANCH_NAME="compliance/ai-policy-$TIMESTAMP"
+
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+            git checkout -b "$BRANCH_NAME"
+            git add docs/AI-POLICY-MIGRATION.md
+            git commit -m "compliance: Update AI-POLICY-MIGRATION.md with latest policies"
+            git push origin "$BRANCH_NAME"
+
+            gh pr create \
+              --title "Compliance: Update Platform-Specific AI Policies" \
+              --body-file docs/AI_COMPLIANCE_PR_DRAFT.md \
+              --head "$BRANCH_NAME" \
+              --base master
+          else
+            echo "No new policies or changes detected."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
