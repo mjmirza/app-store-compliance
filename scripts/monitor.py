@@ -1112,6 +1112,177 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+def update_apple_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the migration report in the output path.
+    """
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+        "# Apple Developer Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track Apple compliance areas.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ]
+
+    if not report_items:
+        lines.append("All monitored Apple Developer requirements are currently up-to-date. No pending migrations detected.")
+        lines.append("")
+    else:
+        for idx, item in enumerate(report_items, 1):
+            lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+            lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+            lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+            lines.append(f"- **Release Impact**: {item['severity_impact']}")
+            lines.append(f"- **Description**: {item['repository_impact']}")
+            lines.append("")
+
+        lines.append("## Automated Migration Recommendations & Implementation Tasks")
+        lines.append("")
+
+        for item in report_items:
+            track = item["track"]
+            lines.append(f"### Tasks for {track}")
+            lines.append(f"- **Regulatory Impact**: {item['severity_impact']} priority compliance area.")
+            lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+
+            for step_idx, step in enumerate(item["migration_tasks"], 1):
+                lines.append(f"- [ ] **Task {step_idx}**: {step}")
+            lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def generate_consolidated_pr_draft(report_items):
+    """
+    Consolidates multiple matched Apple requirement updates into a single
+    15-section, emoji-free compliance Pull Request draft.
+    """
+    if not report_items:
+        tracks_str = "None"
+        citations_str = "- *No updates cited.*"
+        affected_files_str = "- *No affected files detected.*"
+        risk_assessment_str = "- *Low identified risk.*"
+        migration_steps_str = "- *No migration steps identified.*"
+        impl_checklist_str = "- [ ] Perform generic verification of the privacy policy."
+        approver_rec_str = "- **Senior iOS Developer**"
+    else:
+        tracks_list = [item["track"] for item in report_items]
+        tracks_str = ", ".join(tracks_list)
+
+        citations_list = []
+        affected_files_set = set()
+        migration_steps = []
+        impl_checklist = []
+        risk_assessment = []
+        approver_rec_list = []
+
+        for item in report_items:
+            track = item["track"]
+            citations_list.append(
+                f"- **{track}**: [{item['announcement_title']}]({item['announcement_link']}) (Published: {item['announcement_pubDate']})"
+            )
+
+            for f in item["affected_files"]:
+                affected_files_set.add(f)
+
+            for step in item["migration_tasks"]:
+                migration_steps.append(f"- **{track}**: {step}")
+                impl_checklist.append(f"- [ ] Implement/Verify: {step}")
+
+            risk_assessment.append(
+                f"- **{track}** ({item['severity_impact']}): {item['repository_impact']}"
+            )
+
+            if item["severity_impact"] in ["Critical", "High"]:
+                approver_rec_list.append("Lead Mobile Engineer")
+                approver_rec_list.append("Legal & Privacy Compliance Officer")
+            else:
+                approver_rec_list.append("Senior iOS Developer")
+                approver_rec_list.append("QA Team Lead")
+
+        citations_str = "\n".join(citations_list)
+
+        if affected_files_set:
+            affected_files_str = "\n".join(f"- `{f}`" for f in sorted(list(affected_files_set)))
+        else:
+            affected_files_str = "- *No specific files containing matching category patterns were automatically detected. (Perform manual review of configuration variables).* "
+
+        migration_steps_str = "\n".join(migration_steps)
+        impl_checklist_str = "\n".join(impl_checklist)
+        risk_assessment_str = "\n".join(risk_assessment)
+
+        approvers_set = sorted(list(set(approver_rec_list)))
+        approver_rec_str = "\n".join(f"- **{app}**" for app in approvers_set)
+
+    pr_template = f"""# PULL REQUEST DRAFT: Apple Developer Requirements Compliance Update
+
+## 1. Summary
+This pull request brings the application into complete compliance with all monitored Apple developer and App Store requirements. It addresses the following tracks: {tracks_str}.
+
+## 2. Background
+Apple continuously updates its App Store Review Guidelines, Developer Program License Agreements, and privacy expectations. Proactively resolving these changes protects the application against submission delays, rejection cycles, and administrative publication blockages.
+
+## 3. Regulatory change
+The updates address critical Apple requirements, ensuring full alignment with standard App Store practices. This includes the mandatory integration of Privacy Manifests, strict Required Reason API mapping, explicit App Tracking Transparency prompts, and payments rules to satisfy modern publishing gates.
+
+## 4. Official citations
+{citations_str}
+
+## 5. Affected files
+{affected_files_str}
+
+## 6. Risk assessment
+{risk_assessment_str}
+- **Overall Standing**: High risk of update blockage or account warnings if publishing gates are not proactively cleared.
+
+## 7. Migration steps
+{migration_steps_str}
+
+## 8. Backward compatibility
+All modifications are fully backward-compatible. Minimum SDK targets and deployment targets are adjusted safely without introducing runtime failures or breaking legacy device integrations.
+
+## 9. Implementation checklist
+{impl_checklist_str}
+- [ ] Re-run the automated pre-submission compliance guard locally to verify the codebase state.
+
+## 10. Testing checklist
+- [ ] Verify clean compilation with current Xcode compiler specifications.
+- [ ] Run automated tests to check for regression-free performance.
+- [ ] Manually validate updated application flows (e.g., user consents, permission dialogs, payments).
+
+## 11. Documentation checklist
+- [ ] Update `docs/APPLE-POLICY-MIGRATION.md` with migration tasks and logs.
+- [ ] Keep App Store Review Notes updated with valid demo accounts.
+- [ ] Confirm privacy policy URL points to an active, valid endpoint.
+
+## 12. Compliance impact
+- **Submission Safety**: Eliminates common Apple rejection categories (e.g., missing manifests, mismatched privacy declarations).
+- **Storefront Health**: Protects corporate publisher credentials from warnings or suspension.
+- **Publishing Velocity**: Guarantees uninterrupted delivery of product bug-fixes and security patches.
+
+## 13. Breaking changes
+- No functional breaking changes or structural API breakages are introduced.
+
+## 14. Review checklist
+- [ ] Confirm that all required keys, identifiers, and files are present in the pull request diff.
+- [ ] Verify that no unauthorized third-party libraries are referenced.
+- [ ] Ensure the codebase is free of debugging bypasses or non-compliant placeholders.
+
+## 15. Approver recommendations
+{approver_rec_str}
+"""
+    return pr_template
+
+
 def main():
     import argparse
 
@@ -1141,6 +1312,16 @@ def main():
         action="store_true",
         help="Print verbose execution and scanning logs",
     )
+    parser.add_argument(
+        "--output-docs",
+        default="docs/APPLE-POLICY-MIGRATION.md",
+        help="Filepath to write migration tasks and logs",
+    )
+    parser.add_argument(
+        "--pr-output",
+        default="docs/APPLE_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
+    )
 
     args = parser.parse_args()
 
@@ -1151,6 +1332,22 @@ def main():
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    # Generate documents and PR drafts if we have report items
+    if report_items:
+        update_apple_documentation_report(report_items, args.output_docs)
+        if not args.json:
+            print(f"Apple documentation updated successfully at: {args.output_docs}")
+
+        pr_draft = generate_consolidated_pr_draft(report_items)
+        try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_draft)
+            if not args.json:
+                print(f"PR draft written successfully to: {args.pr_output}")
+        except Exception as e:
+            print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
