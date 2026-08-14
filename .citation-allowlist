@@ -9,6 +9,7 @@ https://yourdomain.com/.well-known/assetlinks.json
 
 # Deliberate low-trust fixture. Proves the monitor rejects Priority 5 sources.
 https://randomblogsite.com/gdpr-rumor
+https://randomblogsite.com/iso-rumor
 
 # Gauntlet fixtures for verify-citations.py itself. Must stay broken to test the gate.
 https://support.google.com/googleplay/android-developer/answer/datasafety
@@ -22,3 +23,31 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Apple news or requirement placeholders (query IDs)
+https://developer.apple.com/news/?id=02172025a
+https://developer.apple.com/news/?id=07242025a
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Google Play news or answer placeholders
+https://support.google.com/googleplay/android-developer/answer/9999999
+
+# Unreachable local/test endpoints from test scripts
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://example.com/x
+https://realbackend.io/privacy-policy
+https://staging.example.com
+
+# Unreachable external repositories / links
+https://github.com/mjmirza/app-store-compliance/stargazers
+
+# Changed or unreachable governmental URLs
+https://cppa.ca.gov/regulations/ccpa_updates.html
+https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
+https://egazette.gov.in/
+
+# Other unreachable allowlisted sites or elements
+https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores
