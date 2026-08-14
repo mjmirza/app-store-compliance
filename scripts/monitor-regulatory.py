@@ -452,10 +452,83 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
+    "EU e-Evidence Package": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal", "EUR-Lex"],
+        "citations": [
+            "Regulation (EU) 2023/1543 on European Production and Preservation Orders for electronic evidence in criminal matters (OJ L 135, 23.5.2023)",
+            "Directive (EU) 2023/1544 on the appointment of legal representatives for the purpose of gathering evidence (OJ L 135, 23.5.2023)",
+        ],
+        "keywords": [
+            "e-evidence",
+            "european production order",
+            "european preservation order",
+            "evidence in criminal matters",
+            "legal representative",
+            "emergency timeline",
+        ],
+        "patterns": [
+            r"e-evidence",
+            r"european[ -]production[ -]order",
+            r"european[ -]preservation[ -]order",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
+        "detect_regex": r"e-evidence|european production order|european preservation order|emergency data production|legalRepresentative|emergencyResponseProtocol",
+        "impact_desc": "The EU e-Evidence Package (Regulation (EU) 2023/1543 & Directive (EU) 2023/1544) allows judicial authorities of EU Member States to issue direct data production or preservation orders to service providers, establishing a standard 10-day timeline and a critical 8-hour emergency timeline.",
+        "migration_steps": [
+            "Designate an official establishment or legal representative in the EU to receive legal orders.",
+            "Establish a rapid response protocol to extract and package user data within the 8-hour emergency timeline.",
+            "Implement secure cryptographic logging for all incoming orders, verification steps, and data access events.",
+            "Disclose data access and preservation compliance in the user-facing privacy policy."
+        ],
+        "compliance_impact": "High",
+    },
+    "EU Contract Withdrawal Button": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2023/2673 of the European Parliament and of the Council of 22 November 2023 amending Directive 2011/83/EU on consumer rights (OJ L, 2023/2673, 22.11.2023)"
+        ],
+        "keywords": [
+            "withdrawal button",
+            "withdrawal function",
+            "contract withdrawal",
+            "withdrawal period",
+            "frictionless cancellation",
+            "distance contract",
+        ],
+        "patterns": [
+            r"withdrawal[ -]button",
+            r"withdrawal[ -]function",
+            r"contract[ -]withdrawal",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
+        "detect_regex": r"withdrawal button|withdrawal function|withdraw from contract|distance contract|withdrawalButton|withdrawalFunction|cancelSubscription|frictionlessCancellation",
+        "impact_desc": "The EU Contract Withdrawal Button Directive (Directive (EU) 2023/2673) requires a prominent, easily accessible 'withdrawal button' or 'withdrawal function' on online user interfaces for distance consumer contracts.",
+        "migration_steps": [
+            "Add a prominent, easily accessible withdrawal button inside the application settings or subscription details screen.",
+            "Ensure the cancellation path is frictionless, direct, and at least as simple as the sign-up path.",
+            "Display clear disclosures on the 14-day statutory withdrawal period and its consequences.",
+            "Implement transactional logging of withdrawal requests, timestamps, and refund executions."
+        ],
+        "compliance_impact": "High",
+    },
 }
 
 # Pre-defined Simulated Regulatory Announcements
 SIMULATED_DEVELOPMENTS = [
+    {
+        "title": "EU e-Evidence Package compliance enforcement begins with strict timelines",
+        "description": "Judicial authorities in the European Union are now empowered under Regulation (EU) 2023/1543 to directly issue electronic evidence production or preservation orders to digital service providers, carrying a mandatory 10-day standard and 8-hour emergency response protocol.",
+        "pubDate": "Tue, 18 Aug 2026 09:00:00 GMT",
+        "link": "https://eur-lex.europa.eu/eli/reg/2023/1543/oj",
+    },
+    {
+        "title": "EU Contract Withdrawal Button requirement comes into force for consumer interfaces",
+        "description": "Directive (EU) 2023/2673 becomes fully applicable, requiring online marketplaces and subscription services to implement a prominent and frictionless withdrawal button or function on user interfaces for contract termination.",
+        "pubDate": "Fri, 19 Jun 2026 09:00:00 GMT",
+        "link": "https://eur-lex.europa.eu/eli/dir/2023/2673/oj",
+    },
     {
         "title": "EU AI Act Article 50 Transparency Obligations taking full effect in August 2026",
         "description": "The European Commission published draft implementation guidelines on transparency obligations under Article 50 of the AI Act. Developers of chatbot systems and synthetic content generators must implement interaction disclosure and watermarking.",
