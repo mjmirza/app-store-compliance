@@ -22,3 +22,7 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Test fixture URLs in test scripts.
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
