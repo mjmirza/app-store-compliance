@@ -22,3 +22,7 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Governmental/official portals blocked by bot or server firewall.
+https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
+https://egazette.gov.in/
