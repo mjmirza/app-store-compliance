@@ -35,23 +35,23 @@ echo "[PASS] monitor-regulatory.py successfully scanned the target directory"
 echo "[TEST] Simulating 'EU AI Act' track and validating 15-section JSON output..."
 EU_JSON=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --json)
 
-# Define expected sections
+# Define expected sections (1 to 15)
 SECTIONS=(
-  "Summary"
-  "Background"
-  "Regulatory change"
-  "Official citations"
-  "Affected files"
-  "Risk assessment"
-  "Migration steps"
-  "Backward compatibility"
-  "Implementation checklist"
-  "Testing checklist"
-  "Documentation checklist"
-  "Compliance impact"
-  "Breaking changes"
-  "Review checklist"
-  "Approver recommendations"
+  "1. Summary"
+  "2. Background"
+  "3. Regulatory change"
+  "4. Official citations"
+  "5. Affected files"
+  "6. Risk assessment"
+  "7. Migration steps"
+  "8. Backward compatibility"
+  "9. Implementation checklist"
+  "10. Testing checklist"
+  "11. Documentation checklist"
+  "12. Compliance impact"
+  "13. Breaking changes"
+  "14. Review checklist"
+  "15. Approver recommendations"
 )
 
 for sect in "${SECTIONS[@]}"; do
