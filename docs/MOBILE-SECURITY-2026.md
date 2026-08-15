@@ -9,7 +9,7 @@ Each section provides a high-level review of the security domain, platform-speci
 ## 1. Secure Storage
 
 ### 1.1 Overview
-Sensitive information (session tokens, passwords, personal data, API keys, private cryptographic keys) must never be stored in plaintext. Standard application sandbox structures—such as `UserDefaults` on iOS or standard `SharedPreferences` on Android—write content directly to XML or plist files in unencrypted formats, allowing easy retrieval on jailbroken/rooted devices, or via backup analysis.
+Sensitive information (session tokens, passwords, personal data, API keys, private cryptographic keys) must never be stored in plaintext. Standard application sandbox structures - such as `UserDefaults` on iOS or standard `SharedPreferences` on Android - write content directly to XML or plist files in unencrypted formats, allowing easy retrieval on jailbroken/rooted devices, or via backup analysis.
 
 ### 1.2 Platform Implementation & Best Practices
 
