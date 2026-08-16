@@ -557,19 +557,23 @@ def classify_announcements(announcements, keywords_filter=None):
     return classified_updates
 
 
-def generate_pull_request_draft(updates, scan_results):
+def generate_pull_request_draft(updates, scan_results, is_mock=False):
     """Generates a draft of a pull request complying with the exact 15 required sections."""
     citations_list = []
     affected_files_set = set()
-    migration_steps = []
-    impl_checklist = []
-    risk_assessment = []
+    migration_steps_dict = {}
+    impl_checklist_dict = {}
+    risk_assessment_dict = {}
 
+    seen_citations = set()
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
-        )
+        cit_key = (cat, u["title"], u["link"])
+        if cit_key not in seen_citations:
+            seen_citations.add(cit_key)
+            citations_list.append(
+                f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+            )
 
         # Pull affected files
         files = scan_results.get(cat, [])
@@ -577,179 +581,182 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific migration details
-        if cat == "secure storage":
-            migration_steps.append(
+        # Category-specific migration details (keyed by category to avoid duplication)
+        if cat == "secure storage" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Migrate sensitive localized storage from plaintext UserDefaults/SharedPreferences to Jetpack EncryptedSharedPreferences (Android) or iOS Keychain."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Replace plain SharedPreferences calls with EncryptedSharedPreferences."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Extraction of user session credentials from the file system on compromised or backed-up devices."
             )
-        elif cat == "Keychain":
-            migration_steps.append(
+        elif cat == "Keychain" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Audit and enforce `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on all newly added iOS Keychain entries."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Configure kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly on iOS Keychain items."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Unauthorized keychain migration to other physical devices during system backups."
             )
-        elif cat == "Android Keystore":
-            migration_steps.append(
+        elif cat == "Android Keystore" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Initialize KeyGenParameterSpec with hardware-backed StrongBox protection and enforce biometric user authentication."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Configure KeyGenParameterSpec with StrongBox-backed hardware parameters."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Extraction of cryptographic keys from memory if the key is not hardware-enclave isolated."
             )
-        elif cat == "biometric authentication":
-            migration_steps.append(
+        elif cat == "biometric authentication" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Secure biometric auth with a Keystore CryptoObject rather than rely on vulnerable runtime boolean returns."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Implement CryptoObject-backed BiometricPrompt authentication."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Runtime bypass using hooking engines like Frida if the biometric check merely checks a return value."
             )
-        elif cat == "certificate pinning":
-            migration_steps.append(
+        elif cat == "certificate pinning" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Pin Subject Public Key Info (SPKI) hashes in network security configs instead of leaf certificates."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Configure SPKI hashes in network_security_config.xml and NSPinnedDomains in Info.plist."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Traffic interception or server spoofing if trust anchors are compromised."
             )
-        elif cat == "jailbreak detection":
-            migration_steps.append(
+        elif cat == "jailbreak detection" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Implement multi-layered jailbreak audits covering file paths, directory permissions, and dynamic linker library loading."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Add multi-layered jailbreak detection heuristic checks on iOS."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Execution on heavily compromised platforms exposing client-side secure boundaries."
             )
-        elif cat == "root detection":
-            migration_steps.append(
+        elif cat == "root detection" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Integrate Google Play Integrity API and implement backend token validation to detect rooted/compromised environments."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Integrate Google Play Integrity verification workflows."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Bypassed client-side heuristic checks due to advanced rooting bypass frameworks."
             )
-        elif cat == "SSL configuration":
-            migration_steps.append(
+        elif cat == "SSL configuration" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Disable cleartext HTTP traffic globally in the manifest and configuration files, enforcing TLS 1.2+."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Disable usesCleartextTraffic in AndroidManifest.xml and verify ATS in Info.plist."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Credential sniffing or traffic modification over unencrypted HTTP channels."
             )
-        elif cat == "backup rules":
-            migration_steps.append(
+        elif cat == "backup rules" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Configure precise data extraction rules or set allowBackup to false to block database leaks."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Configure dataExtractionRules to exclude credentials and local SQLite databases."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Extraction of private sandboxed files via standard ADB backup extractions."
             )
-        elif cat == "exported activities":
-            migration_steps.append(
+        elif cat == "exported activities" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Review AndroidManifest.xml; enforce exported='false' on all internal components."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Set android:exported=false for all non-launcher activities."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: External apps launching internal flows to bypass authentication states."
             )
-        elif cat == "intent filters":
-            migration_steps.append(
+        elif cat == "intent filters" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Protect implicit intent filters using custom signature-level permissions."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Enforce signature-level permissions on any exported intent filters."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Interception, spoofing, or hijacking of implicit intent components by other apps."
             )
-        elif cat == "deep links":
-            migration_steps.append(
+        elif cat == "deep links" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Sanitize all incoming deep link parameters and avoid using them for sensitive operations."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Add strict input sanitization on deep link parameter parsers."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Parameter injection or cross-site scripting-like exploits within web rendering modules."
             )
-        elif cat == "universal links":
-            migration_steps.append(
+        elif cat == "universal links" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Implement verified Universal Links with a valid apple-app-site-association file to secure routing."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Host a secure apple-app-site-association file at the target web domain."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Custom URL scheme hijacking if another app registers the same custom link protocol."
             )
-        elif cat == "app links":
-            migration_steps.append(
+        elif cat == "app links" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Implement verified Android App Links with a digitally signed assetlinks.json file on the host domain."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Publish the digital assetlinks.json with the correct signing certificate fingerprint."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Platform disambiguation dialogues and custom scheme hijacking on Android."
             )
-        elif cat == "authentication flows":
-            migration_steps.append(
+        elif cat == "authentication flows" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Implement Proof Key for Code Exchange (PKCE) over secure system browsers (Custom Tabs / ASWebAuthenticationSession)."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Configure OAuth 2.1 client with PKCE challenge/verifier code generation."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Interception of authorization codes and leakage of client credentials inside source code."
             )
-        elif cat == "session handling":
-            migration_steps.append(
+        elif cat == "session handling" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Perform complete server-side session invalidation on logout and blur background app snapshot views."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Add background multitasking blur window transitions to protect user data from snapshots."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Leaking sensitive UI layouts inside system multitasking views or session hijacking due to orphan backend sessions."
             )
-        elif cat == "token storage":
-            migration_steps.append(
+        elif cat == "token storage" and cat not in migration_steps_dict:
+            migration_steps_dict[cat] = (
                 f"- **{cat}**: Isolate refresh tokens inside a secure hardware-backed database vault or encrypted preferences."
             )
-            impl_checklist.append(
+            impl_checklist_dict[cat] = (
                 "- [ ] Save access and refresh tokens inside encrypted vaults with short-lived access periods."
             )
-            risk_assessment.append(
+            risk_assessment_dict[cat] = (
                 f"- *{cat}*: Loss of user account custody if refresh tokens leak from persistent cache storage."
             )
 
     citations_str = "\n".join(citations_list)
+    migration_steps_str = "\n".join(migration_steps_dict.values())
+    impl_checklist_str = "\n".join(impl_checklist_dict.values())
+    risk_assessment_str = "\n".join(risk_assessment_dict.values())
 
     if affected_files_set:
         affected_files_str = "\n".join(
@@ -757,10 +764,6 @@ def generate_pull_request_draft(updates, scan_results):
         )
     else:
         affected_files_str = "- *No specific files containing matching category patterns were automatically detected. (Perform manual review of configuration variables).* "
-
-    migration_steps_str = "\n".join(migration_steps)
-    impl_checklist_str = "\n".join(impl_checklist)
-    risk_assessment_str = "\n".join(risk_assessment)
 
     pr_template = f"""# PULL REQUEST DRAFT: Mobile Security Requirements Compliance Update
 
@@ -824,7 +827,7 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_mock=False):
     """Overwrites or updates the migration report in docs/SECURITY-POLICY-MIGRATION.md."""
     lines = [
         "<!-- SECURITY_POLICY_MONITOR_START -->",
@@ -832,9 +835,18 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-security.py` to track compliance areas.",
         "",
+    ]
+
+    if is_mock:
+        lines.extend([
+            "> **Simulated output, not live announcements.**",
+            "",
+        ])
+
+    lines.extend([
         "## Monitored Security Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -846,8 +858,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -976,12 +993,14 @@ def main():
     total_matches = sum(len(matches) for matches in scan_results.values())
     print(f"Found {total_matches} signal matches in code.")
 
+    is_mock = bool(args.mock or (not args.live and not args.mock))
+
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_mock=is_mock)
 
     # 5. Generate Pull Request draft
-    pr_draft = generate_pull_request_draft(classified_updates, scan_results)
+    pr_draft = generate_pull_request_draft(classified_updates, scan_results, is_mock=is_mock)
 
     if args.pr_output:
         try:
