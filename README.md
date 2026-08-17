@@ -198,6 +198,7 @@ python3 scripts/release-audit.py /path/to/your/app                  # release re
 python3 scripts/accessibility-audit.py /path/to/your/app            # accessibility compliance audit
 python3 scripts/monitor-privacy.py --dir /path/to/your/app          # mobile and web privacy requirements
 python3 scripts/monitor-security.py --dir /path/to/your/app         # 17 mobile security requirements
+python3 scripts/monitor-standards.py --dir /path/to/your/app        # 10 key technical standards requirements
 python3 scripts/generate-timeline.py                                # chronological regulatory timeline
 ```
 
@@ -254,6 +255,7 @@ python3 scripts/deadline-checker.py
 | `scripts/verify-citations.py` | Verifies every cited URL resolves to real content, catching soft-404 pages that return HTTP 200 |
 | `scripts/monitor-privacy.py` | Monitors mobile and web privacy requirements across Apple, Google, and EU sources |
 | `scripts/monitor-security.py` | Monitors 17 mobile security requirements, matching real API symbols in your code |
+| `scripts/monitor-standards.py` | Monitors 10 key technical standards requirements (ISO, IEC, OWASP, NIST, CIS) |
 | `scripts/generate-timeline.py` | Compiles a chronological regulatory timeline from the deadline database |
 | `scripts/monitor.py` | Monitors 25 Apple developer requirements tracks, maps announcements to tracks, identifies affected files, generates migration tasks, estimates release impact, and drafts pull requests |
 | `scripts/monitor-test.sh` | Unit and integration test suite verifying the monitor's mapping, simulation, and scanning functionalities |
