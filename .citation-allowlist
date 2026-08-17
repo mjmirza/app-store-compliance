@@ -22,3 +22,15 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Test fixtures and placeholders used in test scripts
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://developer.apple.com/visionos/submit/
+https://example.com/x
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://realbackend.io/privacy-policy
+https://staging.example.com
