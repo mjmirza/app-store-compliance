@@ -22,3 +22,8 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Real government sites or law firm alerts that refuse or block automated clients or experience host faults.
+https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
+https://egazette.gov.in/
+https://www.wilmerhale.com/en/insights/client-alerts/20250801-eighth-circuit-vacates-the-ftcs-click-to-cancel-rule-but-federal-and-state-regulators-likely-to-remain-active
