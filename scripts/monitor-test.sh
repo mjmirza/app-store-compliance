@@ -24,10 +24,43 @@ echo "$OUT" | grep -q "TRACK UPDATE: \[DMA compliance changes\]" && \
 echo "$OUT" | grep -q "TRACK UPDATE: \[Swift requirements\]" && \
 ok "simulating all 25 tracks runs successfully with no crashes and outputs matches" || bad "simulate all tracks"
 
-# 4. JSON output format verification
+# 4. JSON output format verification and 15-section validation
 JSON_OUT="$($MONITOR --simulate "Required Reason APIs" --json 2>&1)"
 # Validate if it is well-formed JSON
 echo "$JSON_OUT" | python3 -c "import sys, json; data = json.load(sys.stdin); assert len(data) > 0; assert data[0]['track'] == 'Required Reason APIs'" 2>/dev/null && ok "json output format is valid and contains matched track" || bad "json output"
+
+# Validate that all 15 required numbered compliance sections exist in the PR description
+PR_SECTIONS_OK=true
+SECTIONS=(
+  "1. Summary"
+  "2. Background"
+  "3. Regulatory change"
+  "4. Official citations"
+  "5. Affected files"
+  "6. Risk assessment"
+  "7. Migration steps"
+  "8. Backward compatibility"
+  "9. Implementation checklist"
+  "10. Testing checklist"
+  "11. Documentation checklist"
+  "12. Compliance impact"
+  "13. Breaking changes"
+  "14. Review checklist"
+  "15. Approver recommendations"
+)
+
+for sect in "${SECTIONS[@]}"; do
+  if ! echo "$JSON_OUT" | grep -q "## $sect"; then
+    PR_SECTIONS_OK=false
+    break
+  fi
+done
+
+if [ "$PR_SECTIONS_OK" = true ]; then
+  ok "PR description contains all 15 required numbered compliance sections"
+else
+  bad "PR description is missing one or more required numbered compliance sections"
+fi
 
 # 5. Repository scanning verification
 T=$(mktemp -d)
