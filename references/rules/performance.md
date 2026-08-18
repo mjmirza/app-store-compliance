@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-24 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+28 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -81,6 +81,57 @@ How to detect.
 
 ```bash
 grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\|opt-in\|privacyConsent\|deletePersonalData\|exportData' .
+```
+
+## BOTH-US-ASAA-COMPLIANCE-MISSING
+
+- Title. Missing US State App Store Accountability Act age assurance and parental consent controls
+- Platform. both
+- Guideline or policy. US State ASAA (Utah SB 142 / Texas SB 2420 / Louisiana HB 570)
+- Severity. critical
+- What triggers it. Failing to integrate Declared Age Range API or Play Age Signals API and missing parental consent validation for minor users in applicable US states.
+- How to fix it. Integrate native age signal APIs (Declared Age Range on iOS, Play Age Signals API on Android), enforce verifiable parental consent for minor accounts, and purge raw age verification data immediately.
+- Detection signals. ageCategory, minorUser, parentalConsent, DeclaredAgeRange, com.google.android.play:age-signals
+- Present means handled. verifyParentalConsent, deleteAgeVerificationData, handleAgeCategorySignal, rescindConsent
+
+How to detect.
+
+```bash
+grep -rni 'DeclaredAgeRange\|age-signals\|parentalConsent\|RESCIND_CONSENT' --include='*.swift' --include='*.kt' --include='*.java' . || echo '  MISSING: No state ASAA age assurance or parental consent signals found'
+```
+
+## US-COPPA-AMENDED-RULE-MISSING
+
+- Title. Non-compliance with Amended COPPA Rule requirements
+- Platform. both
+- Guideline or policy. COPPA 16 CFR Part 312
+- Severity. critical
+- What triggers it. Collecting childrens data or biometric identifiers without separate opt-in consent for third-party disclosure/targeted ads, or lacking written retention and information security policies.
+- How to fix it. Implement separate opt-in consent for third-party sharing/advertising, establish written data retention policies, maintain a written security program, and update verifiable parental consent flows.
+- Detection signals. biometricIdentifier, childData, kidProfile, coppaConsent
+- Present means handled. separateThirdPartyConsent, coppaWrittenRetentionPolicy, coppaInfoSecurityProgram, verifiableParentalConsent
+
+How to detect.
+
+```bash
+grep -rni 'coppaWrittenRetentionPolicy\|coppaInfoSecurityProgram\|separateThirdPartyConsent' --include='*.swift' --include='*.kt' --include='*.md' . || echo '  MISSING: No amended COPPA retention policy or separate consent handles found'
+```
+
+## EU-AI-ACT-ART-50-TRANSPARENCY-MISSING
+
+- Title. Missing AI interaction disclosure or synthetic content marking
+- Platform. both
+- Guideline or policy. EU AI Act Article 50
+- Severity. critical
+- What triggers it. Providing AI chatbots or generating synthetic text/media without immediate AI-interaction disclosures or machine-readable synthetic content watermarks.
+- How to fix it. Display immediate in-app disclosures informing users they are interacting with AI, inject machine-readable provenance watermarks (e.g., C2PA) into synthetic media, and disclose artificial manipulation.
+- Detection signals. chatCompletion, generateImage, syntheticMedia, aiChat
+- Present means handled. aiInteractionNotice, c2paWatermark, syntheticContentMarker, deepfakeDisclosure
+
+How to detect.
+
+```bash
+grep -rni 'aiInteractionNotice\|c2paWatermark\|syntheticContentMarker' --include='*.swift' --include='*.kt' --include='*.js' --include='*.ts' . || echo '  MISSING: No AI Act Article 50 transparency disclosure or C2PA watermarking found'
 ```
 
 ## APPLE-2.1-DEBUG-FEATURES
@@ -286,6 +337,23 @@ How to detect.
 
 ```bash
 grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
+```
+
+## EU-AI-ACT-ART-4-LITERACY-MISSING
+
+- Title. Missing AI Literacy Policy and training induction logs for AI system operations
+- Platform. both
+- Guideline or policy. EU AI Act Article 4
+- Severity. high
+- What triggers it. Operating or deploying AI models or AI features without maintaining an active AI Literacy Policy, team induction records, and training logs.
+- How to fix it. Maintain a written AI Literacy Policy, conduct regular AI safety and privacy inductions, and keep an up-to-date AI literacy training log.
+- Detection signals. openai, anthropic, llm, generativeAI, aiAssistant
+- Present means handled. aiLiteracyPolicy, AI_LITERACY_LOG, aiTrainingCompleted, aiLiteracyRecord
+
+How to detect.
+
+```bash
+grep -rni 'aiLiteracyPolicy\|AI_LITERACY_LOG' --include='*.md' --include='*.swift' --include='*.py' . || echo '  MISSING: No AI literacy policy or training log file found'
 ```
 
 ## APPLE-ACCESSIBILITY-COLORCONTRAST

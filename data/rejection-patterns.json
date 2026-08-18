@@ -1408,6 +1408,92 @@
         "trackingPreferences"
       ],
       "fix": "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
+    },
+    {
+      "id": "BOTH-US-ASAA-COMPLIANCE-MISSING",
+      "platform": "both",
+      "guideline": "US State ASAA (Utah SB 142 / Texas SB 2420 / Louisiana HB 570)",
+      "title": "Missing US State App Store Accountability Act age assurance and parental consent controls",
+      "severity": "critical",
+      "detection": "Failing to integrate Declared Age Range API or Play Age Signals API and missing parental consent validation for minor users in applicable US states.",
+      "signals": [
+        "ageCategory",
+        "minorUser",
+        "parentalConsent",
+        "DeclaredAgeRange",
+        "com.google.android.play:age-signals"
+      ],
+      "counterSignals": [
+        "verifyParentalConsent",
+        "deleteAgeVerificationData",
+        "handleAgeCategorySignal",
+        "rescindConsent"
+      ],
+      "fix": "Integrate native age signal APIs (Declared Age Range on iOS, Play Age Signals API on Android), enforce verifiable parental consent for minor accounts, and purge raw age verification data immediately."
+    },
+    {
+      "id": "US-COPPA-AMENDED-RULE-MISSING",
+      "platform": "both",
+      "guideline": "COPPA 16 CFR Part 312",
+      "title": "Non-compliance with Amended COPPA Rule requirements",
+      "severity": "critical",
+      "detection": "Collecting childrens data or biometric identifiers without separate opt-in consent for third-party disclosure/targeted ads, or lacking written retention and information security policies.",
+      "signals": [
+        "biometricIdentifier",
+        "childData",
+        "kidProfile",
+        "coppaConsent"
+      ],
+      "counterSignals": [
+        "separateThirdPartyConsent",
+        "coppaWrittenRetentionPolicy",
+        "coppaInfoSecurityProgram",
+        "verifiableParentalConsent"
+      ],
+      "fix": "Implement separate opt-in consent for third-party sharing/advertising, establish written data retention policies, maintain a written security program, and update verifiable parental consent flows."
+    },
+    {
+      "id": "EU-AI-ACT-ART-4-LITERACY-MISSING",
+      "platform": "both",
+      "guideline": "EU AI Act Article 4",
+      "title": "Missing AI Literacy Policy and training induction logs for AI system operations",
+      "severity": "high",
+      "detection": "Operating or deploying AI models or AI features without maintaining an active AI Literacy Policy, team induction records, and training logs.",
+      "signals": [
+        "openai",
+        "anthropic",
+        "llm",
+        "generativeAI",
+        "aiAssistant"
+      ],
+      "counterSignals": [
+        "aiLiteracyPolicy",
+        "AI_LITERACY_LOG",
+        "aiTrainingCompleted",
+        "aiLiteracyRecord"
+      ],
+      "fix": "Maintain a written AI Literacy Policy, conduct regular AI safety and privacy inductions, and keep an up-to-date AI literacy training log."
+    },
+    {
+      "id": "EU-AI-ACT-ART-50-TRANSPARENCY-MISSING",
+      "platform": "both",
+      "guideline": "EU AI Act Article 50",
+      "title": "Missing AI interaction disclosure or synthetic content marking",
+      "severity": "critical",
+      "detection": "Providing AI chatbots or generating synthetic text/media without immediate AI-interaction disclosures or machine-readable synthetic content watermarks.",
+      "signals": [
+        "chatCompletion",
+        "generateImage",
+        "syntheticMedia",
+        "aiChat"
+      ],
+      "counterSignals": [
+        "aiInteractionNotice",
+        "c2paWatermark",
+        "syntheticContentMarker",
+        "deepfakeDisclosure"
+      ],
+      "fix": "Display immediate in-app disclosures informing users they are interacting with AI, inject machine-readable provenance watermarks (e.g., C2PA) into synthetic media, and disclose artificial manipulation."
     }
   ]
 }

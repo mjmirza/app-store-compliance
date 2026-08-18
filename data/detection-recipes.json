@@ -82,6 +82,10 @@
     "RN-PRIVACY-MANIFEST-MISSING": "grep -qE '\"react-native\"|\"expo\"' package.json 2>/dev/null && grep -rn 'Firebase\\|AsyncStorage\\|expo-file-system' --include='*.ts' --include='*.tsx' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
     "IONIC-4.2-THIN-WRAPPER": "grep -rlE 'WKWebView|loadRequest|Capacitor|Cordova' --include='*.ts' --include='*.js' --include='*.swift' . 2>/dev/null | wc -l   # then count distinct @capacitor/(status-bar|splash-screen|push-notifications|haptics) markers, fewer than 2 is a thin wrapper",
     "IONIC-UIWEBVIEW-DEPRECATED": "grep -rn 'UIWebView' --include='*.swift' --include='*.m' . 2>/dev/null",
-    "IONIC-PRIVACY-MANIFEST-MISSING": "grep -rq '@capacitor/\\|Capacitor\\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q ."
+    "IONIC-PRIVACY-MANIFEST-MISSING": "grep -rq '@capacitor/\\|Capacitor\\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
+    "BOTH-US-ASAA-COMPLIANCE-MISSING": "grep -rni 'DeclaredAgeRange\\|age-signals\\|parentalConsent\\|RESCIND_CONSENT' --include='*.swift' --include='*.kt' --include='*.java' . || echo '  MISSING: No state ASAA age assurance or parental consent signals found'",
+    "US-COPPA-AMENDED-RULE-MISSING": "grep -rni 'coppaWrittenRetentionPolicy\\|coppaInfoSecurityProgram\\|separateThirdPartyConsent' --include='*.swift' --include='*.kt' --include='*.md' . || echo '  MISSING: No amended COPPA retention policy or separate consent handles found'",
+    "EU-AI-ACT-ART-4-LITERACY-MISSING": "grep -rni 'aiLiteracyPolicy\\|AI_LITERACY_LOG' --include='*.md' --include='*.swift' --include='*.py' . || echo '  MISSING: No AI literacy policy or training log file found'",
+    "EU-AI-ACT-ART-50-TRANSPARENCY-MISSING": "grep -rni 'aiInteractionNotice\\|c2paWatermark\\|syntheticContentMarker' --include='*.swift' --include='*.kt' --include='*.js' --include='*.ts' . || echo '  MISSING: No AI Act Article 50 transparency disclosure or C2PA watermarking found'"
   }
 }
