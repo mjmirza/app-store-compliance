@@ -1,38 +1,56 @@
-## What this changes
+# [Compliance] Pull Request Title
 
-<!-- One or two sentences. What is different after this merges. -->
+## 1. Summary
+<!-- Concise high-level summary of the repository updates or regulatory compliance changes being introduced. -->
 
-## Why
+## 2. Background
+<!-- Operational, legal, or policy context driving this change. Link relevant issue or ticket if applicable. -->
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+## 3. Regulatory change
+<!-- Specific regulatory directive, statutory requirement, or platform policy update being satisfied. -->
 
-## Sources
+## 4. Official citations
+<!-- Traceable primary citations following source trust hierarchy (Priority 1: EUR-Lex, Official Journal, FTC, NIST, CISA, ICO; Priority 2: Reuters, AP, Bloomberg). -->
+-
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+## 5. Affected files
+<!-- List of files modified, added, or scanned in scope for this compliance update. -->
+-
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 6. Risk assessment
+<!-- Assessment of non-compliance severity (Critical/High/Medium/Low), exposure risk, and consequences of inaction. -->
 
+## 7. Migration steps
+<!-- Step-by-step procedures or manual/automated instructions required to execute or apply the migration. -->
 - 
 
-## Checks I ran
+## 8. Backward compatibility
+<!-- Impact on existing client versions, API contracts, database schemas, or legacy fallback behavior. -->
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+## 9. Implementation checklist
+<!-- Actionable engineering checklist for code, metadata, or configuration changes. -->
+- [ ]
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 10. Testing checklist
+<!-- Verification commands executed, automated test results, and manual validation checks. -->
+- [ ]
 
-## Declarations
+## 11. Documentation checklist
+<!-- Documentation, playbook references, or wiki entries updated in tandem with code changes. -->
+- [ ]
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 12. Compliance impact
+<!-- Summary of overall risk reduction, platform approval readiness, and legal alignment across jurisdictions. -->
 
-## Anything a reviewer should look at first
+## 13. Breaking changes
+<!-- Explicit declaration of any breaking changes to APIs, database schemas, or existing functionality. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 14. Review checklist
+<!-- Peer review requirements, source verification checks, and security/privacy assertions. -->
+- [ ] Verified against official Priority 1 sources
+- [ ] Entire diff and description are 100% emoji-free
+- [ ] All automated tests and validation scripts pass
+
+## 15. Approver recommendations
+<!-- Recommended roles or individuals required to review and approve prior to merging. -->
+-
