@@ -4,6 +4,7 @@
 
 import os
 import re
+import sys
 import json
 import argparse
 from datetime import datetime
@@ -117,37 +118,6 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "High",
     },
-    "European Accessibility Act": {
-        "jurisdiction": "European Union",
-        "authorities": ["European Commission", "Official Journal"],
-        "citations": [
-            "Directive (EU) 2019/882 of the European Parliament and of the Council of 17 April 2019 on the accessibility requirements for products and services",
-            "Harmonised Standard EN 301 549 Chapter 11 (Accessibility requirements for non-web software)",
-        ],
-        "keywords": [
-            "eaa",
-            "european accessibility act",
-            "en 301 549",
-            "accessibility requirements",
-            "wcag 2.1",
-            "accessibility statement",
-        ],
-        "patterns": [
-            r"european[ -]accessibility[ -]act",
-            r"en[ -]301[ -]549",
-            r"accessibility[ -]statement",
-        ],
-        "detect_files": ["*.swift", "*.storyboard", "*.xib", "*.html", "*.md"],
-        "detect_regex": r"accessibilityLabel|accessibilityTraits|VoiceOver|DynamicType|contrast|accessibilityHint",
-        "impact_desc": "The EAA mandates that digital services, including mobile applications and e-commerce websites, meet strict accessibility requirements of EN 301 549 (based on WCAG 2.1 AA) and publish an accessibility statement.",
-        "migration_steps": [
-            "Audit all UI components to ensure screen-reader labels (accessibilityLabel) and traits are present.",
-            "Verify support for system-wide font scaling (Dynamic Type) without breaking the layout.",
-            "Maintain WCAG 2.1 AA color contrast compliance (at least 4.5:1 for normal text).",
-            "Draft and publish an official accessibility statement reachable from within the app.",
-        ],
-        "compliance_impact": "High",
-    },
     "Data Act": {
         "jurisdiction": "European Union",
         "authorities": ["European Commission", "EUR-Lex"],
@@ -170,6 +140,28 @@ REGULATORY_TRACKS = {
             "Implement secure, user-accessible endpoints or download options for all user-generated device data.",
             "Provide transparent disclosures about how and when device sensor data is processed.",
             "Ensure data portability features are integrated into smart device companion apps.",
+        ],
+        "compliance_impact": "Medium",
+    },
+    "Data Governance Act": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Regulation (EU) 2022/868 on European data governance (Data Governance Act)"
+        ],
+        "keywords": [
+            "data governance act",
+            "data intermediation",
+            "data alturism",
+            "data sharing",
+        ],
+        "patterns": [r"data[ -]governance[ -]act", r"data[ -]intermediat"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"dataSharing|dataIntermediary|dataAltruism|sharedData",
+        "impact_desc": "The EU Data Governance Act regulates data intermediation services and data altruism organizations, establishing trust mechanisms for cross-border data sharing.",
+        "migration_steps": [
+            "Ensure data sharing pathways include explicit trust framework verification.",
+            "Maintain clear audit logging for any data shared under European data space protocols.",
         ],
         "compliance_impact": "Medium",
     },
@@ -206,6 +198,29 @@ REGULATORY_TRACKS = {
             "Establish an automated software bill of materials (SBOM) generation pipeline.",
             "Integrate a structured channel for security researchers to report vulnerabilities.",
             "Review dependencies for known vulnerabilities and implement a regular patching cadence.",
+        ],
+        "compliance_impact": "High",
+    },
+    "NIS2 Directive": {
+        "jurisdiction": "European Union",
+        "authorities": ["ENISA", "European Commission", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2022/2555 on measures for a high common level of cybersecurity across the Union (NIS2 Directive)"
+        ],
+        "keywords": [
+            "nis2",
+            "nis 2",
+            "essential entities",
+            "incident reporting",
+            "supply chain security",
+        ],
+        "patterns": [r"nis2", r"nis[ -]2"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"incidentReport|supplyChain|cyberSecurity|incidentLogging",
+        "impact_desc": "NIS2 expands cybersecurity requirements and 24-hour incident notification obligations to key sectors and digital infrastructure service providers across the EU.",
+        "migration_steps": [
+            "Implement automated 24-hour incident notification procedures for critical system events.",
+            "Conduct supply chain risk assessments for integrated third-party SDKs and backend APIs.",
         ],
         "compliance_impact": "High",
     },
@@ -267,6 +282,105 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "High",
     },
+    "ePrivacy Directive": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EDPB", "EUR-Lex"],
+        "citations": [
+            "Directive 2002/58/EC on privacy and electronic communications (ePrivacy Directive)",
+            "EDPB Guidelines on Tracking Technologies and Cookie Consent",
+        ],
+        "keywords": [
+            "eprivacy",
+            "cookie directive",
+            "electronic communications",
+            "consent banner",
+            "tracking cookies",
+        ],
+        "patterns": [r"eprivacy", r"cookie[ -]consent"],
+        "detect_files": ["*.swift", "*.ts", "*.js", "*.html", "*.md"],
+        "detect_regex": r"cookie|storageConsent|tracker|analytics|pixel",
+        "impact_desc": "ePrivacy requires explicit prior consent before accessing or storing information on a user's device (such as cookies, local storage, or SDK identifier access).",
+        "migration_steps": [
+            "Implement a strict prior-consent gate before executing tracking scripts or reading device identifiers.",
+            "Provide clear toggle switches for non-essential storage categories.",
+        ],
+        "compliance_impact": "High",
+    },
+    "European Accessibility Act": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal"],
+        "citations": [
+            "Directive (EU) 2019/882 of the European Parliament and of the Council of 17 April 2019 on the accessibility requirements for products and services",
+            "Harmonised Standard EN 301 549 Chapter 11 (Accessibility requirements for non-web software)",
+        ],
+        "keywords": [
+            "eaa",
+            "european accessibility act",
+            "en 301 549",
+            "accessibility requirements",
+            "wcag 2.1",
+            "accessibility statement",
+        ],
+        "patterns": [
+            r"european[ -]accessibility[ -]act",
+            r"en[ -]301[ -]549",
+            r"accessibility[ -]statement",
+        ],
+        "detect_files": ["*.swift", "*.storyboard", "*.xib", "*.html", "*.md"],
+        "detect_regex": r"accessibilityLabel|accessibilityTraits|VoiceOver|DynamicType|contrast|accessibilityHint",
+        "impact_desc": "The EAA mandates that digital services, including mobile applications and e-commerce websites, meet strict accessibility requirements of EN 301 549 (based on WCAG 2.1 AA) and publish an accessibility statement.",
+        "migration_steps": [
+            "Audit all UI components to ensure screen-reader labels (accessibilityLabel) and traits are present.",
+            "Verify support for system-wide font scaling (Dynamic Type) without breaking the layout.",
+            "Maintain WCAG 2.1 AA color contrast compliance (at least 4.5:1 for normal text).",
+            "Draft and publish an official accessibility statement reachable from within the app.",
+        ],
+        "compliance_impact": "High",
+    },
+    "Product Liability Directive": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2024/2853 on liability for defective products (Revised Product Liability Directive)"
+        ],
+        "keywords": [
+            "product liability",
+            "software defect",
+            "strict liability",
+            "defective software",
+        ],
+        "patterns": [r"product[ -]liability", r"defective[ -]software"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"disclaimer|liability|termsOfService|eula",
+        "impact_desc": "The revised Product Liability Directive explicitly classifies software and digital files as products, making developers strictly liable for damages caused by software defects.",
+        "migration_steps": [
+            "Conduct safety and flaw risk assessments for critical application features.",
+            "Update Terms of Service and End User License Agreements to align with statutory liability terms.",
+        ],
+        "compliance_impact": "High",
+    },
+    "AI Liability Developments": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Proposal for a Directive on adapting non-contractual civil liability rules to artificial intelligence (AI Liability Directive)"
+        ],
+        "keywords": [
+            "ai liability",
+            "presumption of causality",
+            "disclosure of evidence",
+            "ai damage",
+        ],
+        "patterns": [r"ai[ -]liability", r"presumption[ -]of[ -]causality"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"openai|anthropic|llm|aiModel|modelOutput",
+        "impact_desc": "EU AI Liability developments establish rules easing the burden of proof for victims seeking compensation for damage caused by AI systems through rebuttable presumptions.",
+        "migration_steps": [
+            "Maintain detailed audit logs of AI system inputs, outputs, and safety filter triggers.",
+            "Ensure clear risk warnings accompany high-risk AI outputs.",
+        ],
+        "compliance_impact": "Medium",
+    },
     "UK Online Safety Act": {
         "jurisdiction": "United Kingdom",
         "authorities": ["Ofcom", "Government publications"],
@@ -325,6 +439,30 @@ REGULATORY_TRACKS = {
             "Verify that privacy policies and terms are presented in child-friendly language.",
         ],
         "compliance_impact": "High",
+    },
+    "UK AI Framework": {
+        "jurisdiction": "United Kingdom",
+        "authorities": ["DSIT", "ICO", "FCA", "CMA"],
+        "citations": [
+            "UK DSIT Policy Paper: A pro-innovation approach to AI regulation",
+            "ICO AI and Data Protection Guidance",
+        ],
+        "keywords": [
+            "dsit",
+            "fca ai",
+            "cma ai",
+            "uk ai regulation",
+            "pro-innovation ai",
+        ],
+        "patterns": [r"dsit", r"uk[ -]ai", r"fca[ -]ai"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"openai|anthropic|llm|aiModel|dataProtection",
+        "impact_desc": "The UK's sector-led AI regulatory framework empowers key regulators (ICO, FCA, CMA) to enforce fairness, transparency, and data protection principles across AI deployments.",
+        "migration_steps": [
+            "Implement sector-specific fairness and transparency checks for AI feature outputs.",
+            "Align AI automated decision-making logic with ICO data protection guidelines.",
+        ],
+        "compliance_impact": "Medium",
     },
     "US COPPA": {
         "jurisdiction": "United States (Federal)",
@@ -387,6 +525,55 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
+    "US AI and Cybersecurity Guidance": {
+        "jurisdiction": "United States (Federal/State)",
+        "authorities": ["FTC", "NIST", "CISA", "White House"],
+        "citations": [
+            "NIST AI Risk Management Framework (AI RMF 1.0)",
+            "CISA Guidelines for Secure AI System Development",
+            "FTC Guidance on AI Deception and Automated Decision-Making",
+        ],
+        "keywords": [
+            "nist ai rmf",
+            "cisa ai",
+            "ftc ai guidance",
+            "executive order ai",
+            "state ai legislation",
+        ],
+        "patterns": [r"nist", r"cisa", r"ftc[ -]ai", r"ai[ -]rmf"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"openai|anthropic|cisa|nist|security|auditLog",
+        "impact_desc": "US FTC, NIST, CISA, Executive Orders, and State AI legislation mandate rigorous AI risk management, secure system design, and prevention of deceptive automated practices.",
+        "migration_steps": [
+            "Map AI capabilities against NIST AI RMF governance functions.",
+            "Ensure zero deceptive dark patterns are present in AI automated decision screens.",
+        ],
+        "compliance_impact": "High",
+    },
+    "Canada Privacy and AI": {
+        "jurisdiction": "Canada",
+        "authorities": ["OPC", "Innovation, Science and Economic Development Canada"],
+        "citations": [
+            "Office of the Privacy Commissioner of Canada (OPC) Guidance on Generative AI",
+            "Artificial Intelligence and Data Act (AIDA - Bill C-27)",
+        ],
+        "keywords": [
+            "opc canada",
+            "aida canada",
+            "pipeda",
+            "bill c-27",
+            "canada privacy",
+        ],
+        "patterns": [r"opc", r"aida", r"pipeda", r"bill[ -]c[ -]27"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"canada|pipeda|consent|opc|aida",
+        "impact_desc": "Canada's OPC principles and proposed AIDA require mandatory risk mitigation plans, human oversight, and transparent consent for AI processing of personal data.",
+        "migration_steps": [
+            "Implement clear consent mechanisms aligned with PIPEDA and OPC guidance.",
+            "Establish documented human-in-the-loop oversight channels for high-impact AI decisions.",
+        ],
+        "compliance_impact": "Medium",
+    },
     "Australia Online Safety": {
         "jurisdiction": "Australia",
         "authorities": ["OAIC", "eSafety Commissioner"],
@@ -410,6 +597,28 @@ REGULATORY_TRACKS = {
             "Ringfence and completely destroy age verification data to comply with eSafety rules.",
         ],
         "compliance_impact": "Critical",
+    },
+    "Australia AI Governance": {
+        "jurisdiction": "Australia",
+        "authorities": ["OAIC", "Department of Industry, Science and Resources"],
+        "citations": [
+            "OAIC AI Privacy Guidance and Ethics Principles",
+            "Australian Government Safe and Responsible AI Standards",
+        ],
+        "keywords": [
+            "oaic ai",
+            "australia ai governance",
+            "safe and responsible ai",
+        ],
+        "patterns": [r"oaic[ -]ai", r"australia[ -]ai"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"australia|oaic|aiEthics|privacyImpact",
+        "impact_desc": "Australia's OAIC and AI governance guidelines mandate voluntary and mandatory guardrails for high-risk AI deployments, prioritizing privacy and human safety.",
+        "migration_steps": [
+            "Conduct Privacy Impact Assessments (PIA) for features integrating AI or automated profiling.",
+            "Implement clear accountability frameworks for AI output errors.",
+        ],
+        "compliance_impact": "Medium",
     },
     "Brazil Digital ECA": {
         "jurisdiction": "Brazil",
@@ -451,6 +660,54 @@ REGULATORY_TRACKS = {
             "Verify that no age verification data is stored longer than legally necessary.",
         ],
         "compliance_impact": "Critical",
+    },
+    "Singapore AI Governance": {
+        "jurisdiction": "Singapore",
+        "authorities": ["PDPC", "IMDA", "AI Verify Foundation"],
+        "citations": [
+            "Model AI Governance Framework (Generative AI) by IMDA and PDPC",
+            "AI Verify Testing Framework and Software Toolkit",
+        ],
+        "keywords": [
+            "ai verify",
+            "pdpc ai",
+            "imda ai",
+            "singapore ai framework",
+        ],
+        "patterns": [r"ai[ -]verify", r"pdpc[ -]ai", r"imda[ -]ai"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"aiVerify|singapore|imda|pdpc|governance",
+        "impact_desc": "Singapore's AI Verify governance framework provides self-assessment toolkits and 11 governance testing dimensions for trustworthy AI applications.",
+        "migration_steps": [
+            "Audit AI components using AI Verify open-source evaluation metrics.",
+            "Ensure transparency and explainability reports are accessible for enterprise AI workflows.",
+        ],
+        "compliance_impact": "Medium",
+    },
+    "International AI and Tech Standards": {
+        "jurisdiction": "International",
+        "authorities": ["ISO", "IEC", "OECD", "G7", "G20"],
+        "citations": [
+            "ISO/IEC 42001:2023 Information technology - Artificial intelligence - Management system",
+            "OECD AI Principles and G7 Hiroshima AI Code of Conduct",
+        ],
+        "keywords": [
+            "iso 42001",
+            "iec 42001",
+            "oecd ai",
+            "g7 ai",
+            "g20 ai",
+            "international standards",
+        ],
+        "patterns": [r"iso[ -]42001", r"oecd[ -]ai", r"g7[ -]ai", r"g20[ -]ai"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"iso42001|oecd|g7|g20|complianceStandard",
+        "impact_desc": "International consensus standards (ISO/IEC 42001, OECD AI Principles, G7 Hiroshima Code of Conduct) set benchmark expectations for AI safety, governance, and management systems.",
+        "migration_steps": [
+            "Establish an AI Management System (AIMS) in alignment with ISO/IEC 42001.",
+            "Adhere to G7 Code of Conduct principles for developing advanced AI models.",
+        ],
+        "compliance_impact": "Medium",
     },
 }
 
@@ -953,6 +1210,74 @@ def generate_pull_request(track_name, affected_files, announcement):
     }
 
 
+def update_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the Regulatory Intelligence Monitoring Report in docs/REGULATORY-MONITOR-REPORT-2026.md.
+    """
+    lines = [
+        "<!-- REGULATORY_MONITOR_REPORT_START -->",
+        "# Regulatory Intelligence Monitoring Report (2026)",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments and verification status across major international regulatory bodies.",
+        "",
+        "## Monitored Regulatory Domains and Authorities",
+        "- **European Union**: EU AI Act, GDPR, Data Act, Data Governance Act, Cyber Resilience Act, NIS2 Directive, Digital Services Act, Digital Markets Act, ePrivacy Directive, European Accessibility Act, Product Liability Directive, AI Liability Developments, ENISA, EDPB, European Commission, Official Journal, EUR-Lex",
+        "- **United Kingdom**: ICO, DSIT, FCA, CMA, UK AI Framework, UK Online Safety Act, ICO Children's Code",
+        "- **United States**: FTC, NIST, Executive Orders, State AI Legislation, CISA, US COPPA, US State ASAA",
+        "- **Canada**: OPC, AIDA Developments, PIPEDA",
+        "- **Australia**: OAIC, eSafety Commissioner, AI Governance Updates, Australia Online Safety",
+        "- **Singapore**: PDPC, IMDA, AI Verify, Singapore Online Safety",
+        "- **International**: ISO, IEC, OECD, G7, G20 Standards and Governance Frameworks",
+        "",
+        "## Monitored Developments and Regulatory Scans Log",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        announcement_dict = {
+            "title": item["announcement_title"],
+            "description": "",
+            "link": item["announcement_link"],
+        }
+        priority, is_verified = classify_source_and_verify(announcement_dict)
+        status_str = f"Priority {priority} " + ("(Verified Official Source)" if is_verified else "(Unverified Secondary Source)")
+
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Citation Link**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Source Trust Status**: {status_str}")
+        lines.append(f"- **Compliance Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Repository Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+        if item["affected_files"]:
+            lines.append("  **Identified Affected Repository Files**:")
+            for af in item["affected_files"]:
+                lines.append(f"  - `{af}`")
+            lines.append("")
+
+        lines.append("  **Suggested Implementation and Migration Tasks**:")
+        for task in item["migration_tasks"]:
+            lines.append(f"  - [ ] {task}")
+        lines.append("")
+
+    lines.append("## Verification and Compliance Summary")
+    lines.append("")
+    lines.append("All updates are classified in accordance with the strict Source Trust Hierarchy:")
+    lines.append("- Priority 1 (Official Regulatory & Standardization Bodies) changes trigger immediate repository impact evaluation and draft PR proposals.")
+    lines.append("- Priority 4 and 5 changes (industry blogs, social media) are automatically blocked from PR generation unless verified against Priority 1 publications.")
+    lines.append("")
+    lines.append("<!-- REGULATORY_MONITOR_REPORT_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def run_monitor(project_path=".", simulate_track=None, verbose=False):
     """
     Runs the compliance scanner and matches developments to tracks.
@@ -1106,6 +1431,17 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        type=str,
+        default="docs/REGULATORY-MONITOR-REPORT-2026.md",
+        help="Filepath to write migration tasks and logs (default: docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        help="Optional filepath to save drafted PR markdown output",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1117,6 +1453,25 @@ def main():
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+
+    if args.pr_output and report_items:
+        pr_drafts = [
+            item["proposed_pull_request"]["description"]
+            for item in report_items
+            if item.get("proposed_pull_request")
+        ]
+        if pr_drafts:
+            try:
+                os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write("\n\n---\n\n".join(pr_drafts) + "\n")
+                if args.verbose:
+                    print(f"PR draft written successfully to: {args.pr_output}")
+            except Exception as e:
+                print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
