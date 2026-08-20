@@ -564,6 +564,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -576,6 +577,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -846,8 +851,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -855,26 +865,122 @@ def update_documentation_report(updates, output_filepath):
 
         if cat == "secure storage":
             lines.append(
-                "- [ ] **Task 1**: Update standard preferences to EncryptedSharedPreferences on Android."
+                "- [ ] **Task 1**: Migrate sensitive localized storage from plain SharedPreferences to EncryptedSharedPreferences (Android) and Keychain (iOS)."
             )
             lines.append(
-                "- [ ] **Task 2**: Test local database encryption with SQLCipher."
+                "- [ ] **Task 2**: Implement SQLCipher database encryption for local SQLite/Room databases with Keystore/Keychain key protection."
             )
         elif cat == "Keychain":
             lines.append(
-                "- [ ] **Task 1**: Configure Keychain accessibility to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly."
+                "- [ ] **Task 1**: Configure Keychain item accessibility to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Ensure kSecAttrSynchronizable is set to false unless iCloud sync is explicitly required."
             )
         elif cat == "Android Keystore":
             lines.append(
-                "- [ ] **Task 1**: Enforce StrongBox and check KeyInfo.isInsideSecureHardware() on key creation."
+                "- [ ] **Task 1**: Enforce StrongBox HSM backing (setIsStrongBoxBacked(true)) and verify KeyInfo.isInsideSecureHardware()."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Specify explicit KeyGenParameterSpec block modes (AES-GCM) and authentication requirements."
             )
         elif cat == "biometric authentication":
             lines.append(
-                "- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt."
+                "- [ ] **Task 1**: Bind biometric prompts to Keystore CryptoObject or iOS SecAccessControl to prevent boolean bypasses."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Enforce AUTH_BIOMETRIC_STRONG constraints on key unlocking."
             )
         elif cat == "certificate pinning":
             lines.append(
-                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+                "- [ ] **Task 1**: Populate Subject Public Key Info (SPKI) hashes inside network_security_config.xml (Android) and NSPinnedDomains (iOS Info.plist)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Include secondary backup SPKI pin hashes for emergency CA rotations."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement multi-layered iOS jailbreak checks covering dyld dynamic library inspection, known binary paths, and sandbox write attempts."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure automatic session invalidation and memory token purging upon detecting platform compromise."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Integrate Google Play Integrity API for hardware-backed attestation and server-side verdict verification."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement local root heuristic checks for su binaries, test-keys build tags, and superuser app packages."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Enforce cleartextTrafficPermitted='false' in Network Security Config and usesCleartextTraffic='false' in AndroidManifest.xml."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Maintain App Transport Security (ATS) enabled in iOS Info.plist with TLS 1.2+ minimum protocols."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure dataExtractionRules and fullBackupContent XML to explicitly exclude credential preferences and SQLite databases."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Set isExcludedFromBackup resource attribute on sensitive local data files on iOS."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Audit AndroidManifest.xml and explicitly set android:exported='false' for all internal, non-launcher activities."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Protect required exported components with android:protectionLevel='signature' custom permissions."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Replace implicit intent broadcasts with explicit class-targeted intents for internal component transitions."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Validate caller package identities using getCallingPackage() / getCallingActivity()."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Implement strict input validation, sanitization, and parameter parsing on all deep link URLs."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Ensure authentication tokens and session credentials are never passed via custom URL scheme parameters."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Deploy a valid apple-app-site-association (AASA) JSON file at /.well-known/apple-app-site-association."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Enable Associated Domains capability in Xcode entitlements (applinks:yourdomain.com)."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Host a valid Digital Asset Links JSON file (assetlinks.json) with signing certificate fingerprints on the target domain."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add android:autoVerify='true' to intent filters in AndroidManifest.xml."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Migrate mobile OAuth 2.1 authentication flows to Proof Key for Code Exchange (PKCE)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Utilize ASWebAuthenticationSession (iOS) and Custom Tabs (Android) instead of embedded WebViews."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side session revocation and local credential purge during user logout."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add window snapshot blurring during app background transitions to prevent sensitive UI data leakage."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Store access and refresh tokens strictly within hardware-backed Keychains or EncryptedSharedPreferences."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Enforce short access token lifetimes (15 min) and automatic refresh token rotation on renewal."
             )
         else:
             lines.append(
