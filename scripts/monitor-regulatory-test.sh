@@ -109,6 +109,49 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output flags
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOCS_OUT="/tmp/test_regulatory_report.md"
+TEST_PR_OUT="/tmp/test_regulatory_pr.md"
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] Documentation output file was not created at $TEST_DOCS_OUT"
+  exit 1
+fi
+echo "[PASS] Documentation output file created at $TEST_DOCS_OUT"
+
+if ! grep -q "# Regulatory Intelligence Monitoring Report (2026)" "$TEST_DOCS_OUT"; then
+  echo "[ERROR] Documentation output does not contain expected header"
+  exit 1
+fi
+echo "[PASS] Documentation contains expected report header and structure"
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] PR Draft output file was not created at $TEST_PR_OUT"
+  exit 1
+fi
+echo "[PASS] PR Draft output file created at $TEST_PR_OUT"
+
+# Test 9: Verify generated files are 100% emoji-free
+echo "[TEST] Verifying generated documentation and PR draft files are 100% emoji-free..."
+python3 -c "
+import sys
+for filepath in ['$TEST_DOCS_OUT', '$TEST_PR_OUT']:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        text = f.read()
+    emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
+    if emojis:
+        print(f'Found emojis in {filepath}:', emojis)
+        sys.exit(1)
+print('No emojis found in generated markdown files')
+"
+echo "[PASS] Generated documentation and PR draft files are 100% emoji-free"
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
