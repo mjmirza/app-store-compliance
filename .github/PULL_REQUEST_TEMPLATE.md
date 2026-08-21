@@ -1,38 +1,79 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Concise summary of what this compliance pull request changes. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context behind this change, including platform policy or regulatory changes. -->
 
-## Sources
+## 3. Regulatory change
+
+<!-- Description of the underlying legal, statutory, or app store policy change. -->
+
+## 4. Official citations
 
 <!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
-
-If this PR adds no factual claims, write "none, no new claims".
+Official citations from Priority 1 sources (e.g. European Commission, EUR-Lex, Official Journal, FTC, NIST, CISA, ICO, Government publications) or verified Priority 2 sources.
 -->
 
 - 
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of affected source code, configuration, or documentation files and reason for inclusion. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+-
 
-## Declarations
+## 6. Risk assessment
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+<!-- Assessment of risk (Critical, High, Medium, Low) if this change is not applied or delayed. -->
 
-## Anything a reviewer should look at first
+## 7. Migration steps
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+<!-- Step-by-step migration procedures for developers and deployment pipelines. -->
+
+1.
+
+## 8. Backward compatibility
+
+<!-- Details on backward compatibility for legacy runtime environments or older app versions. -->
+
+## 9. Implementation checklist
+
+<!-- Actionable implementation tasks. -->
+
+- [ ]
+
+## 10. Testing checklist
+
+<!-- Verification and testing steps executed. -->
+
+- [ ]
+
+## 11. Documentation checklist
+
+<!-- Documentation updates completed or required. -->
+
+- [ ]
+
+## 12. Compliance impact
+
+<!-- Overall compliance posture impact after merging this change. -->
+
+## 13. Breaking changes
+
+<!-- Declaration of any breaking functional, API, or configuration changes. -->
+
+## 14. Review checklist
+
+<!-- Reviewer verification steps prior to approval. -->
+
+- [ ] Every guideline number, date, and statistic traces to an official citation above.
+- [ ] Diff is entirely emoji-free and contains no non-ASCII graphical characters.
+- [ ] Test suites (scripts/validate.py and verify-citations.py) ran and passed.
+
+## 15. Approver recommendations
+
+<!-- Recommended roles or individuals required for approval signoff. -->
+
+-

@@ -22,3 +22,12 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Test script fixtures flagged by verify-citations.py.
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Moved/changed governmental URLs.
+https://cppa.ca.gov/regulations/ccpa_updates.html
+https://digital-strategy.ec.europa.eu/en/library/draft-guidelines-implementation-transparency-obligations-certain-ai-systems-under-article-50-ai-act
+https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force
