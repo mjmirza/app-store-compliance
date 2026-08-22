@@ -9,6 +9,8 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MON_SCRIPT="$REPO_ROOT/scripts/monitor-regulatory.py"
+TMP_DOC_OUTPUT="/tmp/test_regulatory_monitor_report.md"
+TMP_PR_OUTPUT="/tmp/test_regulatory_pr_draft.md"
 
 echo "[TEST] Starting Regulatory Intelligence Agent Monitor Test Suite"
 echo "Project Path: $REPO_ROOT"
@@ -26,10 +28,18 @@ echo "[PASS] monitor-regulatory.py is executable"
 python3 "$MON_SCRIPT" --help > /dev/null
 echo "[PASS] monitor-regulatory.py --help executed successfully"
 
-# Test 3: Run scan against the repository root
-echo "[TEST] Running scan against current project directory..."
-python3 "$MON_SCRIPT" --project "$REPO_ROOT" > /dev/null
-echo "[PASS] monitor-regulatory.py successfully scanned the target directory"
+# Test 3: Run scan against the repository root and output docs/PR files
+echo "[TEST] Running scan against current project directory and validating file creation..."
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TMP_DOC_OUTPUT" --pr-output "$TMP_PR_OUTPUT" > /dev/null
+if [ ! -f "$TMP_DOC_OUTPUT" ]; then
+  echo "[ERROR] Documentation report file $TMP_DOC_OUTPUT was not created."
+  exit 1
+fi
+if [ ! -f "$TMP_PR_OUTPUT" ]; then
+  echo "[ERROR] PR output file $TMP_PR_OUTPUT was not created."
+  exit 1
+fi
+echo "[PASS] monitor-regulatory.py successfully scanned and created doc and PR files"
 
 # Test 4: Run simulation for EU AI Act and verify output contains the 15 required sections in JSON
 echo "[TEST] Simulating 'EU AI Act' track and validating 15-section JSON output..."
@@ -74,22 +84,23 @@ echo "[PASS] monitor-regulatory.py generated valid JSON output"
 
 # Test 6: Verify strict emoji-free policy on output
 echo "[TEST] Scanning output for any emojis or non-ascii/graphical emoticons..."
-EMOJI_CHECK=$(echo "$EU_JSON" | python3 -c "
+EMOJI_CHECK=$(python3 -c "
 import sys
-text = sys.stdin.read()
-# Check code points for emojis or typical pictograph blocks
-emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
-if emojis:
-    print('Found emojis:', emojis)
-    sys.exit(1)
+for path in ['$TMP_DOC_OUTPUT', '$TMP_PR_OUTPUT']:
+    with open(path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
+    if emojis:
+        print('Found emojis in ' + path + ':', emojis)
+        sys.exit(1)
 print('No emojis found')
 ")
 
 if [ "$EMOJI_CHECK" != "No emojis found" ]; then
-  echo "[ERROR] Emojis detected in monitor-regulatory.py output!"
+  echo "[ERROR] Emojis detected in generated monitor output!"
   exit 1
 fi
-echo "[PASS] monitor-regulatory.py is 100% emoji-free"
+echo "[PASS] monitor-regulatory.py output files are 100% emoji-free"
 
 # Test 7: Verify Source Trust Hierarchy validation and blocking logic
 echo "[TEST] Verifying Source Trust Hierarchy and blocking logic..."
@@ -108,6 +119,9 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
   exit 1
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
+
+# Clean up temp files
+rm -f "$TMP_DOC_OUTPUT" "$TMP_PR_OUTPUT"
 
 echo ""
 echo "[SUCCESS] All tests passed successfully."
