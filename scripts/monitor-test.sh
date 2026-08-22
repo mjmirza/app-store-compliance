@@ -46,6 +46,41 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of 15 numbered compliance sections in generated PR draft
+PR_SECTIONS_OK=true
+SECTIONS=(
+  "Summary"
+  "Background"
+  "Regulatory change"
+  "Official citations"
+  "Affected files"
+  "Risk assessment"
+  "Migration steps"
+  "Backward compatibility"
+  "Implementation checklist"
+  "Testing checklist"
+  "Documentation checklist"
+  "Compliance impact"
+  "Breaking changes"
+  "Review checklist"
+  "Approver recommendations"
+)
+
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! echo "$JSON_OUT" | grep -q "## ${sec_num}\. ${sec_name}"; then
+    PR_SECTIONS_OK=false
+    break
+  fi
+done
+
+if [ "$PR_SECTIONS_OK" = true ]; then
+  ok "generated PR contains all 15 numbered compliance sections"
+else
+  bad "generated PR missing required 15 numbered compliance sections"
+fi
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
