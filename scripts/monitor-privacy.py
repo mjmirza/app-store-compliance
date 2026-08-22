@@ -541,6 +541,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    seen_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -555,6 +556,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -728,7 +733,7 @@ Verify that the published web-based data deletion URL functions correctly before
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_live=False):
     """
     Overwrites or updates the migration report in docs/PRIVACY-POLICY-MIGRATION.md.
     """
@@ -738,9 +743,16 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-privacy.py` to track privacy compliance areas.",
         "",
+    ]
+
+    if not is_live:
+        lines.append("*Note: Simulation disclaimer notice: Data presented below contains simulated compliance updates generated during offline/mock evaluation mode.*")
+        lines.append("")
+
+    lines.extend([
         "## Monitored Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         priority, is_verified = classify_source_and_verify(u)
@@ -755,8 +767,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
@@ -917,7 +934,7 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_live=args.live)
 
     # 5. Generate Pull Request draft using verified updates
     pr_draft = generate_pull_request_draft(verified_updates, scan_results)
