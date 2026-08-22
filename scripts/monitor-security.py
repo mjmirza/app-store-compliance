@@ -530,20 +530,19 @@ def classify_announcements(announcements, keywords_filter=None):
             if not any(k.lower() in text_to_search for k in keywords_filter):
                 continue
 
-        # Match against categories
         matched_categories = []
-        for cat, keywords in CATEGORY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_to_search:
-                    matched_categories.append(cat)
-                    break  # Break keyword loop for this category
-
-        # If a pre-set category exists on mock and no matched categories, use that category
-        if not matched_categories and ann.get("category"):
+        if ann.get("category"):
             matched_categories.append(ann["category"])
+        else:
+            # Match against categories
+            for cat, keywords in CATEGORY_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in text_to_search:
+                        matched_categories.append(cat)
+                        break  # Break keyword loop for this category
 
         if matched_categories:
-            for cat in matched_categories:
+            for cat in set(matched_categories):
                 classified_updates.append(
                     {
                         "id": ann.get("id", "SEC-UPDATE-" + str(hash(title))[:6]),
@@ -561,6 +560,7 @@ def generate_pull_request_draft(updates, scan_results):
     """Generates a draft of a pull request complying with the exact 15 required sections."""
     citations_list = []
     affected_files_set = set()
+    seen_categories = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
@@ -576,6 +576,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -846,8 +850,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_doc_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_doc_categories:
+            continue
+        seen_doc_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -874,7 +883,55 @@ def update_documentation_report(updates, output_filepath):
             )
         elif cat == "certificate pinning":
             lines.append(
-                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml and NSPinnedDomains in Info.plist."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement multi-layered jailbreak audits covering dynamic library inspection and sandbox write tests."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Integrate Google Play Integrity API for backend device attestation."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Disable usesCleartextTraffic in AndroidManifest and enforce ATS in Info.plist."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure dataExtractionRules to exclude credentials and local databases."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Enforce exported=false on all non-launcher activities."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Protect exported intent filters using signature-level permissions."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Add strict parameter input sanitization on all deep link routers."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Host verified apple-app-site-association file on the primary domain."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Publish signed assetlinks.json on the target web host."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Enforce OAuth 2.1 with PKCE using system custom tabs / ASWebAuthenticationSession."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side session invalidation on logout and background window blur."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Store access and refresh tokens inside encrypted vaults with short-lived access periods."
             )
         else:
             lines.append(
