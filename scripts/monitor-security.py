@@ -564,6 +564,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -576,6 +577,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -846,8 +851,12 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_cats = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_cats:
+            continue
+        seen_cats.add(cat)
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
