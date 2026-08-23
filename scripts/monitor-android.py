@@ -633,22 +633,31 @@ def generate_pull_request_draft(updates, scan_results):
     Generates a draft of a pull request complying with the exact 15 required sections.
     """
     citations_list = []
+    seen_citations = set()
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
-        )
+        cit_key = (cat, u["title"], u["link"])
+        if cit_key not in seen_citations:
+            seen_citations.add(cit_key)
+            citations_list.append(
+                f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+            )
 
         # Pull affected files
         files = scan_results.get(cat, [])
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "Target SDK requirements":
@@ -929,7 +938,7 @@ Ensure that the Play Console account owner has completed the personal/organizati
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_mock=False):
     """
     Overwrites or updates the migration report in docs/ANDROID-POLICY-MIGRATION.md.
     """
@@ -939,9 +948,18 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-android.py` to track compliance areas.",
         "",
+    ]
+
+    if is_mock:
+        lines.extend([
+            "> **Simulation / Mock Data Notice**: This document contains simulated announcements and mock compliance updates for demonstration and testing purposes. Verify current wording at official developer resources before citing as fact.",
+            "",
+        ])
+
+    lines.extend([
         "## Monitored Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -953,8 +971,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
@@ -1052,8 +1075,10 @@ def main():
         # Android Security Bulletins publish no RSS feed. The canonical page is
         # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
+    is_mock_data = False
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:
+        is_mock_data = True
         print(
             "Using comprehensive mock Android policy updates for compliance scanning..."
         )
@@ -1095,7 +1120,9 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(
+        classified_updates, args.output_docs, is_mock=is_mock_data
+    )
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
