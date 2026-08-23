@@ -109,6 +109,37 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output file generation
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOC="/tmp/test_reg_doc.md"
+TEST_PR="/tmp/test_reg_pr.md"
+rm -f "$TEST_DOC" "$TEST_PR" 2>/dev/null || true
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOC" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_DOC" ]; then
+  echo "[ERROR] Failed to generate --output-docs file at $TEST_DOC"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR" ]; then
+  echo "[ERROR] Failed to generate --pr-output file at $TEST_PR"
+  exit 1
+fi
+
+if ! grep -q "EU AI Act" "$TEST_DOC"; then
+  echo "[ERROR] --output-docs file does not contain expected track content"
+  exit 1
+fi
+
+if ! grep -q "## 1\. Summary" "$TEST_PR" && ! grep -q "## Summary" "$TEST_PR"; then
+  echo "[ERROR] --pr-output file does not contain expected PR section headers"
+  exit 1
+fi
+
+rm -f "$TEST_DOC" "$TEST_PR" 2>/dev/null || true
+echo "[PASS] Successfully verified --output-docs and --pr-output file generation"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
