@@ -28,7 +28,7 @@ fi
 if [ -n "$STDIN_JSON" ]; then
   CMD="$(printf '%s' "$STDIN_JSON" | grep -oE '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
   # Only act on submission style commands. Otherwise stay silent.
-  if ! printf '%s' "$CMD" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'; then
+  if ! printf '%s' "$CMD" | grep -iE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build' >/dev/null 2>&1; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
