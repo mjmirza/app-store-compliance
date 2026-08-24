@@ -535,12 +535,13 @@ def classify_announcements(announcements, keywords_filter=None):
 def generate_pull_request_draft(updates, scan_results):
     """
     Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates category entries to ensure clean checklists and assessments.
     """
     citations_list = []
     affected_files_set = set()
-    migration_steps = []
-    impl_checklist = []
-    risk_assessment = []
+    migration_steps_dict = {}
+    impl_checklist_dict = {}
+    risk_assessment_dict = {}
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -556,103 +557,108 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific details
-        if cat == "Privacy Manifest":
-            migration_steps.append(
-                f"- **{cat}**: Add or update the PrivacyInfo.xcprivacy file in the iOS app bundle to declare tracking and data collection."
-            )
-            impl_checklist.append("- [ ] Create/Update PrivacyInfo.xcprivacy in iOS App Bundle.")
-            risk_assessment.append(f"- *{cat}*: Immediate App Store Connect build rejection if Privacy Manifest is missing or incomplete.")
-        elif cat == "Required Reason APIs":
-            migration_steps.append(
-                f"- **{cat}**: Declare active usage of designated Required Reason APIs (UserDefaults, NSFileManager, etc.) with valid, approved reason codes in the privacy manifest."
-            )
-            impl_checklist.append("- [ ] Map Required Reason APIs to approved codes in PrivacyInfo.xcprivacy.")
-            risk_assessment.append(f"- *{cat}*: Direct App Store submission failure on detection of undeclared required reason API calls.")
-        elif cat == "App Tracking Transparency":
-            migration_steps.append(
-                f"- **{cat}**: Request explicit tracking consent before invoking any marketing, profiling, or tracking SDKs."
-            )
-            impl_checklist.append("- [ ] Call ATTrackingManager.requestTrackingAuthorization prior to tracking SDK initialization.")
-            risk_assessment.append(f"- *{cat}*: Binary rejection by Apple App Review if cross-app tracking occurs without ATT consent.")
-        elif cat == "Privacy Nutrition Labels":
-            migration_steps.append(
-                f"- **{cat}**: Ensure declared App Store Connect privacy questionnaire labels are completely aligned with actual runtime data transmission."
-            )
-            impl_checklist.append("- [ ] Update App Store Connect Privacy Questionnaire to reflect all active tracking and collected user details.")
-            risk_assessment.append(f"- *{cat}*: Metadata or review rejection due to discrepancy in self-reported labels and dynamic review traffic.")
-        elif cat == "Data Safety":
-            migration_steps.append(
-                f"- **{cat}**: Align the Google Play Store Data Safety declarations with compiled SDKs and actual runtime network endpoints."
-            )
-            impl_checklist.append("- [ ] Review compiled libraries and ensure Play Console Data Safety form declarations match perfectly.")
-            risk_assessment.append(f"- *{cat}*: Critical Google Play rejection due to silent or undeclared SDK data sharing.")
-        elif cat == "User Data Policy":
-            migration_steps.append(
-                f"- **{cat}**: Build clear, prominent in-app disclosures and offer a reliable web and in-app account/data deletion portal."
-            )
-            impl_checklist.append("- [ ] Complete the Google Play Account Deletion section and publish a data deletion URL.")
-            risk_assessment.append(f"- *{cat}*: Policy non-compliance leading to warnings and potential account suspension by Google Play.")
-        elif cat == "Advertising ID":
-            migration_steps.append(
-                f"- **{cat}**: Declare com.google.android.gms.permission.AD_ID permission only with valid opt-out handles."
-            )
-            impl_checklist.append("- [ ] Configure AD_ID permission in AndroidManifest and verify opt-out flows.")
-            risk_assessment.append(f"- *{cat}*: Google Play policy rejection if AD_ID permission is present without opt-out validation.")
-        elif cat == "Runtime permissions":
-            migration_steps.append(
-                f"- **{cat}**: Implement dynamic runtime permission requests with prior user-facing rationale checks."
-            )
-            impl_checklist.append("- [ ] Verify checks for requestPermissions and handle permission denials gracefully.")
-            risk_assessment.append(f"- *{cat}*: High crash rate or Play Store rejection on immediate, un-rationalized permission requests.")
-        elif cat == "Background location":
-            migration_steps.append(
-                f"- **{cat}**: Restrict usage of ACCESS_BACKGROUND_LOCATION to vital features with prominent in-app disclosures."
-            )
-            impl_checklist.append("- [ ] Remove ACCESS_BACKGROUND_LOCATION unless essential and supported by a prominent disclosure view.")
-            risk_assessment.append(f"- *{cat}*: Strict Google Play publishing blocks for unjustified background location permissions.")
-        elif cat == "Health permissions":
-            migration_steps.append(
-                f"- **{cat}**: Formulate specialized health privacy statements and declare fitness/Health Connect permission usage."
-            )
-            impl_checklist.append("- [ ] Deploy a dedicated health data privacy statement and register Health Connect permissions.")
-            risk_assessment.append(f"- *{cat}*: Account suspension and removal under Google Play Health Connect and medical policy rules.")
-        elif cat == "GDPR":
-            migration_steps.append(
-                f"- **{cat}**: Deliver robust opt-in controls, data portability pathways, and right-to-be-forgotten buttons for EU users."
-            )
-            impl_checklist.append("- [ ] Integrate explicit opt-in forms and user-accessible data purge buttons for EU regions.")
-            risk_assessment.append(f"- *{cat}*: Heavy fines and legal non-compliance risks under EU GDPR guidelines.")
-        elif cat == "Cookie consent":
-            migration_steps.append(
-                f"- **{cat}**: Block writing or accessing non-essential cookies until active consent is recorded."
-            )
-            impl_checklist.append("- [ ] Integrate a Cookie Consent banner blocking non-essential cookie writes until approved.")
-            risk_assessment.append(f"- *{cat}*: Regulatory fines by European national authorities for unlawful tracking cookie storage.")
-        elif cat == "Local storage":
-            migration_steps.append(
-                f"- **{cat}**: Purge plain text sensitive data and encrypt JWT tokens stored in browser localStorage."
-            )
-            impl_checklist.append("- [ ] Encrypt all credentials or tokens prior to calling localStorage.setItem.")
-            risk_assessment.append(f"- *{cat}*: High susceptibility to XSS token extraction and subsequent session hijacking.")
-        elif cat == "IndexedDB":
-            migration_steps.append(
-                f"- **{cat}**: Sanitize, encrypt, and properly close/delete client-side IndexedDB databases on user logout."
-            )
-            impl_checklist.append("- [ ] Verify database purging functions run correctly upon account logout or deletion.")
-            risk_assessment.append(f"- *{cat}*: Exposed offline user data on shared computer browser instances.")
-        elif cat == "Session storage":
-            migration_steps.append(
-                f"- **{cat}**: Restrict sensitive data stored in sessionStorage and execute absolute purges on window close."
-            )
-            impl_checklist.append("- [ ] Verify that sensitive keys in sessionStorage are cleared upon user session logout.")
-            risk_assessment.append(f"- *{cat}*: Unsecured temporary data exposed to cross-tab script execution.")
-        elif cat == "Tracking technologies":
-            migration_steps.append(
-                f"- **{cat}**: Hold third-party tracking pixels and analytic script loads until user consent is validated."
-            )
-            impl_checklist.append("- [ ] Implement conditional script loading for third-party tags based on cookies acceptance.")
-            risk_assessment.append(f"- *{cat}*: Direct non-compliance with the ePrivacy directive and subsequent cookie tracking blocks.")
+        # Category-specific details (deduplicated per category)
+        if cat not in migration_steps_dict:
+            if cat == "Privacy Manifest":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Add or update the PrivacyInfo.xcprivacy file in the iOS app bundle to declare tracking and data collection."
+                )
+                impl_checklist_dict[cat] = "- [ ] Create/Update PrivacyInfo.xcprivacy in iOS App Bundle."
+                risk_assessment_dict[cat] = f"- *{cat}*: Immediate App Store Connect build rejection if Privacy Manifest is missing or incomplete."
+            elif cat == "Required Reason APIs":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Declare active usage of designated Required Reason APIs (UserDefaults, NSFileManager, etc.) with valid, approved reason codes in the privacy manifest."
+                )
+                impl_checklist_dict[cat] = "- [ ] Map Required Reason APIs to approved codes in PrivacyInfo.xcprivacy."
+                risk_assessment_dict[cat] = f"- *{cat}*: Direct App Store submission failure on detection of undeclared required reason API calls."
+            elif cat == "App Tracking Transparency":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Request explicit tracking consent before invoking any marketing, profiling, or tracking SDKs."
+                )
+                impl_checklist_dict[cat] = "- [ ] Call ATTrackingManager.requestTrackingAuthorization prior to tracking SDK initialization."
+                risk_assessment_dict[cat] = f"- *{cat}*: Binary rejection by Apple App Review if cross-app tracking occurs without ATT consent."
+            elif cat == "Privacy Nutrition Labels":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Ensure declared App Store Connect privacy questionnaire labels are completely aligned with actual runtime data transmission."
+                )
+                impl_checklist_dict[cat] = "- [ ] Update App Store Connect Privacy Questionnaire to reflect all active tracking and collected user details."
+                risk_assessment_dict[cat] = f"- *{cat}*: Metadata or review rejection due to discrepancy in self-reported labels and dynamic review traffic."
+            elif cat == "Data Safety":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Align the Google Play Store Data Safety declarations with compiled SDKs and actual runtime network endpoints."
+                )
+                impl_checklist_dict[cat] = "- [ ] Review compiled libraries and ensure Play Console Data Safety form declarations match perfectly."
+                risk_assessment_dict[cat] = f"- *{cat}*: Critical Google Play rejection due to silent or undeclared SDK data sharing."
+            elif cat == "User Data Policy":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Build clear, prominent in-app disclosures and offer a reliable web and in-app account/data deletion portal."
+                )
+                impl_checklist_dict[cat] = "- [ ] Complete the Google Play Account Deletion section and publish a data deletion URL."
+                risk_assessment_dict[cat] = f"- *{cat}*: Policy non-compliance leading to warnings and potential account suspension by Google Play."
+            elif cat == "Advertising ID":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Declare com.google.android.gms.permission.AD_ID permission only with valid opt-out handles."
+                )
+                impl_checklist_dict[cat] = "- [ ] Configure AD_ID permission in AndroidManifest and verify opt-out flows."
+                risk_assessment_dict[cat] = f"- *{cat}*: Google Play policy rejection if AD_ID permission is present without opt-out validation."
+            elif cat == "Runtime permissions":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Implement dynamic runtime permission requests with prior user-facing rationale checks."
+                )
+                impl_checklist_dict[cat] = "- [ ] Verify checks for requestPermissions and handle permission denials gracefully."
+                risk_assessment_dict[cat] = f"- *{cat}*: High crash rate or Play Store rejection on immediate, un-rationalized permission requests."
+            elif cat == "Background location":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Restrict usage of ACCESS_BACKGROUND_LOCATION to vital features with prominent in-app disclosures."
+                )
+                impl_checklist_dict[cat] = "- [ ] Remove ACCESS_BACKGROUND_LOCATION unless essential and supported by a prominent disclosure view."
+                risk_assessment_dict[cat] = f"- *{cat}*: Strict Google Play publishing blocks for unjustified background location permissions."
+            elif cat == "Health permissions":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Formulate specialized health privacy statements and declare fitness/Health Connect permission usage."
+                )
+                impl_checklist_dict[cat] = "- [ ] Deploy a dedicated health data privacy statement and register Health Connect permissions."
+                risk_assessment_dict[cat] = f"- *{cat}*: Account suspension and removal under Google Play Health Connect and medical policy rules."
+            elif cat == "GDPR":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Deliver robust opt-in controls, data portability pathways, and right-to-be-forgotten buttons for EU users."
+                )
+                impl_checklist_dict[cat] = "- [ ] Integrate explicit opt-in forms and user-accessible data purge buttons for EU regions."
+                risk_assessment_dict[cat] = f"- *{cat}*: Heavy fines and legal non-compliance risks under EU GDPR guidelines."
+            elif cat == "Cookie consent":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Block writing or accessing non-essential cookies until active consent is recorded."
+                )
+                impl_checklist_dict[cat] = "- [ ] Integrate a Cookie Consent banner blocking non-essential cookie writes until approved."
+                risk_assessment_dict[cat] = f"- *{cat}*: Regulatory fines by European national authorities for unlawful tracking cookie storage."
+            elif cat == "Local storage":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Purge plain text sensitive data and encrypt JWT tokens stored in browser localStorage."
+                )
+                impl_checklist_dict[cat] = "- [ ] Encrypt all credentials or tokens prior to calling localStorage.setItem."
+                risk_assessment_dict[cat] = f"- *{cat}*: High susceptibility to XSS token extraction and subsequent session hijacking."
+            elif cat == "IndexedDB":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Sanitize, encrypt, and properly close/delete client-side IndexedDB databases on user logout."
+                )
+                impl_checklist_dict[cat] = "- [ ] Verify database purging functions run correctly upon account logout or deletion."
+                risk_assessment_dict[cat] = f"- *{cat}*: Exposed offline user data on shared computer browser instances."
+            elif cat == "Session storage":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Restrict sensitive data stored in sessionStorage and execute absolute purges on window close."
+                )
+                impl_checklist_dict[cat] = "- [ ] Verify that sensitive keys in sessionStorage are cleared upon user session logout."
+                risk_assessment_dict[cat] = f"- *{cat}*: Unsecured temporary data exposed to cross-tab script execution."
+            elif cat == "Tracking technologies":
+                migration_steps_dict[cat] = (
+                    f"- **{cat}**: Hold third-party tracking pixels and analytic script loads until user consent is validated."
+                )
+                impl_checklist_dict[cat] = "- [ ] Implement conditional script loading for third-party tags based on cookies acceptance."
+                risk_assessment_dict[cat] = f"- *{cat}*: Direct non-compliance with the ePrivacy directive and subsequent cookie tracking blocks."
+
+    migration_steps = list(migration_steps_dict.values())
+    impl_checklist = list(impl_checklist_dict.values())
+    risk_assessment = list(risk_assessment_dict.values())
 
     citations_str = "\n".join(citations_list) if citations_list else "- *No updates cited.*"
 
@@ -755,9 +761,15 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_categories = set()
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
+        cat_key = f"{cat}_blocked" if (priority in (4, 5) and not is_verified) else cat
+        if cat_key in processed_categories:
+            continue
+        processed_categories.add(cat_key)
+
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
             lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
