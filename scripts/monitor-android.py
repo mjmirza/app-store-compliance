@@ -637,6 +637,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    seen_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -650,8 +651,32 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         # Category-specific migration details
-        if cat == "Target SDK requirements":
+        if cat == "Google Play Developer Policies":
+            migration_steps.append(
+                f"- **{cat}**: Review Google Play Policy Center updates; audit app metadata, in-app experience, and content ratings."
+            )
+            impl_checklist.append(
+                "- [ ] Review updated Developer Program Policies in Google Play Console Policy Center."
+            )
+            risk_assessment.append(
+                f"- *{cat}*: Non-compliance may lead to rejection, limited visibility, or account suspension."
+            )
+        elif cat == "Play Console announcements":
+            migration_steps.append(
+                f"- **{cat}**: Complete mandatory developer account identity verification and monitor Play Console inbox alerts."
+            )
+            impl_checklist.append(
+                "- [ ] Complete mandatory developer account identity verification in Play Console."
+            )
+            risk_assessment.append(
+                f"- *{cat}*: Unverified developer accounts will face publishing blocks and listing removal."
+            )
+        elif cat == "Target SDK requirements":
             migration_steps.append(
                 f"- **{cat}**: Update targetSdkVersion and compileSdkVersion in all build.gradle or build.gradle.kts files to API 36 (Android 16) before the August 31, 2026 deadline."
             )
@@ -844,7 +869,6 @@ def generate_pull_request_draft(updates, scan_results):
                 f"- *{cat}*: App onboarding or link share redirection failure post-sunset of dynamic links."
             )
         else:
-            # Generic category
             migration_steps.append(
                 f"- **{cat}**: Verify that all play console guidelines for {cat} are followed."
             )
@@ -953,19 +977,87 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
         )
 
-        if cat == "Target SDK requirements":
+        if cat == "Google Play Developer Policies":
+            lines.append(
+                "- [ ] **Task 1**: Review updated Developer Program Policies in Google Play Console Policy Center."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Audit app metadata, in-app experience, and content ratings against policy changes."
+            )
+        elif cat == "Play Console announcements":
+            lines.append(
+                "- [ ] **Task 1**: Complete mandatory developer account identity verification in Play Console."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Audit Play Console inbox notifications and fix reported compliance issues."
+            )
+        elif cat == "Target SDK requirements":
             lines.append(
                 "- [ ] **Task 1**: Update `targetSdkVersion` in build.gradle files to 36."
             )
             lines.append(
                 "- [ ] **Task 2**: Test target API level 36 behaviors on devices."
+            )
+        elif cat == "Minimum SDK requirements":
+            lines.append(
+                "- [ ] **Task 1**: Update `minSdkVersion` to 23 in Gradle build configs to deprecate legacy API 21/22 support."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify application initialization on minimum supported Android version."
+            )
+        elif cat == "Android API deprecations":
+            lines.append(
+                "- [ ] **Task 1**: Remove deprecated SafetyNet Attestation SDK dependencies."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Complete migration of anti-abuse and attestation checks to Play Integrity API."
+            )
+        elif cat == "Android permission model":
+            lines.append(
+                "- [ ] **Task 1**: Migrate broad photo/media access requests to native Android Photo Picker."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Audit runtime permission checks and provide rationale prior to requesting permissions."
+            )
+        elif cat == "Background execution restrictions":
+            lines.append(
+                "- [ ] **Task 1**: Audit WorkManager and JobScheduler tasks for execution time limits."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Validate SCHEDULE_EXACT_ALARM usage and replace with inexact alarms where applicable."
+            )
+        elif cat == "Foreground service policies":
+            lines.append(
+                "- [ ] **Task 1**: Specify foregroundServiceType inside the manifest service tags."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Register foreground service type video verification demo on Play Console."
+            )
+        elif cat == "Privacy Sandbox":
+            lines.append(
+                "- [ ] **Task 1**: Migrate analytics/marketing workflows from legacy Advertising ID to Topics API."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement Attribution Reporting and test SDK Runtime compatibility."
+            )
+        elif cat == "Play Integrity API":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side Play Integrity token verification endpoint with cryptographic nonce checks."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Handle integrity verdict responses and configure retry strategy for weak network connections."
             )
         elif cat == "Play Billing":
             lines.append(
@@ -981,12 +1073,54 @@ def update_documentation_report(updates, output_filepath):
             lines.append(
                 "- [ ] **Task 2**: Connect the URL to the Play Console User Data safety form."
             )
-        elif cat == "Foreground service policies":
+        elif cat == "Data Safety section":
             lines.append(
-                "- [ ] **Task 1**: Specify foregroundServiceType inside the manifest service tags."
+                "- [ ] **Task 1**: Conduct static and dynamic audit of all integrated third-party SDKs (Firebase, Facebook, AppsFlyer)."
             )
             lines.append(
-                "- [ ] **Task 2**: Register foreground service type video verification demo on Play Console."
+                "- [ ] **Task 2**: Update Play Console Data Safety questionnaire declarations to reflect actual SDK network activity."
+            )
+        elif cat == "AI-generated content policies":
+            lines.append(
+                "- [ ] **Task 1**: Implement prominent Play Policy disclosure dialog prior to accessing AI features."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add in-app flagging and reporting controls directly adjacent to generative AI content."
+            )
+        elif cat == "Accessibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Audit all interactive UI elements to ensure minimum 48dp x 48dp touch targets."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add meaningful contentDescription attributes to all ImageViews and ImageButtons."
+            )
+        elif cat == "Device compatibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Configure `android:resizeableActivity=true` in manifest for multi-window support."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Test responsive layouts on large screens, tablets, and foldable devices."
+            )
+        elif cat == "Security Bulletins":
+            lines.append(
+                "- [ ] **Task 1**: Implement cryptographic token storage wrapper backed by Android Keystore."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Patch known CVE vulnerabilities and enforce biometric authentication where required."
+            )
+        elif cat == "Android Enterprise requirements":
+            lines.append(
+                "- [ ] **Task 1**: Implement Work Profile boundaries and secure inter-profile communication using DevicePolicyManager."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Audit corporate policy compliance for managed enterprise deployments."
+            )
+        elif cat == "Firebase policy updates":
+            lines.append(
+                "- [ ] **Task 1**: Remove deprecated Firebase Dynamic Links dependencies and migrate to standard Android App Links."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Review and update Firebase Security Rules for Realtime Database and Cloud Firestore."
             )
         else:
             lines.append(
