@@ -1,38 +1,78 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Concise executive summary of what is changed and why. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context behind this change, including historical references or previous audits. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Detail the regulatory requirement or platform policy update triggering this PR. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
+
+<!-- Primary sources (Priority 1 official regulators/platforms). URLs mandatory. -->
 
 - 
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of files modified or added in this repository. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+-
 
-## Declarations
+## 6. Risk assessment
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+<!-- Compliance, legal, operational, and technical risk evaluation. -->
 
-## Anything a reviewer should look at first
+## 7. Migration steps
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+<!-- Step-by-step instructions for adopting this change. -->
+
+1.
+
+## 8. Backward compatibility
+
+<!-- Analysis of backward compatibility impact and API guarantees. -->
+
+## 9. Implementation checklist
+
+<!-- Action items completed during implementation. -->
+
+- [ ]
+
+## 10. Testing checklist
+
+<!-- Verification steps and test suites executed. -->
+
+- [ ] `python3 scripts/validate.py`
+- [ ] `python3 scripts/verify-citations.py --files docs/ data/`
+
+## 11. Documentation checklist
+
+<!-- Updated docs, guides, and metadata files. -->
+
+- [ ]
+
+## 12. Compliance impact
+
+<!-- Specific compliance areas improved or addressed. -->
+
+## 13. Breaking changes
+
+<!-- Declare any breaking changes or state "None". -->
+
+## 14. Review checklist
+
+<!-- Checklist for PR reviewers. -->
+
+- [ ] All claims traced to official Priority 1 citations
+- [ ] No emojis or AI-assistant attribution included
+- [ ] All automated validation and test scripts pass
+
+## 15. Approver recommendations
+
+<!-- Target roles required for final approval. -->
+
+-
