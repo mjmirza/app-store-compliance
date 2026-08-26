@@ -541,6 +541,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -555,6 +556,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,14 +760,23 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_doc_categories = set()
+
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
-            lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
-            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
-            lines.append("")
+            block_key = f"{cat}_blocked"
+            if block_key not in processed_doc_categories:
+                processed_doc_categories.add(block_key)
+                lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
+                lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+                lines.append("")
             continue
+
+        if cat in processed_doc_categories:
+            continue
+        processed_doc_categories.add(cat)
 
         lines.append(f"### Tasks for {cat}")
         lines.append("- **Regulatory Impact**: High priority compliance area.")
