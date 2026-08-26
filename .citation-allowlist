@@ -22,3 +22,17 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Android Privacy Sandbox documentation endpoint changes
+https://developer.android.com/design-for-safety/privacy-sandbox
+
+# Test fixture news placeholders used in monitor test scripts
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Apple support page routing update
+https://developer.apple.com/support/core-technology-fee/
+
+# EU press release URL routing updates
+https://www.consilium.europa.eu/en/press/press-releases/2025/11/26/child-sexual-abuse-council-reaches-position-on-law-protecting-children-from-online-abuse/
+https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/
