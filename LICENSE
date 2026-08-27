@@ -1,40 +1,41 @@
-OpenRoots Agent License 1.0
+OpenRoots Agent License 2.3
 ===========================
 
-Canonical text: https://openroots.org/licenses/ora/1.0/legalcode
-Plain summary:  https://openroots.org/licenses/ora/1.0
+Canonical text: https://openroots.org/licenses/ora/2.3/legalcode.txt
+Plain summary:  https://openroots.org/licenses/ora/2.3
+SPDX:           LicenseRef-OpenRoots-ORA-2.3
 
-Effective:   2026-08-24
-Sunset Date: 2029-08-24
-Fallback:    Apache-2.0
+Effective:      2026-08-27
+Term:           Permanent. This release does not convert to another
+                licence by lapse of time.
 
 This licence is one fixed text, adopted word for word. The canonical
 version lives at the address above and is never edited. A correction
 is issued as a new version and this text remains reachable permanently.
 
-PRIOR LICENCE NOTICE
---------------------
-This repository was previously distributed under MIT.
-That grant is irrevocable for every version released under it.
-Anyone who obtained an earlier release keeps their MIT rights
-in perpetuity. This licence governs releases from 2026-08-24 onward.
+EARLIER RELEASES KEEP THEIR EARLIER TERMS
+-----------------------------------------
+This repository previously carried OpenRoots Agent License 1.0.
+Section 7.2 attaches a version to the release it accompanied, so every
+release distributed under 1.0 stays under 1.0 permanently,
+including any sunset conversion that version granted. This file governs
+releases made from its own effective date onward.
 
 SUMMARY OF TERMS
 ----------------
-Root tier     Free and unconditional at or below USD 2,000,000 annual
-              revenue, and for any individual, nonprofit, school, or
-              government body. Rights equivalent in kind to MIT.
+Root tier     Free and unconditional at or below USD 20,000,000
+              annual revenue, and for any individual, nonprofit,
+              school, or government body, at any size.
 
-Canopy tier   Above the threshold, 0.5% of revenue attributable to
-              this work, capped at USD 250,000 per year. Self-reported
-              quarterly. The rate is never negotiated.
+Canopy tier   Above the threshold, 0.5% of the amount by which
+              attributable revenue EXCEEDS the threshold, capped at
+              USD 250,000 per year. Revenue at or below the
+              threshold bears no royalty, so crossing the line costs
+              almost nothing. Self-reported quarterly, never negotiated.
 
 Compute tier  AI training is not granted by either tier above. It
               requires a separate Compute licence at every tier.
               Human reading and search indexing are unaffected.
-
-Sunset        On 2029-08-24 this release converts to Apache-2.0,
-              automatically, binding successors and insolvency trustees.
 
 The operative text is the canonical version linked above. This file is
 a pointer to it, not a substitute for it.
