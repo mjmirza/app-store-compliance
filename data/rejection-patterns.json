@@ -225,9 +225,9 @@
       "id": "APPLE-1.2-UGC-24H-ACTION",
       "platform": "apple",
       "guideline": "1.2",
-      "title": "User generated content without the 24 hour action mechanism",
+      "title": "User generated content without the required moderation mechanisms",
       "severity": "critical",
-      "detection": "UGC present without a EULA with zero tolerance for objectionable content, content filtering, a flag mechanism, user blocking, and the ability to act on a report within 24 hours by removing content and ejecting the user.",
+      "detection": "UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline.",
       "signals": [
         "post",
         "comment",
@@ -778,7 +778,7 @@
       "guideline": "Privacy Manifest",
       "title": "Required reason APIs or third party SDKs without a privacy manifest",
       "severity": "critical",
-      "detection": "Required reason API usage or a commonly used third party SDK is present but no PrivacyInfo.xcprivacy is bundled, or an SDK lacks its signed manifest. Enforced by Apple at upload since 2024. The top modern Apple upload rejection.",
+      "detection": "Required reason API usage or a commonly used third party SDK is present but no PrivacyInfo.xcprivacy is bundled, or an SDK lacks its signed manifest. Enforced by Apple at upload since 2024.",
       "signals": [
         "NSFileManager",
         "UserDefaults",
@@ -1408,6 +1408,28 @@
         "trackingPreferences"
       ],
       "fix": "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
+    },
+    {
+      "id": "BOTH-US-ASAA-AGE-SIGNALS-MISSING",
+      "platform": "both",
+      "guideline": "US state App Store Accountability Acts (Utah SB 142, Texas SB 2420, and successor state acts). See docs/GLOBAL-REGULATORY-2026.md section 2.2",
+      "title": "Missing store age-signal integration for US state ASAA duties",
+      "severity": "high",
+      "detection": "Heuristic, not a certification. An app with accounts or age-gated features shows no integration with the store age signal surfaces (Declared Age Range on iOS, Play Age Signals API on Android) and no verifiable parental consent handling for minor accounts. Store-side duties began 6 May 2026 (Utah) and are documented with primary sources in docs/GLOBAL-REGULATORY-2026.md section 2.2.",
+      "signals": [
+        "ageCategory",
+        "minorUser",
+        "parentalConsent",
+        "DeclaredAgeRange",
+        "age-signals"
+      ],
+      "counterSignals": [
+        "verifyParentalConsent",
+        "handleAgeCategorySignal",
+        "rescindConsent",
+        "deleteAgeVerificationData"
+      ],
+      "fix": "Integrate the store age signal APIs, confirm verifiable parental consent for minor accounts before use, re-request consent on significant changes, and delete raw age verification data after verification."
     }
   ]
 }
