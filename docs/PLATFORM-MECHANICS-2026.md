@@ -82,7 +82,7 @@ Sources. [Android FGS types required](https://developer.android.com/about/versio
 
 ### 2.3 Play Integrity API and the SafetyNet retirement (HARD)
 
-SafetyNet Attestation is fully shut down (turndown completed 31 January 2025). all attestation and anti-abuse checks must use the Play Integrity API. An app that still calls `com.google.android.gms:play-services-safetynet` is calling a dead service. Verify the server checks the Play Integrity verdict with `requestHash` request-binding. Source. [Play Integrity API](https://en.wikipedia.org/wiki/Play_Integrity_API).
+SafetyNet Attestation is fully shut down (turndown completed 31 January 2025). all attestation and anti-abuse checks must use the Play Integrity API. An app that still calls `com.google.android.gms:play-services-safetynet` is calling a dead service. Verify the server checks the Play Integrity verdict with `requestHash` request-binding. Source. [Play Integrity API](https://developer.android.com/google/play/integrity).
 
 ### 2.4 Play Billing Library minimum version (HARD)
 
