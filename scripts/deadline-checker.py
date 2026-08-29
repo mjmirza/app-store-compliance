@@ -9,7 +9,9 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEADLINES_FILE = os.path.join(ROOT, "data", "regulatory-deadlines.json")
+DEADLINES_FILE = os.environ.get(
+    "DEADLINES_FILE", os.path.join(ROOT, "data", "regulatory-deadlines.json")
+)
 
 
 def load_deadlines():
@@ -38,6 +40,7 @@ def main():
 
     passed_deadlines = []
     upcoming_deadlines = []
+    absorbed_deadlines = []
 
     for d in deadlines:
         try:
@@ -79,9 +82,12 @@ def main():
             "priority": d.get("priority", "Medium"),
             "sections": sections_str,
             "remaining_days": remaining_days,
+            "absorbed_into": d.get("absorbed_into", ""),
         }
 
-        if remaining_days < 0:
+        if remaining_days < 0 and item["absorbed_into"]:
+            absorbed_deadlines.append(item)
+        elif remaining_days < 0:
             passed_deadlines.append(item)
         elif remaining_days <= 90:
             upcoming_deadlines.append(item)
@@ -123,6 +129,16 @@ def main():
             print(f"  Affected repository sections: {item['sections']}")
             print(f"  Priority:                     {item['priority'].upper()}")
             print()
+
+    if absorbed_deadlines:
+        print("PASSED DEADLINES ABSORBED INTO THE PLAYBOOK (no action needed):")
+        print("-" * 80)
+        for item in absorbed_deadlines:
+            print(
+                f"[{item['priority'].upper()}] {item['law']} "
+                f"(mandatory {item['mandatory_date']}) absorbed into {item['absorbed_into']}"
+            )
+        print()
 
     if not warnings_found:
         print(
