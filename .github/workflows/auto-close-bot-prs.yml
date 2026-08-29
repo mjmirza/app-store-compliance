@@ -1,0 +1,22 @@
+name: Auto-close bot PRs
+# Closes scheduled-bot regeneration PRs (Jules and similar). Criteria doc 2026-08-30.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+permissions:
+  pull-requests: write
+  contents: write
+jobs:
+  close-bot-pr:
+    runs-on: ubuntu-latest
+    if: >
+      startsWith(github.event.pull_request.head.ref, 'jules-') ||
+      contains(github.event.pull_request.head.ref, 'jules')
+    steps:
+      - name: Close and comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr close "$PR" --repo "$REPO" --delete-branch --comment "Closed automatically. This repo does not accept scheduled bot regeneration PRs. Master carries the canonical, tested monitor suite. See AGENTS.md."
