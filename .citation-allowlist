@@ -22,3 +22,21 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Test fixture URLs in test scripts
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://example.com/x
+https://realbackend.io/privacy-policy
+https://staging.example.com
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Governmental and regional URLs that block automated bots or return host errors.
+https://cppa.ca.gov/
+https://cppa.ca.gov/regulations/ccpa_updates.html
+https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
+https://www.miit.gov.cn/
