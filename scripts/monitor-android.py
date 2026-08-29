@@ -464,6 +464,60 @@ MOCK_ANNOUNCEMENTS = [
 ]
 
 
+def classify_source_and_verify(announcement, all_announcements=None):
+    """
+    Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "developer.android.com",
+        "support.google.com",
+        "source.android.com",
+        "android-developers.googleblog.com",
+        "firebase.google.com",
+    ]
+    p1_keywords = [
+        "android developer",
+        "google play",
+        "developer policies",
+        "official announcement",
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study"]
+
+    p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog"]
+    p4_keywords = ["industry blog", "tech blog"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit"]
+
+    priority = 4
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".google.com" in link or ".android.com" in link:
+        priority = 1
+
+    is_verified = priority <= 3
+    return priority, is_verified
+
+
 def scan_codebase_for_android_signals(start_dir="."):
     """
     Scans the codebase for files containing signals related to each of the 19 requirement categories.
@@ -631,12 +685,15 @@ def classify_announcements(announcements, keywords_filter=None):
 def generate_pull_request_draft(updates, scan_results):
     """
     Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates migration steps, checklists, and risk assessments per category.
     """
     citations_list = []
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+
+    seen_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -650,7 +707,11 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific migration details
+        # Category-level deduplication for migration details, checklists, risk assessments
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         if cat == "Target SDK requirements":
             migration_steps.append(
                 f"- **{cat}**: Update targetSdkVersion and compileSdkVersion in all build.gradle or build.gradle.kts files to API 36 (Android 16) before the August 31, 2026 deadline."
@@ -708,7 +769,7 @@ def generate_pull_request_draft(updates, scan_results):
                 "- [ ] Audit exact alarm declarations; replace with inexact alarms unless qualifies for exemption."
             )
             risk_assessment.append(
-                f"- *{cat}*: Automated background service thottling or foreground service crash on target devices."
+                f"- *{cat}*: Automated background service throttling or foreground service crash on target devices."
             )
         elif cat == "Foreground service policies":
             migration_steps.append(
@@ -844,7 +905,6 @@ def generate_pull_request_draft(updates, scan_results):
                 f"- *{cat}*: App onboarding or link share redirection failure post-sunset of dynamic links."
             )
         else:
-            # Generic category
             migration_steps.append(
                 f"- **{cat}**: Verify that all play console guidelines for {cat} are followed."
             )
@@ -929,19 +989,32 @@ Ensure that the Play Console account owner has completed the personal/organizati
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_mock=False):
     """
     Overwrites or updates the migration report in docs/ANDROID-POLICY-MIGRATION.md.
+    Deduplicates tasks per category.
     """
-    lines = [
-        "<!-- ANDROID_POLICY_MONITOR_START -->",
+    lines = ["<!-- ANDROID_POLICY_MONITOR_START -->"]
+
+    if is_mock:
+        lines.extend([
+            "",
+            "> **Simulated output, not live announcements.** This file is generated by the monitor",
+            "> script in `--simulate` or mock mode, which uses illustrative sample announcements to show the",
+            "> shape of a migration report. The titles, publish dates, and descriptions below are",
+            "> examples, not real publications. Only the linked official documentation URLs are real.",
+            "> Re-run the monitor without `--mock` against the live feed before treating anything here as an actual requirement.",
+            "",
+        ])
+
+    lines.extend([
         "# Android and Google Play Policy Migration & Requirements Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-android.py` to track compliance areas.",
         "",
         "## Monitored Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -953,8 +1026,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_task_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_task_categories:
+            continue
+        seen_task_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
@@ -1040,20 +1118,19 @@ def main():
 
     # 1. Gather announcements
     announcements = []
+    is_mock_used = False
 
     if args.live:
         print("Fetching live Google Play developer RSS feed...")
-        # Android developers blog posts
         announcements.extend(
             parse_rss_feed(
                 "https://android-developers.googleblog.com/feeds/posts/default"
             )
         )
-        # Android Security Bulletins publish no RSS feed. The canonical page is
-        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:
+        is_mock_used = True
         print(
             "Using comprehensive mock Android policy updates for compliance scanning..."
         )
@@ -1095,13 +1172,14 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_mock=is_mock_used)
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
 
     if args.pr_output:
         try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
             with open(args.pr_output, "w", encoding="utf-8") as f:
                 f.write(pr_draft)
             print(f"PR draft written successfully to: {args.pr_output}")
