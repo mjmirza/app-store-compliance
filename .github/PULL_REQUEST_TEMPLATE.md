@@ -1,38 +1,62 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Concise statement of the change and primary objective. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context regarding the targeted regulatory domain, underlying rationale, and operational scope. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Explicit description of the regulatory requirement or enforcement policy change. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
 
-- 
+<!-- List official primary citations following the Source Trust Hierarchy (Priority 1: EUR-Lex, Official Journal, FTC, NIST, ICO, etc.). -->
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- Specific list of files modified or impacted within the repository. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Analysis of non-compliance risk, severity level, and potential distribution or legal impacts. -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 7. Migration steps
 
-## Anything a reviewer should look at first
+<!-- Actionable step-by-step migration procedures for implementation. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 8. Backward compatibility
+
+<!-- Explanation of backward compatibility considerations and system inter-dependencies. -->
+
+## 9. Implementation checklist
+
+- [ ] Itemized implementation steps
+
+## 10. Testing checklist
+
+- [ ] Automated validation and static analysis checks
+- [ ] Manual test procedures
+
+## 11. Documentation checklist
+
+- [ ] Playbook and documentation update verification
+
+## 12. Compliance impact
+
+<!-- Assessment of regulatory risk reduction and compliance standing. -->
+
+## 13. Breaking changes
+
+<!-- Explicit declaration of breaking changes or confirmation of zero breaking changes. -->
+
+## 14. Review checklist
+
+- [ ] Confirm diff contains zero emojis or emoticons
+- [ ] Verify primary citations trace to official Priority 1 sources
+- [ ] Validate static analysis and script output
+
+## 15. Approver recommendations
+
+<!-- Recommended roles or titles for PR review and final sign-off. -->

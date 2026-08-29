@@ -22,3 +22,10 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+
+# Unreachable external developer and news URLs
+https://developer.android.com/about/versions
+https://developer.android.com/about/versions/14/changes/fgs-types-required
+https://source.android.com/docs/security/bulletin
+https://stripe.com/guides/strong-customer-authentication
+https://techcrunch.com/2025/11/13/apples-new-app-review-guidelines-clamp-down-on-apps-sharing-personal-data-with-third-party-ai/
