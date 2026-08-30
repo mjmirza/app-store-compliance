@@ -8,7 +8,7 @@ A structured, AI loadable reference tree. Load the rule category and the app typ
 - [rules/privacy.md](rules/privacy.md). Privacy and data. 17 rules
 - [rules/payments.md](rules/payments.md). Payments, in app purchase, subscriptions. 8 rules
 - [rules/design.md](rules/design.md). Design and login. 4 rules
-- [rules/performance.md](rules/performance.md). Performance and completeness. 24 rules
+- [rules/performance.md](rules/performance.md). Performance and completeness. 25 rules
 - [rules/entitlements.md](rules/entitlements.md). Entitlements. 1 rules
 - [rules/safety.md](rules/safety.md). Safety and user generated content. 3 rules
 - [rules/android.md](rules/android.md). Google Play specific. 22 rules

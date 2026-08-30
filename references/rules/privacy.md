@@ -57,7 +57,7 @@ grep -rn 'createAccount\|signUp\|register' --include='*.swift' . && ! grep -rn '
 - Platform. apple
 - Guideline or policy. Privacy Manifest
 - Severity. critical
-- What triggers it. Required reason API usage or a commonly used third party SDK is present but no PrivacyInfo.xcprivacy is bundled, or an SDK lacks its signed manifest. Enforced by Apple at upload since 2024. The top modern Apple upload rejection.
+- What triggers it. Required reason API usage or a commonly used third party SDK is present but no PrivacyInfo.xcprivacy is bundled, or an SDK lacks its signed manifest. Enforced by Apple at upload since 2024.
 - How to fix it. Add a PrivacyInfo.xcprivacy with NSPrivacyAccessedAPITypes and approved reason codes, list NSPrivacyTrackingDomains, and confirm every third party SDK ships its signed manifest.
 - Detection signals. NSFileManager, UserDefaults, systemUptime, ProcessInfo, Firebase, Alamofire
 - Present means handled. PrivacyInfo.xcprivacy, NSPrivacyAccessedAPITypes
