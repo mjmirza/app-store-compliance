@@ -4,11 +4,11 @@
 
 ## APPLE-1.2-UGC-24H-ACTION
 
-- Title. User generated content without the 24 hour action mechanism
+- Title. User generated content without the required moderation mechanisms
 - Platform. apple
 - Guideline or policy. 1.2
 - Severity. critical
-- What triggers it. UGC present without a EULA with zero tolerance for objectionable content, content filtering, a flag mechanism, user blocking, and the ability to act on a report within 24 hours by removing content and ejecting the user.
+- What triggers it. UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline.
 - How to fix it. Add a zero tolerance EULA, content filtering, in app reporting, user blocking, and a process to act on reports within 24 hours. Source. real Apple Safety 1.2 rejection email.
 - Detection signals. post, comment, upload, chat, feed, community
 - Present means handled. report, block user, EULA, moderation

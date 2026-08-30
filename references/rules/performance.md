@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-24 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+25 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -287,6 +287,17 @@ How to detect.
 ```bash
 grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'consentTracking\|disableTracking\|optOutTracking\|trackingPreferences' .
 ```
+
+## BOTH-US-ASAA-AGE-SIGNALS-MISSING
+
+- Title. Missing store age-signal integration for US state ASAA duties
+- Platform. both
+- Guideline or policy. US state App Store Accountability Acts (Utah SB 142, Texas SB 2420, and successor state acts). See docs/GLOBAL-REGULATORY-2026.md section 2.2
+- Severity. high
+- What triggers it. Heuristic, not a certification. An app with accounts or age-gated features shows no integration with the store age signal surfaces (Declared Age Range on iOS, Play Age Signals API on Android) and no verifiable parental consent handling for minor accounts. Store-side duties began 6 May 2026 (Utah) and are documented with primary sources in docs/GLOBAL-REGULATORY-2026.md section 2.2.
+- How to fix it. Integrate the store age signal APIs, confirm verifiable parental consent for minor accounts before use, re-request consent on significant changes, and delete raw age verification data after verification.
+- Detection signals. ageCategory, minorUser, parentalConsent, DeclaredAgeRange, age-signals
+- Present means handled. verifyParentalConsent, handleAgeCategorySignal, rescindConsent, deleteAgeVerificationData
 
 ## APPLE-ACCESSIBILITY-COLORCONTRAST
 
