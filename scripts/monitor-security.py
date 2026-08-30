@@ -532,15 +532,14 @@ def classify_announcements(announcements, keywords_filter=None):
 
         # Match against categories
         matched_categories = []
-        for cat, keywords in CATEGORY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_to_search:
-                    matched_categories.append(cat)
-                    break  # Break keyword loop for this category
-
-        # If a pre-set category exists on mock and no matched categories, use that category
-        if not matched_categories and ann.get("category"):
+        if ann.get("category") and ann["category"] in TRACKED_CATEGORIES:
             matched_categories.append(ann["category"])
+        else:
+            for cat, keywords in CATEGORY_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in text_to_search:
+                        matched_categories.append(cat)
+                        break  # Break keyword loop for this category
 
         if matched_categories:
             for cat in matched_categories:
@@ -565,6 +564,7 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_categories_pr = set()
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         citations_list.append(
@@ -576,6 +576,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories_pr:
+            continue
+        seen_categories_pr.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -846,8 +850,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories_doc = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories_doc:
+            continue
+        seen_categories_doc.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
