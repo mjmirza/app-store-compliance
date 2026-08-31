@@ -9,6 +9,7 @@ https://yourdomain.com/.well-known/assetlinks.json
 
 # Deliberate low-trust fixture. Proves the monitor rejects Priority 5 sources.
 https://randomblogsite.com/gdpr-rumor
+https://randomblogsite.com/owasp-rumors
 
 # Gauntlet fixtures for verify-citations.py itself. Must stay broken to test the gate.
 https://support.google.com/googleplay/android-developer/answer/datasafety
