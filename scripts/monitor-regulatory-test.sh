@@ -31,27 +31,27 @@ echo "[TEST] Running scan against current project directory..."
 python3 "$MON_SCRIPT" --project "$REPO_ROOT" > /dev/null
 echo "[PASS] monitor-regulatory.py successfully scanned the target directory"
 
-# Test 4: Run simulation for EU AI Act and verify output contains the 15 required sections in JSON
+# Test 4: Run simulation for EU AI Act and verify output contains the 15 required numbered sections in JSON
 echo "[TEST] Simulating 'EU AI Act' track and validating 15-section JSON output..."
 EU_JSON=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --json)
 
-# Define expected sections
+# Define expected numbered sections
 SECTIONS=(
-  "Summary"
-  "Background"
-  "Regulatory change"
-  "Official citations"
-  "Affected files"
-  "Risk assessment"
-  "Migration steps"
-  "Backward compatibility"
-  "Implementation checklist"
-  "Testing checklist"
-  "Documentation checklist"
-  "Compliance impact"
-  "Breaking changes"
-  "Review checklist"
-  "Approver recommendations"
+  "1. Summary"
+  "2. Background"
+  "3. Regulatory change"
+  "4. Official citations"
+  "5. Affected files"
+  "6. Risk assessment"
+  "7. Migration steps"
+  "8. Backward compatibility"
+  "9. Implementation checklist"
+  "10. Testing checklist"
+  "11. Documentation checklist"
+  "12. Compliance impact"
+  "13. Breaking changes"
+  "14. Review checklist"
+  "15. Approver recommendations"
 )
 
 for sect in "${SECTIONS[@]}"; do
@@ -61,7 +61,7 @@ for sect in "${SECTIONS[@]}"; do
     exit 1
   fi
 done
-echo "[PASS] All 15 required compliance sections exist in the Pull Request generator output"
+echo "[PASS] All 15 required numbered compliance sections exist in the Pull Request generator output"
 
 # Test 5: Verify JSON output is valid JSON
 echo "[TEST] Running JSON output validation..."
@@ -108,6 +108,27 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
   exit 1
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
+
+# Test 8: Verify file outputs (--output-docs and --pr-output)
+echo "[TEST] Verifying report file outputs (--output-docs and --pr-output)..."
+TEST_DOC="/tmp/test_regulatory_doc.md"
+TEST_PR="/tmp/test_regulatory_pr.md"
+rm -f "$TEST_DOC" "$TEST_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOC" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_DOC" ]; then
+  echo "[ERROR] Document report output file $TEST_DOC was not created"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR" ]; then
+  echo "[ERROR] PR draft output file $TEST_PR was not created"
+  exit 1
+fi
+
+rm -f "$TEST_DOC" "$TEST_PR"
+echo "[PASS] Report file outputs created successfully"
 
 echo ""
 echo "[SUCCESS] All tests passed successfully."
