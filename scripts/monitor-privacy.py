@@ -34,12 +34,12 @@ CATEGORIES = [
 
 # Keywords used to classify incoming policy announcements/articles into the 16 categories
 CATEGORY_KEYWORDS = {
-    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy", "manifest"],
+    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy"],
     "Required Reason APIs": ["required reason api", "required reason", "userdefaults", "nsfilemanager", "systemuptime", "processinfo"],
-    "App Tracking Transparency": ["app tracking transparency", "att", "idfa", "tracking authorization", "tracking usage description"],
+    "App Tracking Transparency": ["app tracking transparency", "att", "tracking authorization", "tracking usage description"],
     "Privacy Nutrition Labels": ["privacy nutrition label", "nutrition label", "privacy label", "app store connect privacy"],
     "Data Safety": ["data safety", "datasafety", "google play data safety"],
-    "User Data Policy": ["user data policy", "prominent disclosure", "data deletion", "account deletion", "personal data collection"],
+    "User Data Policy": ["user data policy", "prominent disclosure", "data deletion", "account deletion"],
     "Advertising ID": ["advertising id", "advertising_id", "ad_id", "gaid", "google play services advertising id"],
     "Runtime permissions": ["runtime permission", "requestpermissions", "checkselfpermission", "shouldshowrequestpermissionrationale"],
     "Background location": ["background location", "access_background_location"],
@@ -492,6 +492,7 @@ def parse_rss_feed(url):
 def classify_announcements(announcements, keywords_filter=None):
     """
     Classifies incoming announcements into the 16 Apple, Android, and Web privacy categories.
+    Respects pre-defined categories for announcements if present to avoid cross-classification.
     """
     classified_updates = []
 
@@ -505,17 +506,16 @@ def classify_announcements(announcements, keywords_filter=None):
             if not any(k.lower() in text_to_search for k in keywords_filter):
                 continue
 
-        # Match against categories
+        # Respect pre-assigned category if present to prevent cross-classification
         matched_categories = []
-        for cat, keywords in CATEGORY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_to_search:
-                    matched_categories.append(cat)
-                    break  # Break keyword loop for this category
-
-        # Fallback to predefined category if set
-        if not matched_categories and ann.get("category"):
+        if ann.get("category") and ann["category"] in CATEGORIES:
             matched_categories.append(ann["category"])
+        else:
+            for cat, keywords in CATEGORY_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in text_to_search:
+                        matched_categories.append(cat)
+                        break  # Break keyword loop for this category
 
         if matched_categories:
             for cat in matched_categories:
@@ -542,6 +542,8 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_categories = set()
+
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
@@ -555,6 +557,11 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        # Deduplicate per category to avoid redundant tasks/checklists in PR draft
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,14 +762,22 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_task_categories = set()
+
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
-            lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
-            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
-            lines.append("")
+            if cat not in seen_task_categories:
+                seen_task_categories.add(cat)
+                lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
+                lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+                lines.append("")
             continue
+
+        if cat in seen_task_categories:
+            continue
+        seen_task_categories.add(cat)
 
         lines.append(f"### Tasks for {cat}")
         lines.append("- **Regulatory Impact**: High priority compliance area.")
