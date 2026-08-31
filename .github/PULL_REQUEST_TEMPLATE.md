@@ -1,38 +1,59 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- What is changed and the concise goal of this compliance update. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context surrounding the platform policy, regulation, or store guideline requirement. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Details of the specific statutory rule, law, directive, or store policy update. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
 
-- 
+<!-- Primary official sources (Priority 1: EUR-Lex, Apple, Google, FTC, NIST, etc.). Paste valid URLs. -->
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of files modified, added, or scanned in this repository. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Exposure risk, rejection potential, or non-compliance impact level (CRITICAL/HIGH/MEDIUM/LOW). -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 7. Migration steps
 
-## Anything a reviewer should look at first
+<!-- Chronological step-by-step instructions for completing the migration. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 8. Backward compatibility
+
+<!-- Impact on legacy versions, backward compatibility assurances, or API fallbacks. -->
+
+## 9. Implementation checklist
+
+<!-- Actionable checklist items for code, configuration, or structural changes. -->
+
+## 10. Testing checklist
+
+<!-- Automated and manual test validation steps run to verify compliance. -->
+
+## 11. Documentation checklist
+
+<!-- Documentation, disclosures, checklists, or privacy policy updates required. -->
+
+## 12. Compliance impact
+
+<!-- Broader compliance impact analysis across supported jurisdictions and platform storefronts. -->
+
+## 13. Breaking changes
+
+<!-- Potential breaking changes to build pipelines, user experience, or existing APIs. -->
+
+## 14. Review checklist
+
+<!-- Self-review items for pull request diff, declarations, and validation. -->
+
+## 15. Approver recommendations
+
+<!-- Target roles recommended for final approval review. -->
