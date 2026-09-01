@@ -1045,6 +1045,55 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
     return report_items, processed_tracks
 
 
+def update_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the Regulatory Intelligence Monitoring Report at output_filepath.
+    Enforces emoji-free formatting and strict source trust verification.
+    """
+    lines = [
+        "<!-- REGULATORY_MONITOR_START -->",
+        "# Regulatory Intelligence Monitoring & Compliance Report (2026)",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to evaluate global regulatory updates against codebase signals and strict source trust principles.",
+        "",
+        "## Monitored Regulatory Intelligence Developments",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource Link**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+        if item["affected_files"]:
+            lines.append("#### Identified Codebase Affected Files")
+            for f in item["affected_files"]:
+                lines.append(f"- `{f}`")
+            lines.append("")
+
+        lines.append("#### Actionable Migration Tasks")
+        if item["proposed_pull_request"] is None:
+            lines.append("- [ ] **BLOCKED**: Announcement source is an unverified Priority 4/5 secondary source. Verification from Priority 1 source required before implementation.")
+        else:
+            for task in item["migration_tasks"]:
+                lines.append(f"- [ ] {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"Regulatory intelligence report successfully written to: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def print_text_report(report_items, project_path):
     print("=" * 80)
     print("               REGULATORY INTELLIGENCE MONITOR COMPLIANCE REPORT")
@@ -1106,6 +1155,14 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        help="Optional filepath to write the regulatory documentation report (e.g. docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Optional filepath to write the drafted Pull Request description",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1118,9 +1175,26 @@ def main():
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
 
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+
+    if args.pr_output:
+        pr_contents = []
+        for item in report_items:
+            if item.get("proposed_pull_request"):
+                pr_contents.append(item["proposed_pull_request"]["description"])
+        if pr_contents:
+            try:
+                os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write("\n\n---\n\n".join(pr_contents) + "\n")
+                print(f"PR draft successfully written to: {args.pr_output}")
+            except Exception as e:
+                print(f"Error writing PR draft to {args.pr_output}: {e}", file=sys.stderr)
+
     if args.json:
         print(json.dumps(report_items, indent=2))
-    else:
+    elif not args.output_docs and not args.pr_output:
         print_text_report(report_items, args.project)
 
 
