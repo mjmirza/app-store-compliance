@@ -82,6 +82,7 @@
     "RN-PRIVACY-MANIFEST-MISSING": "grep -qE '\"react-native\"|\"expo\"' package.json 2>/dev/null && grep -rn 'Firebase\\|AsyncStorage\\|expo-file-system' --include='*.ts' --include='*.tsx' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
     "IONIC-4.2-THIN-WRAPPER": "grep -rlE 'WKWebView|loadRequest|Capacitor|Cordova' --include='*.ts' --include='*.js' --include='*.swift' . 2>/dev/null | wc -l   # then count distinct @capacitor/(status-bar|splash-screen|push-notifications|haptics) markers, fewer than 2 is a thin wrapper",
     "IONIC-UIWEBVIEW-DEPRECATED": "grep -rn 'UIWebView' --include='*.swift' --include='*.m' . 2>/dev/null",
-    "IONIC-PRIVACY-MANIFEST-MISSING": "grep -rq '@capacitor/\\|Capacitor\\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q ."
+    "IONIC-PRIVACY-MANIFEST-MISSING": "grep -rq '@capacitor/\\|Capacitor\\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .",
+    "BOTH-US-ASAA-AGE-SIGNALS-MISSING": "grep -rni 'ageCategory\\|minorUser\\|parentalConsent\\|DeclaredAgeRange\\|age-signals' . && ! grep -rni 'verifyParentalConsent\\|handleAgeCategorySignal\\|rescindConsent\\|deleteAgeVerificationData' ."
   }
 }
