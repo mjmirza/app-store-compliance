@@ -23,6 +23,9 @@ https://lumina.app/privacy
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
 
+# Official platform documentation page blocked or returning non-200.
+https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/avoid-common-certification-failures
+
 # Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
