@@ -109,6 +109,40 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify file generation via --output-docs and --pr-output flags
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOCS_OUT="$REPO_ROOT/docs/TEST_REGULATORY_REPORT.md"
+TEST_PR_OUT="$REPO_ROOT/docs/TEST_REGULATORY_PR_DRAFT.md"
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] --output-docs flag failed to create $TEST_DOCS_OUT"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] --pr-output flag failed to create $TEST_PR_OUT"
+  exit 1
+fi
+
+# Verify no emojis in generated files
+python3 -c "
+import sys
+for filepath in ['$TEST_DOCS_OUT', '$TEST_PR_OUT']:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        text = f.read()
+    emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
+    if emojis:
+        print('Found emojis in', filepath, ':', emojis)
+        sys.exit(1)
+"
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+echo "[PASS] --output-docs and --pr-output flags generated valid, emoji-free files successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0

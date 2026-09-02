@@ -1045,6 +1045,64 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
     return report_items, processed_tracks
 
 
+def update_documentation_report(report_items, output_filepath, quiet=False):
+    """
+    Overwrites or updates the regulatory monitoring report in docs/REGULATORY-MONITOR-REPORT-2026.md.
+    Strictly emoji-free and follows source trust hierarchy.
+    """
+    lines = [
+        "<!-- REGULATORY_MONITOR_START -->",
+        "# Regulatory Intelligence Monitoring Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments.",
+        "",
+        "## Monitored Global Regulatory Updates Log",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+    lines.append("## Affected Files and Actionable Migration Recommendations")
+    lines.append("")
+
+    for item in report_items:
+        lines.append(f"### Track: {item['track']}")
+        if item["proposed_pull_request"] is None:
+            lines.append("- **Status**: BLOCKED (Source is an unverified Priority 4/5 secondary source)")
+            lines.append("")
+            continue
+
+        if item["affected_files"]:
+            lines.append("- **Identified Affected Files**:")
+            for f in item["affected_files"]:
+                lines.append(f"  - `{f}`")
+        else:
+            lines.append("- **Identified Affected Files**: None found in dynamic scan.")
+
+        lines.append("- **Actionable Implementation Tasks**:")
+        for task in item["migration_tasks"]:
+            lines.append(f"  - [ ] {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    try:
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        if not quiet:
+            print(f"Regulatory documentation report updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def print_text_report(report_items, project_path):
     print("=" * 80)
     print("               REGULATORY INTELLIGENCE MONITOR COMPLIANCE REPORT")
@@ -1111,12 +1169,43 @@ def main():
     parser.add_argument(
         "--verbose", action="store_true", help="Print verbose execution logs"
     )
+    parser.add_argument(
+        "--output-docs",
+        type=str,
+        default="docs/REGULATORY-MONITOR-REPORT-2026.md",
+        help="Filepath to write documentation report",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        default="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to write drafted Pull Request proposal",
+    )
 
     args = parser.parse_args()
 
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    # If output-docs specified, update documentation
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs, quiet=args.json)
+
+    # Save drafted PR to pr-output if verified PR exists
+    if args.pr_output:
+        valid_prs = [item["proposed_pull_request"] for item in report_items if item.get("proposed_pull_request")]
+        if valid_prs:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            try:
+                # Combine descriptions if multiple
+                combined_prs = "\n\n---\n\n".join(pr["description"] for pr in valid_prs)
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write(combined_prs + "\n")
+                if not args.json and args.verbose:
+                    print(f"PR draft written successfully to: {args.pr_output}")
+            except Exception as e:
+                print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
