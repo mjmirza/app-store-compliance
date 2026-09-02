@@ -6,26 +6,41 @@
 https://mycompany.com/profile
 https://yourdomain.com/.well-known/apple-app-site-association
 https://yourdomain.com/.well-known/assetlinks.json
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://example.com/x
+https://realbackend.io/privacy-policy
+https://staging.example.com
 
 # Deliberate low-trust fixture. Proves the monitor rejects Priority 5 sources.
 https://randomblogsite.com/gdpr-rumor
+https://randomblogsite.com/iso-rumor
 
 # Gauntlet fixtures for verify-citations.py itself. Must stay broken to test the gate.
 https://support.google.com/googleplay/android-developer/answer/datasafety
 https://developer.apple.com/news/?id=required-reason-apis
 
-# Real government site that refuses all automated clients (geo/bot filtered).
+# Test fixtures and placeholders for Apple and Google Play news/policy IDs
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+https://developer.apple.com/news/?id=02172025a
+https://developer.apple.com/news/?id=07242025a
+https://support.google.com/googleplay/android-developer/answer/9999999
+
+# Real government and official sources that block or fail automated citation checks
 https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
-
-# Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
-
-# Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
-
-# Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
 https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
 https://www.miit.gov.cn/
+https://le.utah.gov/~2025/bills/static/SB0142.html
+https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/avoid-common-certification-failures
+https://www.cnbc.com/2025/07/07/apple-appeal-eu-fine-app-store.html
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://egazette.gov.in/
+https://www.wilmerhale.com/en/insights/client-alerts/20250801-eighth-circuit-vacates-the-ftcs-click-to-cancel-rule-but-federal-and-state-regulators-likely-to-remain-active
+https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores
