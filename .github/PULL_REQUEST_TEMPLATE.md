@@ -1,38 +1,64 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Concise summary of what this PR changes. Never generate vague descriptions. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context around the regulatory change, platform policy update, or compliance gap being addressed. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Exact regulatory, legal, or store policy requirement details. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
 
-- 
+<!-- Primary official citations (e.g., EUR-Lex, Apple Developer News, Google Play Policy). -->
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of affected repository files, source files, and documentation. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Assessment of non-compliance risk, severity, and potential enforcement impact. -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 7. Migration steps
 
-## Anything a reviewer should look at first
+<!-- Step-by-step migration or implementation instructions. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 8. Backward compatibility
+
+<!-- Analysis of backward compatibility, API impact, and client behavior. -->
+
+## 9. Implementation checklist
+
+- [ ] Code/documentation updates completed
+- [ ] Verified compliance requirements against primary sources
+
+## 10. Testing checklist
+
+- [ ] Automated validation/audit scripts executed and passing
+- [ ] Verified citations and references
+
+## 11. Documentation checklist
+
+- [ ] Updated compliance migration docs/playbook files
+- [ ] Verified timeline/deadlines updated if applicable
+
+## 12. Compliance impact
+
+<!-- Impact on store readiness, regulatory alignment, and submission clearance. -->
+
+## 13. Breaking changes
+
+<!-- Declaration of breaking changes or confirmation that changes are non-breaking. -->
+
+## 14. Review checklist
+
+- [ ] Ensure the diff is entirely emoji-free
+- [ ] Verify that official citations are correctly indexed and traceable
+- [ ] Confirm compliance checks and validation tests pass
+
+## 15. Approver recommendations
+
+<!-- Recommended roles/approvers for PR review and signoff. -->
