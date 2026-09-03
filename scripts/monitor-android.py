@@ -631,12 +631,14 @@ def classify_announcements(announcements, keywords_filter=None):
 def generate_pull_request_draft(updates, scan_results):
     """
     Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates migration steps, checklists, and risk assessments per category.
     """
     citations_list = []
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -649,6 +651,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "Target SDK requirements":
@@ -932,6 +938,7 @@ Ensure that the Play Console account owner has completed the personal/organizati
 def update_documentation_report(updates, output_filepath):
     """
     Overwrites or updates the migration report in docs/ANDROID-POLICY-MIGRATION.md.
+    Deduplicates task sections per category.
     """
     lines = [
         "<!-- ANDROID_POLICY_MONITOR_START -->",
@@ -953,8 +960,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_task_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in processed_task_categories:
+            continue
+        processed_task_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
