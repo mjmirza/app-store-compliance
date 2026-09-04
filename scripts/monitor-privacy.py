@@ -535,9 +535,11 @@ def classify_announcements(announcements, keywords_filter=None):
 def generate_pull_request_draft(updates, scan_results):
     """
     Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates sections by category to avoid repetitive list items.
     """
     citations_list = []
     affected_files_set = set()
+    seen_categories = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
@@ -555,6 +557,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -731,6 +737,7 @@ Verify that the published web-based data deletion URL functions correctly before
 def update_documentation_report(updates, output_filepath):
     """
     Overwrites or updates the migration report in docs/PRIVACY-POLICY-MIGRATION.md.
+    Deduplicates tasks by category to prevent repeated sections.
     """
     lines = [
         "<!-- PRIVACY_POLICY_MONITOR_START -->",
@@ -755,14 +762,22 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_task_categories = set()
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
+            if cat in seen_task_categories:
+                continue
+            seen_task_categories.add(cat)
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
             lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
             lines.append("")
             continue
+
+        if cat in seen_task_categories:
+            continue
+        seen_task_categories.add(cat)
 
         lines.append(f"### Tasks for {cat}")
         lines.append("- **Regulatory Impact**: High priority compliance area.")
