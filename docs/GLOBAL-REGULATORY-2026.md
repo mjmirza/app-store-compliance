@@ -170,7 +170,7 @@ Common app duties. a privacy notice, an opt-out of targeted advertising, sale, a
 
 ## 4. Alternative app stores (distinct requirements only)
 
-- Huawei AppGallery and Samsung Galaxy Store. for the Singapore age-assurance rule from 1 April 2026 both use credit-card data as the method. Huawei mainland-China distribution needs ICP filing, a local entity, and simplified-Chinese metadata. Source. [App store age-assurance methods](https://www.biometricupdate.com/202604/app-stores-reveal-age-verification-estimation-methods-to-meet-singapore-requirements).
+- Huawei AppGallery and Samsung Galaxy Store. for the Singapore age-assurance rule from 1 April 2026 both use credit-card data as the method. Huawei mainland-China distribution needs ICP filing, a local entity, and simplified-Chinese metadata. Source. [IMDA Singapore Age Assurance Requirements](https://www.imda.gov.sg/how-we-can-help/age-assurance).
 - Amazon Appstore for Android was discontinued on 20 August 2025, so it is no longer a distribution target for new Android work. Source. [Amazon Appstore discontinued](https://www.forasoft.com/blog/article/distribute-android-apps-beyond-google-play).
 
 ## 5. Consolidated global audit checklist (HARD gates)

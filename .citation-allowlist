@@ -22,6 +22,8 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
 
 # Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
