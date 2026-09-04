@@ -109,6 +109,36 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output file generation
+echo "[TEST] Verifying --output-docs and --pr-output flags..."
+TEST_DOCS="/tmp/test_regulatory_report.md"
+TEST_PR="/tmp/test_regulatory_pr.md"
+
+rm -f "$TEST_DOCS" "$TEST_PR"
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TEST_DOCS" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_DOCS" ]; then
+  echo "[ERROR] --output-docs failed to generate $TEST_DOCS"
+  exit 1
+fi
+
+if ! grep -q "# Regulatory Intelligence Monitoring Report" "$TEST_DOCS"; then
+  echo "[ERROR] Generated documentation report $TEST_DOCS is missing header"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR" ]; then
+  echo "[ERROR] --pr-output failed to generate $TEST_PR"
+  exit 1
+fi
+
+if ! grep -q "# Regulatory Compliance Update" "$TEST_PR"; then
+  echo "[ERROR] Generated PR draft $TEST_PR is missing header"
+  exit 1
+fi
+rm -f "$TEST_DOCS" "$TEST_PR"
+echo "[PASS] --output-docs and --pr-output flags generate output files successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0

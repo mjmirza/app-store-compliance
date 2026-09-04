@@ -4,6 +4,7 @@
 
 import os
 import re
+import sys
 import json
 import argparse
 from datetime import datetime
@@ -1045,6 +1046,77 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
     return report_items, processed_tracks
 
 
+def write_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the regulatory monitoring report in output_filepath.
+    Remains completely emoji-free.
+    """
+    lines = [
+        "<!-- REGULATORY_MONITOR_START -->",
+        "# Regulatory Intelligence Monitoring Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to monitor global regulatory updates and compliance gaps.",
+        "",
+        "## Monitored Regulatory Updates",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+        lines.append("#### Affected Files")
+        if item["affected_files"]:
+            for f in item["affected_files"]:
+                lines.append(f"- `{f}`")
+        else:
+            lines.append("- None detected.")
+        lines.append("")
+        lines.append("#### Migration Tasks")
+        for task in item["migration_tasks"]:
+            lines.append(f"- [ ] {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    try:
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"Regulatory documentation report updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def write_pr_draft(report_items, pr_filepath):
+    """
+    Writes drafted PR descriptions for verified updates to pr_filepath.
+    Remains completely emoji-free.
+    """
+    pr_descriptions = []
+    for item in report_items:
+        pr = item.get("proposed_pull_request")
+        if pr and isinstance(pr, dict) and "description" in pr:
+            pr_descriptions.append(pr["description"])
+
+    if not pr_descriptions:
+        content = "# Pull Request Draft: No verified regulatory updates requiring PR generation.\n"
+    else:
+        content = "\n\n---\n\n".join(pr_descriptions) + "\n"
+
+    os.makedirs(os.path.dirname(pr_filepath) or ".", exist_ok=True)
+    try:
+        with open(pr_filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"Regulatory PR draft written successfully to: {pr_filepath}")
+    except Exception as e:
+        print(f"Error writing PR draft to {pr_filepath}: {e}", file=sys.stderr)
+
+
 def print_text_report(report_items, project_path):
     print("=" * 80)
     print("               REGULATORY INTELLIGENCE MONITOR COMPLIANCE REPORT")
@@ -1111,6 +1183,20 @@ def main():
     parser.add_argument(
         "--verbose", action="store_true", help="Print verbose execution logs"
     )
+    parser.add_argument(
+        "--output-docs",
+        nargs="?",
+        const="docs/REGULATORY-MONITOR-REPORT-2026.md",
+        default=None,
+        help="Filepath to write documentation report (default: docs/REGULATORY-MONITOR-REPORT-2026.md when flag is passed)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        nargs="?",
+        const="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        default=None,
+        help="Filepath to save the drafted PR (default: docs/REGULATORY_COMPLIANCE_PR_DRAFT.md when flag is passed)",
+    )
 
     args = parser.parse_args()
 
@@ -1118,9 +1204,15 @@ def main():
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
 
+    if args.output_docs:
+        write_documentation_report(report_items, args.output_docs)
+
+    if args.pr_output:
+        write_pr_draft(report_items, args.pr_output)
+
     if args.json:
         print(json.dumps(report_items, indent=2))
-    else:
+    elif not args.output_docs and not args.pr_output:
         print_text_report(report_items, args.project)
 
 
