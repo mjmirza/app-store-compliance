@@ -565,11 +565,17 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_citations = set()
+    seen_categories = set()
+
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
-        citations_list.append(
+        citation_entry = (
             f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
         )
+        if citation_entry not in seen_citations:
+            seen_citations.add(citation_entry)
+            citations_list.append(citation_entry)
 
         # Pull affected files
         files = scan_results.get(cat, [])
@@ -577,177 +583,180 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific migration details
-        if cat == "secure storage":
-            migration_steps.append(
-                f"- **{cat}**: Migrate sensitive localized storage from plaintext UserDefaults/SharedPreferences to Jetpack EncryptedSharedPreferences (Android) or iOS Keychain."
-            )
-            impl_checklist.append(
-                "- [ ] Replace plain SharedPreferences calls with EncryptedSharedPreferences."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Extraction of user session credentials from the file system on compromised or backed-up devices."
-            )
-        elif cat == "Keychain":
-            migration_steps.append(
-                f"- **{cat}**: Audit and enforce `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on all newly added iOS Keychain entries."
-            )
-            impl_checklist.append(
-                "- [ ] Configure kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly on iOS Keychain items."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Unauthorized keychain migration to other physical devices during system backups."
-            )
-        elif cat == "Android Keystore":
-            migration_steps.append(
-                f"- **{cat}**: Initialize KeyGenParameterSpec with hardware-backed StrongBox protection and enforce biometric user authentication."
-            )
-            impl_checklist.append(
-                "- [ ] Configure KeyGenParameterSpec with StrongBox-backed hardware parameters."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Extraction of cryptographic keys from memory if the key is not hardware-enclave isolated."
-            )
-        elif cat == "biometric authentication":
-            migration_steps.append(
-                f"- **{cat}**: Secure biometric auth with a Keystore CryptoObject rather than rely on vulnerable runtime boolean returns."
-            )
-            impl_checklist.append(
-                "- [ ] Implement CryptoObject-backed BiometricPrompt authentication."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Runtime bypass using hooking engines like Frida if the biometric check merely checks a return value."
-            )
-        elif cat == "certificate pinning":
-            migration_steps.append(
-                f"- **{cat}**: Pin Subject Public Key Info (SPKI) hashes in network security configs instead of leaf certificates."
-            )
-            impl_checklist.append(
-                "- [ ] Configure SPKI hashes in network_security_config.xml and NSPinnedDomains in Info.plist."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Traffic interception or server spoofing if trust anchors are compromised."
-            )
-        elif cat == "jailbreak detection":
-            migration_steps.append(
-                f"- **{cat}**: Implement multi-layered jailbreak audits covering file paths, directory permissions, and dynamic linker library loading."
-            )
-            impl_checklist.append(
-                "- [ ] Add multi-layered jailbreak detection heuristic checks on iOS."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Execution on heavily compromised platforms exposing client-side secure boundaries."
-            )
-        elif cat == "root detection":
-            migration_steps.append(
-                f"- **{cat}**: Integrate Google Play Integrity API and implement backend token validation to detect rooted/compromised environments."
-            )
-            impl_checklist.append(
-                "- [ ] Integrate Google Play Integrity verification workflows."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Bypassed client-side heuristic checks due to advanced rooting bypass frameworks."
-            )
-        elif cat == "SSL configuration":
-            migration_steps.append(
-                f"- **{cat}**: Disable cleartext HTTP traffic globally in the manifest and configuration files, enforcing TLS 1.2+."
-            )
-            impl_checklist.append(
-                "- [ ] Disable usesCleartextTraffic in AndroidManifest.xml and verify ATS in Info.plist."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Credential sniffing or traffic modification over unencrypted HTTP channels."
-            )
-        elif cat == "backup rules":
-            migration_steps.append(
-                f"- **{cat}**: Configure precise data extraction rules or set allowBackup to false to block database leaks."
-            )
-            impl_checklist.append(
-                "- [ ] Configure dataExtractionRules to exclude credentials and local SQLite databases."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Extraction of private sandboxed files via standard ADB backup extractions."
-            )
-        elif cat == "exported activities":
-            migration_steps.append(
-                f"- **{cat}**: Review AndroidManifest.xml; enforce exported='false' on all internal components."
-            )
-            impl_checklist.append(
-                "- [ ] Set android:exported=false for all non-launcher activities."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: External apps launching internal flows to bypass authentication states."
-            )
-        elif cat == "intent filters":
-            migration_steps.append(
-                f"- **{cat}**: Protect implicit intent filters using custom signature-level permissions."
-            )
-            impl_checklist.append(
-                "- [ ] Enforce signature-level permissions on any exported intent filters."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Interception, spoofing, or hijacking of implicit intent components by other apps."
-            )
-        elif cat == "deep links":
-            migration_steps.append(
-                f"- **{cat}**: Sanitize all incoming deep link parameters and avoid using them for sensitive operations."
-            )
-            impl_checklist.append(
-                "- [ ] Add strict input sanitization on deep link parameter parsers."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Parameter injection or cross-site scripting-like exploits within web rendering modules."
-            )
-        elif cat == "universal links":
-            migration_steps.append(
-                f"- **{cat}**: Implement verified Universal Links with a valid apple-app-site-association file to secure routing."
-            )
-            impl_checklist.append(
-                "- [ ] Host a secure apple-app-site-association file at the target web domain."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Custom URL scheme hijacking if another app registers the same custom link protocol."
-            )
-        elif cat == "app links":
-            migration_steps.append(
-                f"- **{cat}**: Implement verified Android App Links with a digitally signed assetlinks.json file on the host domain."
-            )
-            impl_checklist.append(
-                "- [ ] Publish the digital assetlinks.json with the correct signing certificate fingerprint."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Platform disambiguation dialogues and custom scheme hijacking on Android."
-            )
-        elif cat == "authentication flows":
-            migration_steps.append(
-                f"- **{cat}**: Implement Proof Key for Code Exchange (PKCE) over secure system browsers (Custom Tabs / ASWebAuthenticationSession)."
-            )
-            impl_checklist.append(
-                "- [ ] Configure OAuth 2.1 client with PKCE challenge/verifier code generation."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Interception of authorization codes and leakage of client credentials inside source code."
-            )
-        elif cat == "session handling":
-            migration_steps.append(
-                f"- **{cat}**: Perform complete server-side session invalidation on logout and blur background app snapshot views."
-            )
-            impl_checklist.append(
-                "- [ ] Add background multitasking blur window transitions to protect user data from snapshots."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Leaking sensitive UI layouts inside system multitasking views or session hijacking due to orphan backend sessions."
-            )
-        elif cat == "token storage":
-            migration_steps.append(
-                f"- **{cat}**: Isolate refresh tokens inside a secure hardware-backed database vault or encrypted preferences."
-            )
-            impl_checklist.append(
-                "- [ ] Save access and refresh tokens inside encrypted vaults with short-lived access periods."
-            )
-            risk_assessment.append(
-                f"- *{cat}*: Loss of user account custody if refresh tokens leak from persistent cache storage."
-            )
+        # Category-specific migration details (deduplicated per category)
+        if cat not in seen_categories:
+            seen_categories.add(cat)
+
+            if cat == "secure storage":
+                migration_steps.append(
+                    f"- **{cat}**: Migrate sensitive localized storage from plaintext UserDefaults/SharedPreferences to Jetpack EncryptedSharedPreferences (Android) or iOS Keychain."
+                )
+                impl_checklist.append(
+                    "- [ ] Replace plain SharedPreferences calls with EncryptedSharedPreferences."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Extraction of user session credentials from the file system on compromised or backed-up devices."
+                )
+            elif cat == "Keychain":
+                migration_steps.append(
+                    f"- **{cat}**: Audit and enforce `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on all newly added iOS Keychain entries."
+                )
+                impl_checklist.append(
+                    "- [ ] Configure kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly on iOS Keychain items."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Unauthorized keychain migration to other physical devices during system backups."
+                )
+            elif cat == "Android Keystore":
+                migration_steps.append(
+                    f"- **{cat}**: Initialize KeyGenParameterSpec with hardware-backed StrongBox protection and enforce biometric user authentication."
+                )
+                impl_checklist.append(
+                    "- [ ] Configure KeyGenParameterSpec with StrongBox-backed hardware parameters."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Extraction of cryptographic keys from memory if the key is not hardware-enclave isolated."
+                )
+            elif cat == "biometric authentication":
+                migration_steps.append(
+                    f"- **{cat}**: Secure biometric auth with a Keystore CryptoObject rather than rely on vulnerable runtime boolean returns."
+                )
+                impl_checklist.append(
+                    "- [ ] Implement CryptoObject-backed BiometricPrompt authentication."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Runtime bypass using hooking engines like Frida if the biometric check merely checks a return value."
+                )
+            elif cat == "certificate pinning":
+                migration_steps.append(
+                    f"- **{cat}**: Pin Subject Public Key Info (SPKI) hashes in network security configs instead of leaf certificates."
+                )
+                impl_checklist.append(
+                    "- [ ] Configure SPKI hashes in network_security_config.xml and NSPinnedDomains in Info.plist."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Traffic interception or server spoofing if trust anchors are compromised."
+                )
+            elif cat == "jailbreak detection":
+                migration_steps.append(
+                    f"- **{cat}**: Implement multi-layered jailbreak audits covering file paths, directory permissions, and dynamic linker library loading."
+                )
+                impl_checklist.append(
+                    "- [ ] Add multi-layered jailbreak detection heuristic checks on iOS."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Execution on heavily compromised platforms exposing client-side secure boundaries."
+                )
+            elif cat == "root detection":
+                migration_steps.append(
+                    f"- **{cat}**: Integrate Google Play Integrity API and implement backend token validation to detect rooted/compromised environments."
+                )
+                impl_checklist.append(
+                    "- [ ] Integrate Google Play Integrity verification workflows."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Bypassed client-side heuristic checks due to advanced rooting bypass frameworks."
+                )
+            elif cat == "SSL configuration":
+                migration_steps.append(
+                    f"- **{cat}**: Disable cleartext HTTP traffic globally in the manifest and configuration files, enforcing TLS 1.2+."
+                )
+                impl_checklist.append(
+                    "- [ ] Disable usesCleartextTraffic in AndroidManifest.xml and verify ATS in Info.plist."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Credential sniffing or traffic modification over unencrypted HTTP channels."
+                )
+            elif cat == "backup rules":
+                migration_steps.append(
+                    f"- **{cat}**: Configure precise data extraction rules or set allowBackup to false to block database leaks."
+                )
+                impl_checklist.append(
+                    "- [ ] Configure dataExtractionRules to exclude credentials and local SQLite databases."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Extraction of private sandboxed files via standard ADB backup extractions."
+                )
+            elif cat == "exported activities":
+                migration_steps.append(
+                    f"- **{cat}**: Review AndroidManifest.xml; enforce exported='false' on all internal components."
+                )
+                impl_checklist.append(
+                    "- [ ] Set android:exported=false for all non-launcher activities."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: External apps launching internal flows to bypass authentication states."
+                )
+            elif cat == "intent filters":
+                migration_steps.append(
+                    f"- **{cat}**: Protect implicit intent filters using custom signature-level permissions."
+                )
+                impl_checklist.append(
+                    "- [ ] Enforce signature-level permissions on any exported intent filters."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Interception, spoofing, or hijacking of implicit intent components by other apps."
+                )
+            elif cat == "deep links":
+                migration_steps.append(
+                    f"- **{cat}**: Sanitize all incoming deep link parameters and avoid using them for sensitive operations."
+                )
+                impl_checklist.append(
+                    "- [ ] Add strict input sanitization on deep link parameter parsers."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Parameter injection or cross-site scripting-like exploits within web rendering modules."
+                )
+            elif cat == "universal links":
+                migration_steps.append(
+                    f"- **{cat}**: Implement verified Universal Links with a valid apple-app-site-association file to secure routing."
+                )
+                impl_checklist.append(
+                    "- [ ] Host a secure apple-app-site-association file at the target web domain."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Custom URL scheme hijacking if another app registers the same custom link protocol."
+                )
+            elif cat == "app links":
+                migration_steps.append(
+                    f"- **{cat}**: Implement verified Android App Links with a digitally signed assetlinks.json file on the host domain."
+                )
+                impl_checklist.append(
+                    "- [ ] Publish the digital assetlinks.json with the correct signing certificate fingerprint."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Platform disambiguation dialogues and custom scheme hijacking on Android."
+                )
+            elif cat == "authentication flows":
+                migration_steps.append(
+                    f"- **{cat}**: Implement Proof Key for Code Exchange (PKCE) over secure system browsers (Custom Tabs / ASWebAuthenticationSession)."
+                )
+                impl_checklist.append(
+                    "- [ ] Configure OAuth 2.1 client with PKCE challenge/verifier code generation."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Interception of authorization codes and leakage of client credentials inside source code."
+                )
+            elif cat == "session handling":
+                migration_steps.append(
+                    f"- **{cat}**: Perform complete server-side session invalidation on logout and blur background app snapshot views."
+                )
+                impl_checklist.append(
+                    "- [ ] Add background multitasking blur window transitions to protect user data from snapshots."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Leaking sensitive UI layouts inside system multitasking views or session hijacking due to orphan backend sessions."
+                )
+            elif cat == "token storage":
+                migration_steps.append(
+                    f"- **{cat}**: Isolate refresh tokens inside a secure hardware-backed database vault or encrypted preferences."
+                )
+                impl_checklist.append(
+                    "- [ ] Save access and refresh tokens inside encrypted vaults with short-lived access periods."
+                )
+                risk_assessment.append(
+                    f"- *{cat}*: Loss of user account custody if refresh tokens leak from persistent cache storage."
+                )
 
     citations_str = "\n".join(citations_list)
 
@@ -846,8 +855,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
