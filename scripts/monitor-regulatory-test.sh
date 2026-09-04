@@ -109,6 +109,37 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output file generation
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOCS_OUT="$REPO_ROOT/docs/TEST_REGULATORY_REPORT.md"
+TEST_PR_OUT="$REPO_ROOT/docs/TEST_REGULATORY_PR_DRAFT.md"
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] Failed to generate documentation report at $TEST_DOCS_OUT"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] Failed to generate PR draft at $TEST_PR_OUT"
+  exit 1
+fi
+
+if ! grep -q "Regulatory Intelligence Monitoring Report" "$TEST_DOCS_OUT"; then
+  echo "[ERROR] Documentation report header missing in $TEST_DOCS_OUT"
+  exit 1
+fi
+
+if ! grep -q "## Approver recommendations" "$TEST_PR_OUT"; then
+  echo "[ERROR] PR draft missing 15-section structure in $TEST_PR_OUT"
+  exit 1
+fi
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+echo "[PASS] Successfully generated and verified output docs and PR draft files"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
