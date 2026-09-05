@@ -1,38 +1,70 @@
-## What this changes
+## 1. Summary
 
 <!-- One or two sentences. What is different after this merges. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- The rejection, policy change, regulatory update, or compliance gap this closes. -->
 
-## Sources
+## 3. Regulatory change
+
+<!-- Description of the specific regulatory or platform policy update. -->
+
+## 4. Official citations
 
 <!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
-
-If this PR adds no factual claims, write "none, no new claims".
+Every factual claim needs a primary source (Apple, Google, EUR-Lex, state legislature, regulator).
+Paste the URLs you actually opened.
 -->
 
-- 
+## 5. Affected files
 
-## Checks I ran
+<!-- List of affected repository files and directories. -->
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+## 6. Risk assessment
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+<!-- Severity and risk analysis (CRITICAL, HIGH, MEDIUM, LOW) of compliance exposure. -->
 
-## Declarations
+## 7. Migration steps
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+<!-- Actionable step-by-step instructions for migration and implementation. -->
 
-## Anything a reviewer should look at first
+## 8. Backward compatibility
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+<!-- Analysis of backward compatibility impact on existing implementations. -->
+
+## 9. Implementation checklist
+
+<!-- Actionable checklist of code and configuration changes. -->
+
+## 10. Testing checklist
+
+<!-- Verification checks, test executions, and validation suite runs. -->
+
+## 11. Documentation checklist
+
+<!-- Documentation updates required to maintain compliance alignment. -->
+
+## 12. Compliance impact
+
+<!-- Broader compliance implications across jurisdictions and platforms. -->
+
+## 13. Breaking changes
+
+<!-- Explicit declaration of any breaking changes or required API shifts. -->
+
+## 14. Review checklist
+
+<!-- Comprehensive checklist for pull request reviewers. -->
+
+## 15. Approver recommendations
+
+<!-- Recommended roles (e.g. Lead Engineer, Compliance Officer) for pull request sign-off. -->
+
+---
+
+*Declarations:*
+- Every guideline number, date, and statistic here traces to a primary source above. Nothing is from memory.
+- No simulate-mode or sample monitor output is committed as if it were a real announcement.
+- This is not a point-in-time generated report.
+- No emoji, and no AI-assistant attribution in the commits.

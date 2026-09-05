@@ -46,6 +46,34 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of all 15 required PR sections in JSON description
+SECTIONS=(
+  "Summary"
+  "Background"
+  "Regulatory change"
+  "Official citations"
+  "Affected files"
+  "Risk assessment"
+  "Migration steps"
+  "Backward compatibility"
+  "Implementation checklist"
+  "Testing checklist"
+  "Documentation checklist"
+  "Compliance impact"
+  "Breaking changes"
+  "Review checklist"
+  "Approver recommendations"
+)
+MISSING=0
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! echo "$JSON_OUT" | grep -q "## ${sec_num}\. ${sec_name}"; then
+    MISSING=$((MISSING + 1))
+  fi
+done
+[ "$MISSING" -eq 0 ] && ok "json PR draft contains all 15 required compliance sections" || bad "json PR draft missing required sections"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
