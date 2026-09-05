@@ -7,6 +7,17 @@ https://mycompany.com/profile
 https://yourdomain.com/.well-known/apple-app-site-association
 https://yourdomain.com/.well-known/assetlinks.json
 
+# Test fixtures and localhost endpoints
+http://localhost:8787
+http://localhost:9000
+https://api.realbackend.io
+https://example.com/x
+https://realbackend.io/privacy-policy
+https://staging.example.com
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
 # Deliberate low-trust fixture. Proves the monitor rejects Priority 5 sources.
 https://randomblogsite.com/gdpr-rumor
 
@@ -16,6 +27,9 @@ https://developer.apple.com/news/?id=required-reason-apis
 
 # Real government site that refuses all automated clients (geo/bot filtered).
 https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
+https://egazette.gov.in/
+https://www.in.gov.br/
+https://www.law.go.kr/
 
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
@@ -23,7 +37,7 @@ https://lumina.app/privacy
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
 
-# Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
+# Official government sources that block automated citation checks
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
