@@ -1,5 +1,6 @@
 ---
 name: app-store-compliance
+license: LicenseRef-OpenRoots-ORA-2.3
 description: Run an enterprise pre submission compliance audit on a mobile app project before uploading to the Apple App Store or Google Play. Use when the user is about to submit, ship, or release an iOS or Android app, when an app was rejected and needs a fix plan, when reviewing App Store Review Guidelines or Google Play policy compliance, or when the user mentions App Store rejection, Play Console rejection, Resolution Center, Data Safety form, privacy nutrition labels, account deletion requirement, in app purchase rules, or app review.
 ---
 
