@@ -11,6 +11,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Fixed
 
+- The README install prompt and the one-time check prompt never asked the agent to walk the account and program readiness checklist or the 90-day regulatory deadline window, both of which a code scan cannot see. Both prompts now do.
 - docs/PLATFORM-MECHANICS-2026.md cited the wrong announcement id for the June 2026 Guideline 4.3 tightening and still said API 35. Now a233fmpw and API 36 with the 1 November 2026 extension.
 - docs/EU-REGULATORY-2026.md section 2.3 said the EU unified fee model was not implemented. It applies from 1 October 2026 (Core Technology Commission, Attachment 14).
 - Past-dated deadlines added in this sweep carry absorbed_into, so the deadline checker points at the owning pattern or doc section instead of reporting them overdue.

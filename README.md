@@ -51,6 +51,11 @@ Steps:
 4. Add a standing instruction to your agent config: for any iOS or Android work, always adhere to the Apple App Store Review Guidelines and Google Play policies, run the audit before submission, and never say an app is clear to submit while a critical risk stands.
 5. Run the guard against my current project and show me the ranked findings:
    bash ~/.claude/hooks/app-store-compliance-guard.sh /path/to/my/app
+   Then walk the account and program readiness section of docs/PRE-SUBMISSION-CHECKLIST.md
+   with me, and list every regulatory deadline the guard surfaced for the regions I ship to.
+   The code scan cannot see whether my developer account is active, whether every agreement
+   and attachment is accepted, or whether my Play account and package names are registered,
+   and in 2026 those block a first launch for weeks before review starts.
 6. Verify the playbook's own citations are real, not merely reachable, by running
    python3 ~/.claude/skills/app-store-compliance/scripts/verify-citations.py --files docs/ data/
 7. Tell me exactly what you installed and how I run an audit any time.
@@ -67,7 +72,7 @@ on my behalf. Ask me, show me the link, and let me decide.
 Want only a one time check, no install? Paste this instead.
 
 ```
-Read https://github.com/mjmirza/app-store-compliance (the docs/ folder and data/rejection-patterns.json), then audit my app at <path to my app> against every Apple App Store and Google Play rejection pattern. Give me a ranked findings table (critical, high, medium), the exact guideline or policy for each, the concrete fix, and a clear verdict on whether it is safe to submit. Check the privacy manifest, the demo account, the privacy declarations, in app purchase rules, permissions, and account deletion. Then audit the store listing with scripts/metadata-audit.py against the metadata directory if I have pulled it.
+Read https://github.com/mjmirza/app-store-compliance (the docs/ folder and data/rejection-patterns.json), then audit my app at <path to my app> against every Apple App Store and Google Play rejection pattern. Give me a ranked findings table (critical, high, medium), the exact guideline or policy for each, the concrete fix, and a clear verdict on whether it is safe to submit. Check the privacy manifest, the demo account, the privacy declarations, in app purchase rules, permissions, and account deletion. Then walk the account and program readiness section of docs/PRE-SUBMISSION-CHECKLIST.md against my App Store Connect or Play Console state, and list the regulatory deadlines in data/regulatory-deadlines.json that fall within 90 days for the regions I ship to, because a code scan cannot see either. Then audit the store listing with scripts/metadata-audit.py against the metadata directory if I have pulled it.
 
 Read only. Do not modify my project. Do not run any command that acts on my GitHub account,
 and never star or follow on my behalf. If the audit caught something that would have cost me
