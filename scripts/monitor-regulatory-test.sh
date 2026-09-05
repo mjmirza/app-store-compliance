@@ -109,6 +109,27 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify file output options (--output-docs and --pr-output)
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOCS_OUT="/tmp/test_regulatory_doc.md"
+TEST_PR_OUT="/tmp/test_regulatory_pr.md"
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] Expected documentation report file was not created: $TEST_DOCS_OUT"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] Expected PR draft output file was not created: $TEST_PR_OUT"
+  exit 1
+fi
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+echo "[PASS] --output-docs and --pr-output flags generated output files successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
