@@ -21,6 +21,9 @@ STDIN_JSON=""
 CMD=""
 if [ "$#" -ge 1 ] && [ -d "$1" ]; then
   DIR="$1"                                   # standalone with explicit path
+elif [ "$#" -ge 1 ] && [ ! -d "$1" ]; then
+  # An explicit path that does not exist must fail open, never fall back to scanning the working directory.
+  log_err "project dir not found. $1"; exit 0
 elif [ ! -t 0 ]; then
   STDIN_JSON="$(cat 2>/dev/null || true)"    # hook mode, payload on stdin
 fi
@@ -154,6 +157,10 @@ if [ -n "$DEADLINE_PY" ]; then
 fi
 
 # ===== shared checks =====
+# App Store Connect API 4.3 and 4.4 removed the old age-rating declaration endpoints. a pipeline that still calls them stops the release.
+if grep_has 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'; then
+  finding critical "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED" "Pipeline calls a removed App Store Connect API age-rating endpoint" "Switch to the current age-rating declaration read and update endpoints (ASC API 4.4 release notes)."
+fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
@@ -245,6 +252,26 @@ if [ "$IS_IOS" -eq 1 ]; then
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
     grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)."
+  fi
+  # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
+  if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then
+    finding critical "APPLE-4.0-SIWA-RELAY-DOMAIN" "Sign in with Apple relay allowlist accepts only privaterelay.appleid.com" "Accept private.icloud.com as well, everywhere relay addresses are validated or allowlisted."
+  fi
+  # Age assurance. a parent can withdraw consent, Apple then blocks launch. the app must handle RESCIND_CONSENT.
+  if grep_has 'DeclaredAgeRange|AgeRangeService' && ! grep_has 'RESCIND_CONSENT|rescindConsent'; then
+    finding high "APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED" "Declared Age Range used without RESCIND_CONSENT handling" "Handle the RESCIND_CONSENT server notification, revoke the minor session and consent-scoped data, and build with the iOS 26.2 SDK or later."
+  fi
+  # The no-entitlement external purchase link is a US-storefront carve-out only. everywhere else it is still 3.1.1.
+  if grep_has 'ExternalPurchaseLink|external-purchase-link|openExternalPurchaseLink' && ! grep_has 'Storefront|storefront|countryCode'; then
+    finding high "APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING" "External purchase link is not gated on the storefront" "Show the link only on the US storefront (or where you hold the entitlement). gate on Storefront.current or countryCode."
+  fi
+  # On-Demand Resources are deprecated from the 27 OS family (WWDC26).
+  if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
+    finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework."
+  fi
+  # Since September 2026 the social media capability question gates every submission (Apple news 0d2gpmml).
+  if grep_has 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'; then
+    finding medium "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION" "Social features detected, confirm the social media capability declaration in App Store Connect" "Answer the social media question before submitting. it sets a 13+ minimum and requires Declared Age Range for under-13 users."
   fi
   # Match the tracking SDKs by their own type names / imports, never the bare words "Adjust" or
   # "Branch", which collide with ordinary English ("Adjust times", a git branch) and false-flag a
@@ -340,6 +367,40 @@ if [ "$IS_AND" -eq 1 ]; then
   if grep_has 'Stripe|PayPal|braintree|razorpay'; then
     grep_has 'BillingClient|com\.android\.billingclient' || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods."
   fi
+  # Payments policy exception is literal. only a tax-exempt charity may take donations outside Play
+  # billing (AnkiDroid, August 2026). A donate link to a funding platform is a Payments violation.
+  if grep_has 'opencollective\.com|ko-fi\.com|patreon\.com|buymeacoffee\.com|github\.com/sponsors|liberapay\.com|paypal\.com/donate'; then
+    finding high "GOOGLE-PAYMENTS-DONATION-LINK" "In-app donation link to a payment page outside Play billing" "Remove the donation entry point from the Play build or sell it through Play billing. Only a tax-exempt charity (501(c)(3)-class) may bypass Play billing, Google rejects 501(c)(6) and unincorporated projects (Payments policy)."
+  fi
+  # Since 3 August 2026 the developer bears chargeback costs. An app on Play billing that never
+  # handles the refund-review notification loses every fraudulent dispute by default.
+  if grep_has 'BillingClient|com\.android\.billingclient'; then
+    grep_has 'PendingRefundReviewNotification|[Rr]eview[Rr]efund' || finding medium "GOOGLE-PLAY-CHARGEBACK-LIABILITY" "Play billing without chargeback dispute handling" "Handle PendingRefundReviewNotification and call the Review Refund API within 24 hours with the refund preference and usage evidence (Play Console Help answer 17068375)."
+  fi
+  # From 30 September 2026 regulated categories must publish from an organization account with a D-U-N-S number.
+  if grep_has 'VpnService|HealthConnect|health\.connect|BankAccount|cryptocurrency'; then
+    finding high "GOOGLE-ORG-REGISTRATION-REQUIRED" "Regulated-category signals (VPN, health, finance), organization account required from 30 Sep 2026" "Publish from an organization account with a D-U-N-S number matching the Dun and Bradstreet profile (Play Console Help 10788890)."
+  fi
+  # Geofencing is no longer an approved foreground-service use case for API 37 targets (Play Console Help 16965181).
+  if grep_has 'FOREGROUND_SERVICE_LOCATION' && grep_has '[Gg]eofenc'; then
+    finding high "GOOGLE-FGS-GEOFENCE-REMOVED" "Foreground service used for geofencing" "Move to the Geofence API (GeofencingClient) and drop FOREGROUND_SERVICE_LOCATION if geofencing was its only use."
+  fi
+  # Random or anonymous chat is now in scope of Age-Restricted, Families, and Child Safety Standards (26 Aug 2026).
+  if grep_has '[Rr]andom chat|[Aa]nonymous chat|chat with strangers|Omegle' && ! grep_has 'ageGate|minorBlock|csae'; then
+    finding critical "GOOGLE-ANON-CHAT-MINOR-BLOCK" "Random or anonymous chat without minor blocking and child-safety standards" "Enable Play Console minor blocking, exclude children from the target audience, publish CSAE standards, add in-app reporting and a child-safety contact."
+  fi
+  # Generative image or video apps need NCII controls and a full-access test account (Android Developers Blog, 25 Aug 2026).
+  if grep_has 'generateImage|imageGeneration|text-to-image|faceSwap|stable-diffusion' && ! grep_has '[Mm]oderation|safetyClassifier|contentFilter'; then
+    finding high "GOOGLE-GENAI-NCII-CONTROLS" "Generative image or video feature without moderation controls" "Add input and output moderation for intimate and deepfake content, document tested safety prompts, and give the reviewer a full-access test account."
+  fi
+  # From February 2027 release builds must be R8-optimized (25 percent minimum coverage, Play Console Help 17492799).
+  if ! grep -rqE '(isMinifyEnabled|minifyEnabled)[[:space:]=]+true' "$DIR" --include='*.gradle' --include='*.kts' 2>/dev/null; then
+    finding high "ANDROID-R8-OPTIMIZATION-MISSING" "No release build type with minifyEnabled true" "Enable R8 (isMinifyEnabled = true, isShrinkResources = true) in the release build type before February 2027."
+  fi
+  # From April 2027 sign-in apps must restore sign-in state on a new device (Restore Credentials API).
+  if grep_has 'signInWith|CredentialManager|FirebaseAuth|LoginActivity' && ! grep_has 'RestoreCredential'; then
+    finding medium "ANDROID-RESTORE-CREDENTIALS-REQUIRED" "Sign-in present without Restore Credentials integration" "Create a restore credential on sign-in and restore it after device transfer (Play technical quality requirement, April 2027)."
+  fi
   if grep_has 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'; then
     finding high "GOOGLE-DATASAFETY-MISMATCH" "Analytics or ad SDK present. Verify the Data Safety form" "Declare every collection and sharing accurately. Data Safety mismatch is the top Google rejection."
   fi
@@ -349,6 +410,18 @@ if [ "$IS_AND" -eq 1 ]; then
   TSDK="$(grep -hoE 'targetSdk(Version)?[[:space:]=]+[0-9]+' "$DIR"/**/build.gradle* 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
   if [ -n "$TSDK" ] && [ "$TSDK" -lt 34 ]; then
     finding high "GOOGLE-TARGET-API" "targetSdk is $TSDK, below the current Play requirement" "Build against the current required Android target API level and verify the current minimum."
+  fi
+  # Android 17 (API 37) targets. contacts picker, location button scope, and local network permission (27 Jan 2027).
+  if [ -n "$TSDK" ] && [ "$TSDK" -ge 37 ] 2>/dev/null; then
+    if grep_has 'READ_CONTACTS' && ! grep_has 'ACTION_PICK|ContactPicker'; then
+      finding high "GOOGLE-CONTACTS-PICKER-REQUIRED" "READ_CONTACTS on an API 37 target where the Contact Picker may suffice" "Use the Android Contact Picker for one-off selection and keep READ_CONTACTS only for a declared core use (Play Console Help 16909972)."
+    fi
+    if grep_has 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION' && ! grep_has 'onlyForLocationButton'; then
+      finding high "GOOGLE-LOCATION-BUTTON-SCOPE" "Location requested on an API 37 target without the location button scope" "Scope one-shot location to the Android location button with the onlyForLocationButton manifest flag (Play Console Help 16909972)."
+    fi
+    if grep_has 'NsdManager|MulticastSocket|_tcp\.local|mDNS' && ! grep_has 'ACCESS_LOCAL_NETWORK'; then
+      finding high "ANDROID-LOCAL-NETWORK-PERMISSION" "Local network discovery on an API 37 target without ACCESS_LOCAL_NETWORK" "Declare and request android.permission.ACCESS_LOCAL_NETWORK before any LAN discovery or connection (Android 17 behavior changes)."
+    fi
   fi
   if grep_has 'DexClassLoader|PathClassLoader|loadDex'; then
     finding high "ANDROID-DYNAMIC-CODE-LOADING" "Dynamic code loading at runtime" "Ship all code in the package. Server changes are data, not executable code."
