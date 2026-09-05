@@ -1,6 +1,23 @@
 # Rules. Metadata and store listing
 
-9 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+10 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+
+## APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION
+
+- Title. Social media capability not declared before submission
+- Platform. apple
+- Guideline or policy. 2.3.6 and the App Store Connect social media capability declaration (Apple Developer news 0d2gpmml, 8 June 2026)
+- Severity. critical
+- What triggers it. Since September 2026 every new version or update, and every notarization for alternative marketplaces, requires answering whether the app includes social media capabilities. An app with feeds, followers, chat rooms, direct messages, or live streams that has not answered the question cannot be submitted. Declaring social media places the app in the Time Allowance category for Social Media with a minimum 13+ rating, and serving under-13 users requires the Declared Age Range API.
+- How to fix it. Answer the social media capability question in App Store Connect (or set socialMedia and socialMediaAgeRestricted through the App Store Connect API age-rating declaration), accept the 13+ minimum, and adopt the Declared Age Range API if you need under-13 users.
+- Detection signals. newsFeed, NewsFeed, followers, chatRoom, ChatRoom, DirectMessage, liveStream, LiveStream, socialMedia
+- Present means handled. socialMediaAgeRestricted, DeclaredAgeRange
+
+How to detect.
+
+```bash
+grep -rn 'newsFeed\|NewsFeed\|followers\|chatRoom\|ChatRoom\|DirectMessage\|liveStream\|LiveStream' --include='*.swift' --include='*.m' --include='*.plist' --include='*.entitlements' --include='*.pbxproj' .   # then confirm the social media capability question is answered in App Store Connect
+```
 
 ## APPLE-2.3-AGE-RATING-2026
 

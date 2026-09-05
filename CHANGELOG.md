@@ -6,10 +6,16 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Added
 
+- September 2026 gap analysis, docs/GAP-ANALYSIS-2026-09.md. 22 rejection patterns (Apple social media declaration gate, Sign in with Apple relay domain, RESCIND_CONSENT, external purchase link region gating, Live Activities, On-Demand Resources deprecation, removed App Store Connect age-rating endpoints, Rosetta sunset, Play chargeback liability, donation links, organization registration, package registration, Contact Picker and location button and geofence rules for API 37, ACCESS_LOCAL_NETWORK, R8 optimization, Restore Credentials, generative AI NCII controls, anonymous chat minor blocking, unrated apps, developer account enrollment readiness), 20 regulatory deadlines (US ADA Title II and HHS 504 extensions, FTC COPPA age-verification policy, UK DUAA, ICO storage guidance, DMCCA subscriptions, under-16 ban, Ofcom app stores report, EU AI Act marking retrofit, Product Liability Directive, Data Act switching, eIDAS wallet, CSAM derogation expiry, Korea PIPA, China AI companion measures, Singapore OSRAA, India Consent Managers, Japan APPI), 16 new guard checks with 16 gauntlet cases, and an account and program readiness section in the pre-submission checklist.
 - Licence. The whole repository moved from a dual MIT and CC BY 4.0 grant to the OpenRoots Agent License 2.3 (via ORA 1.0 on 24 August 2026, then 2.3 on 27 August 2026). One licence now covers code, docs, data, the skill, and the guard. Releases before 24 August 2026 keep MIT and CC BY 4.0 irrevocably. LICENSE is a pointer to the canonical text at openroots.org.
 
 ### Fixed
 
+- docs/PLATFORM-MECHANICS-2026.md cited the wrong announcement id for the June 2026 Guideline 4.3 tightening and still said API 35. Now a233fmpw and API 36 with the 1 November 2026 extension.
+- docs/EU-REGULATORY-2026.md section 2.3 said the EU unified fee model was not implemented. It applies from 1 October 2026 (Core Technology Commission, Attachment 14).
+- Past-dated deadlines added in this sweep carry absorbed_into, so the deadline checker points at the owning pattern or doc section instead of reporting them overdue.
+- The guard scanned the working directory when an explicit project path did not exist. It now fails open.
+- The gauntlet's silent-case checks matched a bare pattern id anywhere in the output, so a deadline line naming that id could fail a silence test. They now match the finding line.
 - README, NOTICE, CITATION.cff, and CONTRIBUTING.md still described MIT, CC BY 4.0, or the retired ORA 1.0 sunset terms after the licence change. All four now state the same licence as LICENSE.
 - README listed no entry for docs/CROSS-PLATFORM-FRAMEWORKS.md, docs/PRIVACY-POLICY-MIGRATION.md, docs/SECURITY-POLICY-MIGRATION.md, docs/REGULATORY-TIMELINE.md, or the per-script test suites.
 - CHANGELOG claimed the README install prompt stars the repo and follows the author through the GitHub CLI. That step was removed in #140 and the prompt now explicitly forbids acting on the user's GitHub account.

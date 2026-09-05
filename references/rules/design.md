@@ -1,6 +1,40 @@
 # Rules. Design and login
 
-4 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+6 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+
+## APPLE-4.0-SIWA-RELAY-DOMAIN
+
+- Title. Sign in with Apple relay addresses on private.icloud.com rejected by email validation
+- Platform. apple
+- Guideline or policy. 4.0 Design and Sign in with Apple. Hide My Email relay domain change (Apple Developer news 1ptvdtcm, 15 June 2026, corrected 24 August 2026)
+- Severity. critical
+- What triggers it. The account system, email validation, or allowlist accepts only privaterelay.appleid.com. Apple now issues Hide My Email relay addresses on private.icloud.com as well. Sign-ups with the new domain fail silently and the app is rejected under 4.0 or 4.8 for a broken Sign in with Apple flow.
+- How to fix it. Accept both privaterelay.appleid.com and private.icloud.com everywhere email addresses are validated, allowlisted, or matched, server and client.
+- Detection signals. privaterelay.appleid.com
+- Present means handled. private.icloud.com
+
+How to detect.
+
+```bash
+grep -rn 'privaterelay\.appleid\.com' . && ! grep -rqn 'private\.icloud\.com' .
+```
+
+## APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED
+
+- Title. CI pipeline calls a removed App Store Connect API age-rating endpoint
+- Platform. apple
+- Guideline or policy. App Store Connect API 4.3 and 4.4 release notes
+- Severity. critical
+- What triggers it. The App Store Connect API removed GET /v1/appStoreVersions/{id}/relationships/ageRatingDeclaration and GET /v1/appStoreVersions/{id}/ageRatingDeclaration. A fastlane, script, or CI step that still calls them fails and the release pipeline stops. The replacement is the read age-rating declaration endpoint, which also carries the new socialMedia and socialMediaAgeRestricted attributes.
+- How to fix it. Switch to the current age-rating declaration read and update endpoints, and set socialMedia and socialMediaAgeRestricted where the app has social features. Re-run the pipeline against a TestFlight build before the next release.
+- Detection signals. appStoreVersions/, /ageRatingDeclaration, relationships/ageRatingDeclaration
+- Present means handled. ageRatingDeclarations/
+
+How to detect.
+
+```bash
+grep -rn 'appStoreVersions/[^ ]*/ageRatingDeclaration\|relationships/ageRatingDeclaration' --include='*.rb' --include='*.sh' --include='*.py' --include='*.js' --include='*.ts' --include='*.yml' --include='*.yaml' .
+```
 
 ## APPLE-4.0-SIWA-UX
 

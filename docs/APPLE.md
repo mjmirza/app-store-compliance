@@ -21,6 +21,7 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 | Guideline | Requires | Triggers rejection | Avoid by |
 |---|---|---|---|
+| 1.2 UGC escalation (8 June 2026) | The four UGC controls plus an escalation clause | Egregious or repeated UGC failures are now grounds for immediate removal from the App Store and from the Apple Developer Program. 1.2.1(a) creator apps must gate over-rating content on verified or declared age | Treat the first UGC rejection as the last warning, add age-based gating for creator content. Source. [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
 | 1.1 Objectionable content | No defamatory, discriminatory, violent, sexual, or inflammatory content | Mean spirited content, realistic depictions of harm, pornography, hookup or prostitution promotion, fake or trick functionality. An entertainment disclaimer does not excuse it | Ship genuine, non objectionable functionality and remove joke or fake utility features |
 | 1.2 User generated content | Filtering, reporting, blocking, and published contact info for any app with UGC | No content filter, no report mechanism, no way to block abusive users, anonymous or objectionable chat | Build moderation, in app reporting, user blocking, and a contact method before submission |
 | 1.2.1 Creator content | Age restriction so minors cannot reach age inappropriate creator content | Creator app with no age gating mechanism | Add an age restriction based on verified or declared age |
@@ -34,6 +35,7 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 | Guideline | Requires | Triggers rejection | Avoid by |
 |---|---|---|---|
+| 2.3.6 Social media declaration (September 2026) | Answer whether the app includes social media capabilities | Since September 2026 you cannot submit a new version, an update, or notarize for alternative marketplaces without answering the question. Declaring social media places the app in the Time Allowance category with a minimum 13+ rating, and under-13 users require the Declared Age Range API | Answer it in App Store Connect (or through the API socialMedia and socialMediaAgeRestricted attributes), accept 13+, adopt Declared Age Range if needed. Sources. [Apple, 8 June 2026](https://developer.apple.com/news/?id=0d2gpmml), [Apple, 9 July 2026](https://developer.apple.com/news/?id=tlur8uvi) |
 | 2.1 App completeness | A finished, stable, fully reviewable build | Crashes, bugs, broken links, placeholder or temporary content, untested code, missing demo account or demo mode for account features, backend not live during review, in app purchases incomplete or invisible, undocumented non obvious features | Test on device, ship a live backend, provide demo credentials, explain every non obvious feature and every in app purchase in App Review Notes |
 | 2.2 Beta testing | No demos, betas, or trials on the App Store | Submitting a trial or beta directly instead of using TestFlight | Use TestFlight for any pre release build |
 | 2.3.1 Accurate metadata | No hidden, dormant, or undocumented features, no misleading marketing | Hidden functionality, false claims, generic Notes for Review, unvalidated claims such as an iOS virus scanner | Document everything, make claims you can prove |
@@ -52,6 +54,7 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 | Guideline | Requires | Triggers rejection | Avoid by |
 |---|---|---|---|
+| 3.1.1 External purchase link, storefront scope | The no-entitlement link is a US storefront carve-out only | The same link UI shipped to every region is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts. Review evaluates per region. Developers report two rejection rounds before shipping in 2026 | Gate the link on Storefront.current or countryCode, keep the entitlement path elsewhere. Sources. [Apple guideline update, 1 May 2025](https://developer.apple.com/news/?id=9txfddzf), [implementation report, May 2026](https://stora.sh/blog/2026-05-16-apple-app-store-external-purchase-links-implementation-guide) |
 | 3.1.1 In app purchase | Apple's in app purchase for all digital goods, services, and paid content access | Selling digital access with license keys, QR codes, crypto, or any non IAP method, loot boxes without disclosed odds, digital gift cards outside IAP, external buttons or links to purchase NFTs (the ban is global, not US only) | Route every digital purchase through StoreKit in app purchase, disclose loot box odds before purchase |
 | 3.1.1(a) External link entitlements | StoreKit external purchase link entitlements used only in approved regions | Using external purchase links outside approved storefronts, misleading entitlement marketing | Apply for the correct entitlement, restrict to approved regions |
 | 3.1.2 Subscriptions | Ongoing value, periods of 7 days or more, clear terms, available across devices | Subscriptions with no ongoing value, hidden terms, removing paid functionality to force a subscription, subscription scams | Provide continuous value, disclose terms, never remove what existing users already bought |
@@ -62,6 +65,9 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 | Guideline | Requires | Triggers rejection | Avoid by |
 |---|---|---|---|
+| 4.0 Sign in with Apple relay domain | Accept Hide My Email addresses on private.icloud.com and privaterelay.appleid.com | Email validation or an allowlist that accepts only privaterelay.appleid.com breaks sign-up for the new relay domain, a broken Sign in with Apple flow | Accept both domains server and client side. Source. [Apple, 15 June 2026, corrected 24 August 2026](https://developer.apple.com/news/?id=1ptvdtcm) |
+| 4.5.3 Live Activities (8 June 2026) | No spam, phishing, or unsolicited messages over Apple services | The guideline now names Live Activities alongside Game Center and Push Notifications. A promotional or unrelated Live Activity is rejected | Tie every Live Activity to a real, user-initiated, time-bound activity. Source. [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/) |
+| On-Demand Resources (WWDC26) | Migrate to Background Assets | On-Demand Resources are deprecated starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27 | Move tagged resources to the Background Assets framework. Source. [WWDC26 App Store guide](https://developer.apple.com/wwdc26/guides/app-store/) |
 | 4.1 Copycats | Original app, no impersonation, no third party brand in icon or name | Copying a popular app with minor changes, impersonating a service, using another brand's icon or name without permission | Build an original experience and own your brand assets |
 | 4.2 Minimum functionality | Real features, content, and UI beyond a repackaged website | Repackaged website, thin web clip, marketing only app, content aggregator or link collection with no utility | Add native value, lasting utility, or entertainment |
 | 4.2.3 Standalone and disclosed downloads | Works on its own, discloses on launch download size | Requiring another app to function, hidden large downloads | Make the app self sufficient, prompt before large downloads |
@@ -78,6 +84,7 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 | Guideline | Requires | Triggers rejection | Avoid by |
 |---|---|---|---|
+| 5.1.1 Age assurance, RESCIND_CONSENT | Handle withdrawn parental consent | The RESCIND_CONSENT App Store Server Notification fires when a parent revokes consent and Apple then prevents the app from launching. Unhandled, minor data and entitlements stay live. Age assurance also needs the iOS 26.2 SDK with Xcode 26.2 (17C52) or later | Subscribe to server notifications, revoke the session and consent-scoped data on RESCIND_CONSENT. Source. [Apple age assurance support page](https://developer.apple.com/support/age-assurance) |
 | 5.1.1(i) Privacy policy | A privacy policy linked in App Store Connect and inside the app, describing data collected, third party protection, retention, and deletion | Missing, inaccessible, or vague privacy policy, undisclosed third party sharing | Publish a complete, accessible privacy policy and keep it accurate |
 | 5.1.1(ii) Consent and purpose strings | Consent before collection, paid features not gated by data access, clear purpose strings, easy consent withdrawal | No consent, paid features blocked behind a permission, vague purpose strings, no way to withdraw | Request consent, write specific purpose strings, never gate purchases behind data access |
 | 5.1.1(iii) Data minimization | Only data relevant to core functionality | Excessive or irrelevant data collection | Collect the minimum, use the system picker or share sheet instead of full access |
@@ -95,6 +102,22 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 | 5.6 Developer code of conduct | Honest behavior, no impersonation, no review manipulation | Impersonating another app or service, manipulating ratings | Act honestly, build original apps |
 
 ## 2026 changes you must act on
+
+Verified against Apple's own pages on 5 September 2026. The App Review Guidelines page states Last Updated June 8, 2026, and no guideline text has changed since.
+
+- Social media capability declaration is a submission gate since September 2026 (minimum 13+, Declared Age Range for under-13). [Apple](https://developer.apple.com/news/?id=0d2gpmml)
+- Age assurance needs the iOS 26.2 SDK with Xcode 26.2 (17C52) or later, and RESCIND_CONSENT must be handled. [Apple](https://developer.apple.com/support/age-assurance)
+- Sign in with Apple relay addresses now also arrive from private.icloud.com. [Apple](https://developer.apple.com/news/?id=1ptvdtcm)
+- EU. Core Technology Commission replaces the Core Technology Fee on 1 October 2026, Initial Acquisition and Store Services fees are eliminated, alternative payments may sit alongside In-App Purchase, and Attachment 14 must be accepted. [Apple](https://developer.apple.com/news/?id=gmws0jgp)
+- Brazil. Alternative distribution from iOS 26.5 under the CADE decision, Attachment 12 acceptance was due 6 July 2026. [Apple](https://developer.apple.com/news/?id=dhwadr2x)
+- Australia 15+ rating removed and Vietnam region-specific rating required from 18 June 2026. Korea descriptor escalation in October 2026. [Apple](https://developer.apple.com/news/?id=yrrb45pw), [Apple](https://developer.apple.com/news/?id=oj3r9pvw)
+- ADPLA 8 June 2026. AI and machine learning grouped under 3.3.11 with updated Foundation Models terms, plus new framework obligations (Trust Insights, Sensitive Content Analysis, Suggested Actions, Media Device Extension, Spatial Audio Extension, Customer Engagement APIs). The Foundation Models acceptable-use rules ban stripping AI-content labels. [Apple](https://developer.apple.com/news/?id=a233fmpw), [Apple](https://developer.apple.com/apple-intelligence/acceptable-use-requirements-for-the-foundation-models-framework/)
+- App Store Connect API 4.3 and 4.4 removed the old age-rating declaration endpoints, added socialMedia attributes, and deprecated the v1 in-app purchase localizations resource and the ACCESS_TO_REPORTS role. [Apple](https://developer.apple.com/documentation/appstoreconnectapi/app-store-connect-api-4-4-release-notes)
+- macOS 27 is the final release to support Rosetta. Intel-only apps stop running on Apple silicon after it. [Apple](https://developer.apple.com/news/?id=w5ngl9k2)
+- On-Demand Resources deprecated from the 27 OS family. [Apple](https://developer.apple.com/wwdc26/guides/app-store/)
+- Monthly subscriptions with a 12-month commitment are available worldwide except the United States and Singapore. [Apple](https://developer.apple.com/news/?id=agq42lxe)
+- The Mini Apps Partner Program 15 percent rate requires the Declared Age Range API and the Advanced Commerce API. [Apple](https://developer.apple.com/programs/mini-apps-partner/)
+- Developer account readiness is a launch blocker before review. Enrollment and identity verification are taking weeks in 2026 and an individual-to-organization migration has been reported open for 61 days. Enroll six weeks ahead. [Apple Developer Forums](https://developer.apple.com/forums/thread/817247), [Apple Developer Forums](https://developer.apple.com/forums/thread/816626)
 
 | Change | Deadline or status | Action |
 |---|---|---|

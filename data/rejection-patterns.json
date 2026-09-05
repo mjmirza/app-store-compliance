@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-06-06",
+  "updated": "2026-09-05",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -109,7 +109,7 @@
       "guideline": "Device and Network Abuse",
       "title": "Dynamic code loading at runtime",
       "severity": "high",
-      "detection": "DexClassLoader, PathClassLoader from a downloaded file, or downloading and executing code at runtime.",
+      "detection": "DexClassLoader, PathClassLoader from a downloaded file, or downloading and executing code at runtime. For apps targeting API 37, every native library loaded with System.load() must be read-only or the system throws UnsatisfiedLinkError.",
       "signals": [
         "DexClassLoader",
         "PathClassLoader",
@@ -227,7 +227,7 @@
       "guideline": "1.2",
       "title": "User generated content without the required moderation mechanisms",
       "severity": "critical",
-      "detection": "UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline.",
+      "detection": "UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline. Since 8 June 2026 guideline 1.2 states that egregious or repeated behavior is grounds for immediate removal from the App Store and from the Apple Developer Program, and 1.2.1(a) requires creator apps to gate over-rating content on verified or declared age.",
       "signals": [
         "post",
         "comment",
@@ -770,7 +770,7 @@
         "Secretariat of Prizes and Bets",
         "SPA license"
       ],
-      "fix": "Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification."
+      "fix": "Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification. A new app version must be submitted to start licence verification, editing App Review Information alone does not (Apple Developer news x4eyetnp, 8 May 2026)."
     },
     {
       "id": "APPLE-PRIVACY-MANIFEST-MISSING",
@@ -1156,7 +1156,7 @@
       "guideline": "Permissions and APIs",
       "title": "SMS or Call Log without an approved core use case",
       "severity": "critical",
-      "detection": "READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, or WRITE_CALL_LOG declared without an approved use case.",
+      "detection": "READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, or WRITE_CALL_LOG declared without an approved use case. From 26 August 2026 account verification via phone call is no longer a permitted use case for READ_CALL_LOG. Use the Digital Credentials API or the SMS Retriever API instead.",
       "signals": [
         "READ_SMS",
         "SEND_SMS",
@@ -1206,7 +1206,7 @@
       "guideline": "Target API level",
       "title": "App does not target the current required API level",
       "severity": "high",
-      "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher.",
+      "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher. A Play Console extension to 1 November 2026 is available. Wear OS and Automotive OS must target API 35 or higher, TV and XR API 34 or higher.",
       "signals": [
         "targetSdkVersion",
         "targetSdk"
@@ -1430,6 +1430,427 @@
         "deleteAgeVerificationData"
       ],
       "fix": "Integrate the store age signal APIs, confirm verifiable parental consent for minor accounts before use, re-request consent on significant changes, and delete raw age verification data after verification."
+    },
+    {
+      "id": "GOOGLE-PAYMENTS-DONATION-LINK",
+      "platform": "google",
+      "guideline": "Payments policy (support.google.com/googleplay/android-developer/answer/9992660). Donations outside Play billing are permitted only as tax-exempt donations",
+      "title": "In-app donation link to a payment page outside Play billing",
+      "severity": "high",
+      "detection": "An in-app link or button routes to Open Collective, Ko-fi, Patreon, Buy Me a Coffee, GitHub Sponsors, Liberapay, or a PayPal donate page. Google enforces the Payments policy exception literally. only donations to a tax-exempt charity (a 501(c)(3)-class body, not a 501(c)(6) trade association or an unincorporated project) may bypass Play billing. Everything else is treated as a digital-goods payment. Open-source apps are the most common casualty (AnkiDroid, August 2026, Hacker News 921 points).",
+      "signals": [
+        "opencollective.com",
+        "ko-fi.com",
+        "patreon.com",
+        "buymeacoffee.com",
+        "github.com/sponsors",
+        "liberapay.com",
+        "paypal.com/donate",
+        "Donate"
+      ],
+      "counterSignals": [
+        "BillingClient",
+        "com.android.billingclient",
+        "501(c)(3)"
+      ],
+      "fix": "Either remove the donation entry point from the Play build (a build flavor is enough), route it through Play billing as a one-time product, or, if the recipient is a tax-exempt charity, keep proof of that status in the review notes. Do not argue the case in the appeal, Google has already stated 501(c)(6) does not qualify."
+    },
+    {
+      "id": "GOOGLE-PLAY-CHARGEBACK-LIABILITY",
+      "platform": "google",
+      "guideline": "Play Console. Updates to refund protection and chargeback cost responsibility (support.google.com/googleplay/android-developer/answer/17068375)",
+      "title": "Play billing without chargeback dispute handling (developer now bears the cost)",
+      "severity": "medium",
+      "detection": "For orders placed after 3 August 2026 Google Play no longer absorbs chargebacks. the developer bears the purchase price less the service fee plus the card-network chargeback fee (typically USD 15 to 25 per dispute). An app uses Play billing but never handles the PendingRefundReviewNotification real-time developer notification or calls the Review Refund API, so every fraudulent dispute is lost by default. Not a rejection cause, a revenue-and-fraud exposure that lands on the developer's account.",
+      "signals": [
+        "BillingClient",
+        "com.android.billingclient",
+        "purchases.subscriptions",
+        "purchases.products"
+      ],
+      "counterSignals": [
+        "PendingRefundReviewNotification",
+        "ReviewRefund",
+        "reviewrefund",
+        "pendingRefundReviewNotification"
+      ],
+      "fix": "Subscribe to real-time developer notifications, handle PendingRefundReviewNotification, and call the Review Refund API within 24 hours with the refund preference and purchase-usage evidence so Google Play can contest illegitimate chargebacks. Reconcile chargeback fees in your revenue model."
+    },
+    {
+      "id": "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION",
+      "platform": "apple",
+      "guideline": "2.3.6 and the App Store Connect social media capability declaration (Apple Developer news 0d2gpmml, 8 June 2026)",
+      "title": "Social media capability not declared before submission",
+      "severity": "critical",
+      "detection": "Since September 2026 every new version or update, and every notarization for alternative marketplaces, requires answering whether the app includes social media capabilities. An app with feeds, followers, chat rooms, direct messages, or live streams that has not answered the question cannot be submitted. Declaring social media places the app in the Time Allowance category for Social Media with a minimum 13+ rating, and serving under-13 users requires the Declared Age Range API.",
+      "signals": [
+        "newsFeed",
+        "NewsFeed",
+        "followers",
+        "chatRoom",
+        "ChatRoom",
+        "DirectMessage",
+        "liveStream",
+        "LiveStream",
+        "socialMedia"
+      ],
+      "counterSignals": [
+        "socialMediaAgeRestricted",
+        "DeclaredAgeRange"
+      ],
+      "fix": "Answer the social media capability question in App Store Connect (or set socialMedia and socialMediaAgeRestricted through the App Store Connect API age-rating declaration), accept the 13+ minimum, and adopt the Declared Age Range API if you need under-13 users.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-4.0-SIWA-RELAY-DOMAIN",
+      "platform": "apple",
+      "guideline": "4.0 Design and Sign in with Apple. Hide My Email relay domain change (Apple Developer news 1ptvdtcm, 15 June 2026, corrected 24 August 2026)",
+      "title": "Sign in with Apple relay addresses on private.icloud.com rejected by email validation",
+      "severity": "critical",
+      "detection": "The account system, email validation, or allowlist accepts only privaterelay.appleid.com. Apple now issues Hide My Email relay addresses on private.icloud.com as well. Sign-ups with the new domain fail silently and the app is rejected under 4.0 or 4.8 for a broken Sign in with Apple flow.",
+      "signals": [
+        "privaterelay.appleid.com"
+      ],
+      "counterSignals": [
+        "private.icloud.com"
+      ],
+      "fix": "Accept both privaterelay.appleid.com and private.icloud.com everywhere email addresses are validated, allowlisted, or matched, server and client.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED",
+      "platform": "apple",
+      "guideline": "5.1.1 and the age assurance framework (developer.apple.com/support/age-assurance)",
+      "title": "Declared Age Range used without handling RESCIND_CONSENT",
+      "severity": "high",
+      "detection": "The app reads Declared Age Range but never handles the RESCIND_CONSENT App Store Server Notification. When a parent withdraws consent Apple prevents the app from launching, and any server-side minor data or entitlement keyed to the withdrawn consent stays live.",
+      "signals": [
+        "DeclaredAgeRange",
+        "AgeRangeService"
+      ],
+      "counterSignals": [
+        "RESCIND_CONSENT",
+        "rescindConsent"
+      ],
+      "fix": "Subscribe to App Store Server Notifications, handle RESCIND_CONSENT by revoking the minor's session and deleting consent-scoped data, and build against the iOS 26.2 SDK with Xcode 26.2 (17C52) or later, which Apple requires for all age assurance technologies.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING",
+      "platform": "apple",
+      "guideline": "3.1.1 and 3.1.3 external purchase links. US-storefront carve-out only (Apple guideline update 1 May 2025, developer.apple.com/news/?id=9txfddzf)",
+      "title": "External purchase link shown on every storefront",
+      "severity": "high",
+      "detection": "An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026.",
+      "signals": [
+        "ExternalPurchaseLink",
+        "ExternalLink",
+        "external-purchase-link",
+        "openExternalPurchaseLink"
+      ],
+      "counterSignals": [
+        "Storefront",
+        "storefront",
+        "countryCode"
+      ],
+      "fix": "Gate the external link UI on the current storefront (StoreKit Storefront.current, countryCode) and show it only where you hold the entitlement or the US carve-out applies. Outside the US keep the entitlement path and the disclosure sheet.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-4.5.3-LIVE-ACTIVITY-SPAM",
+      "platform": "apple",
+      "guideline": "4.5.3 Apple Services (revised 8 June 2026)",
+      "title": "Live Activities used for promotional or unsolicited messages",
+      "severity": "high",
+      "detection": "Guideline 4.5.3 now names Live Activities alongside Game Center and Push Notifications as surfaces that may not be used to spam, phish, or send unsolicited messages. A Live Activity that carries marketing, upsells, or content unrelated to the ongoing activity is rejected.",
+      "signals": [
+        "ActivityKit",
+        "Activity.request",
+        "LiveActivity"
+      ],
+      "counterSignals": [],
+      "fix": "Keep every Live Activity tied to a real, user-initiated, time-bound activity. No promotions, no engagement bait, no unrelated content in the Dynamic Island or Lock Screen presentation.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-ODR-DEPRECATED-27",
+      "platform": "apple",
+      "guideline": "On-Demand Resources deprecation (WWDC26 App Store guide)",
+      "title": "On-Demand Resources still in use",
+      "severity": "high",
+      "detection": "Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets.",
+      "signals": [
+        "NSBundleResourceRequest",
+        "OnDemandResources",
+        "on-demand-resource"
+      ],
+      "counterSignals": [
+        "BackgroundAssets",
+        "BAManagedDownloader"
+      ],
+      "fix": "Migrate tagged resources to the Background Assets framework before the iOS 27 family becomes the submission floor.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED",
+      "platform": "apple",
+      "guideline": "App Store Connect API 4.3 and 4.4 release notes",
+      "title": "CI pipeline calls a removed App Store Connect API age-rating endpoint",
+      "severity": "critical",
+      "detection": "The App Store Connect API removed GET /v1/appStoreVersions/{id}/relationships/ageRatingDeclaration and GET /v1/appStoreVersions/{id}/ageRatingDeclaration. A fastlane, script, or CI step that still calls them fails and the release pipeline stops. The replacement is the read age-rating declaration endpoint, which also carries the new socialMedia and socialMediaAgeRestricted attributes.",
+      "signals": [
+        "appStoreVersions/",
+        "/ageRatingDeclaration",
+        "relationships/ageRatingDeclaration"
+      ],
+      "counterSignals": [
+        "ageRatingDeclarations/"
+      ],
+      "fix": "Switch to the current age-rating declaration read and update endpoints, and set socialMedia and socialMediaAgeRestricted where the app has social features. Re-run the pipeline against a TestFlight build before the next release.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-MACOS-ROSETTA-SUNSET",
+      "platform": "apple",
+      "guideline": "Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026)",
+      "title": "Intel-only macOS binary with Rosetta ending after macOS 27",
+      "severity": "high",
+      "detection": "macOS 27 is the final release to support Rosetta. An Intel-only (x86_64) macOS app will no longer run on Apple silicon after that release. Detection is manual. check the build architectures and any x86_64-only dependencies.",
+      "signals": [
+        "x86_64",
+        "ONLY_ACTIVE_ARCH",
+        "VALID_ARCHS"
+      ],
+      "counterSignals": [
+        "arm64"
+      ],
+      "fix": "Ship a universal or arm64 binary, replace x86_64-only dependencies, and test on Apple silicon without Rosetta installed.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-ORG-REGISTRATION-REQUIRED",
+      "platform": "google",
+      "guideline": "Play Console requirements. organization account for regulated categories (Play Console Help answers 10788890 and 17125096)",
+      "title": "Regulated-category app published from a personal developer account",
+      "severity": "critical",
+      "detection": "From 30 September 2026 financial products and services (banking, loans, trading, investment funds, crypto wallets and exchanges), health apps (medical, human subjects research), apps approved to use VpnService, and government apps must be published from an organization account with a D-U-N-S number consistent with the Dun and Bradstreet profile. Detection is heuristic on VpnService, Health Connect, and finance signals.",
+      "signals": [
+        "VpnService",
+        "HealthConnect",
+        "health.connect",
+        "BankAccount",
+        "loan",
+        "cryptocurrency",
+        "wallet"
+      ],
+      "counterSignals": [],
+      "fix": "Convert or create an organization developer account, obtain a D-U-N-S number, keep the account details identical to the Dun and Bradstreet profile, and transfer the app through the official Transfer ownership workflow before 30 September 2026.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-PLAY-APP-REGISTRATION-MISSING",
+      "platform": "google",
+      "guideline": "Android developer verification, Play leg (Play Console Help answers 17125096 and 17134731)",
+      "title": "Play app package name not registered for developer verification",
+      "severity": "critical",
+      "detection": "Every Play app package name must be registered in Play Console for Android developer verification by 30 September 2026. This leg is global. Unregistered apps risk global removal from Google Play. Detection is manual in Play Console. Development-build package names that are never distributed do not need registration.",
+      "signals": [
+        "applicationId"
+      ],
+      "counterSignals": [],
+      "fix": "Open Play Console, complete developer verification, register every distributed package name, and re-check after adding a new applicationId or product flavor.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-CONTACTS-PICKER-REQUIRED",
+      "platform": "google",
+      "guideline": "Contacts Permissions policy for apps targeting Android 17, API level 37 (Play Console Help answer 16909972)",
+      "title": "READ_CONTACTS requested where the Contact Picker is sufficient",
+      "severity": "high",
+      "detection": "Apps targeting API 37 or later may only request READ_CONTACTS when the Android Contact Picker is not sufficient for core functionality, and must complete the Play Console declaration. Enforcement 27 January 2027, pre-review checks from 27 October 2026.",
+      "signals": [
+        "READ_CONTACTS",
+        "targetSdk 37",
+        "targetSdkVersion 37"
+      ],
+      "counterSignals": [
+        "ContactsContract.Intents.Insert",
+        "ACTION_PICK",
+        "ContactPicker"
+      ],
+      "fix": "Replace READ_CONTACTS with the Contact Picker for one-off selection. Keep the permission only for a genuine core use (a dialer, a contacts manager) and file the declaration.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-LOCATION-BUTTON-SCOPE",
+      "platform": "google",
+      "guideline": "Location Permissions policy for apps targeting API 37 (Play Console Help answer 16909972)",
+      "title": "Location requested without the Android location button scope",
+      "severity": "high",
+      "detection": "Apps targeting API 37 or later must implement the Android location button using the onlyForLocationButton permission flag in the manifest when location is only needed at a user-triggered moment. A blanket ACCESS_FINE_LOCATION request for a tap-to-locate feature is a policy violation from 27 January 2027.",
+      "signals": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "targetSdk 37"
+      ],
+      "counterSignals": [
+        "onlyForLocationButton"
+      ],
+      "fix": "Scope one-shot location use to the location button with the onlyForLocationButton flag and keep the broad permission only for continuous features that justify it.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-FGS-GEOFENCE-REMOVED",
+      "platform": "google",
+      "guideline": "Foreground service requirements for apps targeting API 37 (Play Console Help answer 16965181)",
+      "title": "Foreground service used for geofencing",
+      "severity": "high",
+      "detection": "Geofencing is removed as an approved foreground service use case for apps targeting API 37. An app declaring FOREGROUND_SERVICE_LOCATION whose only location use is geofencing is rejected from 27 January 2027.",
+      "signals": [
+        "FOREGROUND_SERVICE_LOCATION",
+        "geofence",
+        "Geofence"
+      ],
+      "counterSignals": [
+        "GeofencingClient",
+        "addGeofences"
+      ],
+      "fix": "Move to the Geofence API (GeofencingClient) and drop FOREGROUND_SERVICE_LOCATION if geofencing was its only use.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "ANDROID-LOCAL-NETWORK-PERMISSION",
+      "platform": "google",
+      "guideline": "Android 17 behavior changes for apps targeting API 37 (developer.android.com/about/versions/17/behavior-changes-17)",
+      "title": "Local network access without the ACCESS_LOCAL_NETWORK runtime permission",
+      "severity": "high",
+      "detection": "From Android 17 enforcement is mandatory for apps targeting API 37 or later. mDNS, NSD discovery, multicast, and direct LAN connections fail with a security exception unless the app declares and requests ACCESS_LOCAL_NETWORK.",
+      "signals": [
+        "NsdManager",
+        "MulticastSocket",
+        "_tcp.local",
+        "mDNS",
+        "192.168."
+      ],
+      "counterSignals": [
+        "ACCESS_LOCAL_NETWORK"
+      ],
+      "fix": "Declare android.permission.ACCESS_LOCAL_NETWORK, request it at runtime before any LAN discovery or connection, and degrade gracefully when denied.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "ANDROID-R8-OPTIMIZATION-MISSING",
+      "platform": "google",
+      "guideline": "Play Console technical quality requirements, DEX optimization (Play Console Help answer 17492799)",
+      "title": "Release build not optimized, shrunk, or obfuscated",
+      "severity": "high",
+      "detection": "From February 2027 apps must be optimized with a minimum of 25 percent coverage across optimization, shrinking, and obfuscation using a tool such as R8. A release build with minifyEnabled false, or with no minifyEnabled at all, falls below the bar and loses visibility and publishing capabilities.",
+      "signals": [
+        "minifyEnabled false",
+        "isMinifyEnabled = false"
+      ],
+      "counterSignals": [
+        "minifyEnabled true",
+        "isMinifyEnabled = true"
+      ],
+      "fix": "Enable R8 in the release build type (isMinifyEnabled = true, isShrinkResources = true), fix keep rules, and verify the Play Console optimization report before February 2027.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "ANDROID-RESTORE-CREDENTIALS-REQUIRED",
+      "platform": "google",
+      "guideline": "Play Console technical quality requirements, Zero-Tap Sign-In (Play Console Help answer 17492799)",
+      "title": "Sign-in state not restored on a new device",
+      "severity": "medium",
+      "detection": "From April 2027 any app with user sign-in, optional or mandatory, must restore the sign-in state when the user moves to a new Android device using the Restore Credentials API. Games are currently out of scope. An app with a login flow and no RestoreCredential integration will miss the requirement.",
+      "signals": [
+        "signInWith",
+        "CredentialManager",
+        "FirebaseAuth",
+        "LoginActivity"
+      ],
+      "counterSignals": [
+        "RestoreCredential",
+        "createRestoreCredential"
+      ],
+      "fix": "Create a restore credential on successful sign-in through Credential Manager, restore it on first launch after device transfer, and clear it on sign-out.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-GENAI-NCII-CONTROLS",
+      "platform": "google",
+      "guideline": "Generative AI policy enforcement, non-consensual intimate content (Android Developers Blog, 25 August 2026)",
+      "title": "Generative image or video app without NCII safeguards and a full-access test account",
+      "severity": "critical",
+      "detection": "Apps that generate or edit images or video of people must integrate customized input and output moderation, document the safety prompts and edge cases tested, and give the reviewer a test account with full unpaywalled access to every AI feature. Suspended apps are blocked from monetization and advertising across Google platforms.",
+      "signals": [
+        "generateImage",
+        "imageGeneration",
+        "text-to-image",
+        "faceSwap",
+        "face swap",
+        "undress",
+        "stable-diffusion"
+      ],
+      "counterSignals": [
+        "moderation",
+        "safetyClassifier",
+        "contentFilter"
+      ],
+      "fix": "Add input and output moderation for intimate and deepfake content, keep a written test record of safety prompts and edge cases, and provide a full-access test account in the Play Console review notes.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-ANON-CHAT-MINOR-BLOCK",
+      "platform": "google",
+      "guideline": "Age-Restricted Content, Families, and Child Safety Standards policies (Play Console Help answers 17036597, 17122218, 14747720, effective 26 August 2026)",
+      "title": "Random or anonymous chat app without minor blocking and child-safety standards",
+      "severity": "critical",
+      "detection": "Apps whose core function is randomly connecting users to strangers, or anonymous communication with hidden identities, must use Play Console functionality to block minors, may not target children, and are in scope of the Child Safety Standards policy (published CSAE standards, in-app reporting, CSAM removal, child-safety contact).",
+      "signals": [
+        "random chat",
+        "anonymous chat",
+        "chat with strangers",
+        "Omegle",
+        "stranger"
+      ],
+      "counterSignals": [
+        "ageGate",
+        "minorBlock",
+        "csae"
+      ],
+      "fix": "Enable the Play Console minor-blocking tools, set the age rating and target audience to exclude children, publish CSAE standards, add in-app reporting, and designate a child-safety contact.",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "GOOGLE-UNRATED-APP-BANNED",
+      "platform": "google",
+      "guideline": "Content Ratings policy clarification (Play Console Help answer 17134731, 26 August 2026)",
+      "title": "App published or updated with no content rating",
+      "severity": "high",
+      "detection": "Google clarified that unrated apps are not allowed on Google Play. An incomplete or expired IARC content rating questionnaire blocks publishing. Detection is manual in Play Console.",
+      "signals": [
+        "contentRating"
+      ],
+      "counterSignals": [],
+      "fix": "Complete the content rating questionnaire for every app and re-answer it when features change (chat, UGC, gambling, AI generation).",
+      "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-ENROLLMENT-VERIFICATION-PENDING",
+      "platform": "apple",
+      "guideline": "Apple Developer Program enrollment and identity verification (Apple Developer Forums threads 817247, 816626, 816864, 817185, 813667, 821680, 814930, January to September 2026)",
+      "title": "Launch planned before the developer account is active",
+      "severity": "high",
+      "detection": "Not a review rejection, a launch blocker that sits before review. Developers report enrollment stuck in Pending for two to six weeks after payment, identity-verification upload links that fail with an access error, no reply from Developer Support for weeks, and an individual-to-organization migration open for 61 days. A release date that assumes the account is active on day one slips by weeks. Detection is manual. check the membership status, the agreement acceptance state, and any pending migration before scheduling a submission.",
+      "signals": [
+        "enrollment",
+        "identity verification",
+        "Pending"
+      ],
+      "counterSignals": [],
+      "fix": "Enroll and complete identity verification at least six weeks before the planned first submission, keep the government ID upload ready, accept every ADPLA update and attachment as it lands (Attachment 12 Brazil by 6 July 2026, Attachment 14 EU before 1 October 2026), and start an individual-to-organization migration a quarter ahead. Track the support case number and escalate through Developer Support phone, not only email.",
+      "added": "2026-09-05"
     }
   ]
 }

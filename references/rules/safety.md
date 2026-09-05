@@ -8,7 +8,7 @@
 - Platform. apple
 - Guideline or policy. 1.2
 - Severity. critical
-- What triggers it. UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline.
+- What triggers it. UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline. Since 8 June 2026 guideline 1.2 states that egregious or repeated behavior is grounds for immediate removal from the App Store and from the Apple Developer Program, and 1.2.1(a) requires creator apps to gate over-rating content on verified or declared age.
 - How to fix it. Add a zero tolerance EULA, content filtering, in app reporting, user blocking, and a process to act on reports within 24 hours. Source. real Apple Safety 1.2 rejection email.
 - Detection signals. post, comment, upload, chat, feed, community
 - Present means handled. report, block user, EULA, moderation

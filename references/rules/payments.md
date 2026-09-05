@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-8 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+10 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -26,7 +26,7 @@ grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' . && 
 - Guideline or policy. 3.1.1
 - Severity. critical
 - What triggers it. An app that indicates gambling/betting features but does not provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in its App Review Information section when distributing on the Brazil storefront.
-- How to fix it. Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification.
+- How to fix it. Select 'Yes' to the gambling question in the age rating questionnaire (which automatically sets the Brazil age rating to A18), provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in the App Review Information field, and submit a new app version for verification. A new app version must be submitted to start licence verification, editing App Review Information alone does not (Apple Developer news x4eyetnp, 8 May 2026).
 - Detection signals. gambling, fixed-odds betting, Secretariat of Prizes and Bets, SPA license
 
 How to detect.
@@ -130,4 +130,38 @@ How to detect.
 
 ```bash
 grep -rniE 'withdrawal button|withdrawal function|withdraw from contract|distance contract' . 2>/dev/null
+```
+
+## APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING
+
+- Title. External purchase link shown on every storefront
+- Platform. apple
+- Guideline or policy. 3.1.1 and 3.1.3 external purchase links. US-storefront carve-out only (Apple guideline update 1 May 2025, developer.apple.com/news/?id=9txfddzf)
+- Severity. high
+- What triggers it. An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026.
+- How to fix it. Gate the external link UI on the current storefront (StoreKit Storefront.current, countryCode) and show it only where you hold the entitlement or the US carve-out applies. Outside the US keep the entitlement path and the disclosure sheet.
+- Detection signals. ExternalPurchaseLink, ExternalLink, external-purchase-link, openExternalPurchaseLink
+- Present means handled. Storefront, storefront, countryCode
+
+How to detect.
+
+```bash
+grep -rqn 'ExternalPurchaseLink\|external-purchase-link\|openExternalPurchaseLink' . && ! grep -rqn 'Storefront\|storefront\|countryCode' .
+```
+
+## ANDROID-RESTORE-CREDENTIALS-REQUIRED
+
+- Title. Sign-in state not restored on a new device
+- Platform. google
+- Guideline or policy. Play Console technical quality requirements, Zero-Tap Sign-In (Play Console Help answer 17492799)
+- Severity. medium
+- What triggers it. From April 2027 any app with user sign-in, optional or mandatory, must restore the sign-in state when the user moves to a new Android device using the Restore Credentials API. Games are currently out of scope. An app with a login flow and no RestoreCredential integration will miss the requirement.
+- How to fix it. Create a restore credential on successful sign-in through Credential Manager, restore it on first launch after device transfer, and clear it on sign-out.
+- Detection signals. signInWith, CredentialManager, FirebaseAuth, LoginActivity
+- Present means handled. RestoreCredential, createRestoreCredential
+
+How to detect.
+
+```bash
+grep -rqn 'signInWith\|CredentialManager\|FirebaseAuth\|LoginActivity' --include='*.kt' --include='*.java' --include='*.xml' --include='*.gradle' --include='*.kts' . && ! grep -rqn 'RestoreCredential' --include='*.kt' --include='*.java' --include='*.xml' --include='*.gradle' --include='*.kts' .
 ```
