@@ -87,4 +87,4 @@ bash agent-os/hooks/app-store-compliance-guard-test.sh
 
 ## License
 
-By contributing you agree that your contributions are licensed under the MIT License in `LICENSE`.
+By contributing you agree that your contributions are licensed under the OpenRoots Agent License 2.3, the licence in `LICENSE`, and that the copyright notice and licence reference stay intact in every copy. If you used an AI tool to produce a contribution, say so in the pull request and name the tool, as Section 8.4 of the licence requires.

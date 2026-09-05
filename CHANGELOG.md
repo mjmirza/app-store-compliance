@@ -6,13 +6,20 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Added
 
+- Licence. The whole repository moved from a dual MIT and CC BY 4.0 grant to the OpenRoots Agent License 2.3 (via ORA 1.0 on 24 August 2026, then 2.3 on 27 August 2026). One licence now covers code, docs, data, the skill, and the guard. Releases before 24 August 2026 keep MIT and CC BY 4.0 irrevocably. LICENSE is a pointer to the canonical text at openroots.org.
+
+### Fixed
+
+- README, NOTICE, CITATION.cff, and CONTRIBUTING.md still described MIT, CC BY 4.0, or the retired ORA 1.0 sunset terms after the licence change. All four now state the same licence as LICENSE.
+- README listed no entry for docs/CROSS-PLATFORM-FRAMEWORKS.md, docs/PRIVACY-POLICY-MIGRATION.md, docs/SECURITY-POLICY-MIGRATION.md, docs/REGULATORY-TIMELINE.md, or the per-script test suites.
+- CHANGELOG claimed the README install prompt stars the repo and follows the author through the GitHub CLI. That step was removed in #140 and the prompt now explicitly forbids acting on the user's GitHub account.
+
 - scripts/verify-citations.py and its 10-case gauntlet. A citation provenance verifier. An HTTP 200 is not proof a page is real, because developer.apple.com serves a byte-identical news index for any unknown article id. The verifier fetches a deliberately bogus control id per host and flags any citation whose content fingerprint matches that control. It separates bot-blocked 4xx and host-fault 5xx from genuine fabrication so the gate stays signal rather than noise. Found and fixed six dead or fabricated citations already present in the repo.
 - scripts/monitor-privacy.py and its test suite. Mobile and web privacy requirements monitoring across Apple, Google, and EU sources. Selected from eight competing implementations on citation integrity, the five-way majority version carried nine fabricated citations each.
 - scripts/monitor-security.py and its test suite. Seventeen mobile security requirements, matched against real API symbols in your code rather than prose keywords. Selected over a longer rival that detected nothing against a fixture of real API symbols.
 - scripts/generate-timeline.py and its test. Compiles a chronological regulatory timeline from data/regulatory-deadlines.json, cross-referenced into the playbook's own docs. Additive over deadline-checker.py, which only prints a rolling 90-day window.
 - scripts/accessibility-audit-test.sh. A test suite for the existing accessibility audit, proven to go red when a rule is mutated.
 - data/regulatory-deadlines.json. EU e-Evidence Regulation (EU) 2023/1543, applying 18 August 2026, and the Distance Marketing of Financial Services Directive (EU) 2023/2673 withdrawal button, applying 19 June 2026. Both verified against EUR-Lex.
-- README. An install step that stars the repo and follows the author through the GitHub CLI, degrading to plain links when gh is absent.
 
 ### Fixed
 
