@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-25 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+29 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -298,6 +298,72 @@ grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --in
 - How to fix it. Integrate the store age signal APIs, confirm verifiable parental consent for minor accounts before use, re-request consent on significant changes, and delete raw age verification data after verification.
 - Detection signals. ageCategory, minorUser, parentalConsent, DeclaredAgeRange, age-signals
 - Present means handled. verifyParentalConsent, handleAgeCategorySignal, rescindConsent, deleteAgeVerificationData
+
+## APPLE-4.5.3-LIVE-ACTIVITY-SPAM
+
+- Title. Live Activities used for promotional or unsolicited messages
+- Platform. apple
+- Guideline or policy. 4.5.3 Apple Services (revised 8 June 2026)
+- Severity. high
+- What triggers it. Guideline 4.5.3 now names Live Activities alongside Game Center and Push Notifications as surfaces that may not be used to spam, phish, or send unsolicited messages. A Live Activity that carries marketing, upsells, or content unrelated to the ongoing activity is rejected.
+- How to fix it. Keep every Live Activity tied to a real, user-initiated, time-bound activity. No promotions, no engagement bait, no unrelated content in the Dynamic Island or Lock Screen presentation.
+- Detection signals. ActivityKit, Activity.request, LiveActivity
+
+How to detect.
+
+```bash
+grep -rn 'ActivityKit\|Activity\.request\|LiveActivity' {S} .   # then review every Live Activity for promotional content
+```
+
+## APPLE-ODR-DEPRECATED-27
+
+- Title. On-Demand Resources still in use
+- Platform. apple
+- Guideline or policy. On-Demand Resources deprecation (WWDC26 App Store guide)
+- Severity. high
+- What triggers it. Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets.
+- How to fix it. Migrate tagged resources to the Background Assets framework before the iOS 27 family becomes the submission floor.
+- Detection signals. NSBundleResourceRequest, OnDemandResources, on-demand-resource
+- Present means handled. BackgroundAssets, BAManagedDownloader
+
+How to detect.
+
+```bash
+grep -rn 'NSBundleResourceRequest\|OnDemandResources\|on-demand-resource' --include='*.swift' --include='*.m' --include='*.plist' --include='*.entitlements' --include='*.pbxproj' .
+```
+
+## APPLE-MACOS-ROSETTA-SUNSET
+
+- Title. Intel-only macOS binary with Rosetta ending after macOS 27
+- Platform. apple
+- Guideline or policy. Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026)
+- Severity. high
+- What triggers it. macOS 27 is the final release to support Rosetta. An Intel-only (x86_64) macOS app will no longer run on Apple silicon after that release. Detection is manual. check the build architectures and any x86_64-only dependencies.
+- How to fix it. Ship a universal or arm64 binary, replace x86_64-only dependencies, and test on Apple silicon without Rosetta installed.
+- Detection signals. x86_64, ONLY_ACTIVE_ARCH, VALID_ARCHS
+- Present means handled. arm64
+
+How to detect.
+
+```bash
+grep -rn 'VALID_ARCHS\|ONLY_ACTIVE_ARCH\|x86_64' --include='*.pbxproj' --include='*.xcconfig' . && ! grep -rqn 'arm64' --include='*.pbxproj' --include='*.xcconfig' .
+```
+
+## APPLE-ENROLLMENT-VERIFICATION-PENDING
+
+- Title. Launch planned before the developer account is active
+- Platform. apple
+- Guideline or policy. Apple Developer Program enrollment and identity verification (Apple Developer Forums threads 817247, 816626, 816864, 817185, 813667, 821680, 814930, January to September 2026)
+- Severity. high
+- What triggers it. Not a review rejection, a launch blocker that sits before review. Developers report enrollment stuck in Pending for two to six weeks after payment, identity-verification upload links that fail with an access error, no reply from Developer Support for weeks, and an individual-to-organization migration open for 61 days. A release date that assumes the account is active on day one slips by weeks. Detection is manual. check the membership status, the agreement acceptance state, and any pending migration before scheduling a submission.
+- How to fix it. Enroll and complete identity verification at least six weeks before the planned first submission, keep the government ID upload ready, accept every ADPLA update and attachment as it lands (Attachment 12 Brazil by 6 July 2026, Attachment 14 EU before 1 October 2026), and start an individual-to-organization migration a quarter ahead. Track the support case number and escalate through Developer Support phone, not only email.
+- Detection signals. enrollment, identity verification, Pending
+
+How to detect.
+
+```bash
+echo 'manual. open developer.apple.com/account, confirm Membership is Active, every agreement and attachment is accepted, and no migration is pending, at least six weeks before the first submission'
+```
 
 ## APPLE-ACCESSIBILITY-COLORCONTRAST
 

@@ -350,6 +350,144 @@ else
 fi
 rm -rf "$D"
 
+# 27 Donation link to a funding platform fires the Payments-policy finding on an Android tree
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } }\n' > "$D/app/build.gradle"
+printf 'val donate = "https://opencollective.com/example/donate"\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PAYMENTS-DONATION-LINK' && ok "Open Collective donate link fires the Payments finding" || bad "Open Collective donate link fires the Payments finding"
+rm -rf "$D"
+
+# 28 Play billing with no refund-review handling surfaces the chargeback-liability finding
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } }\n' > "$D/app/build.gradle"
+printf 'import com.android.billingclient.api.BillingClient\nval c = BillingClient.newBuilder(ctx)\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PLAY-CHARGEBACK-LIABILITY' && ok "Play billing without ReviewRefund handling surfaces chargeback liability" || bad "Play billing without ReviewRefund handling surfaces chargeback liability"
+rm -rf "$D"
+
+# 29 Play billing WITH refund-review handling stays silent on the chargeback finding
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } }\n' > "$D/app/build.gradle"
+printf 'import com.android.billingclient.api.BillingClient\nfun onRtdn(n: PendingRefundReviewNotification) { reviewRefund(n) }\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +GOOGLE-PLAY-CHARGEBACK-LIABILITY ' && bad "Play billing with ReviewRefund handling stays silent" || ok "Play billing with ReviewRefund handling stays silent"
+rm -rf "$D"
+
+# 30 SIWA relay allowlist with only the old domain fires
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let ok = email.hasSuffix("privaterelay.appleid.com")\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-4.0-SIWA-RELAY-DOMAIN' && ok "SIWA relay allowlist missing private.icloud.com fires" || bad "SIWA relay allowlist missing private.icloud.com fires"
+rm -rf "$D"
+
+# 31 SIWA relay allowlist with both domains stays silent
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let ok = email.hasSuffix("privaterelay.appleid.com") || email.hasSuffix("private.icloud.com")\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-4\.0-SIWA-RELAY-DOMAIN ' && bad "SIWA relay allowlist with both domains stays silent" || ok "SIWA relay allowlist with both domains stays silent"
+rm -rf "$D"
+
+# 32 External purchase link with no storefront gating fires
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'ExternalPurchaseLink.open()\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING' && ok "External purchase link without storefront gating fires" || bad "External purchase link without storefront gating fires"
+rm -rf "$D"
+
+# 33 External purchase link gated on the storefront stays silent
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'if Storefront.current?.countryCode == "USA" { ExternalPurchaseLink.open() }\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-3\.1\.1-EXTERNAL-LINK-REGION-GATING ' && bad "External purchase link gated on storefront stays silent" || ok "External purchase link gated on storefront stays silent"
+rm -rf "$D"
+
+# 34 Declared Age Range without RESCIND_CONSENT fires
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let r = DeclaredAgeRange.request()\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED' && ok "Declared Age Range without RESCIND_CONSENT fires" || bad "Declared Age Range without RESCIND_CONSENT fires"
+rm -rf "$D"
+
+# 35 On-Demand Resources usage fires the deprecation finding
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let req = NSBundleResourceRequest(tags: ["level2"])\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-ODR-DEPRECATED-27' && ok "On-Demand Resources usage fires" || bad "On-Demand Resources usage fires"
+rm -rf "$D"
+
+# 36 READ_CONTACTS on an API 37 target fires the contact-picker finding
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 37 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val p = "android.permission.READ_CONTACTS"\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-CONTACTS-PICKER-REQUIRED' && ok "READ_CONTACTS at API 37 fires contact-picker finding" || bad "READ_CONTACTS at API 37 fires contact-picker finding"
+rm -rf "$D"
+
+# 37 READ_CONTACTS on an API 36 target stays silent on the API 37 finding
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val p = "android.permission.READ_CONTACTS"\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +GOOGLE-CONTACTS-PICKER-REQUIRED ' && bad "READ_CONTACTS at API 36 stays silent on the API 37 finding" || ok "READ_CONTACTS at API 36 stays silent on the API 37 finding"
+rm -rf "$D"
+
+# 38 Local network discovery on API 37 without ACCESS_LOCAL_NETWORK fires
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 37 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val nsd = getSystemService(NsdManager::class.java)\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'ANDROID-LOCAL-NETWORK-PERMISSION' && ok "NsdManager at API 37 without ACCESS_LOCAL_NETWORK fires" || bad "NsdManager at API 37 without ACCESS_LOCAL_NETWORK fires"
+rm -rf "$D"
+
+# 39 Foreground service used for geofencing fires
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val perm = "android.permission.FOREGROUND_SERVICE_LOCATION"; fun geofenceLoop() {}\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-FGS-GEOFENCE-REMOVED' && ok "FGS geofencing fires" || bad "FGS geofencing fires"
+rm -rf "$D"
+
+# 40 Random chat app without minor blocking fires critical
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val tagline = "random chat with strangers"\n' > "$D/app/src/main/java/t/Src.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-ANON-CHAT-MINOR-BLOCK' && ok "Random chat without minor blocking fires" || bad "Random chat without minor blocking fires"
+rm -rf "$D"
+
+# 41 Release build without minifyEnabled true fires the R8 finding
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'val x = 1\n' > "$D/app/src/main/java/t/Src.kt"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled false } } }\n' > "$D/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "Missing R8 minify fires" || bad "Missing R8 minify fires"
+rm -rf "$D"
+
+# 42 Pipeline script calling the removed ASC age-rating endpoint fires critical
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf '// curl https://api.appstoreconnect.apple.com/v1/appStoreVersions/123/ageRatingDeclaration\n' > "$D/App/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED' && ok "Removed ASC age-rating endpoint in a script fires" || bad "Removed ASC age-rating endpoint in a script fires"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

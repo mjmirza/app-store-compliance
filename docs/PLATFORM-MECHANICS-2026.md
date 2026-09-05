@@ -22,7 +22,7 @@ Sources. [Apple notarizing macOS software](https://developer.apple.com/documenta
 - 4.3(b) Copycat. cloning or imitating another developer's app.
 - June 2026 tightening. Apple strengthened 4.3 and named saturated categories (dating, flashlight, sound effects, wallpaper, simple timers, fortune telling). New submissions in these categories are not accepted unless they offer a materially different or improved experience, and Apple may remove existing apps in these categories that are not updated, improved, or attracting customers.
 
-Sources. [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [Apple 2026 guideline update](https://developer.apple.com/news/?id=d75yllv4), [MacRumors on the 4.3 saturation tightening](https://www.macrumors.com/2026/06/09/app-store-guidelines-low-quality-apps/).
+Sources. [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [Apple 8 June 2026 guideline update, 4.3(b) clarified with examples](https://developer.apple.com/news/?id=a233fmpw), [MacRumors on the 4.3 saturation tightening](https://www.macrumors.com/2026/06/09/app-store-guidelines-low-quality-apps/).
 
 ### 1.3 Reader apps, the External Link Account Entitlement (Guideline 3.1.3(a))
 
@@ -90,7 +90,7 @@ By 31 August 2026, all new apps and updates to existing apps must use Play Billi
 
 ### 2.5 Target API level (annual bump, HARD)
 
-New apps and updates must target Android 15 (API 35) or later. existing apps must target API 34 or later to stay visible to new users on newer devices (Wear OS, Android TV, and Automotive target API 34 or later), effective 31 August 2025 with an extension window. The 2026 bump to API 36 (Android 16) for new apps and updates, reported for 31 August 2026 with a version-35 minimum for existing apps, is consistent with Google's yearly release pattern but should be verified live on the target-sdk page before it is written as a fixed date. Verify `targetSdkVersion` is at least 35 today and plan for at least 36 by the 2026 deadline.
+New apps and updates must target Android 16 (API 36) or later from 31 August 2026 (Play Console extension to 1 November 2026), existing apps must target API 35 or later to stay visible to new users on newer devices, Wear OS and Automotive OS must target API 35 or later, TV and XR API 34 or later. Android 17 is API 37, released 16 June 2026, and its Play policy changes land 27 January 2027 (Wear OS, Android TV, and Automotive target API 34 or later), effective 31 August 2025 with an extension window. The 2026 bump to API 36 (Android 16) for new apps and updates, reported for 31 August 2026 with a version-35 minimum for existing apps, is consistent with Google's yearly release pattern but should be verified live on the target-sdk page before it is written as a fixed date. Verify `targetSdkVersion` is at least 35 today and plan for at least 36 by the 2026 deadline.
 
 Sources. [Android target SDK requirement](https://developer.android.com/google/play/requirements/target-sdk), [Play Console target API help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en).
 

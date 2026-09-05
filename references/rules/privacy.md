@@ -1,6 +1,6 @@
 # Rules. Privacy and data
 
-17 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+18 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-5.1.1-MISSING-PRIVACY-POLICY
 
@@ -279,4 +279,21 @@ How to detect.
 
 ```bash
 grep -rq '@capacitor/\|Capacitor\.' --include='*.ts' . 2>/dev/null && ! find . -name 'PrivacyInfo.xcprivacy' | grep -q .
+```
+
+## APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED
+
+- Title. Declared Age Range used without handling RESCIND_CONSENT
+- Platform. apple
+- Guideline or policy. 5.1.1 and the age assurance framework (developer.apple.com/support/age-assurance)
+- Severity. high
+- What triggers it. The app reads Declared Age Range but never handles the RESCIND_CONSENT App Store Server Notification. When a parent withdraws consent Apple prevents the app from launching, and any server-side minor data or entitlement keyed to the withdrawn consent stays live.
+- How to fix it. Subscribe to App Store Server Notifications, handle RESCIND_CONSENT by revoking the minor's session and deleting consent-scoped data, and build against the iOS 26.2 SDK with Xcode 26.2 (17C52) or later, which Apple requires for all age assurance technologies.
+- Detection signals. DeclaredAgeRange, AgeRangeService
+- Present means handled. RESCIND_CONSENT, rescindConsent
+
+How to detect.
+
+```bash
+grep -rqn 'DeclaredAgeRange\|AgeRangeService' . && ! grep -rqn 'RESCIND_CONSENT\|rescindConsent' .
 ```

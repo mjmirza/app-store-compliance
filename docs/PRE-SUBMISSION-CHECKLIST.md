@@ -135,3 +135,17 @@ Cross-cutting.
 ## The two checks that prevent the most rejections
 
 Two checks stop the majority of rejections across both stores. A working demo account with a live backend, and a privacy declaration that matches actual runtime behavior including SDKs. If you verify nothing else, verify these two.
+
+## Account and program readiness (added September 2026)
+
+The checks above assume the developer account can submit. In 2026 that assumption fails often enough to plan for.
+
+- [ ] Apple Developer Program membership shows Active, not Pending. Enrollment and identity verification are taking two to six weeks, the ID upload link has failed for some accounts, and Developer Support replies take days. Enroll six weeks before the first submission ([Apple Developer Forums](https://developer.apple.com/forums/thread/817247), [thread 816626](https://developer.apple.com/forums/thread/816626)).
+- [ ] Every Apple Developer Program License Agreement update and attachment is accepted by the Account Holder. Attachment 12 (Brazil) was due 6 July 2026, Attachment 14 (EU) before 1 October 2026.
+- [ ] Any individual-to-organization migration was started a quarter ahead (a 61-day open migration was reported on 1 September 2026).
+- [ ] The social media capability question is answered in App Store Connect before uploading a new version.
+- [ ] Google Play account type is Organization with a D-U-N-S number if the app is financial, health, VPN, or government (30 September 2026).
+- [ ] Every distributed Play package name is registered for Android developer verification (30 September 2026).
+- [ ] Play content rating questionnaire is complete and current (unrated apps are not allowed).
+- [ ] If enrolled in US alternative billing or external links, transaction reporting is wired for 1 October 2026.
+

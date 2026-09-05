@@ -18,6 +18,7 @@ Scope. Any app whose AI feature reaches EU users is in scope, wherever the devel
 | 2 Feb 2025 | Article 5 prohibited practices, Article 4 AI literacy | live now |
 | 2 Aug 2025 | GPAI-model obligations, governance, penalties (Articles 99 and 100) | live now |
 | 2 Aug 2026 | Article 50 transparency, and most remaining provisions | in force from this date |
+| 2 Dec 2026 | Article 111(4) retrofit of Article 50(2) AI-content marking onto generative systems already on the market before 2 August 2026, and the new Article 5 prohibition on AI systems producing non-consensual intimate imagery or CSAM (both via Regulation (EU) 2026/1744) | future |
 | 2 Dec 2027 | Article 6(1) / Annex III High-risk AI systems (as deferred by the AI Omnibus, in force 27 July 2026) | future |
 | 2 Aug 2028 | Annex I High-risk AI embedded in physical products (as deferred by the AI Omnibus, in force 27 July 2026) | future |
 
@@ -81,15 +82,18 @@ There are three EU distribution channels, all still involving Apple. the App Sto
 
 Source. [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/).
 
-### 2.3 The EU fee model (advisory, re-verify before encoding numbers)
+### 2.3 The EU fee model (unified terms from 1 October 2026, verified 5 September 2026)
 
-Two fee regimes coexisted as of mid-2026 (the promised single business model announced for 1 January 2026 had NOT been implemented, and Apple remained in discussion with the Commission, so treat all numbers as advisory and re-check Apple's live page).
+On 18 August 2026 Apple announced updated business terms for apps in the EU, effective 1 October 2026, and added Attachment 14 to the Apple Developer Program License Agreement to carry them. Verbatim from Apple. "The Core Technology Fee, a per-install fee for developers who achieve extraordinary scale, will be replaced by the Core Technology Commission, a simple 5% commission on digital transactions in apps distributed outside the App Store." and "The new terms also eliminate the Initial Acquisition Fee and Store Services Fee."
 
-- Core Technology Fee (CTF). 0.50 euro per first annual install per year above a 1,000,000 first-annual-installs per year threshold, for developers on the Alternative Terms Addendum. Apple estimates fewer than 1 percent of developers pay it. Exemptions include under 1,000,000 installs per year, a small-developer 3-year on-ramp under 10,000,000 euro global revenue, and nonprofit or education or government waivers.
-- Core Technology Commission (CTC). 5 percent on digital goods sold through promoted external offers, effective 26 June 2025.
-- External Purchase Link fee stack (June 2025 model). an Initial Acquisition Fee of 2 percent, Store Services of 5 percent (Tier 1) or 13 percent (Tier 2), plus the 5 percent Core Technology Commission, totalling roughly 12 percent to 20 percent.
+- Core Technology Commission (CTC). 5 percent on digital transactions in apps distributed outside the App Store, covering sales within alternative app marketplaces, apps distributed via alternative marketplaces, and apps distributed via Web Distribution. From 1 October 2026 it is the general replacement for the CTF, not only the promoted-external-offer case it covered from 26 June 2025.
+- Core Technology Fee (CTF). Replaced on 1 October 2026. The earlier 0.50 euro per first annual install above 1,000,000 installs applies only to releases under the pre-October terms.
+- Initial Acquisition Fee and Store Services Fee. Eliminated on 1 October 2026.
+- Alternative payments. Apps may offer alternative payment options alongside Apple In-App Purchase on the App Store.
+- Marketplace and Web Distribution eligibility. From 1 October 2026 a developer meeting at least one of seven alternative criteria may operate an alternative app marketplace, including a stand-by letter of credit of USD 1,000,000 or one million first annual installs worldwide.
+- Attachment 14. Must be accepted in App Store Connect by the Account Holder, or new EU submissions under the new terms are blocked.
 
-Rule for a compliance tool. warn about the fee model, do not hardcode fee numbers, because the model was unresolved in mid-2026. Sources. [Apple Core Technology Fee](https://developer.apple.com/support/core-technology-fee/), [Apple DMA and apps in the EU](https://developer.apple.com/support/dma-and-apps-in-the-eu/), [RevenueCat June 2025 analysis](https://www.revenuecat.com/blog/growth/apple-eu-dma-update-june-2025/).
+Rule for a compliance tool. verify the Account Holder has accepted Attachment 14, and re-check Apple's live page before encoding any fee number. Sources. [Apple, updated business terms for apps in the EU, 18 August 2026](https://developer.apple.com/news/?id=gmws0jgp), [Apple, Attachment 14 added to the ADPLA](https://developer.apple.com/news/?id=0cgo95n6), [Apple DMA and apps in the EU](https://developer.apple.com/support/dma-and-apps-in-the-eu/).
 
 ### 2.4 Browser engine, NFC, interoperability
 
@@ -164,6 +168,15 @@ These map onto the Apple accessibility discipline the setup already carries (Dyn
 - Cyber Resilience Act, Regulation (EU) 2024/2847. reporting obligations from 11 September 2026, main obligations from 11 December 2027. Relevant when the app ships as a standalone product with digital elements (security-by-design, vulnerability handling).
 - DSA protection of minors and age verification. Commission Guidelines on Protection of Minors published 14 July 2025. an EU age-verification blueprint became feature-ready 15 April 2026, with Member States urged to roll out by 31 December 2026.
 - GDPR children's data. EDPB Statement 1/2025 on age assurance (adopted 11 February 2025) sets ten principles, and age assurance must still respect data minimisation and purpose limitation.
+
+Verified 5 September 2026 against EUR-Lex, four more dated items and one correction.
+
+- Product Liability Directive (EU) 2024/2853. From 9 December 2026 national law treats standalone software and app updates as a product under strict liability, for anything placed on the market or put into service on or after that date. Source. [Directive text](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202402853).
+- Data Act, Regulation (EU) 2023/2854. The 12 September 2026 date is the Article 3(1) access-by-design duty for connected products, not cloud switching. Switching charges fall to zero on 12 January 2027 (Article 29(1)), and legacy long-dated contracts must meet Chapter IV by 12 September 2027. Source. [Regulation text](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202302854).
+- eIDAS 2, Regulation (EU) 2024/1183. Each Member State provides at least one EU Digital Identity Wallet by 24 December 2026 (derived), and a private relying party above micro or small size that uses strong user authentication in banking, finance, health, telecom, transport, energy, education, or digital infrastructure must accept the wallet on request by 24 December 2027 (derived). Source. [Consolidated eIDAS](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02014R0910-20241018).
+- Regulation (EU) 2026/1881 of 24 July 2026. The temporary ePrivacy derogation for voluntary CSAM detection in messaging expires 3 April 2028. Source. [Regulation text](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202601881).
+- European Accessibility Act correction. There is no general 28 June 2027 accessibility date. The only 2027 date in the Directive is the Article 31(3) deferral for 112 emergency-call answering. Service contracts run to 2030 under Article 32. Source. [Directive 2019/882](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32019L0882).
+- Checked and carrying no new dated obligation. Digital Fairness Act (no proposal, indicative Q4 2026), Digital Omnibus GDPR and ePrivacy half (tabled, no adoption), ePrivacy Regulation (withdrawn 11 February 2025), NIS2 and DORA (Commission review clauses only), the EU age-verification app (non-binding Recommendation of 29 April 2026).
 
 ### 5.1 EU e-Evidence Package (Regulation (EU) 2023/1543 & Directive (EU) 2023/1544) (HARD, NEW)
 
