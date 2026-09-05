@@ -1,15 +1,25 @@
-Licensed under the OpenRoots Agent License 1.0 (ORA 1.0).
+App Store Compliance Playbook
+Copyright (c) 2026 Mirza Iqbal (mjmirza)
 
-Effective:    2026-08-24
-Sunset Date:  2029-08-24
-Fallback:     Apache-2.0
-Full text:    https://openroots.org/licenses/ora/1.0
+Licensed under the OpenRoots Agent License 2.3 (ORA 2.3).
+SPDX:        LicenseRef-OpenRoots-ORA-2.3
+Full text:   https://openroots.org/licenses/ora/2.3/legalcode.txt
+Summary:     https://openroots.org/licenses/ora/2.3
 
-On the Sunset Date this release becomes available under Apache-2.0,
-automatically and irrevocably. That date cannot be moved by anyone.
+One licence covers the whole repository. Code, documentation, data,
+the agent skill, and the guard hook. There is no separate MIT or
+Creative Commons grant for any part of it.
 
-Free below USD 2,000,000 annual revenue. Above it, 0.5% of attributable
-revenue, capped at USD 250,000 per year.
+Free for any individual, nonprofit, school, or government body at any
+size, and for any company at or below USD 20,000,000 annual gross
+revenue. Above that, 0.5% of the attributable revenue that exceeds the
+threshold, capped at USD 250,000 per year, self-reported quarterly.
 
-AI training on this work requires a separate Compute licence.
-See Section 6 of the full text.
+AI training on this work requires a separate Compute licence
+(Section 6). This licence has no sunset and no fallback licence
+(Section 7).
+
+Earlier releases keep the licence they shipped with. Releases before
+2026-08-24 remain under MIT (code) and CC BY 4.0 (content). Releases
+between 2026-08-24 and 2026-08-27 remain under ORA 1.0 with its own
+2029 Apache-2.0 sunset.
