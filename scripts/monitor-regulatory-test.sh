@@ -109,6 +109,36 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output file generation and emoji-free compliance
+echo "[TEST] Verifying --output-docs and --pr-output flags..."
+TEST_DOC="/tmp/test_regulatory_report.md"
+TEST_PR="/tmp/test_regulatory_pr.md"
+rm -f "$TEST_DOC" "$TEST_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TEST_DOC" --pr-output "$TEST_PR" > /dev/null
+
+if [ ! -f "$TEST_DOC" ]; then
+  echo "[ERROR] Documentation report file $TEST_DOC was not created"
+  exit 1
+fi
+if [ ! -f "$TEST_PR" ]; then
+  echo "[ERROR] PR draft file $TEST_PR was not created"
+  exit 1
+fi
+
+# Check for emojis in generated files
+python3 -c "
+for path in ['$TEST_DOC', '$TEST_PR']:
+    with open(path, 'r') as f:
+        text = f.read()
+    emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
+    if emojis:
+        print(f'Found emojis in {path}:', emojis)
+        exit(1)
+"
+rm -f "$TEST_DOC" "$TEST_PR"
+echo "[PASS] --output-docs and --pr-output generated valid, emoji-free markdown files successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
