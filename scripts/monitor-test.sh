@@ -11,7 +11,10 @@ bad(){ FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
 OUT="$($MONITOR --help 2>&1)"
 echo "$OUT" | grep -q "Monitor and track updates to Apple developer requirements" && ok "help output contains usage description" || bad "help output"
 
-# 2. Simulation of a single track
+# 2. Simulation of a single track and PR draft section verification
+PR_DESC="$($MONITOR --simulate "Privacy Manifests" --json | python3 -c "import sys, json; print(json.load(sys.stdin)[0]['proposed_pull_request']['description'])")"
+echo "$PR_DESC" | python3 "$HERE/verify-pr-sections.py" > /dev/null && ok "simulating a track generates all 15 required numbered compliance PR sections" || bad "simulate PR 15 sections"
+
 OUT="$($MONITOR --simulate "Privacy Manifests" 2>&1)"
 echo "$OUT" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "simulating a track successfully matches and prints track header" || bad "simulate single track"
 echo "$OUT" | grep -q "Proposed Pull Request Details:" && ok "simulating a track generates proposed pull request information" || bad "simulate PR generation"
