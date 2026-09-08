@@ -31,6 +31,15 @@ TRACKED_CATEGORIES = [
     "token storage",
 ]
 
+# Source trust domains and keywords for verification
+TRUST_HIERARCHY = {
+    "Priority 1": "Official sources (Apple Developer, Android Developer, OWASP MASVS, NIST, CISA, FTC, EDPB, EUR-Lex, Government publications)",
+    "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
+    "Priority 3": "Academic papers",
+    "Priority 4": "Industry blogs",
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries"
+}
+
 # Keywords used to classify incoming policy announcements/articles into the 17 categories
 CATEGORY_KEYWORDS = {
     "secure storage": [
@@ -394,6 +403,98 @@ MOCK_ANNOUNCEMENTS = [
 ]
 
 
+def classify_source_and_verify(announcement, all_announcements=None):
+    """Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified)."""
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "apple.com",
+        "developer.apple.com",
+        "android.com",
+        "developer.android.com",
+        "support.google.com",
+        "owasp.org",
+        "mas.owasp.org",
+        "cheatsheetseries.owasp.org",
+        "oauth.net",
+        "ftc.gov",
+        "nist.gov",
+        "cisa.gov",
+        "europa.eu",
+    ]
+    p1_keywords = [
+        "apple developer",
+        "android developer",
+        "owasp masvs",
+        "owasp",
+        "ftc",
+        "nist",
+        "cisa",
+        "edpb",
+        "official journal",
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study", "university research"]
+
+    p4_domains = ["medium.com", "randomblogsite.com", "blog"]
+    p4_keywords = ["industry blog", "tech blog", "blog post"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai generated"]
+
+    priority = 4
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if has_p1_ref_in_text:
+            is_verified = True
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(announcements):
+    """Enforces source credibility verification and logs warnings to stderr."""
+    for ann in announcements:
+        priority, is_verified = classify_source_and_verify(ann)
+        if priority in (4, 5) and not is_verified:
+            print(
+                f"Source Trust Warning: Unverified Priority {priority} announcement detected: '{ann.get('title')}' ({ann.get('link')}). Compliance PR generation will block unverified secondary sources.",
+                file=sys.stderr,
+            )
+
+
 def scan_codebase_for_security_signals(start_dir="."):
     """Scans the codebase for files containing signals related to each of the 17 security categories."""
     matches = {cat: [] for cat in TRACKED_CATEGORIES}
@@ -411,18 +512,15 @@ def scan_codebase_for_security_signals(start_dir="."):
         "dist",
     }
 
-    # Compile the signal patterns
     compiled_signals = {
         cat: [re.compile(pattern, re.IGNORECASE) for pattern in patterns]
         for cat, patterns in CATEGORY_SIGNALS.items()
     }
 
     for root, dirs, files in os.walk(start_dir):
-        # Prune excluded directories in-place
         dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.endswith("Tests")]
 
         for file in files:
-            # Check applicable file types
             if not file.endswith(
                 (
                     ".kt",
@@ -444,7 +542,6 @@ def scan_codebase_for_security_signals(start_dir="."):
                 continue
 
             filepath = os.path.join(root, file)
-            # Skip monitor scripts to avoid self-referencing matches
             if "monitor-security" in file or "monitor-security-test" in file:
                 continue
 
@@ -462,7 +559,6 @@ def scan_codebase_for_security_signals(start_dir="."):
                                             "matched_pattern": pattern.pattern,
                                         }
                                     )
-                                    # Break to avoid duplicate entry for the same line and category
                                     break
             except Exception:
                 pass
@@ -517,7 +613,8 @@ def parse_rss_feed(url):
 
 
 def classify_announcements(announcements, keywords_filter=None):
-    """Classifies incoming announcements into the 17 mobile security requirement categories."""
+    """Classifies incoming announcements into the 17 mobile security requirement categories.
+    Respects pre-assigned categories when provided to prevent cross-category matching."""
     classified_updates = []
 
     for ann in announcements:
@@ -525,22 +622,21 @@ def classify_announcements(announcements, keywords_filter=None):
         desc = ann.get("description", "")
         text_to_search = (title + " " + desc).lower()
 
-        # If keywords_filter is supplied, verify if any filter matches
         if keywords_filter:
             if not any(k.lower() in text_to_search for k in keywords_filter):
                 continue
 
-        # Match against categories
         matched_categories = []
-        for cat, keywords in CATEGORY_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in text_to_search:
-                    matched_categories.append(cat)
-                    break  # Break keyword loop for this category
 
-        # If a pre-set category exists on mock and no matched categories, use that category
-        if not matched_categories and ann.get("category"):
+        # If a pre-assigned category is explicitly provided in the announcement and is tracked, respect it
+        if ann.get("category") and ann["category"] in TRACKED_CATEGORIES:
             matched_categories.append(ann["category"])
+        else:
+            for cat, keywords in CATEGORY_KEYWORDS.items():
+                for kw in keywords:
+                    if kw.lower() in text_to_search:
+                        matched_categories.append(cat)
+                        break
 
         if matched_categories:
             for cat in matched_categories:
@@ -558,26 +654,38 @@ def classify_announcements(announcements, keywords_filter=None):
 
 
 def generate_pull_request_draft(updates, scan_results):
-    """Generates a draft of a pull request complying with the exact 15 required sections."""
+    """Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates migration steps, checklists, and risk assessments at the category level."""
     citations_list = []
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
 
-    for idx, u in enumerate(updates, 1):
+    seen_categories = set()
+
+    for u in updates:
         cat = u["category"]
+        priority, is_verified = classify_source_and_verify(u)
+
+        # Skip unverified Priority 4/5 updates for PR generation
+        if priority in (4, 5) and not is_verified:
+            continue
+
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
         citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
         )
 
-        # Pull affected files
         files = scan_results.get(cat, [])
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific migration details
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         if cat == "secure storage":
             migration_steps.append(
                 f"- **{cat}**: Migrate sensitive localized storage from plaintext UserDefaults/SharedPreferences to Jetpack EncryptedSharedPreferences (Android) or iOS Keychain."
@@ -749,7 +857,7 @@ def generate_pull_request_draft(updates, scan_results):
                 f"- *{cat}*: Loss of user account custody if refresh tokens leak from persistent cache storage."
             )
 
-    citations_str = "\n".join(citations_list)
+    citations_str = "\n".join(citations_list) if citations_list else "- *No updates cited.*"
 
     if affected_files_set:
         affected_files_str = "\n".join(
@@ -758,9 +866,9 @@ def generate_pull_request_draft(updates, scan_results):
     else:
         affected_files_str = "- *No specific files containing matching category patterns were automatically detected. (Perform manual review of configuration variables).* "
 
-    migration_steps_str = "\n".join(migration_steps)
-    impl_checklist_str = "\n".join(impl_checklist)
-    risk_assessment_str = "\n".join(risk_assessment)
+    migration_steps_str = "\n".join(migration_steps) if migration_steps else "- *No migration required.*"
+    impl_checklist_str = "\n".join(impl_checklist) if impl_checklist else "- [ ] Verify mobile security parameters."
+    risk_assessment_str = "\n".join(risk_assessment) if risk_assessment else "- *Low identified security risk.*"
 
     pr_template = f"""# PULL REQUEST DRAFT: Mobile Security Requirements Compliance Update
 
@@ -824,7 +932,7 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_mock=False):
     """Overwrites or updates the migration report in docs/SECURITY-POLICY-MIGRATION.md."""
     lines = [
         "<!-- SECURITY_POLICY_MONITOR_START -->",
@@ -832,22 +940,47 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-security.py` to track compliance areas.",
         "",
-        "## Monitored Security Requirements Update Log",
-        "",
     ]
 
+    if is_mock:
+        lines.extend([
+            "> **Notice**: This migration report was generated using mock/simulated security policy updates. Run `python3 scripts/monitor-security.py --live` to fetch real-time updates when connected.",
+            "",
+        ])
+
+    lines.extend([
+        "## Monitored Security Requirements Update Log",
+        "",
+    ])
+
     for idx, u in enumerate(updates, 1):
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
         lines.append(f"- **Published Date**: {u['pubDate']}")
         lines.append(f"- **Official Resource**: [{u['link']}]({u['link']})")
+        lines.append(f"- **Verification Status**: {status_str}")
         lines.append(f"- **Description**: {u['description']}")
         lines.append("")
 
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
+
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
+        priority, is_verified = classify_source_and_verify(u)
+        if priority in (4, 5) and not is_verified:
+            lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
+            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+            lines.append("")
+            continue
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -875,6 +1008,54 @@ def update_documentation_report(updates, output_filepath):
         elif cat == "certificate pinning":
             lines.append(
                 "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement multi-layered dyld inspection and sandbox write check routines."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Integrate Google Play Integrity API attestation and verify tokens on backend."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Enforce cleartextTrafficPermitted='false' and verify TLS 1.3/1.2 minimum settings."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure dataExtractionRules to exclude database and shared preferences files."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Explicitly declare android:exported='false' for all internal components."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Secure implicit intent filters using custom signature-level permissions."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Parse, sanitize, and validate all incoming deep link parameters as untrusted."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Host valid apple-app-site-association file with application/json content type."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Publish assetlinks.json with certificate fingerprint and set autoVerify='true'."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Enforce OAuth 2.1 with PKCE over secure system browser custom tabs."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side session invalidation on logout and blur background app snapshot."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Save long-lived refresh tokens in EncryptedSharedPreferences/Keychain."
             )
         else:
             lines.append(
@@ -927,16 +1108,17 @@ def main():
 
     args = parser.parse_args()
 
-    # 1. Gather announcements
     announcements = []
+    is_mock_run = False
 
     if args.live:
         print("Fetching live Security RSS feeds...")
-        # Android Security Bulletins publish no RSS feed. The canonical page is
-        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
+        # Android Security Bulletins and Apple Security Updates
+        announcements.extend(parse_rss_feed("https://developer.apple.com/news/rss/news.rss"))
+        announcements.extend(parse_rss_feed("https://android-developers.googleblog.com/feeds/posts/default"))
 
-    # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:
+        is_mock_run = True
         print(
             "Using comprehensive mock Security policy updates for compliance scanning..."
         )
@@ -953,7 +1135,8 @@ def main():
         else:
             announcements.extend(MOCK_ANNOUNCEMENTS)
 
-    # 2. Classify updates into the 17 required categories
+    enforce_strict_source_trust_hierarchy(announcements)
+
     keywords_filter = (
         [k.strip() for k in args.keywords.split(",")] if args.keywords else None
     )
@@ -967,20 +1150,19 @@ def main():
         f"Monitored and classified {len(classified_updates)} security requirement updates:"
     )
     for idx, u in enumerate(classified_updates, 1):
-        print(f" {idx}. [{u['category']}] {u['title']}")
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        print(f" {idx}. [{u['category']}] {u['title']} - {status_str}")
 
-    # 3. Scan the codebase for signals related to these categories
     print(f"Scanning codebase under '{args.dir}' for security integration signals...")
     scan_results = scan_codebase_for_security_signals(args.dir)
 
     total_matches = sum(len(matches) for matches in scan_results.values())
     print(f"Found {total_matches} signal matches in code.")
 
-    # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_mock=is_mock_run)
 
-    # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
 
     if args.pr_output:
