@@ -187,11 +187,13 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### Tasks for Google Play Developer Policies
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Google Play Developer Policies are checked and handled.
+- [ ] **Task 1**: Audit store listing details, asset descriptions, and in-app content for Play Policy compliance.
+- [ ] **Task 2**: Verify restricted content, intellectual property, and user safety guidelines.
 
 ### Tasks for Play Console announcements
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
+- [ ] **Task 1**: Complete mandatory developer identity verification in Google Play Console.
+- [ ] **Task 2**: Review Play Console organization settings and contact declarations.
 
 ### Tasks for Target SDK requirements
 - **Regulatory Impact**: High priority. Publishing gates require action.
@@ -200,31 +202,23 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### Tasks for Minimum SDK requirements
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Minimum SDK requirements are checked and handled.
+- [ ] **Task 1**: Update `minSdkVersion` to 23 in Gradle build configs.
+- [ ] **Task 2**: Verify compatibility fallback logic for legacy device deprecation.
 
 ### Tasks for Android API deprecations
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Android API deprecations are checked and handled.
-
-### Tasks for Play Console announcements
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
-
-### Tasks for Android API deprecations
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Android API deprecations are checked and handled.
+- [ ] **Task 1**: Remove legacy SafetyNet Attestation dependency `com.google.android.gms:play-services-safetynet`.
+- [ ] **Task 2**: Complete migration to Play Integrity SDK for attestation checks.
 
 ### Tasks for Play Integrity API
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Integrity API are checked and handled.
-
-### Tasks for Play Console announcements
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
+- [ ] **Task 1**: Implement server-side Play Integrity token verification endpoint with cryptographic nonce checks.
+- [ ] **Task 2**: Validate token verdicts on backend prior to dispensing secure payloads.
 
 ### Tasks for Android permission model
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Android permission model are checked and handled.
+- [ ] **Task 1**: Implement native Android Photo Picker API wrapper.
+- [ ] **Task 2**: Update AndroidManifest permissions; remove unnecessary broad media permissions.
 
 ### Tasks for User Data policy
 - **Regulatory Impact**: High priority. Publishing gates require action.
@@ -233,98 +227,57 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### Tasks for Background execution restrictions
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Background execution restrictions are checked and handled.
-
-### Tasks for Play Console announcements
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
+- [ ] **Task 1**: Audit exact alarm declarations (`SCHEDULE_EXACT_ALARM`); replace with inexact alarms where feasible.
+- [ ] **Task 2**: Ensure WorkManager and JobScheduler tasks comply with execution limits.
 
 ### Tasks for Foreground service policies
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task 1**: Specify foregroundServiceType inside the manifest service tags.
+- [ ] **Task 1**: Specify `foregroundServiceType` inside manifest service tags.
 - [ ] **Task 2**: Register foreground service type video verification demo on Play Console.
 
 ### Tasks for Privacy Sandbox
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Privacy Sandbox are checked and handled.
-
-### Tasks for Google Play Developer Policies
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Google Play Developer Policies are checked and handled.
-
-### Tasks for Play Console announcements
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
-
-### Tasks for Play Integrity API
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Integrity API are checked and handled.
+- [ ] **Task 1**: Migrate marketing/analytics workflows from Advertising ID (GAID) to Privacy Sandbox Topics and Attribution APIs.
+- [ ] **Task 2**: Configure SDK Runtime and Privacy Sandbox opt-in settings in build scripts.
 
 ### Tasks for Play Billing
 - **Regulatory Impact**: High priority. Publishing gates require action.
 - [ ] **Task 1**: Migrate project dependencies to Billing Library version 8.0.
 - [ ] **Task 2**: Perform test transactions on Google Play console sandbox.
 
-### Tasks for User Data policy
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task 1**: Publish a public account and data deletion URL.
-- [ ] **Task 2**: Connect the URL to the Play Console User Data safety form.
-
-### Tasks for Google Play Developer Policies
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Google Play Developer Policies are checked and handled.
-
-### Tasks for User Data policy
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task 1**: Publish a public account and data deletion URL.
-- [ ] **Task 2**: Connect the URL to the Play Console User Data safety form.
-
 ### Tasks for Data Safety section
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Data Safety section are checked and handled.
+- [ ] **Task 1**: Audit compiled third-party SDKs (Firebase, Facebook, AppsFlyer) for data transmission.
+- [ ] **Task 2**: Update Play Console Data Safety questionnaire declarations.
 
 ### Tasks for Firebase policy updates
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Firebase policy updates are checked and handled.
+- [ ] **Task 1**: Remove Firebase Dynamic Links dependency; migrate scheme to standard App Links.
+- [ ] **Task 2**: Review Cloud Firestore and Realtime Database authorization security rules.
 
 ### Tasks for AI-generated content policies
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for AI-generated content policies are checked and handled.
+- [ ] **Task 1**: Implement a prominent Play Policy disclosure dialog prior to accessing AI features.
+- [ ] **Task 2**: Add flagging/reporting buttons directly adjacent to all generative AI content blocks.
 
 ### Tasks for Accessibility requirements
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Accessibility requirements are checked and handled.
+- [ ] **Task 1**: Audit layout XML; verify all interactive targets measure >= 48dp.
+- [ ] **Task 2**: Add contentDescription attributes on all ImageViews and ImageButtons.
 
 ### Tasks for Device compatibility requirements
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Device compatibility requirements are checked and handled.
-
-### Tasks for Google Play Developer Policies
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Google Play Developer Policies are checked and handled.
+- [ ] **Task 1**: Configure `android:resizeableActivity=true` in manifest.
+- [ ] **Task 2**: Test multi-window, tablet, and foldable display responsive orientation layouts.
 
 ### Tasks for Security Bulletins
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Security Bulletins are checked and handled.
-
-### Tasks for Play Console announcements
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Play Console announcements are checked and handled.
+- [ ] **Task 1**: Implement cryptographic token storage wrapper backed by Android Keystore.
+- [ ] **Task 2**: Apply latest Security Bulletin patches and enforce biometric unlock.
 
 ### Tasks for Android Enterprise requirements
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Android Enterprise requirements are checked and handled.
-
-### Tasks for Google Play Developer Policies
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Google Play Developer Policies are checked and handled.
-
-### Tasks for Android API deprecations
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Android API deprecations are checked and handled.
-
-### Tasks for Firebase policy updates
-- **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task**: Verify that all platform criteria for Firebase policy updates are checked and handled.
+- [ ] **Task 1**: Implement Work Profile boundaries and secure inter-profile communication using DevicePolicyManager.
+- [ ] **Task 2**: Enforce corporate enterprise management policies and prevent side-loading.
 
 <!-- ANDROID_POLICY_MONITOR_END -->
