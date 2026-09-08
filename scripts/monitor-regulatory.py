@@ -896,49 +896,49 @@ def generate_pull_request(track_name, affected_files, announcement):
     desc_lines = [
         f"# Regulatory Compliance Update: {track_name}",
         "",
-        "## Summary",
+        "## 1. Summary",
         summary_text,
         "",
-        "## Background",
+        "## 2. Background",
         bg_text,
         "",
-        "## Regulatory change",
+        "## 3. Regulatory change",
         reg_change_text,
         "",
-        "## Official citations",
+        "## 4. Official citations",
         citations_text,
         "",
-        "## Affected files",
+        "## 5. Affected files",
         affected_files_text,
         "",
-        "## Risk assessment",
+        "## 6. Risk assessment",
         risk_desc,
         "",
-        "## Migration steps",
+        "## 7. Migration steps",
         migration_steps_text,
         "",
-        "## Backward compatibility",
+        "## 8. Backward compatibility",
         bk_compat_text,
         "",
-        "## Implementation checklist",
+        "## 9. Implementation checklist",
         impl_text,
         "",
-        "## Testing checklist",
+        "## 10. Testing checklist",
         test_text,
         "",
-        "## Documentation checklist",
+        "## 11. Documentation checklist",
         doc_text,
         "",
-        "## Compliance impact",
+        "## 12. Compliance impact",
         compliance_impact_text,
         "",
-        "## Breaking changes",
+        "## 13. Breaking changes",
         breaking_changes_text,
         "",
-        "## Review checklist",
+        "## 14. Review checklist",
         review_text,
         "",
-        "## Approver recommendations",
+        "## 15. Approver recommendations",
         approver_text,
         "",
         "---",
@@ -1093,6 +1093,57 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+def generate_documentation_report(report_items, project_path, output_filepath):
+    """
+    Generates a markdown documentation report from the monitoring findings.
+    """
+    lines = [
+        "# Regulatory Intelligence Monitoring Report 2026",
+        "",
+        f"- Target Project: `{os.path.abspath(project_path)}`",
+        f"- Date Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Summary of Tracked Regulatory Developments",
+        "",
+    ]
+
+    if not report_items:
+        lines.append("No active regulatory developments matched.")
+    else:
+        for item in report_items:
+            lines.extend([
+                f"### Track: {item['track']}",
+                f"- **Announcement Title**: {item['announcement_title']}",
+                f"- **Published Date**: {item['announcement_pubDate']}",
+                f"- **Reference Link**: {item['announcement_link']}",
+                f"- **Jurisdiction**: {item['jurisdiction']}",
+                f"- **Compliance Impact**: {item['compliance_impact']}",
+                f"- **Scan Verdict**: {item['scan_verdict']}",
+                "",
+                "#### Affected Files",
+            ])
+            if item["affected_files"]:
+                for af in item["affected_files"]:
+                    lines.append(f"- `{af}`")
+            else:
+                lines.append("- None detected.")
+            lines.append("")
+            lines.append("#### Migration Tasks")
+            for task in item["migration_tasks"]:
+                lines.append(f"- [ ] {task}")
+            lines.append("")
+
+    lines.extend([
+        "---",
+        "*Generated automatically by the Regulatory Intelligence Agent Monitor. Strict Emoji-Free Policy enforced.*",
+        "",
+    ])
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regulatory Intelligence Agent Monitor."
@@ -1106,6 +1157,14 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        help="Filepath to write migration docs / report (e.g. docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Filepath to write generated Pull Request draft (e.g. docs/REGULATORY_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1117,6 +1176,26 @@ def main():
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    if args.output_docs:
+        generate_documentation_report(report_items, args.project, args.output_docs)
+        if not args.json and args.verbose:
+            print(f"[*] Saved documentation report to {args.output_docs}")
+
+    if args.pr_output:
+        # Find first valid PR proposal or combine
+        pr_text = ""
+        for item in report_items:
+            pr = item.get("proposed_pull_request")
+            if pr and pr.get("description"):
+                pr_text = pr["description"]
+                break
+        if pr_text:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_text)
+            if not args.json and args.verbose:
+                print(f"[*] Saved PR draft to {args.pr_output}")
 
     if args.json:
         print(json.dumps(report_items, indent=2))

@@ -891,50 +891,50 @@ def generate_pull_request(track_name, affected_files, item_title):
     desc_lines = [
         f"# Compliance Update: {track_name}",
         "",
-        "## Summary",
+        "## 1. Summary",
         f"This Pull Request addresses the latest compliance requirements for **{track_name}**, "
         f'triggered by the developer update: *"{item_title}"*.',
         "",
-        "## Background",
+        "## 2. Background",
         bg_context,
         "",
-        "## Regulatory change",
+        "## 3. Regulatory change",
         reg_change_desc,
         "",
-        "## Official citations",
+        "## 4. Official citations",
         "\n".join(citations),
         "",
-        "## Affected files",
+        "## 5. Affected files",
         affected_files_content,
         "",
-        "## Risk assessment",
+        "## 6. Risk assessment",
         risk_desc,
         "",
-        "## Migration steps",
+        "## 7. Migration steps",
         "\n".join(migration_steps_lines),
         "",
-        "## Backward compatibility",
+        "## 8. Backward compatibility",
         bk_compat,
         "",
-        "## Implementation checklist",
+        "## 9. Implementation checklist",
         "\n".join(impl_checklist),
         "",
-        "## Testing checklist",
+        "## 10. Testing checklist",
         "\n".join(test_checklist),
         "",
-        "## Documentation checklist",
+        "## 11. Documentation checklist",
         "\n".join(doc_checklist),
         "",
-        "## Compliance impact",
+        "## 12. Compliance impact",
         compliance_impact_desc,
         "",
-        "## Breaking changes",
+        "## 13. Breaking changes",
         breaking_changes_desc,
         "",
-        "## Review checklist",
+        "## 14. Review checklist",
         "\n".join(review_checklist),
         "",
-        "## Approver recommendations",
+        "## 15. Approver recommendations",
         approver_rec,
         "",
         "---",
@@ -1112,6 +1112,56 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+def generate_documentation_report(report_items, project_path, output_filepath):
+    """
+    Generates a markdown documentation report from the monitoring findings.
+    """
+    lines = [
+        "# Apple Policy Migration Report",
+        "",
+        f"- Target Project: `{os.path.abspath(project_path)}`",
+        f"- Date Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Summary of Tracked Apple Developer Policy Updates",
+        "",
+    ]
+
+    if not report_items:
+        lines.append("No active Apple policy updates matched.")
+    else:
+        for item in report_items:
+            lines.extend([
+                f"### Track: {item['track']}",
+                f"- **Announcement Title**: {item['announcement_title']}",
+                f"- **Published Date**: {item['announcement_pubDate']}",
+                f"- **Reference Link**: {item['announcement_link']}",
+                f"- **Release Impact**: {item['severity_impact']}",
+                f"- **Scan Verdict**: {item['scan_verdict']}",
+                "",
+                "#### Affected Files",
+            ])
+            if item["affected_files"]:
+                for af in item["affected_files"]:
+                    lines.append(f"- `{af}`")
+            else:
+                lines.append("- None detected.")
+            lines.append("")
+            lines.append("#### Migration Tasks")
+            for task in item["migration_tasks"]:
+                lines.append(f"- [ ] {task}")
+            lines.append("")
+
+    lines.extend([
+        "---",
+        "*Generated automatically by the Apple Developer Requirements Monitor.*",
+        "",
+    ])
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
 def main():
     import argparse
 
@@ -1134,6 +1184,14 @@ def main():
         "--news-file", help="Path to a custom XML or JSON file containing announcements"
     )
     parser.add_argument(
+        "--output-docs",
+        help="Filepath to save updated markdown migration docs (e.g., docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Filepath to save generated Pull Request draft (e.g., docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1151,6 +1209,25 @@ def main():
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    if args.output_docs:
+        generate_documentation_report(report_items, args.project, args.output_docs)
+        if not args.json and args.verbose:
+            print(f"[*] Saved documentation report to {args.output_docs}")
+
+    if args.pr_output:
+        pr_text = ""
+        for item in report_items:
+            pr = item.get("proposed_pull_request")
+            if pr and pr.get("description"):
+                pr_text = pr["description"]
+                break
+        if pr_text:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_text)
+            if not args.json and args.verbose:
+                print(f"[*] Saved PR draft to {args.pr_output}")
 
     if args.json:
         print(json.dumps(report_items, indent=2))

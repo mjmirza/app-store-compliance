@@ -46,6 +46,51 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. File output flags (--output-docs and --pr-output) and 15-section verification
+TMP_DOCS="/tmp/test_apple_migration.md"
+TMP_PR="/tmp/test_apple_pr.md"
+rm -f "$TMP_DOCS" "$TMP_PR"
+
+$MONITOR --simulate "Privacy Manifests" --output-docs "$TMP_DOCS" --pr-output "$TMP_PR" > /dev/null 2>&1
+
+SECTIONS=(
+  "1. Summary"
+  "2. Background"
+  "3. Regulatory change"
+  "4. Official citations"
+  "5. Affected files"
+  "6. Risk assessment"
+  "7. Migration steps"
+  "8. Backward compatibility"
+  "9. Implementation checklist"
+  "10. Testing checklist"
+  "11. Documentation checklist"
+  "12. Compliance impact"
+  "13. Breaking changes"
+  "14. Review checklist"
+  "15. Approver recommendations"
+)
+
+ALL_FOUND=true
+if [ -s "$TMP_PR" ] && [ -s "$TMP_DOCS" ]; then
+  for sect in "${SECTIONS[@]}"; do
+    if ! grep -q "## $sect" "$TMP_PR"; then
+      ALL_FOUND=false
+      break
+    fi
+  done
+else
+  ALL_FOUND=false
+fi
+
+rm -f "$TMP_DOCS" "$TMP_PR"
+
+if [ "$ALL_FOUND" = true ]; then
+  ok "file output flags (--output-docs and --pr-output) produce 15-section draft PR"
+else
+  bad "file output flags or 15-section draft PR verification failed"
+fi
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

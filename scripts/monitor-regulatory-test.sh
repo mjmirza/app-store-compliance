@@ -37,21 +37,21 @@ EU_JSON=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --
 
 # Define expected sections
 SECTIONS=(
-  "Summary"
-  "Background"
-  "Regulatory change"
-  "Official citations"
-  "Affected files"
-  "Risk assessment"
-  "Migration steps"
-  "Backward compatibility"
-  "Implementation checklist"
-  "Testing checklist"
-  "Documentation checklist"
-  "Compliance impact"
-  "Breaking changes"
-  "Review checklist"
-  "Approver recommendations"
+  "1. Summary"
+  "2. Background"
+  "3. Regulatory change"
+  "4. Official citations"
+  "5. Affected files"
+  "6. Risk assessment"
+  "7. Migration steps"
+  "8. Backward compatibility"
+  "9. Implementation checklist"
+  "10. Testing checklist"
+  "11. Documentation checklist"
+  "12. Compliance impact"
+  "13. Breaking changes"
+  "14. Review checklist"
+  "15. Approver recommendations"
 )
 
 for sect in "${SECTIONS[@]}"; do
@@ -108,6 +108,34 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
   exit 1
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
+
+# Test 8: Verify --output-docs and --pr-output file generation
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TMP_DOCS="/tmp/test_regulatory_report.md"
+TMP_PR="/tmp/test_regulatory_pr.md"
+rm -f "$TMP_DOCS" "$TMP_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TMP_DOCS" --pr-output "$TMP_PR" > /dev/null
+
+if [ ! -s "$TMP_DOCS" ]; then
+  echo "[ERROR] Failed to generate documentation report at $TMP_DOCS"
+  exit 1
+fi
+
+if [ ! -s "$TMP_PR" ]; then
+  echo "[ERROR] Failed to generate PR draft at $TMP_PR"
+  exit 1
+fi
+
+# Verify the PR draft has all 15 numbered headings
+for sect in "${SECTIONS[@]}"; do
+  if ! grep -q "## $sect" "$TMP_PR"; then
+    echo "[ERROR] Missing expected section $sect in $TMP_PR"
+    exit 1
+  fi
+done
+rm -f "$TMP_DOCS" "$TMP_PR"
+echo "[PASS] Successfully generated and verified file outputs for --output-docs and --pr-output"
 
 echo ""
 echo "[SUCCESS] All tests passed successfully."
