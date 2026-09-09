@@ -10,99 +10,102 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 13 Required areas
+# 15 Required review domains
 REQUIRED_AREAS = [
-    "Apple requirements",
-    "Google Play requirements",
-    "Web requirements",
-    "Privacy",
-    "Security",
-    "Accessibility",
-    "AI regulations",
-    "Store metadata",
-    "Permissions",
-    "Legal documentation",
-    "SDK compatibility",
-    "Deprecated APIs",
-    "Platform announcements",
+    "permissions",
+    "privacy disclosures",
+    "screenshots",
+    "metadata",
+    "age rating",
+    "AI disclosures",
+    "subscription disclosures",
+    "payment compliance",
+    "accessibility",
+    "legal documents",
+    "support URL",
+    "privacy policy",
+    "terms of service",
+    "export compliance",
+    "encryption declarations",
 ]
 
-# Recommended reviewers for each area
+# Recommended reviewers for each domain
 RECOMMENDED_REVIEWERS = {
-    "Apple requirements": "Mobile Tech Lead, iOS Platform Architect",
-    "Google Play requirements": "Mobile Tech Lead, Android Platform Architect",
-    "Web requirements": "Frontend Technical Lead, Web Architect",
-    "Privacy": "Data Protection Officer (DPO), Legal Counsel (Privacy)",
-    "Security": "Product Security Engineering Team, DevSecOps Lead",
-    "Accessibility": "Frontend QA Team, Accessibility Specialist",
-    "AI regulations": "AI Ethics and Governance Committee, Lead AI Architect",
-    "Store metadata": "Product Marketing Manager (PMM), App Store Optimization (ASO) Specialist",
-    "Permissions": "Lead Developer, Mobile Platform Leads",
-    "Legal documentation": "Legal Counsel (Commercial/IP), Compliance Officer",
-    "SDK compatibility": "Lead Mobile Developer, Architecture Review Board",
-    "Deprecated APIs": "Lead Developer, Tech Debt/Platform Team",
-    "Platform announcements": "Lead Developer, Mobile Release Manager",
+    "permissions": "Lead Developer, Mobile Platform Leads",
+    "privacy disclosures": "Data Protection Officer (DPO), Legal Counsel (Privacy)",
+    "screenshots": "Product Marketing Manager (PMM), App Store Optimization (ASO) Specialist",
+    "metadata": "Product Marketing Manager (PMM), App Store Optimization (ASO) Specialist",
+    "age rating": "Compliance Officer, Product Manager",
+    "AI disclosures": "AI Ethics and Governance Committee, Lead AI Architect",
+    "subscription disclosures": "Growth Lead, Legal Counsel (Commercial)",
+    "payment compliance": "Mobile Tech Lead, Payment Integration Specialist",
+    "accessibility": "Frontend QA Team, Accessibility Specialist",
+    "legal documents": "Legal Counsel (Commercial/IP), Compliance Officer",
+    "support URL": "Customer Support Lead, Web Master",
+    "privacy policy": "Data Protection Officer (DPO), Legal Counsel (Privacy)",
+    "terms of service": "Legal Counsel (Commercial/IP)",
+    "export compliance": "Trade Compliance Officer, Legal Counsel",
+    "encryption declarations": "Security Lead, iOS Platform Architect",
 }
 
-# Manual mapping of specific patterns to areas
+# Manual mapping of specific patterns to review domains
 MAP_PATTERNS_TO_AREAS = {
-    "APPLE-2.1-MISSING-DEMO-ACCOUNT": ["Apple requirements"],
-    "APPLE-2.1-PLACEHOLDER-CONTENT": ["Apple requirements", "Store metadata"],
-    "APPLE-2.1-STAGING-BACKEND": ["Apple requirements", "Security"],
-    "APPLE-5.1.1-MISSING-PRIVACY-POLICY": ["Apple requirements", "Privacy"],
-    "APPLE-5.1.1-VAGUE-PURPOSE-STRING": ["Apple requirements", "Permissions"],
-    "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION": ["Apple requirements", "Permissions"],
-    "APPLE-5.1.1-NO-ACCOUNT-DELETION": ["Apple requirements", "Privacy"],
-    "APPLE-5.1.2-MISSING-ATT": ["Apple requirements", "Privacy"],
-    "APPLE-3.1.1-EXTERNAL-PAYMENT": ["Apple requirements", "SDK compatibility"],
-    "APPLE-4.8-SOCIAL-LOGIN-ONLY": ["Apple requirements", "Privacy"],
-    "APPLE-4.2-WEB-WRAPPER": ["Apple requirements", "Web requirements"],
-    "APPLE-2.5.1-PRIVATE-API": ["Apple requirements", "Deprecated APIs", "Security"],
-    "APPLE-2.3-CROSS-PLATFORM-REFERENCE": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3-AGE-RATING-2026": ["Apple requirements", "Platform announcements"],
-    "APPLE-5.1.2-AI-NO-CONSENT-MODAL": [
-        "Apple requirements",
-        "AI regulations",
-        "Privacy",
-    ],
-    "GOOGLE-DATASAFETY-MISMATCH": ["Google Play requirements", "Privacy"],
-    "GOOGLE-PERM-BACKGROUND-LOCATION": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-ALL-FILES": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-SMS-CALLLOG": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-ACCESSIBILITY-MISUSE": ["Google Play requirements", "Accessibility"],
-    "GOOGLE-TARGET-API": ["Google Play requirements", "Platform announcements"],
-    "GOOGLE-12-TESTER-RULE": ["Google Play requirements", "Platform announcements"],
-    "GOOGLE-PLAY-BILLING": ["Google Play requirements", "SDK compatibility"],
-    "GOOGLE-MISSING-PRIVACY-POLICY": ["Google Play requirements", "Privacy"],
-    "GOOGLE-MISLEADING-LISTING": ["Google Play requirements", "Store metadata"],
-    "GOOGLE-FAMILIES-AD-SDK": ["Google Play requirements", "SDK compatibility"],
-    "BOTH-SDK-SUPPLY-CHAIN": ["SDK compatibility"],
-    "BOTH-LOOTBOX-ODDS": ["Legal documentation"],
-    "APPLE-PRIVACY-MANIFEST-MISSING": ["Apple requirements", "Privacy"],
-    "APPLE-EXPORT-COMPLIANCE-MISSING": ["Apple requirements", "Legal documentation"],
-    "APPLE-RESTORE-PURCHASES-MISSING": ["Apple requirements"],
-    "APPLE-ACCOUNT-DELETION-WEAK": ["Apple requirements", "Privacy"],
-    "ANDROID-DYNAMIC-CODE-LOADING": ["Google Play requirements", "Security"],
-    "ANDROID-QUERY-ALL-PACKAGES": ["Google Play requirements", "Permissions"],
-    "ANDROID-OVERLAY-TAPJACKING": ["Google Play requirements", "Security"],
-    "ANDROID-ACCOUNT-DELETION-URL": ["Google Play requirements", "Privacy"],
-    "BOTH-AI-GENERATED-CONTENT": ["AI regulations"],
-    "BOTH-METADATA-DECORATION": ["Store metadata"],
-    "BOTH-FINGERPRINTING": ["Privacy", "Security"],
-    "APPLE-2.3-FUTURE-FUNCTIONALITY": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": ["Apple requirements", "Store metadata"],
-    "BOTH-UNREACHABLE-METADATA-URL": ["Store metadata"],
-    "APPLE-5.2.5-APPLE-DEVICE-IMAGE": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3.4-DEVICE-FRAMES-PREVIEW": ["Apple requirements", "Store metadata"],
-    "APPLE-3.1.2-MISLEADING-PRICING": ["Apple requirements", "Store metadata"],
-    "APPLE-1.2-UGC-24H-ACTION": ["Apple requirements", "Legal documentation"],
-    "CHINA-AI-REFERENCES": ["AI regulations"],
-    "APPLE-2.4.5-UNUSED-ENTITLEMENTS": ["Apple requirements"],
-    "APPLE-4.0-SIWA-UX": ["Apple requirements"],
-    "APPLE-5.1.1-UNNECESSARY-DATA": ["Apple requirements", "Privacy"],
-    "APPLE-2.1-DEBUG-FEATURES": ["Apple requirements", "Security"],
-    "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION": ["Apple requirements"],
-    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["Apple requirements", "Store metadata"],
+    "APPLE-2.1-MISSING-DEMO-ACCOUNT": ["metadata"],
+    "APPLE-2.1-PLACEHOLDER-CONTENT": ["metadata", "screenshots"],
+    "APPLE-2.1-STAGING-BACKEND": ["metadata"],
+    "APPLE-5.1.1-MISSING-PRIVACY-POLICY": ["privacy policy"],
+    "APPLE-5.1.1-VAGUE-PURPOSE-STRING": ["permissions"],
+    "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION": ["permissions"],
+    "APPLE-5.1.1-NO-ACCOUNT-DELETION": ["privacy disclosures"],
+    "APPLE-5.1.2-MISSING-ATT": ["privacy disclosures"],
+    "APPLE-3.1.1-EXTERNAL-PAYMENT": ["payment compliance"],
+    "APPLE-4.8-SOCIAL-LOGIN-ONLY": ["privacy disclosures"],
+    "APPLE-4.2-WEB-WRAPPER": ["metadata"],
+    "APPLE-2.5.1-PRIVATE-API": ["permissions"],
+    "APPLE-2.3-CROSS-PLATFORM-REFERENCE": ["metadata"],
+    "APPLE-2.3-AGE-RATING-2026": ["age rating"],
+    "APPLE-5.1.2-AI-NO-CONSENT-MODAL": ["AI disclosures", "privacy disclosures"],
+    "GOOGLE-DATASAFETY-MISMATCH": ["privacy disclosures"],
+    "GOOGLE-PERM-BACKGROUND-LOCATION": ["permissions"],
+    "GOOGLE-PERM-ALL-FILES": ["permissions"],
+    "GOOGLE-PERM-SMS-CALLLOG": ["permissions"],
+    "GOOGLE-PERM-ACCESSIBILITY-MISUSE": ["accessibility"],
+    "GOOGLE-TARGET-API": ["metadata"],
+    "GOOGLE-12-TESTER-RULE": ["metadata"],
+    "GOOGLE-PLAY-BILLING": ["payment compliance"],
+    "GOOGLE-MISSING-PRIVACY-POLICY": ["privacy policy"],
+    "GOOGLE-MISLEADING-LISTING": ["metadata"],
+    "GOOGLE-FAMILIES-AD-SDK": ["privacy disclosures"],
+    "BOTH-SDK-SUPPLY-CHAIN": ["privacy disclosures"],
+    "BOTH-LOOTBOX-ODDS": ["legal documents"],
+    "APPLE-PRIVACY-MANIFEST-MISSING": ["privacy disclosures"],
+    "APPLE-EXPORT-COMPLIANCE-MISSING": ["export compliance"],
+    "APPLE-RESTORE-PURCHASES-MISSING": ["payment compliance"],
+    "APPLE-ACCOUNT-DELETION-WEAK": ["privacy disclosures"],
+    "ANDROID-DYNAMIC-CODE-LOADING": ["permissions"],
+    "ANDROID-QUERY-ALL-PACKAGES": ["permissions"],
+    "ANDROID-OVERLAY-TAPJACKING": ["permissions"],
+    "ANDROID-ACCOUNT-DELETION-URL": ["privacy disclosures"],
+    "BOTH-AI-GENERATED-CONTENT": ["AI disclosures"],
+    "BOTH-METADATA-DECORATION": ["metadata"],
+    "BOTH-FINGERPRINTING": ["privacy disclosures"],
+    "APPLE-2.3-FUTURE-FUNCTIONALITY": ["metadata"],
+    "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": ["metadata"],
+    "BOTH-UNREACHABLE-METADATA-URL": ["support URL"],
+    "APPLE-5.2.5-APPLE-DEVICE-IMAGE": ["screenshots"],
+    "APPLE-2.3.4-DEVICE-FRAMES-PREVIEW": ["screenshots"],
+    "APPLE-3.1.2-MISLEADING-PRICING": ["subscription disclosures"],
+    "BOTH-SUBSCRIPTION-HARD-CANCEL": ["subscription disclosures"],
+    "APPLE-1.2-UGC-24H-ACTION": ["terms of service", "legal documents"],
+    "CHINA-AI-REFERENCES": ["AI disclosures"],
+    "APPLE-2.4.5-UNUSED-ENTITLEMENTS": ["permissions"],
+    "APPLE-4.0-SIWA-UX": ["privacy disclosures"],
+    "APPLE-5.1.1-UNNECESSARY-DATA": ["privacy disclosures"],
+    "APPLE-2.1-DEBUG-FEATURES": ["metadata"],
+    "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION": ["metadata"],
+    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["metadata"],
+    "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED": ["age rating"],
+    "BOTH-PLACEHOLDER": ["metadata"],
 }
 
 
@@ -131,61 +134,42 @@ def get_areas_for_pattern(pid, patterns_dict):
         return MAP_PATTERNS_TO_AREAS[pid]
 
     pdata = patterns_dict.get(pid, {})
-    platform = pdata.get("platform", "").lower()
-
-    areas = []
-    if platform == "apple":
-        areas.append("Apple requirements")
-    elif platform == "google":
-        areas.append("Google Play requirements")
-    elif platform == "web":
-        areas.append("Web requirements")
-    elif platform == "both":
-        areas.append("Apple requirements")
-        areas.append("Google Play requirements")
-
     title_lower = pdata.get("title", "").lower() + " " + pid.lower()
 
-    if (
-        "privacy" in title_lower
-        or "data-safety" in title_lower
-        or "tracking" in title_lower
-        or "fingerprinting" in title_lower
-    ):
-        areas.append("Privacy")
-    if (
-        "security" in title_lower
-        or "staging" in title_lower
-        or "backend" in title_lower
-        or "private-api" in title_lower
-        or "overlay" in title_lower
-        or "dynamic" in title_lower
-    ):
-        areas.append("Security")
-    if "accessibility" in title_lower:
-        areas.append("Accessibility")
-    if (
-        "ai" in title_lower
-        or "openai" in title_lower
-        or "gemini" in title_lower
-        or "claude" in title_lower
-    ):
-        areas.append("AI regulations")
-    if (
-        "metadata" in title_lower
-        or "placeholder" in title_lower
-        or "future-func" in title_lower
-        or "unreachable" in title_lower
-    ):
-        areas.append("Store metadata")
+    areas = []
     if "perm" in title_lower or "usage-description" in title_lower:
-        areas.append("Permissions")
-    if "billing" in title_lower or "payment" in title_lower or "sdk" in title_lower:
-        areas.append("SDK compatibility")
+        areas.append("permissions")
+    if "privacy-policy" in title_lower or "missing-privacy-policy" in title_lower:
+        areas.append("privacy policy")
+    elif "privacy" in title_lower or "data-safety" in title_lower or "tracking" in title_lower or "fingerprinting" in title_lower:
+        areas.append("privacy disclosures")
+    if "screenshot" in title_lower or "device-image" in title_lower or "device-frame" in title_lower:
+        areas.append("screenshots")
+    if "age" in title_lower or "rating" in title_lower or "minor" in title_lower or "child" in title_lower:
+        areas.append("age rating")
+    if "ai" in title_lower or "openai" in title_lower or "gemini" in title_lower or "claude" in title_lower:
+        areas.append("AI disclosures")
+    if "subscr" in title_lower or "renew" in title_lower or "hard-cancel" in title_lower:
+        areas.append("subscription disclosures")
+    if "billing" in title_lower or "payment" in title_lower or "external-payment" in title_lower or "restore" in title_lower:
+        areas.append("payment compliance")
+    if "accessibility" in title_lower:
+        areas.append("accessibility")
+    if "legal" in title_lower or "lootbox" in title_lower or "dsa" in title_lower or "licens" in title_lower:
+        areas.append("legal documents")
+    if "support" in title_lower or "unreachable" in title_lower or "url" in title_lower:
+        areas.append("support URL")
+    if "terms" in title_lower or "eula" in title_lower or "tos" in title_lower:
+        areas.append("terms of service")
+    if "export" in title_lower:
+        areas.append("export compliance")
+    if "encrypt" in title_lower or "anssi" in title_lower:
+        areas.append("encryption declarations")
+    if "metadata" in title_lower or "placeholder" in title_lower or "future-func" in title_lower:
+        areas.append("metadata")
 
     if not areas:
-        areas.append("Apple requirements")
-        areas.append("Google Play requirements")
+        areas.append("metadata")
 
     return list(set(areas))
 
@@ -498,7 +482,14 @@ def main():
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines) + "\n")
 
+    # Also update docs/RELEASE-REVIEW-REPORT-2026.md in the repo
+    doc_report_path = os.path.join(ROOT, "docs", "RELEASE-REVIEW-REPORT-2026.md")
+    os.makedirs(os.path.dirname(doc_report_path), exist_ok=True)
+    with open(doc_report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(report_lines) + "\n")
+
     print(f"Release readiness report generated successfully at: {report_path}")
+    print(f"Release review report updated at: {doc_report_path}")
     print(
         f"Summary: critical={sum(1 for f in findings if f['severity'] == 'critical')} high={sum(1 for f in findings if f['severity'] == 'high')} medium={sum(1 for f in findings if f['severity'] == 'medium')} low={sum(1 for f in findings if f['severity'] == 'low')}"
     )
