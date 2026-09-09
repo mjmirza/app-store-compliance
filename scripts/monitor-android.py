@@ -307,6 +307,15 @@ CATEGORY_SIGNALS = {
     ],
 }
 
+# Source trust domains and keywords for verification
+TRUST_HIERARCHY = {
+    "Priority 1": "Official sources (European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications, Apple Developer, Android Developer, Google Play Console)",
+    "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
+    "Priority 3": "Academic papers",
+    "Priority 4": "Industry blogs",
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries",
+}
+
 # Rich mock announcements representing policy updates/bulletins for ALL 19 categories
 MOCK_ANNOUNCEMENTS = [
     {
@@ -462,6 +471,190 @@ MOCK_ANNOUNCEMENTS = [
         "pubDate": "Mon, 04 May 2026 09:00:00 PDT",
     },
 ]
+
+
+def classify_source_and_verify(announcement, all_announcements=None):
+    """
+    Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "europa.eu",
+        "eur-lex.europa.eu",
+        "enisa.europa.eu",
+        "edpb.europa.eu",
+        "ftc.gov",
+        "nist.gov",
+        "cisa.gov",
+        "ico.org.uk",
+        "gov.uk",
+        "gov.sg",
+        "imda.gov.sg",
+        "pdpc.gov.sg",
+        "anpd.gov.br",
+        "esafety.gov.au",
+        "apple.com",
+        "developer.apple.com",
+        "android.com",
+        "developer.android.com",
+        "support.google.com",
+        "source.android.com",
+        "firebase.google.com",
+    ]
+    p1_keywords = [
+        "european commission",
+        "eur-lex",
+        "official journal",
+        "enisa",
+        "edpb",
+        "ftc",
+        "nist",
+        "cisa",
+        "ico",
+        "government publication",
+        "imda",
+        "pdpc",
+        "anpd",
+        "esafety commissioner",
+        "federal register",
+        "apple developer",
+        "android developer",
+        "google play",
+        "play console",
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = [
+        "academic paper",
+        "academic study",
+        "university research",
+        "peer-reviewed",
+    ]
+
+    p4_domains = [
+        "techcrunch.com",
+        "wired.com",
+        "medium.com",
+        "blog",
+        "randomblogsite.com",
+    ]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = [
+        "tweet",
+        "twitter",
+        "linkedin",
+        "reddit",
+        "ai summary",
+        "ai-generated summary",
+        "ai generated summaries",
+        "chatgpt summary",
+    ]
+
+    priority = 4  # Default to 4 if nothing matches
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(
+        kw in combined for kw in p4_keywords
+    ):
+        priority = 4
+    elif (
+        any(d in link for d in p3_domains)
+        or any(kw in combined for kw in p3_keywords)
+        or ".edu" in link
+    ):
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(
+        kw in combined for kw in p2_keywords
+    ):
+        priority = 2
+
+    if (
+        any(d in link for d in p1_domains)
+        or any(kw in combined for kw in p1_keywords)
+        or ".gov" in link
+    ):
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if ".gov" in combined:
+            has_p1_ref_in_text = True
+
+        if has_p1_ref_in_text:
+            is_verified = True
+        elif all_announcements:
+            words = set(re.findall(r"[a-z]+", combined))
+            for other in all_announcements:
+                if other == announcement:
+                    continue
+                other_p, _ = classify_source_and_verify(other, None)
+                if other_p == 1:
+                    other_combined = f"{other.get('title', '')} {other.get('description', '')} {other.get('link', '')}".lower()
+                    other_words = set(re.findall(r"[a-z]+", other_combined))
+                    common_terms = {
+                        "android",
+                        "google",
+                        "play",
+                        "sdk",
+                        "privacy",
+                        "security",
+                    }
+                    overlap = words.intersection(other_words).intersection(
+                        common_terms
+                    )
+                    if overlap:
+                        is_verified = True
+                        break
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(classified_updates):
+    """
+    Logs source trust verification status and returns only verified updates
+    for compliance PR draft generation.
+    """
+    verified_updates = []
+    blocked_count = 0
+    for u in classified_updates:
+        priority, is_verified = classify_source_and_verify(
+            u, classified_updates
+        )
+        status_str = f"Priority {priority} " + (
+            "(Verified)" if is_verified else "(Unverified)"
+        )
+        if priority in (4, 5) and not is_verified:
+            blocked_count += 1
+            print(
+                f"[Source Trust Warning] Blocked unverified Priority {priority} update for PR draft: {u['title']}",
+                file=sys.stderr,
+            )
+        else:
+            verified_updates.append(u)
+    return verified_updates, blocked_count
 
 
 def scan_codebase_for_android_signals(start_dir="."):
@@ -631,6 +824,7 @@ def classify_announcements(announcements, keywords_filter=None):
 def generate_pull_request_draft(updates, scan_results):
     """
     Generates a draft of a pull request complying with the exact 15 required sections.
+    Deduplicates details at the category level to prevent repetitive sections.
     """
     citations_list = []
     affected_files_set = set()
@@ -638,10 +832,14 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_categories = set()
+
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
         citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
         )
 
         # Pull affected files
@@ -649,6 +847,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific migration details
         if cat == "Target SDK requirements":
@@ -932,6 +1134,7 @@ Ensure that the Play Console account owner has completed the personal/organizati
 def update_documentation_report(updates, output_filepath):
     """
     Overwrites or updates the migration report in docs/ANDROID-POLICY-MIGRATION.md.
+    Deduplicates categories when generating implementation task lists.
     """
     lines = [
         "<!-- ANDROID_POLICY_MONITOR_START -->",
@@ -944,17 +1147,32 @@ def update_documentation_report(updates, output_filepath):
     ]
 
     for idx, u in enumerate(updates, 1):
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
         lines.append(f"- **Published Date**: {u['pubDate']}")
         lines.append(f"- **Official Resource**: [{u['link']}]({u['link']})")
+        lines.append(f"- **Verification Status**: {status_str}")
         lines.append(f"- **Description**: {u['description']}")
         lines.append("")
 
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
+        priority, is_verified = classify_source_and_verify(u)
+        if priority in (4, 5) and not is_verified:
+            lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
+            lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
+            lines.append("")
+            continue
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
@@ -967,12 +1185,61 @@ def update_documentation_report(updates, output_filepath):
             lines.append(
                 "- [ ] **Task 2**: Test target API level 36 behaviors on devices."
             )
+        elif cat == "Minimum SDK requirements":
+            lines.append(
+                "- [ ] **Task 1**: Set `minSdkVersion` to 23 (Android 6.0) or higher."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify legacy API 21/22 support removal."
+            )
+        elif cat == "Android API deprecations":
+            lines.append(
+                "- [ ] **Task 1**: Remove legacy SafetyNet Attestation references."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Integrate Play Integrity API for client security."
+            )
+        elif cat == "Android permission model":
+            lines.append(
+                "- [ ] **Task 1**: Migrate to native Android Photo Picker for scoped media access."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Audit Manifest permissions for restricted access."
+            )
+        elif cat == "Background execution restrictions":
+            lines.append(
+                "- [ ] **Task 1**: Audit WorkManager and AlarmManager background task timeouts."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify SCHEDULE_EXACT_ALARM exemption eligibility."
+            )
+        elif cat == "Foreground service policies":
+            lines.append(
+                "- [ ] **Task 1**: Specify foregroundServiceType inside manifest service tags."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Register foreground service type video verification demo on Play Console."
+            )
+        elif cat == "Privacy Sandbox":
+            lines.append(
+                "- [ ] **Task 1**: Opt into Privacy Sandbox Topics and Attribution Reporting APIs."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Transition analytics away from persistent GAID identifiers."
+            )
+        elif cat == "Play Integrity API":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side Play Integrity token verification."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Enforce cryptographic nonce checks to prevent replay attacks."
+            )
         elif cat == "Play Billing":
             lines.append(
                 "- [ ] **Task 1**: Migrate project dependencies to Billing Library version 8.0."
             )
             lines.append(
-                "- [ ] **Task 2**: Perform test transactions on Google Play console sandbox."
+                "- [ ] **Task 2**: Perform test transactions on Google Play Console sandbox."
             )
         elif cat == "User Data policy":
             lines.append(
@@ -981,12 +1248,54 @@ def update_documentation_report(updates, output_filepath):
             lines.append(
                 "- [ ] **Task 2**: Connect the URL to the Play Console User Data safety form."
             )
-        elif cat == "Foreground service policies":
+        elif cat == "Data Safety section":
             lines.append(
-                "- [ ] **Task 1**: Specify foregroundServiceType inside the manifest service tags."
+                "- [ ] **Task 1**: Conduct static SDK audit for third-party analytics/ad tracking."
             )
             lines.append(
-                "- [ ] **Task 2**: Register foreground service type video verification demo on Play Console."
+                "- [ ] **Task 2**: Align Play Console Data Safety declarations with runtime traffic."
+            )
+        elif cat == "AI-generated content policies":
+            lines.append(
+                "- [ ] **Task 1**: Add AI disclosure dialog and user content flagging UI."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure content safety filters for AI outputs."
+            )
+        elif cat == "Accessibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Ensure minimum 48dp touch targets and content descriptions on all views."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Validate screen reader navigation with TalkBack scanner."
+            )
+        elif cat == "Device compatibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Enable dynamic activity resizing and multi-window support."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Test layout responsiveness on foldable and tablet devices."
+            )
+        elif cat == "Security Bulletins":
+            lines.append(
+                "- [ ] **Task 1**: Isolate cryptographic keys inside hardware-backed Android Keystore."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Review monthly Security Bulletins for outstanding CVE patches."
+            )
+        elif cat == "Android Enterprise requirements":
+            lines.append(
+                "- [ ] **Task 1**: Implement Work Profile boundary checks and secure DevicePolicyManager APIs."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Validate managed device deployment compliance."
+            )
+        elif cat == "Firebase policy updates":
+            lines.append(
+                "- [ ] **Task 1**: Migrate from Firebase Dynamic Links to standard App Links / Hosting."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Update Firestore and Realtime Database security rules."
             )
         else:
             lines.append(
@@ -1033,7 +1342,8 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (outputs to stdout if omitted)",
+        default="docs/ANDROID_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR",
     )
 
     args = parser.parse_args()
@@ -1049,14 +1359,9 @@ def main():
                 "https://android-developers.googleblog.com/feeds/posts/default"
             )
         )
-        # Android Security Bulletins publish no RSS feed. The canonical page is
-        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:
-        print(
-            "Using comprehensive mock Android policy updates for compliance scanning..."
-        )
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
             try:
                 with open(args.mock, "r") as f:
@@ -1080,11 +1385,16 @@ def main():
         print("No classified updates matched the current filters.")
         sys.exit(0)
 
+    # Enforce strict source trust hierarchy validation
+    verified_updates, blocked_count = enforce_strict_source_trust_hierarchy(classified_updates)
+
     print(
-        f"Monitored and classified {len(classified_updates)} policy/requirement updates:"
+        f"Monitored and classified {len(classified_updates)} policy/requirement updates ({blocked_count} blocked due to source trust validation):"
     )
     for idx, u in enumerate(classified_updates, 1):
-        print(f" {idx}. [{u['category']}] {u['title']}")
+        priority, is_verified = classify_source_and_verify(u)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        print(f" {idx}. [{u['category']}] {u['title']} - {status_str}")
 
     # 3. Scan the codebase for signals related to these categories
     print(f"Scanning codebase under '{args.dir}' for Android integration signals...")
@@ -1098,9 +1408,10 @@ def main():
     update_documentation_report(classified_updates, args.output_docs)
 
     # 5. Generate Pull Request draft
-    pr_draft = generate_pull_request_draft(classified_updates, scan_results)
+    pr_draft = generate_pull_request_draft(verified_updates, scan_results)
 
     if args.pr_output:
+        os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
         try:
             with open(args.pr_output, "w", encoding="utf-8") as f:
                 f.write(pr_draft)
