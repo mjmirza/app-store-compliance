@@ -253,6 +253,15 @@ CATEGORY_SIGNALS = {
     ],
 }
 
+# Source trust domains and keywords for verification
+TRUST_HIERARCHY = {
+    "Priority 1": "Official sources (European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications, Apple Developer, Android Developer)",
+    "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
+    "Priority 3": "Academic papers",
+    "Priority 4": "Industry blogs",
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries",
+}
+
 # Mock announcements covering the 17 mobile security categories
 MOCK_ANNOUNCEMENTS = [
     {
@@ -392,6 +401,128 @@ MOCK_ANNOUNCEMENTS = [
         "pubDate": "Wed, 22 Jul 2026 13:00:00 PDT",
     },
 ]
+
+
+def classify_source_and_verify(announcement, all_announcements=None):
+    """Classifies an announcement by TRUST_HIERARCHY priority (1-5) and verification status.
+
+    Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "europa.eu",
+        "eur-lex.europa.eu",
+        "enisa.europa.eu",
+        "edpb.europa.eu",
+        "ftc.gov",
+        "nist.gov",
+        "cisa.gov",
+        "ico.org.uk",
+        "gov.uk",
+        "apple.com",
+        "developer.apple.com",
+        "android.com",
+        "developer.android.com",
+        "support.google.com",
+        "owasp.org",
+        "oauth.net",
+    ]
+    p1_keywords = [
+        "european commission",
+        "eur-lex",
+        "official journal",
+        "enisa",
+        "edpb",
+        "ftc",
+        "nist",
+        "cisa",
+        "ico",
+        "government publication",
+        "apple developer",
+        "android developer",
+        "owasp",
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = [
+        "academic paper",
+        "academic study",
+        "university research",
+        "peer-reviewed",
+    ]
+
+    p4_domains = [
+        "techcrunch.com",
+        "wired.com",
+        "medium.com",
+        "blog",
+        "randomblogsite.com",
+    ]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = [
+        "tweet",
+        "twitter",
+        "linkedin",
+        "reddit",
+        "ai summary",
+        "ai generated summaries",
+    ]
+
+    priority = 4
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(
+        kw in combined for kw in p4_keywords
+    ):
+        priority = 4
+    elif (
+        any(d in link for d in p3_domains)
+        or any(kw in combined for kw in p3_keywords)
+        or ".edu" in link
+    ):
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(
+        kw in combined for kw in p2_keywords
+    ):
+        priority = 2
+
+    if (
+        any(d in link for d in p1_domains)
+        or any(kw in combined for kw in p1_keywords)
+        or ".gov" in link
+    ):
+        priority = 1
+
+    is_verified = priority <= 3
+    if not is_verified:
+        has_p1_ref = any(d in combined for d in p1_domains) or any(
+            kw in combined for kw in p1_keywords
+        )
+        if has_p1_ref:
+            is_verified = True
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(classified_updates):
+    """Enforces strict source trust hierarchy validation on classified updates."""
+    for u in classified_updates:
+        priority, is_verified = classify_source_and_verify(u)
+        if priority in (4, 5) and not is_verified:
+            print(
+                f"Source Trust Verification Warning: Unverified Priority {priority} source detected for '{u['title']}' ({u['link']}). Compliance PR generation restricted.",
+                file=sys.stderr,
+            )
 
 
 def scan_codebase_for_security_signals(start_dir="."):
@@ -565,6 +696,7 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_categories = set()
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         citations_list.append(
@@ -576,6 +708,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -824,7 +960,7 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_mock=True):
     """Overwrites or updates the migration report in docs/SECURITY-POLICY-MIGRATION.md."""
     lines = [
         "<!-- SECURITY_POLICY_MONITOR_START -->",
@@ -832,9 +968,17 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-security.py` to track compliance areas.",
         "",
+    ]
+    if is_mock:
+        lines.extend([
+            "> **Notice**: Running in simulation/mock mode using offline security requirement update feeds.",
+            "",
+        ])
+
+    lines.extend([
         "## Monitored Security Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -846,8 +990,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -864,17 +1013,113 @@ def update_documentation_report(updates, output_filepath):
             lines.append(
                 "- [ ] **Task 1**: Configure Keychain accessibility to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly."
             )
+            lines.append(
+                "- [ ] **Task 2**: Audit Keychain item sharing and set kSecAttrSynchronizable to false."
+            )
         elif cat == "Android Keystore":
             lines.append(
                 "- [ ] **Task 1**: Enforce StrongBox and check KeyInfo.isInsideSecureHardware() on key creation."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure KeyGenParameterSpec with AES-GCM and user authentication parameters."
             )
         elif cat == "biometric authentication":
             lines.append(
                 "- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt."
             )
+            lines.append(
+                "- [ ] **Task 2**: Replace unsecure boolean LAContext evaluatePolicy checks with SecAccessControl structures."
+            )
         elif cat == "certificate pinning":
             lines.append(
                 "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure NSPinnedDomains in iOS Info.plist with backup intermediate CA pins."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement multi-layered jailbreak detection checking dyld library injection, directory write permissions, and symlink structures."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement immediate security responses (token purge and session invalidation) upon detecting jailbreak environment."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement Play Integrity API token generation and backend cryptographical verification."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add local heuristic root checks for su binaries, test-keys build tags, and zygisk modules."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Enforce android:usesCleartextTraffic=false in AndroidManifest.xml and network_security_config.xml."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Set minimum TLS version to TLS 1.2 / TLS 1.3 across all client networking engines."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure android:dataExtractionRules and android:fullBackupContent to exclude credentials and database files."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Set isExcludedFromBackup resource attribute on sensitive iOS local data files."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Explicitly declare android:exported=false on all non-launcher activities in AndroidManifest.xml."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Secure required exported activities with signature-level custom permissions."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Replace implicit intent dispatches with explicit class-targeted intents."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Validate caller package identity via getCallingActivity() or getCallingPackage() before processing intent payloads."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Sanitize and strictly parse all incoming custom URL scheme parameters."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Eliminate secret or token transmissions via custom URL schemes."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Publish and host a valid apple-app-site-association file under .well-known/ on the domain."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure Xcode Associated Domains entitlement for applinks."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Publish assetlinks.json with certificate SHA-256 fingerprint on the host web domain."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Set android:autoVerify=true on AndroidManifest.xml intent filters."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Implement OAuth 2.1 with Proof Key for Code Exchange (PKCE)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Transition authentication screens from embedded WebViews to ASWebAuthenticationSession / Custom Tabs."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Implement complete server-side session invalidation on user logout."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Apply multitasking window background blurring on app background state changes."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Store access and refresh tokens exclusively inside iOS Keychain or Android EncryptedSharedPreferences."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement short token lifetimes for access tokens and automatic refresh token rotation."
             )
         else:
             lines.append(
@@ -929,14 +1174,15 @@ def main():
 
     # 1. Gather announcements
     announcements = []
+    is_mock_mode = False
 
     if args.live:
         print("Fetching live Security RSS feeds...")
-        # Android Security Bulletins publish no RSS feed. The canonical page is
-        # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
+        # Android Security Bulletins publish no RSS feed.
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
     if args.mock or (not args.live and not args.mock) or not announcements:
+        is_mock_mode = True
         print(
             "Using comprehensive mock Security policy updates for compliance scanning..."
         )
@@ -963,6 +1209,8 @@ def main():
         print("No classified updates matched the current filters.")
         sys.exit(0)
 
+    enforce_strict_source_trust_hierarchy(classified_updates)
+
     print(
         f"Monitored and classified {len(classified_updates)} security requirement updates:"
     )
@@ -978,7 +1226,9 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(
+        classified_updates, args.output_docs, is_mock=is_mock_mode
+    )
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
