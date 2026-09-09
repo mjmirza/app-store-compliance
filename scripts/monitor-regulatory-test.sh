@@ -54,10 +54,12 @@ SECTIONS=(
   "Approver recommendations"
 )
 
-for sect in "${SECTIONS[@]}"; do
-  # Check if the section header exists as a markdown heading in the description field of the JSON
-  if ! echo "$EU_JSON" | grep -q "## $sect"; then
-    echo "[ERROR] Missing expected section in output: $sect"
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  # Check if the section header exists as a numbered markdown heading in the description field of the JSON
+  if ! echo "$EU_JSON" | grep -q "## ${sec_num}\. ${sec_name}"; then
+    echo "[ERROR] Missing expected section in output: ## ${sec_num}. ${sec_name}"
     exit 1
   fi
 done
