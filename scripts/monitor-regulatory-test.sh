@@ -109,6 +109,36 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output flags
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TEST_DOCS_OUT="/tmp/test-regulatory-report.md"
+TEST_PR_OUT="/tmp/test-regulatory-pr.md"
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] --output-docs failed to create output file at $TEST_DOCS_OUT"
+  exit 1
+fi
+echo "[PASS] --output-docs created report file successfully"
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] --pr-output failed to create PR draft file at $TEST_PR_OUT"
+  exit 1
+fi
+echo "[PASS] --pr-output created PR draft file successfully"
+
+for sect in "${SECTIONS[@]}"; do
+  if ! grep -q "## $sect" "$TEST_PR_OUT"; then
+    echo "[ERROR] Missing expected section $sect in PR file $TEST_PR_OUT"
+    exit 1
+  fi
+done
+echo "[PASS] PR draft file contains all 15 required compliance sections"
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
