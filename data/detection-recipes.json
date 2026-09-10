@@ -104,6 +104,7 @@
     "GOOGLE-GENAI-NCII-CONTROLS": "grep -rqn 'generateImage\\|imageGeneration\\|text-to-image\\|faceSwap\\|stable-diffusion' --include='*.kt' --include='*.java' --include='*.xml' --include='*.gradle' --include='*.kts' --include='*.dart' --include='*.ts' . && ! grep -rqi 'moderation\\|safetyClassifier\\|contentFilter' .",
     "GOOGLE-ANON-CHAT-MINOR-BLOCK": "grep -rqi 'random chat\\|anonymous chat\\|chat with strangers\\|Omegle' . && ! grep -rqi 'ageGate\\|minorBlock\\|csae' .",
     "GOOGLE-UNRATED-APP-BANNED": "echo 'manual. open Play Console, App content, Content rating, and confirm the questionnaire is complete and current'",
-    "APPLE-ENROLLMENT-VERIFICATION-PENDING": "echo 'manual. open developer.apple.com/account, confirm Membership is Active, every agreement and attachment is accepted, and no migration is pending, at least six weeks before the first submission'"
+    "APPLE-ENROLLMENT-VERIFICATION-PENDING": "echo 'manual. open developer.apple.com/account, confirm Membership is Active, every agreement and attachment is accepted, and no migration is pending, at least six weeks before the first submission'",
+    "BOTH-US-ASAA-AGE-SIGNALS-MISSING": "grep -rn 'ageCategory\\|minorUser\\|parentalConsent' --include='*.swift' --include='*.kt' --include='*.java' . && ! grep -rn 'DeclaredAgeRange\\|com.google.android.play:age-signals\\|verifyParentalConsent' ."
   }
 }
