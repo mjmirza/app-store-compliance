@@ -103,6 +103,10 @@ MAP_PATTERNS_TO_AREAS = {
     "APPLE-2.1-DEBUG-FEATURES": ["Apple requirements", "Security"],
     "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION": ["Apple requirements"],
     "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["Apple requirements", "Store metadata"],
+    "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED": ["Apple requirements", "Deprecated APIs"],
+    "BOTH-PLACEHOLDER": ["Store metadata"],
+    "BOTH-SUBSCRIPTION-HARD-CANCEL": ["Privacy", "Legal documentation"],
+    "BOTH-MISSING-PRIVACY-POLICY": ["Privacy"],
 }
 
 
@@ -353,6 +357,14 @@ def main():
     i = 0
     while i < len(lines):
         line = lines[i]
+        if (
+            "absorbed into" in line.lower()
+            or "jurisdiction:" in line.lower()
+            or "passed deadlines absorbed" in line.lower()
+        ):
+            i += 1
+            continue
+
         match = re.match(
             r"^\s*\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s+([A-Z0-9-._]+)\s+(.+)$",
             line,
@@ -494,11 +506,20 @@ def main():
         report_lines.append("")
 
     # Write report file into the audited target, not this playbook's own root
+    report_content = "\n".join(report_lines) + "\n"
     report_path = os.path.join(target_dir, "RELEASE-READINESS-REPORT.md")
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(report_lines) + "\n")
+        f.write(report_content)
+
+    docs_dir = os.path.join(target_dir, "docs")
+    if not os.path.exists(docs_dir):
+        os.makedirs(docs_dir, exist_ok=True)
+    docs_report_path = os.path.join(docs_dir, "RELEASE-REVIEW-REPORT-2026.md")
+    with open(docs_report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
 
     print(f"Release readiness report generated successfully at: {report_path}")
+    print(f"Documentation report generated successfully at: {docs_report_path}")
     print(
         f"Summary: critical={sum(1 for f in findings if f['severity'] == 'critical')} high={sum(1 for f in findings if f['severity'] == 'high')} medium={sum(1 for f in findings if f['severity'] == 'medium')} low={sum(1 for f in findings if f['severity'] == 'low')}"
     )
