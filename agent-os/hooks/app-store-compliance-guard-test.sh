@@ -554,7 +554,7 @@ rm -rf "$D"
 # 49 "renew automatically until cancelled" is a renewal notice, not an instruction to call.
 D="$(mktemp -d)"
 printf '{"name":"t"}' > "$D/package.json"
-printf '<html><body>Subscriptions renew automatically until cancelled in your store account settings.</body></html>' > "$D/index.html"
+printf '<html><body>Your subscription renews automatically until cancelled in your store account settings.</body></html>' > "$D/index.html"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +BOTH-SUBSCRIPTION-HARD-CANCEL ' && bad "Call inside automatically does not read as call to cancel" || ok "Call inside automatically does not read as call to cancel"
 rm -rf "$D"
