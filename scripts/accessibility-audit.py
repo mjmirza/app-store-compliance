@@ -419,6 +419,7 @@ def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to write generated markdown report to.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -476,6 +477,35 @@ def main():
 
     print(f"Summary. critical={crit} high={high} medium={med} low={low}")
     print("Reference. docs/EU-REGULATORY-2026.md and docs/PLATFORM-MECHANICS-2026.md")
+
+    if args.report_out:
+        lines = []
+        lines.append("# Accessibility Compliance Report\n")
+        lines.append(f"**Audited Directory**: `{args.directory}`")
+        lines.append(f"**Scanned Files**: iOS={len(ios_files)}, Android={len(android_files)}\n")
+        lines.append("## Executive Summary\n")
+        lines.append(f"- **Critical**: {crit}")
+        lines.append(f"- **High**: {high}")
+        lines.append(f"- **Medium**: {med}")
+        lines.append(f"- **Low**: {low}\n")
+        lines.append("## Rule Evaluation Breakdown\n")
+        lines.append("| Platform | Rule ID | Category | Status |")
+        lines.append("| --- | --- | --- | --- |")
+        for rid, meta in RULE_META.items():
+            r_findings = [f for f in all_findings if f["rule_id"] == rid]
+            status = f"FAILED ({len(r_findings)} issue(s))" if r_findings else "PASSED"
+            lines.append(f"| {meta['platform'].capitalize()} | `{rid}` | {meta['title']} | {status} |")
+        lines.append("\n## Audit Findings Detail\n")
+        if not all_findings:
+            lines.append("No accessibility compliance regressions found.\n")
+        else:
+            for f in all_findings:
+                lines.append(f"### `{f['rule_id']}` in `{f['file']}:{f['line']}`")
+                lines.append(f"- **Match**: `{f['match']}`")
+                lines.append(f"- **Reason**: {f['message']}")
+                lines.append(f"- **Fix**: {f['fix']}\n")
+        with open(args.report_out, "w", encoding="utf-8") as rf:
+            rf.write("\n".join(lines))
 
     # Exit with 0 on advisory findings since accessibility represents medium store risk
     return 0
