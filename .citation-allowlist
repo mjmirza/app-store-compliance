@@ -20,6 +20,13 @@ https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restric
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
 
+# Test fixture URLs used in monitor-ai-policy-test.sh
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# OWASP community URL subject to redirect or 404
+https://owasp.org/www-community/controls/Certificate_and_Public_Key_Pinning
+
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
 
