@@ -292,7 +292,7 @@ MOCK_ANNOUNCEMENTS = [
         "category": "certificate pinning",
         "title": "Certificate Pinning Guidelines: Mandating Subject Public Key Info (SPKI) Pinning",
         "description": "Leaf-level certificate pinning is discouraged due to rotational outages. Best practices mandate pinning the Subject Public Key Info (SPKI) of the primary and backup intermediate certificate authorities.",
-        "link": "https://owasp.org/www-community/controls/Certificate_and_Public_Key_Pinning",
+        "link": "https://cheatsheetseries.owasp.org/cheatsheets/Pinning_Cheat_Sheet.html",
         "pubDate": "Wed, 24 Jun 2026 14:00:00 PDT",
     },
     {
