@@ -11,6 +11,17 @@ import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
+import html
+
+def clean_html_text(raw_text, max_len=400):
+    if not raw_text:
+        return ""
+    clean = re.sub(r'<[^>]+>', ' ', raw_text)
+    clean = html.unescape(clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    if max_len and len(clean) > max_len:
+        clean = clean[:max_len].rsplit(' ', 1)[0] + "..."
+    return clean
 
 # The 16 tracked privacy requirement categories
 CATEGORIES = [
@@ -467,21 +478,21 @@ def parse_rss_feed(url):
                     for child in elem:
                         ctag = clean_tag(child.tag)
                         if ctag == "title":
-                            title = child.text or ""
+                            title = clean_html_text(child.text or "", max_len=200)
                         elif ctag in ("description", "summary", "content"):
-                            desc = child.text or ""
+                            desc = clean_html_text(child.text or "", max_len=400)
                         elif ctag == "link":
                             link_val = child.get("href")
                             link = link_val if link_val else (child.text or "")
                         elif ctag in ("pubDate", "published", "updated"):
-                            pub_date = child.text or ""
+                            pub_date = (child.text or "").strip()
 
                     items.append(
                         {
-                            "title": title.strip(),
-                            "description": desc.strip() if desc else "",
+                            "title": title,
+                            "description": desc,
                             "link": link.strip(),
-                            "pubDate": pub_date.strip(),
+                            "pubDate": pub_date,
                         }
                     )
     except Exception as e:
