@@ -50,15 +50,24 @@ fi
 [ -d "$DIR" ] || { log_err "project dir not found. $DIR"; exit 0; }
 
 # ----- build a source file list, excluding vendor dirs -----
+# Directories are pruned by name, and only below the project root (-mindepth 1). The old full-path
+# match also hit the folders ABOVE the root, so a project sitting under a folder named build was
+# scanned as empty, and it still walked every excluded tree. Test code, Python virtualenvs, and
+# bundled web output (dist) never ship in the binary, and a virtualenv's vendored JSON otherwise
+# reads as app source. .xcprivacy is scanned because NSPrivacyCollectedDataTypes lives there.
 FILELIST="$(mktemp 2>/dev/null || echo /tmp/ascg.$$)"
-find "$DIR" -type f \( \
+find "$DIR" -mindepth 1 \
+  \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o -name dist \
+    -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
+    -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests \
+    -o -name integration_test -o -name .venv -o -name venv -o -name site-packages \) -prune \) \
+  -o -type f \( \
   -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
   -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
   -o -name '*.json' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
   -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
-  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' \
-  \) 2>/dev/null \
-  | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
+  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
+  \) -print 2>/dev/null \
   > "$FILELIST"
 
 grep_has() {  # 0 if regex found in any source file
@@ -106,24 +115,30 @@ finding() {  # severity id title fix
   printf '      fix. %s\n' "$4"
 }
 
+# Cross-platform apps reach StoreKit and Play Billing through a plugin, so the native symbols never
+# appear in their source. These are the plugins' own package names.
+XPLAT_IAP='in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor'
+
 # ----- platform detection -----
+# Every find below pipes into `grep .`, never `grep -q .`, for the reason in release_string_has:
+# grep -q exits on the first match, find dies of SIGPIPE, and pipefail turns "found" into "missing".
 IS_IOS=0; IS_AND=0; IS_WEB=0
-find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep -q . && IS_IOS=1
-find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
-find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
-find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep -q . && IS_WEB=1
+find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep . >/dev/null && IS_IOS=1
+find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep . >/dev/null && IS_IOS=1
+find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep . >/dev/null && IS_AND=1
+find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep . >/dev/null && IS_WEB=1
 
 # ----- cross-platform framework detection -----
 # IS_IOS/IS_AND above still fire on the built artifact. This adds framework-specific checks.
 IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
-find "$DIR" -maxdepth 4 -name 'pubspec.yaml' 2>/dev/null | grep -q . && IS_FLUTTER=1
+find "$DIR" -maxdepth 4 -name 'pubspec.yaml' 2>/dev/null | grep . >/dev/null && IS_FLUTTER=1
 # Scan EVERY package.json within depth (not just the first), so a monorepo root's tooling
 # package.json never shadows a real apps/mobile/package.json deeper in the tree.
 while IFS= read -r pkg; do
   grep -qE '"react-native"|"expo"' "$pkg" 2>/dev/null && IS_RN=1
   grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$pkg" 2>/dev/null && IS_IONIC=1
 done < <(find "$DIR" -maxdepth 4 -name 'package.json' 2>/dev/null | grep -vE '/(node_modules|ios/Pods)/')
-find "$DIR" -maxdepth 4 -name 'capacitor.config.*' 2>/dev/null | grep -q . && IS_IONIC=1
+find "$DIR" -maxdepth 4 -name 'capacitor.config.*' 2>/dev/null | grep . >/dev/null && IS_IONIC=1
 # config.xml alone is ambiguous (Maven/NuGet/tooling also use that filename), so require the
 # Cordova widget marker before it counts as a signal.
 while IFS= read -r cfg; do
@@ -168,7 +183,9 @@ if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_
   finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content."
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
-if grep_has 'subscri(be|ption)|auto.renew|membership' && grep_has '[Cc]all.{0,25}[Cc]ancel|[Cc]ancel.{0,25}[Cc]all|[Mm]ail.{0,25}[Cc]ancel|[Ww]rite.{0,25}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'; then
+# "call" and "write" match as whole words only, or "renews automatically until cancelled" and
+# "overwrite ... cancel" read as an instruction to call or write in.
+if grep_has 'subscri(be|ption)|auto.renew|membership' && grep_has '(^|[^A-Za-z])[Cc]all[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,25}[^A-Za-z][Cc]all([^A-Za-z]|$)|[Mm]ail.{0,25}[Cc]ancel|(^|[^A-Za-z])[Ww]rite[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'; then
   finding high "BOTH-SUBSCRIPTION-HARD-CANCEL" "Subscription cancellation appears to require a phone call, mail, or an in-person visit" "Provide a self-service cancellation path at least as easy as sign-up (FTC Section 5, ROSCA, and CA/NY/MA negative-option laws)."
 fi
 # fastlane precheck derived metadata checks
@@ -186,7 +203,7 @@ fi
 # iOS-only Apple requirement, gated on IS_IOS so an Android-only build is never blocked for it.
 if [ "$IS_FLUTTER" -eq 1 ]; then
   if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
       finding critical "FLUTTER-PRIVACY-MANIFEST-MISSING" "Flutter plugins that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere in the project" "Add an app-level PrivacyInfo.xcprivacy AND confirm each Flutter plugin ships its own (permission_handler, image_picker, and most first-party plugins added theirs from Flutter 3.19+). A missing plugin-level manifest is invisible to Apple's aggregator unless the app manifest also declares that plugin's reason codes. This check only runs against an iOS target."
     fi
   fi
@@ -204,7 +221,7 @@ if [ "$IS_RN" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     fi
   fi
   if grep_has 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
       finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side."
     fi
   fi
@@ -222,7 +239,7 @@ if [ "$IS_IONIC" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it."
   fi
   if grep_has '@capacitor/|Capacitor\.'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
       finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one."
     fi
   fi
@@ -280,7 +297,7 @@ if [ "$IS_IOS" -eq 1 ]; then
     grep_has 'ATTrackingManager|NSUserTrackingUsageDescription' || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency" "Call the ATT prompt and add NSUserTrackingUsageDescription (Apple 5.1.2)."
   fi
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
-    grep_has 'StoreKit|SKProduct|Product\.purchase' || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)."
+    grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)."
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)."
@@ -300,7 +317,7 @@ if [ "$IS_IOS" -eq 1 ]; then
   fi
   # Privacy manifest, the top modern Apple upload rejection since 2024
   if grep_has 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
+    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
       finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest."
     fi
   fi
@@ -365,7 +382,7 @@ if [ "$IS_AND" -eq 1 ]; then
     finding critical "GOOGLE-PERM-ACCESSIBILITY-MISUSE" "AccessibilityService present" "Use it only for genuine accessibility and declare the use, or remove it."
   fi
   if grep_has 'Stripe|PayPal|braintree|razorpay'; then
-    grep_has 'BillingClient|com\.android\.billingclient' || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods."
+    grep_has "BillingClient|com\.android\.billingclient|$XPLAT_IAP" || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods."
   fi
   # Payments policy exception is literal. only a tax-exempt charity may take donations outside Play
   # billing (AnkiDroid, August 2026). A donate link to a funding platform is a Payments violation.
@@ -467,7 +484,9 @@ if [ "$IS_AND" -eq 1 ]; then
     fi
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
-  if grep_has 'contacts|SMS|device accounts|files|personalData'; then
+  # Permission constants and API symbols, not English words (#542). The old lowercase word list,
+  # matched case-sensitively, fired on "files" in any documented repo and missed READ_CONTACTS.
+  if grep_has 'READ_CONTACTS|WRITE_CONTACTS|ContactsContract|READ_SMS|SEND_SMS|RECEIVE_SMS|SmsManager|GET_ACCOUNTS|AccountManager|READ_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_(IMAGES|VIDEO|AUDIO)|personalData'; then
     if ! grep_has 'prominent disclosure|user consent|privacy consent|accept policy'; then
       finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent."
     fi

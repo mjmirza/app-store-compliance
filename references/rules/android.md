@@ -27,13 +27,13 @@ grep -rn 'HealthConnectClient\|com.google.android.gms.permission.HealthConnect\|
 - Severity. critical
 - What triggers it. Collecting personal user data (e.g. contacts, SMS, device accounts, files) without a prominent disclosure and explicit user consent block.
 - How to fix it. Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent.
-- Detection signals. contacts, SMS, device accounts, files, personalData
+- Detection signals. READ_CONTACTS, WRITE_CONTACTS, ContactsContract, READ_SMS, SEND_SMS, RECEIVE_SMS, SmsManager, GET_ACCOUNTS, AccountManager, READ_EXTERNAL_STORAGE, MANAGE_EXTERNAL_STORAGE, READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO, personalData
 - Present means handled. prominent disclosure, user consent, privacy consent, accept policy
 
 How to detect.
 
 ```bash
-grep -rn 'contacts\|SMS\|device accounts\|files\|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\|user consent\|privacy consent\|accept policy' .
+grep -rnE 'READ_CONTACTS|WRITE_CONTACTS|ContactsContract|READ_SMS|SEND_SMS|RECEIVE_SMS|SmsManager|GET_ACCOUNTS|AccountManager|READ_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_(IMAGES|VIDEO|AUDIO)|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\|user consent\|privacy consent\|accept policy' .
 ```
 
 ## GOOGLE-DATASAFETY-MISMATCH

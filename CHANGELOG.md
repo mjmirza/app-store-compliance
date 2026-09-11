@@ -11,6 +11,12 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Fixed
 
+- The guard scanned Python virtualenvs, bundled web output under dist/, and lowercase test folders (test/, tests/, integration_test/) as app source. A virtualenv's vendored API JSON alone raised five false criticals on one Flutter project. Directories are now pruned by name below the project root only, which also fixes a project sitting under a folder named build being scanned as empty (#542).
+- Every `find | grep -q .` pipeline exited 141 under `set -o pipefail` once grep stopped reading and find died of SIGPIPE, so a project with more than one PrivacyInfo.xcprivacy (any CocoaPods or SPM project) was reported as missing its privacy manifest, and platform detection could miss a platform. The pipelines now drain their input, as release_string_has already did.
+- ANDROID-USER-DATA-DISCLOSURE matched lowercase English words case-sensitively, so it fired on "files" in any documented repo and stayed silent on READ_CONTACTS. It now matches the permission constants and API symbols (#542).
+- APPLE-3.1.1-EXTERNAL-PAYMENT and GOOGLE-PLAY-BILLING only recognised native StoreKit and BillingClient symbols, which never appear in a Flutter, React Native, Expo, Capacitor, or Cordova app's source. The store purchase plugins for those frameworks now count.
+- APPLE-PRIVACY-NUTRITION-LABELS looked for NSPrivacyCollectedDataTypes but never read .xcprivacy files, where that key lives. They are now scanned.
+- BOTH-SUBSCRIPTION-HARD-CANCEL matched "call" inside "automatically", so "renews automatically until cancelled" read as an instruction to call. "call" and "write" now match as whole words.
 - The README install prompt and the one-time check prompt never asked the agent to walk the account and program readiness checklist or the 90-day regulatory deadline window, both of which a code scan cannot see. Both prompts now do.
 - docs/PLATFORM-MECHANICS-2026.md cited the wrong announcement id for the June 2026 Guideline 4.3 tightening and still said API 35. Now a233fmpw and API 36 with the 1 November 2026 extension.
 - docs/EU-REGULATORY-2026.md section 2.3 said the EU unified fee model was not implemented. It applies from 1 October 2026 (Core Technology Commission, Attachment 14).

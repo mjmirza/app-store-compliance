@@ -16,7 +16,7 @@
 How to detect.
 
 ```bash
-grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' . && ! grep -rn 'StoreKit\|SKProduct\|Product.purchase' --include='*.swift' .
+grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' --include='pubspec.yaml' --include='package.json' . && ! grep -rnE 'StoreKit|SKProduct|Product.purchase|in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor' --include='*.swift' --include='pubspec.yaml' --include='package.json' .
 ```
 
 ## APPLE-GAMBLING-BRAZIL-LICENSE
@@ -49,7 +49,7 @@ grep -rni 'gambling\|fixed-odds\|betting' --include='*.swift' .   # then verify 
 How to detect.
 
 ```bash
-grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' . && ! grep -rn 'BillingClient\|com.android.billingclient' .
+grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' --include='pubspec.yaml' --include='package.json' . && ! grep -rnE 'BillingClient|com.android.billingclient|in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor' .
 ```
 
 ## APPLE-3.1.2-MISLEADING-PRICING
@@ -113,7 +113,7 @@ grep -rni 'lootbox\|loot box\|gacha\|mystery box\|random reward' .
 How to detect.
 
 ```bash
-grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
+grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE '(^|[^a-z])call[^a-z].{0,24}cancel|cancel.{0,25}[^a-z]call([^a-z]|$)|mail.{0,25}cancel|(^|[^a-z])write[^a-z].{0,24}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
 ```
 
 ## BOTH-WITHDRAWAL-BUTTON-MISSING

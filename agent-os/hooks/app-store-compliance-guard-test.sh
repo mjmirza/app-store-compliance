@@ -62,7 +62,7 @@ mk_ios_bad_nutrition() {
 
 mk_android_bad_privacy() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/app/src/main"
-  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="com.google.android.gms.permission.AD_ID"/><uses-permission android:name="android.permission.READ_STEPS"/></manifest>' > "$d/app/src/main/AndroidManifest.xml"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="com.google.android.gms.permission.AD_ID"/><uses-permission android:name="android.permission.READ_STEPS"/><uses-permission android:name="android.permission.READ_CONTACTS"/></manifest>' > "$d/app/src/main/AndroidManifest.xml"
   printf 'android { defaultConfig { targetSdkVersion 34 } }\n' > "$d/app/build.gradle"
   printf 'class MyActivity { void test() { requestPermissions(new String[]{"camera"}, 1); HealthConnectClient client = null; contacts = "john"; } }\n' > "$d/app/src/main/MyActivity.java"
   echo "$d"
@@ -486,6 +486,102 @@ printf '<plist/>' > "$D/App/Info.plist"
 printf '// curl https://api.appstoreconnect.apple.com/v1/appStoreVersions/123/ageRatingDeclaration\n' > "$D/App/A.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -q 'APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED' && ok "Removed ASC age-rating endpoint in a script fires" || bad "Removed ASC age-rating endpoint in a script fires"
+rm -rf "$D"
+
+# 43 A Python virtualenv inside the project is not app source. Its vendored JSON mentions betting,
+# background location, and localhost, none of which the app ships.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/app/src/main" "$D/tool/.venv/lib/python3.12/site-packages/api"
+printf '<plist/>' > "$D/App/Info.plist"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf '{"a": "fixed-odds betting", "b": "ACCESS_BACKGROUND_LOCATION", "c": "http://localhost:8080"}\n' > "$D/tool/.venv/lib/python3.12/site-packages/api/discovery.json"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(APPLE-GAMBLING-BRAZIL-LICENSE|APPLE-2\.1-STAGING-BACKEND|GOOGLE-PERM-BACKGROUND-LOCATION) ' && bad "Virtualenv contents are not scanned as app source" || ok "Virtualenv contents are not scanned as app source"
+rm -rf "$D"
+
+# 44 Many privacy manifests, as every CocoaPods or SPM project has. `find | grep -q .` exited 141
+# under pipefail once grep stopped reading, and reported the app's own manifest missing.
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/lib"
+printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$D/pubspec.yaml"
+printf "import 'package:permission_handler/permission_handler.dart';\n" > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf '{}' > "$D/ios/Runner/PrivacyInfo.xcprivacy"
+for i in $(seq 1 1500); do mkdir -p "$D/ios/Pods/SomeVendoredPod$i/Resources"; printf '{}' > "$D/ios/Pods/SomeVendoredPod$i/Resources/PrivacyInfo.xcprivacy"; done
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(FLUTTER|APPLE)-PRIVACY-MANIFEST-MISSING ' && bad "Existing privacy manifest is found among many (no SIGPIPE under pipefail)" || ok "Existing privacy manifest is found among many (no SIGPIPE under pipefail)"
+rm -rf "$D"
+
+# 45 A project that itself sits under folders named build and test is still scanned. Exclusions
+# apply only below the project root.
+P="$(mktemp -d)"; D="$P/build/test/app"; mkdir -p "$D"
+S="$(mk_ios_bad)"; cp -R "$S/." "$D/"; rm -rf "$S"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-3.1.1-EXTERNAL-PAYMENT' && [ "$RC" -eq 2 ] && ok "Project under build/ and test/ parent folders is still scanned" || bad "Project under build/ and test/ parent folders is still scanned (rc=$RC)"
+rm -rf "$P"
+
+# 46 NSPrivacyCollectedDataTypes lives in PrivacyInfo.xcprivacy, so declaring it there satisfies the check.
+D="$(mk_ios_bad_nutrition)"
+printf '<plist><dict><key>NSPrivacyCollectedDataTypes</key><array/></dict></plist>' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-PRIVACY-NUTRITION-LABELS ' && bad "Privacy manifest declaring collected data types satisfies nutrition labels" || ok "Privacy manifest declaring collected data types satisfies nutrition labels"
+rm -rf "$D"
+
+# 47 Lowercase test folders (Flutter test/ and integration_test/, JS tests/) never ship either.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/test"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.delete("/users/me") }\n' > "$D/App/A.swift"
+printf '// the outgoing page must finish sliding after it is deactivated\n' > "$D/test/T.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "Words in a lowercase test/ folder are not app source" || ok "Words in a lowercase test/ folder are not app source"
+rm -rf "$D"
+
+# 48 A cross-platform app selling digital goods through a store plugin, and physical goods through a
+# payment SDK, is not an external-payment violation. Without the plugin it still is.
+mk_flutter_pay() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  razorpay_flutter: ^1.3.0\n%b' "$1" > "$d/pubspec.yaml"
+  printf '<plist><dict></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '{}' > "$d/ios/Runner/PrivacyInfo.xcprivacy"
+  printf '<manifest package="t"/>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+D="$(mk_flutter_pay '  in_app_purchase: ^3.2.0\n')"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(GOOGLE-PLAY-BILLING|APPLE-3\.1\.1-EXTERNAL-PAYMENT) ' && bad "Store purchase plugin satisfies both IAP checks" || ok "Store purchase plugin satisfies both IAP checks"
+rm -rf "$D"
+D="$(mk_flutter_pay '')"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PLAY-BILLING' && echo "$OUT" | grep -q 'APPLE-3.1.1-EXTERNAL-PAYMENT' && ok "Payment SDK with no store plugin still fires both IAP checks" || bad "Payment SDK with no store plugin still fires both IAP checks"
+rm -rf "$D"
+
+# 49 "renew automatically until cancelled" is a renewal notice, not an instruction to call.
+D="$(mktemp -d)"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Subscriptions renew automatically until cancelled in your store account settings.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +BOTH-SUBSCRIPTION-HARD-CANCEL ' && bad "Call inside automatically does not read as call to cancel" || ok "Call inside automatically does not read as call to cancel"
+rm -rf "$D"
+
+# 50 and 51, the two fixtures from #542. Prose about files is not a sensitive permission. READ_CONTACTS is.
+mk_android_perm() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/android/app/src/main"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/>%s</manifest>' "$1" > "$d/android/app/src/main/AndroidManifest.xml"
+  printf 'android { compileSdk 36 }\n' > "$d/android/app/build.gradle"
+  echo "$d"
+}
+D="$(mk_android_perm '')"
+printf '<html><body>%s</body></html>' "$(for i in $(seq 1 20); do printf 'Export the files. '; done)" > "$D/notes.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +ANDROID-USER-DATA-DISCLOSURE ' && bad "#542 fixture A: prose about files stays silent" || ok "#542 fixture A: prose about files stays silent"
+rm -rf "$D"
+D="$(mk_android_perm '<uses-permission android:name="android.permission.READ_CONTACTS"/>')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'ANDROID-USER-DATA-DISCLOSURE' && ok "#542 fixture B: READ_CONTACTS without disclosure fires" || bad "#542 fixture B: READ_CONTACTS without disclosure fires"
+rm -rf "$D"
+
+# 52 #542. Bundled web output under dist/ is a build artifact, not source.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/web/dist/assets"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'const u="http://localhost:54321/auth/v1";\n' > "$D/web/dist/assets/index-abc123.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-2\.1-STAGING-BACKEND ' && bad "Bundled dist/ output is not scanned as source" || ok "Bundled dist/ output is not scanned as source"
 rm -rf "$D"
 
 echo ""
