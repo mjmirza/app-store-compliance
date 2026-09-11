@@ -56,14 +56,34 @@ SECTIONS=(
 
 for sect in "${SECTIONS[@]}"; do
   # Check if the section header exists as a markdown heading in the description field of the JSON
-  if ! echo "$EU_JSON" | grep -q "## $sect"; then
+  if ! echo "$EU_JSON" | grep -q "## [0-9]*\. *$sect"; then
     echo "[ERROR] Missing expected section in output: $sect"
     exit 1
   fi
 done
 echo "[PASS] All 15 required compliance sections exist in the Pull Request generator output"
 
-# Test 5: Verify JSON output is valid JSON
+# Test 5: Verify CLI flags --output-docs and --pr-output work
+echo "[TEST] Testing --output-docs and --pr-output flags..."
+TEST_DOCS_OUT="/tmp/test_regulatory_doc.md"
+TEST_PR_OUT="/tmp/test_regulatory_pr.md"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TEST_DOCS_OUT" --pr-output "$TEST_PR_OUT" > /dev/null
+
+if [ ! -f "$TEST_DOCS_OUT" ]; then
+  echo "[ERROR] --output-docs file was not created"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR_OUT" ]; then
+  echo "[ERROR] --pr-output file was not created"
+  exit 1
+fi
+
+rm -f "$TEST_DOCS_OUT" "$TEST_PR_OUT"
+echo "[PASS] CLI flags --output-docs and --pr-output generate expected files"
+
+# Test 6: Verify JSON output is valid JSON
 echo "[TEST] Running JSON output validation..."
 JSON_OUT=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "COPPA" --json)
 if ! echo "$JSON_OUT" | python3 -m json.tool > /dev/null; then
@@ -72,7 +92,7 @@ if ! echo "$JSON_OUT" | python3 -m json.tool > /dev/null; then
 fi
 echo "[PASS] monitor-regulatory.py generated valid JSON output"
 
-# Test 6: Verify strict emoji-free policy on output
+# Test 7: Verify strict emoji-free policy on output
 echo "[TEST] Scanning output for any emojis or non-ascii/graphical emoticons..."
 EMOJI_CHECK=$(echo "$EU_JSON" | python3 -c "
 import sys
@@ -91,7 +111,7 @@ if [ "$EMOJI_CHECK" != "No emojis found" ]; then
 fi
 echo "[PASS] monitor-regulatory.py is 100% emoji-free"
 
-# Test 7: Verify Source Trust Hierarchy validation and blocking logic
+# Test 8: Verify Source Trust Hierarchy validation and blocking logic
 echo "[TEST] Verifying Source Trust Hierarchy and blocking logic..."
 GDPR_RUMOR_JSON=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "rumors of GDPR policy changes" --json)
 

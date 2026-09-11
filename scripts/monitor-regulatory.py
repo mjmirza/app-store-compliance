@@ -4,6 +4,7 @@
 
 import os
 import re
+import sys
 import json
 import argparse
 from datetime import datetime
@@ -67,12 +68,12 @@ REGULATORY_TRACKS = {
             "product safety",
             "manufacturer details",
             "responsible person",
-            "safety warning"
+            "safety warning",
         ],
         "patterns": [
             r"gpsr",
             r"general[ -]product[ -]safety[ -]regulation",
-            r"product[ -]safety"
+            r"product[ -]safety",
         ],
         "detect_files": ["*.swift", "*.py", "*.js", "*.ts", "*.json", "*.md"],
         "detect_regex": r"productListing|buyProduct|checkout|e-commerce|manufacturerInfo|safetyWarning|manufacturerEmail|manufacturerAddress|safetyLabel|productSafety|responsiblePerson",
@@ -81,9 +82,9 @@ REGULATORY_TRACKS = {
             "Ensure e-commerce product detail templates display manufacturer identity (name, registered trade name/trademark).",
             "Provide manufacturer postal address and electronic address (email or website) directly on the interface.",
             "Display relevant product safety warnings or instructions in languages accepted by the member states of distribution.",
-            "Formally verify that an EU-based Responsible Person is designated for any products sold to EU consumers."
+            "Formally verify that an EU-based Responsible Person is designated for any products sold to EU consumers.",
         ],
-        "compliance_impact": "High"
+        "compliance_impact": "High",
     },
     "GDPR": {
         "jurisdiction": "European Union",
@@ -117,37 +118,6 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "High",
     },
-    "European Accessibility Act": {
-        "jurisdiction": "European Union",
-        "authorities": ["European Commission", "Official Journal"],
-        "citations": [
-            "Directive (EU) 2019/882 of the European Parliament and of the Council of 17 April 2019 on the accessibility requirements for products and services",
-            "Harmonised Standard EN 301 549 Chapter 11 (Accessibility requirements for non-web software)",
-        ],
-        "keywords": [
-            "eaa",
-            "european accessibility act",
-            "en 301 549",
-            "accessibility requirements",
-            "wcag 2.1",
-            "accessibility statement",
-        ],
-        "patterns": [
-            r"european[ -]accessibility[ -]act",
-            r"en[ -]301[ -]549",
-            r"accessibility[ -]statement",
-        ],
-        "detect_files": ["*.swift", "*.storyboard", "*.xib", "*.html", "*.md"],
-        "detect_regex": r"accessibilityLabel|accessibilityTraits|VoiceOver|DynamicType|contrast|accessibilityHint",
-        "impact_desc": "The EAA mandates that digital services, including mobile applications and e-commerce websites, meet strict accessibility requirements of EN 301 549 (based on WCAG 2.1 AA) and publish an accessibility statement.",
-        "migration_steps": [
-            "Audit all UI components to ensure screen-reader labels (accessibilityLabel) and traits are present.",
-            "Verify support for system-wide font scaling (Dynamic Type) without breaking the layout.",
-            "Maintain WCAG 2.1 AA color contrast compliance (at least 4.5:1 for normal text).",
-            "Draft and publish an official accessibility statement reachable from within the app.",
-        ],
-        "compliance_impact": "High",
-    },
     "Data Act": {
         "jurisdiction": "European Union",
         "authorities": ["European Commission", "EUR-Lex"],
@@ -170,6 +140,28 @@ REGULATORY_TRACKS = {
             "Implement secure, user-accessible endpoints or download options for all user-generated device data.",
             "Provide transparent disclosures about how and when device sensor data is processed.",
             "Ensure data portability features are integrated into smart device companion apps.",
+        ],
+        "compliance_impact": "Medium",
+    },
+    "Data Governance Act": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Regulation (EU) 2022/868 on European data governance (Data Governance Act)"
+        ],
+        "keywords": [
+            "data governance act",
+            "dga",
+            "data intermediation",
+            "data altruism",
+        ],
+        "patterns": [r"data[ -]governance[ -]act", r"\bdga\b"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"dataSharing|dataIntermediation|dataAltruism|dataTrust",
+        "impact_desc": "The Data Governance Act sets conditions for data sharing services and data altruism organizations across the EU.",
+        "migration_steps": [
+            "Verify data intermediation neutrality and separate entity compliance if providing data broker services.",
+            "Maintain explicit consent records for any data shared under data altruism frameworks.",
         ],
         "compliance_impact": "Medium",
     },
@@ -206,6 +198,28 @@ REGULATORY_TRACKS = {
             "Establish an automated software bill of materials (SBOM) generation pipeline.",
             "Integrate a structured channel for security researchers to report vulnerabilities.",
             "Review dependencies for known vulnerabilities and implement a regular patching cadence.",
+        ],
+        "compliance_impact": "High",
+    },
+    "NIS2": {
+        "jurisdiction": "European Union",
+        "authorities": ["ENISA", "European Commission", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2022/2555 on measures for a high common level of cybersecurity across the Union (NIS2 Directive)"
+        ],
+        "keywords": [
+            "nis2",
+            "network and information security directive",
+            "incident reporting",
+            "supply chain security",
+        ],
+        "patterns": [r"nis2", r"directive[ -]2022/2555"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"incidentReporting|supplyChain|securityAudit|essentialEntities",
+        "impact_desc": "NIS2 expands cybersecurity compliance duties, incident reporting timelines (24-hour initial warning), and supply chain risk management for essential and important entities.",
+        "migration_steps": [
+            "Establish automated incident detection and rapid reporting workflows.",
+            "Audit supply chain dependencies and third-party vendor security posture.",
         ],
         "compliance_impact": "High",
     },
@@ -267,62 +281,194 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "High",
     },
-    "UK Online Safety Act": {
-        "jurisdiction": "United Kingdom",
-        "authorities": ["Ofcom", "Government publications"],
+    "ePrivacy": {
+        "jurisdiction": "European Union",
+        "authorities": ["EDPB", "European Commission"],
         "citations": [
-            "Online Safety Act 2023 (c. 50)",
-            "Ofcom Guidelines on Highly Effective Age Assurance for Child Protection",
+            "Directive 2002/58/EC concerning the processing of personal data and the protection of privacy in the electronic communications sector (ePrivacy Directive)"
+        ],
+        "keywords": ["eprivacy", "cookie consent", "terminal equipment", "tracking pixels"],
+        "patterns": [r"eprivacy", r"terminal[ -]equipment"],
+        "detect_files": ["*.html", "*.js", "*.ts", "*.swift", "*.md"],
+        "detect_regex": r"cookieConsent|trackingPixel|gtag|fbq|localStorage",
+        "impact_desc": "The ePrivacy Directive requires explicit, prior consent before storing or accessing information stored on user terminal equipment.",
+        "migration_steps": [
+            "Deploy a cookie consent banner blocking non-essential tracking scripts until opt-in.",
+            "Ensure terminal storage access (cookies, localStorage) adheres strictly to prior consent choices.",
+        ],
+        "compliance_impact": "High",
+    },
+    "European Accessibility Act": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "Official Journal"],
+        "citations": [
+            "Directive (EU) 2019/882 of the European Parliament and of the Council of 17 April 2019 on the accessibility requirements for products and services",
+            "Harmonised Standard EN 301 549 Chapter 11 (Accessibility requirements for non-web software)",
         ],
         "keywords": [
-            "online safety act",
-            "ofcom",
-            "age assurance",
-            "child protection",
-            "harmful content",
-            "digital id",
+            "eaa",
+            "european accessibility act",
+            "en 301 549",
+            "accessibility requirements",
+            "wcag 2.1",
+            "accessibility statement",
         ],
         "patterns": [
-            r"online[ -]safety[ -]act",
-            r"age[ -]assurance",
-            r"child[ -]protection",
+            r"european[ -]accessibility[ -]act",
+            r"en[ -]301[ -]549",
+            r"accessibility[ -]statement",
         ],
-        "detect_files": ["*.swift", "Info.plist", "*.json", "*.md"],
-        "detect_regex": r"age-gating|DeclaredAgeRange|ageVerification|parental|Ofcom",
-        "impact_desc": "The UK Online Safety Act requires platforms likely to host child users or harmful content to use highly effective age assurance methods (e.g. digital ID, facial estimation) rather than simple self-declaration.",
+        "detect_files": ["*.swift", "*.storyboard", "*.xib", "*.html", "*.md"],
+        "detect_regex": r"accessibilityLabel|accessibilityTraits|VoiceOver|DynamicType|contrast|accessibilityHint",
+        "impact_desc": "The EAA mandates that digital services, including mobile applications and e-commerce websites, meet strict accessibility requirements of EN 301 549 (based on WCAG 2.1 AA) and publish an accessibility statement.",
         "migration_steps": [
-            "Upgrade minor age assurance flows to leverage verified methods (such as document checking or facial age estimation).",
-            "Store and process verification data in a ringfenced environment and destroy it immediately after use.",
-            "Verify that default privacy settings for minor accounts are highly restrictive.",
+            "Audit all UI components to ensure screen-reader labels (accessibilityLabel) and traits are present.",
+            "Verify support for system-wide font scaling (Dynamic Type) without breaking the layout.",
+            "Maintain WCAG 2.1 AA color contrast compliance (at least 4.5:1 for normal text).",
+            "Draft and publish an official accessibility statement reachable from within the app.",
         ],
-        "compliance_impact": "Critical",
+        "compliance_impact": "High",
     },
-    "ICO Childrens Code": {
+    "Product Liability Directive": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Directive (EU) 2024/2853 of the European Parliament and of the Council on liability for defective products"
+        ],
+        "keywords": [
+            "product liability directive",
+            "defective software",
+            "software liability",
+        ],
+        "patterns": [r"product[ -]liability", r"defective[ -]software"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"termsOfService|disclaimer|warranty|liability",
+        "impact_desc": "The revised EU Product Liability Directive explicitly classifies software and AI systems as products, making developers liable for damage caused by defective software.",
+        "migration_steps": [
+            "Audit software safety, error handling, and defensive fallback pathways.",
+            "Review legal Terms of Service and warranty disclaimers in accordance with EU liability rules.",
+        ],
+        "compliance_impact": "High",
+    },
+    "AI Liability Directive": {
+        "jurisdiction": "European Union",
+        "authorities": ["European Commission", "EUR-Lex"],
+        "citations": [
+            "Proposal for a Directive on adapting non-contractual civil liability rules to artificial intelligence (AI Liability Directive, COM/2022/496 final)"
+        ],
+        "keywords": [
+            "ai liability directive",
+            "ai liability",
+            "presumption of causality",
+        ],
+        "patterns": [r"ai[ -]liability", r"causality[ -]presumption"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"aiLog|aiDecision|modelOutput|aiAudit",
+        "impact_desc": "The proposed AI Liability Directive establishes harmonized rules for civil liability claims related to AI outputs, introducing presumpions of causality and disclosure orders.",
+        "migration_steps": [
+            "Maintain structured, tamper-evident logs of AI model inputs, outputs, and system decisions.",
+            "Implement audit trails for AI model updates and fine-tuning history.",
+        ],
+        "compliance_impact": "Medium",
+    },
+    "UK ICO & DSIT": {
         "jurisdiction": "United Kingdom",
-        "authorities": ["ICO", "Government publications"],
+        "authorities": ["ICO", "DSIT", "Government publications"],
         "citations": [
             "Information Commissioner's Office Age Appropriate Design Code (Children's Code)",
-            "UK Data Protection Act 2018",
+            "DSIT White Paper on AI Regulation: A pro-innovation approach (2023/2024)",
         ],
         "keywords": [
             "childrens code",
             "age appropriate design",
             "ico",
+            "dsit",
+            "uk ai regulation",
             "high privacy by default",
-            "dpia",
         ],
         "patterns": [
             r"children[s]?[ -]code",
             r"age[ -]appropriate[ -]design",
-            r"high[ -]privacy[ -]by[ -]default",
+            r"ico",
+            r"dsit",
         ],
         "detect_files": ["*.swift", "Info.plist", "*.md"],
         "detect_regex": r"dpia|tracking|location|profiling|minor|child",
-        "impact_desc": "The ICO Children's Code sets 15 standards for apps likely to be accessed by children under 18, requiring high privacy by default, zero tracking/profiling by default, and a formal DPIA.",
+        "impact_desc": "The UK ICO Children's Code sets 15 standards for apps likely to be accessed by children under 18, requiring high privacy by default, zero tracking/profiling by default, and a formal DPIA.",
         "migration_steps": [
             "Conduct a comprehensive Data Protection Impact Assessment (DPIA).",
             "Disable precise geolocation and profiling features by default for all minor accounts.",
             "Verify that privacy policies and terms are presented in child-friendly language.",
+        ],
+        "compliance_impact": "High",
+    },
+    "UK FCA & CMA": {
+        "jurisdiction": "United Kingdom",
+        "authorities": ["FCA", "CMA", "Government publications"],
+        "citations": [
+            "Financial Conduct Authority Guidance on AI and Consumer Duty",
+            "Competition and Markets Authority Principles for Foundation Models",
+        ],
+        "keywords": ["fca", "cma", "consumer duty", "foundation models", "uk finance"],
+        "patterns": [r"\bfca\b", r"\bcma\b", r"consumer[ -]duty"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"financialAdvice|creditScoring|paymentProcessing|pricingAlgorithm",
+        "impact_desc": "UK financial and competition regulators (FCA/CMA) require transparent algorithmic pricing, fair treatment of consumers, and accountability for AI financial guidance.",
+        "migration_steps": [
+            "Audit financial calculation models and AI advice features for fairness and transparency.",
+            "Ensure consumer duty principles are met in user-facing financial guidance flows.",
+        ],
+        "compliance_impact": "High",
+    },
+    "US FTC & CISA": {
+        "jurisdiction": "United States (Federal)",
+        "authorities": ["FTC", "CISA", "Federal Register"],
+        "citations": [
+            "FTC Policy Statement on Deceptive AI and Synthetic Media",
+            "CISA Guidelines for Secure AI System Development",
+        ],
+        "keywords": [
+            "ftc",
+            "cisa",
+            "deceptive ai",
+            "secure ai development",
+            "dark patterns",
+        ],
+        "patterns": [r"\bftc\b", r"\bcisa\b", r"dark[ -]patterns"],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"darkPattern|subscriptionTrap|autoRenew|deceptiveUI|syntheticMedia",
+        "impact_desc": "The FTC enforces Section 5 actions against deceptive AI representations, undisclosed dark patterns, and automated subscription traps; CISA issues secure AI development guidance.",
+        "migration_steps": [
+            "Review subscription enrollment and cancellation flows to eliminate dark patterns.",
+            "Apply CISA secure AI design practices across data preparation, training, and inference.",
+        ],
+        "compliance_impact": "Critical",
+    },
+    "US NIST AI RMF & Executive Orders": {
+        "jurisdiction": "United States (Federal)",
+        "authorities": ["NIST", "Executive Orders", "CISA"],
+        "citations": [
+            "NIST AI Risk Management Framework (NIST AI RMF 1.0 / NIST SP 1270)",
+            "Executive Order 14110 on Safe, Secure, and Trustworthy Development and Use of Artificial Intelligence",
+        ],
+        "keywords": [
+            "nist",
+            "nist ai rmf",
+            "executive order 14110",
+            "ai risk management",
+            "red teaming",
+        ],
+        "patterns": [
+            r"nist[ -]ai[ -]rmf",
+            r"executive[ -]order[ -]14110",
+            r"ai[ -]risk[ -]management",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"aiRisk|redTeaming|modelEvaluation|safetyGuardrail",
+        "impact_desc": "NIST AI RMF and US Executive Orders establish governance standards (MAP, MEASURE, MANAGE, GOVERN) for trustworthy AI deployment and compulsory red-teaming.",
+        "migration_steps": [
+            "Incorporate NIST AI RMF core functions into internal engineering workflows.",
+            "Document red-teaming and adversarial robustness testing for integrated model endpoints.",
         ],
         "compliance_impact": "High",
     },
@@ -356,38 +502,62 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
-    "US State ASAA": {
+    "US State AI Legislation": {
         "jurisdiction": "United States (State)",
-        "authorities": ["State Legislatures", "CISA"],
+        "authorities": ["State Legislatures", "State Attorneys General"],
         "citations": [
+            "Colorado Artificial Intelligence Act (SB 24-205)",
+            "California SB 1047 / AB 2013 Generative AI Transparency Act",
             "Utah SB 142 (App Store Accountability Act)",
-            "Texas SB 2420 (App Store Accountability Act)",
         ],
         "keywords": [
-            "asaa",
-            "app store accountability",
-            "utah sb 142",
-            "texas sb 2420",
-            "louisiana hb 570",
-            "age category",
+            "colorado ai act",
+            "california ai",
+            "sb 24-205",
+            "ab 2013",
+            "state ai legislation",
+            "algorithmic discrimination",
         ],
         "patterns": [
-            r"asaa",
-            r"app[ -]store[ -]accountability",
-            r"sb[ -]142",
-            r"sb[ -]2420",
+            r"colorado[ -]ai",
+            r"sb[ -]24-205",
+            r"ab[ -]2013",
+            r"algorithmic[ -]discrimination",
         ],
         "detect_files": ["*.swift", "Info.plist", "*.md"],
-        "detect_regex": r"DeclaredAgeRange|ageCategory|parentalConsent|texas|utah",
-        "impact_desc": "State App Store Accountability Acts require stores and developers to cooperate on age categorization and require verified parental consent before a minor downloads or transacts.",
+        "detect_regex": r"discriminationRisk|biasImpact|california|colorado|DeclaredAgeRange",
+        "impact_desc": "State laws require developers of high-risk AI systems to complete algorithmic discrimination impact assessments and provide consumer notices.",
         "migration_steps": [
-            "Integrate with platform Declared Age Range APIs to request the user's age category.",
-            "Enforce strict deletion of verification data immediately after age checks complete.",
-            "Verify and enforce parental consent checks on all minor transactions.",
+            "Perform bias impact assessments for algorithmic decision components.",
+            "Display state-mandated consumer notices when automated decision-making is deployed.",
         ],
         "compliance_impact": "Critical",
     },
-    "Australia Online Safety": {
+    "Canada OPC & AIDA": {
+        "jurisdiction": "Canada",
+        "authorities": ["OPC", "ISED", "Government publications"],
+        "citations": [
+            "Office of the Privacy Commissioner of Canada (OPC) Guidance on Generative AI",
+            "Artificial Intelligence and Data Act (AIDA - Bill C-27)",
+        ],
+        "keywords": [
+            "opc",
+            "aida",
+            "canada ai",
+            "artificial intelligence and data act",
+            "pipeda",
+        ],
+        "patterns": [r"\bopc\b", r"\baida\b", r"pipeda"],
+        "detect_files": ["*.swift", "Info.plist", "*.md"],
+        "detect_regex": r"canada|pipeda|aida|meaningfulConsent",
+        "impact_desc": "Canadian privacy and AI rules mandate meaningful consent, strict risk management for high-impact AI systems, and transparent data practices.",
+        "migration_steps": [
+            "Integrate meaningful consent mechanisms tailored to Canadian PIPEDA standards.",
+            "Establish risk mitigation plans for high-impact AI components under AIDA guidance.",
+        ],
+        "compliance_impact": "High",
+    },
+    "Australia OAIC & AI Governance": {
         "jurisdiction": "Australia",
         "authorities": ["OAIC", "eSafety Commissioner"],
         "citations": [
@@ -400,6 +570,7 @@ REGULATORY_TRACKS = {
             "esafety",
             "oaic",
             "australia online safety",
+            "australia ai",
         ],
         "patterns": [r"minimum[ -]age", r"esafety", r"oaic"],
         "detect_files": ["*.swift", "Info.plist", "*.md"],
@@ -411,46 +582,63 @@ REGULATORY_TRACKS = {
         ],
         "compliance_impact": "Critical",
     },
-    "Brazil Digital ECA": {
-        "jurisdiction": "Brazil",
-        "authorities": ["ANPD", "Government publications"],
-        "citations": [
-            "Digital ECA (Law 15,211/2025)",
-            "ANPD Rules on Age Assurance and LGPD Minor Consent",
-        ],
-        "keywords": ["digital eca", "law 15211", "anpd", "cpf", "brazil age assurance"],
-        "patterns": [r"digital[ -]eca", r"law[ -]15211", r"anpd", r"brazil"],
-        "detect_files": ["*.swift", "Info.plist", "*.md"],
-        "detect_regex": r"cpf|age-assurance|brazil|lgpd|DeclaredAgeRange",
-        "impact_desc": "Brazil's Digital ECA prohibits simple age self-declaration checkboxes and mandates approved methods such as facial matching, document checking, or CPF database verification.",
-        "migration_steps": [
-            "Integrate approved verification mechanisms (CPF, facial, or document) for Brazilian minor accounts.",
-            "Configure loot-box games to auto-rate 18-plus in compliance with Brazilian classification requirements.",
-        ],
-        "compliance_impact": "Critical",
-    },
-    "Singapore Online Safety": {
+    "Singapore PDPC & AI Verify": {
         "jurisdiction": "Singapore",
         "authorities": ["PDPC", "IMDA"],
         "citations": [
             "IMDA Code of Practice for Online Safety for App Distribution Services (April 2026)",
             "Singapore Personal Data Protection Act (PDPA)",
+            "Model AI Governance Framework and AI Verify Testing Framework",
         ],
         "keywords": [
             "imda",
             "pdpc",
             "singapore online safety",
-            "app store age assurance",
+            "ai verify",
+            "singapore ai",
         ],
-        "patterns": [r"imda", r"pdpc", r"singapore"],
+        "patterns": [r"imda", r"pdpc", r"singapore", r"ai[ -]verify"],
         "detect_files": ["*.swift", "Info.plist", "*.md"],
-        "detect_regex": r"age-assurance|singapore|imda|DeclaredAgeRange",
-        "impact_desc": "Singapore IMDA rules mandate that stores and developers screen and stop minor access to age-inappropriate apps through credit-card or digital verification.",
+        "detect_regex": r"age-assurance|singapore|imda|DeclaredAgeRange|aiVerify",
+        "impact_desc": "Singapore IMDA rules mandate that stores and developers screen minor access to age-inappropriate apps; AI Verify sets benchmark testing standards for AI models.",
         "migration_steps": [
             "Adopt native platform age-assurance APIs for users on the Singapore storefront.",
-            "Verify that no age verification data is stored longer than legally necessary.",
+            "Run model testing against Singapore AI Verify framework metrics.",
         ],
         "compliance_impact": "Critical",
+    },
+    "International Standards (ISO, IEC, OECD, G7, G20)": {
+        "jurisdiction": "International",
+        "authorities": ["ISO", "IEC", "OECD", "G7", "G20"],
+        "citations": [
+            "ISO/IEC 42001:2023 Information technology - Artificial intelligence - Management system",
+            "ISO/IEC 27001:2022 & ISO/IEC 27701:2019 Security and Privacy Management Systems",
+            "OECD Principles on Artificial Intelligence & Hiroshima AI Process Code of Conduct (G7)",
+        ],
+        "keywords": [
+            "iso 42001",
+            "iso 27001",
+            "iso 27701",
+            "oecd ai principles",
+            "hiroshima ai process",
+            "g7 ai",
+            "g20 ai",
+        ],
+        "patterns": [
+            r"iso[ -]42001",
+            r"iso[ -]27001",
+            r"iso[ -]27701",
+            r"oecd[ -]ai",
+            r"g7[ -]ai",
+        ],
+        "detect_files": ["*.swift", "*.py", "*.json", "*.md"],
+        "detect_regex": r"iso42001|iso27001|aims|privacyInformationManagement|oecdPrinciples",
+        "impact_desc": "International standards (ISO/IEC 42001, OECD principles, Hiroshima AI Code) define global best practices for AI Management Systems (AIMS), data privacy, and security controls.",
+        "migration_steps": [
+            "Align AI governance documentation with ISO/IEC 42001 AIMS controls.",
+            "Maintain an updated AI asset inventory and risk assessment register.",
+        ],
+        "compliance_impact": "High",
     },
 }
 
@@ -576,6 +764,11 @@ def classify_source_and_verify(announcement, all_announcements=None):
         "pdpc.gov.sg",
         "anpd.gov.br",
         "esafety.gov.au",
+        "oaic.gov.au",
+        "priv.gc.ca",
+        "iso.org",
+        "iec.ch",
+        "oecd.org",
     ]
     p1_keywords = [
         "european commission",
@@ -593,6 +786,11 @@ def classify_source_and_verify(announcement, all_announcements=None):
         "anpd",
         "esafety commissioner",
         "federal register",
+        "oaic",
+        "opc",
+        "iso",
+        "iec",
+        "oecd",
     ]
 
     # Priority 2 patterns
@@ -892,53 +1090,53 @@ def generate_pull_request(track_name, affected_files, announcement):
             "- QA Lead (for testing checklist confirmation)"
         )
 
-    # Compile the 15 required sections exactly
+    # Compile the 15 required sections with exact numbered headings
     desc_lines = [
         f"# Regulatory Compliance Update: {track_name}",
         "",
-        "## Summary",
+        "## 1. Summary",
         summary_text,
         "",
-        "## Background",
+        "## 2. Background",
         bg_text,
         "",
-        "## Regulatory change",
+        "## 3. Regulatory change",
         reg_change_text,
         "",
-        "## Official citations",
+        "## 4. Official citations",
         citations_text,
         "",
-        "## Affected files",
+        "## 5. Affected files",
         affected_files_text,
         "",
-        "## Risk assessment",
+        "## 6. Risk assessment",
         risk_desc,
         "",
-        "## Migration steps",
+        "## 7. Migration steps",
         migration_steps_text,
         "",
-        "## Backward compatibility",
+        "## 8. Backward compatibility",
         bk_compat_text,
         "",
-        "## Implementation checklist",
+        "## 9. Implementation checklist",
         impl_text,
         "",
-        "## Testing checklist",
+        "## 10. Testing checklist",
         test_text,
         "",
-        "## Documentation checklist",
+        "## 11. Documentation checklist",
         doc_text,
         "",
-        "## Compliance impact",
+        "## 12. Compliance impact",
         compliance_impact_text,
         "",
-        "## Breaking changes",
+        "## 13. Breaking changes",
         breaking_changes_text,
         "",
-        "## Review checklist",
+        "## 14. Review checklist",
         review_text,
         "",
-        "## Approver recommendations",
+        "## 15. Approver recommendations",
         approver_text,
         "",
         "---",
@@ -951,6 +1149,63 @@ def generate_pull_request(track_name, affected_files, announcement):
         "description": "\n".join(desc_lines),
         "files_to_modify": affected_files,
     }
+
+
+def update_documentation_report(report_items, output_filepath):
+    """
+    Overwrites or updates the Regulatory Intelligence Monitoring Report markdown file.
+    Follows strict emoji-free policy.
+    """
+    lines = [
+        "# Regulatory Intelligence Monitoring Report (2026)",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments and their repository impact.",
+        "",
+        f"**Date Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"**Monitored Jurisdiction Areas**: European Union, United Kingdom, United States, Canada, Australia, Singapore, International (ISO/IEC, OECD, G7/G20)",
+        "",
+        "## Summary of Active Compliance Tracking Updates",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. Track: [{item['track']}]")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Announcement**: {item['announcement_title']}")
+        lines.append(f"- **Publication Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Link**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+        lines.append("#### Affected Repository Files")
+        if item["affected_files"]:
+            for f in item["affected_files"]:
+                lines.append(f"- `{f}`")
+        else:
+            lines.append("- No specific matching files found in codebase (configuration/docs audit recommended).")
+        lines.append("")
+        lines.append("#### Suggested Migration Tasks")
+        for task in item["migration_tasks"]:
+            lines.append(f"- [ ] {task}")
+        lines.append("")
+
+    lines.append("## Source Trust Hierarchy Verification Matrix")
+    lines.append("")
+    lines.append("| Priority | Category | Examples | Status |")
+    lines.append("|---|---|---|---|")
+    lines.append("| Priority 1 | Official Regulatory Bodies | European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO | Allowed & Verified |")
+    lines.append("| Priority 2 | Reputable News Agencies | Reuters, AP, Bloomberg | Allowed & Verified |")
+    lines.append("| Priority 3 | Academic Publications | Academic papers, peer-reviewed journals | Allowed & Verified |")
+    lines.append("| Priority 4 | Industry Material | Industry blogs, vendor publications | Requires Priority 1 Verification |")
+    lines.append("| Priority 5 | Social Media & AI Summaries | LinkedIn, Reddit, Twitter, AI generated summaries | Blocked unless corroborated by Priority 1 |")
+    lines.append("")
+    lines.append("---")
+    lines.append("*Generated automatically by `scripts/monitor-regulatory.py`. Strict Emoji-Free Policy enforced.*")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    print(f"Regulatory report updated successfully at: {output_filepath}")
 
 
 def run_monitor(project_path=".", simulate_track=None, verbose=False):
@@ -1106,6 +1361,18 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        nargs="?",
+        const="docs/REGULATORY-MONITOR-REPORT-2026.md",
+        help="Filepath to write documentation report (default: docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        nargs="?",
+        const="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR (default: docs/REGULATORY_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1118,9 +1385,27 @@ def main():
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
 
+    # Write documentation report if requested
+    if args.output_docs:
+        doc_path = args.output_docs
+        update_documentation_report(report_items, doc_path)
+
+    # Write PR draft if requested
+    if args.pr_output:
+        pr_path = args.pr_output
+        valid_prs = [item["proposed_pull_request"] for item in report_items if item.get("proposed_pull_request")]
+        if valid_prs:
+            pr = valid_prs[0]
+            os.makedirs(os.path.dirname(pr_path) or ".", exist_ok=True)
+            with open(pr_path, "w", encoding="utf-8") as f:
+                f.write(pr["description"])
+            print(f"PR draft written successfully to: {pr_path}")
+        else:
+            print("No unblocked PR draft available to write.", file=sys.stderr)
+
     if args.json:
         print(json.dumps(report_items, indent=2))
-    else:
+    elif not args.output_docs and not args.pr_output:
         print_text_report(report_items, args.project)
 
 
