@@ -415,10 +415,83 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_markdown_report(args, ios_files, android_files, all_findings, report_path):
+    import datetime
+
+    crit = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "critical")
+    high = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "high")
+    med = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "medium")
+    low = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "low")
+
+    report = []
+    report.append("# Accessibility Compliance Audit Report")
+    report.append("")
+    report.append("## Executive Summary")
+    report.append("")
+    report.append(f"- **Audited Directory:** `{args.directory}`")
+    report.append(f"- **Audit Date:** {datetime.date.today().isoformat()}")
+    report.append(f"- **Scanned Files:** iOS ({len(ios_files)}), Android ({len(android_files)})")
+    report.append(f"- **Total Findings:** {len(all_findings)} (Critical: {crit}, High: {high}, Medium: {med}, Low: {low})")
+    report.append("")
+    report.append("## Regulatory and Platform Compliance Context")
+    report.append("")
+    report.append("Mobile app accessibility is mandated across major global jurisdictions and app platform review guidelines:")
+    report.append("- **European Accessibility Act (Directive (EU) 2019/882):** Enforces harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA mobile accessibility compliance.")
+    report.append("- **ADA Title II / Title III (US Federal & Commercial):** Requires public entity and commercial mobile applications to satisfy WCAG 2.1 Level AA standard.")
+    report.append("- **HHS Section 504 (45 CFR 84.84):** Mandatory WCAG 2.1 Level AA conformance for mobile apps provided by recipients of federal financial assistance.")
+    report.append("- **Apple App Store Review Guidelines & Accessibility Nutrition Labels:** Requires accurate accessibility declarations and full task completion using VoiceOver, Dynamic Type, Reduce Motion, and Color Contrast.")
+    report.append("- **Google Play Accessibility Policies:** Enforces touch target minimums (48dp x 48dp), TalkBack content descriptions, font scaling, and strictly prohibits BIND_ACCESSIBILITY_SERVICE permission misuse.")
+    report.append("")
+    report.append("## Verification Domains")
+    report.append("")
+    report.append("### Apple iOS")
+    report.append("1. **VoiceOver:** Interactive elements and informative images must provide meaningful labels and traits.")
+    report.append("2. **Dynamic Type:** Text sizing must respond dynamically to system accessibility text settings without hardcoded font point sizes.")
+    report.append("3. **Reduce Motion:** System motion preferences must be detected (`UIAccessibility.isReduceMotionEnabled` or `@Environment(\\.accessibilityReduceMotion)`), disabling non-essential animations.")
+    report.append("4. **Color Contrast:** Dynamic and system colors must be used to ensure sufficient contrast ratios and adapt to high-contrast system modes.")
+    report.append("5. **Haptics:** Interactive controls should incorporate haptic feedback (`UIImpactFeedbackGenerator`) for tactile interaction.")
+    report.append("6. **Keyboard Navigation:** Custom views and focus states must support physical keyboard navigation using `@FocusState` or `keyCommands`.")
+    report.append("")
+    report.append("### Android")
+    report.append("1. **TalkBack:** All informative images and interactive elements must declare `contentDescription` attributes.")
+    report.append("2. **Font Scaling:** Text dimensions must be specified in scale-independent pixels (`sp`) rather than `dp` to honor system font scaling.")
+    report.append("3. **High Contrast:** Colors must reference semantic theme attributes (`?attr/colorOnSurface` or Material3 color schemes) rather than static hex codes.")
+    report.append("4. **Accessibility Scanner Recommendations:** Interactive touch targets must maintain a minimum size of 48dp x 48dp.")
+    report.append("")
+    report.append("## Audit Findings")
+    report.append("")
+
+    if not all_findings:
+        report.append("Clean. No accessibility compliance regressions or violations detected.")
+    else:
+        for f in all_findings:
+            meta = RULE_META[f["rule_id"]]
+            report.append(f"### [{meta['severity'].upper()}] {f['rule_id']}: {meta['title']}")
+            report.append(f"- **File:** `{f['file']}:{f['line']}`")
+            report.append(f"- **Platform:** {meta['platform']}")
+            report.append(f"- **Code Context:** `{f['match']}`")
+            report.append(f"- **Issue Description:** {f['message']}")
+            report.append(f"- **Recommended Fix:** {f['fix']}")
+            report.append("")
+
+    report.append("## Strategic Recommendations for Continuous Accessibility")
+    report.append("")
+    report.append("1. **Automated Continuous Integration:** Run `python3 scripts/accessibility-audit.py .` as a mandatory step in CI pipelines to block regressions prior to merge.")
+    report.append("2. **Screen Reader Verification:** Regularly test primary user flows using VoiceOver on iOS devices and TalkBack on Android hardware.")
+    report.append("3. **Dynamic Layout Testing:** Validate UI layout behavior under maximum Dynamic Type (iOS) and 200% Font Scaling (Android).")
+    report.append("4. **Design System Standardization:** Ensure base design tokens mandate 48dp/pt minimum touch targets and semantic color tokens.")
+    report.append("")
+
+    content = "\n".join(report) + "\n"
+    os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to generate a Markdown accessibility audit report.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -448,34 +521,37 @@ def main():
         print("Clean. No accessibility compliance regressions found.")
         print("")
         print("Summary. critical=0 high=0 medium=0 low=0")
-        return 0
+    else:
+        # Print detailed findings
+        crit = 0
+        high = 0
+        med = 0
+        low = 0
 
-    # Print detailed findings
-    crit = 0
-    high = 0
-    med = 0
-    low = 0
+        for f in all_findings:
+            meta = RULE_META[f["rule_id"]]
+            sev = meta["severity"]
+            if sev == "critical":
+                crit += 1
+            elif sev == "high":
+                high += 1
+            elif sev == "medium":
+                med += 1
+            else:
+                low += 1
 
-    for f in all_findings:
-        meta = RULE_META[f["rule_id"]]
-        sev = meta["severity"]
-        if sev == "critical":
-            crit += 1
-        elif sev == "high":
-            high += 1
-        elif sev == "medium":
-            med += 1
-        else:
-            low += 1
+            print(f"  [{sev.upper()}] {f['rule_id']}  ({f['file']}:{f['line']})")
+            print(f"      context: {f['match']}")
+            print(f"      reason:  {f['message']}")
+            print(f"      fix:     {f['fix']}")
+            print("")
 
-        print(f"  [{sev.upper()}] {f['rule_id']}  ({f['file']}:{f['line']})")
-        print(f"      context: {f['match']}")
-        print(f"      reason:  {f['message']}")
-        print(f"      fix:     {f['fix']}")
-        print("")
+        print(f"Summary. critical={crit} high={high} medium={med} low={low}")
+        print("Reference. docs/EU-REGULATORY-2026.md and docs/PLATFORM-MECHANICS-2026.md")
 
-    print(f"Summary. critical={crit} high={high} medium={med} low={low}")
-    print("Reference. docs/EU-REGULATORY-2026.md and docs/PLATFORM-MECHANICS-2026.md")
+    if args.report_out:
+        generate_markdown_report(args, ios_files, android_files, all_findings, args.report_out)
+        print(f"\nReport generated successfully at: {args.report_out}")
 
     # Exit with 0 on advisory findings since accessibility represents medium store risk
     return 0

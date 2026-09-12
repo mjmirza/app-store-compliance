@@ -371,6 +371,15 @@ else
   echo "$OUT_COMPLIANT"
 fi
 
+# Test 1b: Verify --report-out flag generates report file
+REPORT_FILE="$COMPLIANT_DIR/report.md"
+OUT_REPORT=$($AUDIT --report-out "$REPORT_FILE" "$COMPLIANT_DIR" 2>&1)
+if [ -f "$REPORT_FILE" ] && grep -q "# Accessibility Compliance Audit Report" "$REPORT_FILE"; then
+  ok "--report-out generated valid report document"
+else
+  bad "Failed to generate report document via --report-out. Output: $OUT_REPORT"
+fi
+
 # Test 2: Run on regression folder. Should detect regressions.
 OUT_REGRESSION=$($AUDIT "$REGRESSION_DIR" 2>&1)
 
