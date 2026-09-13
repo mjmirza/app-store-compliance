@@ -26,6 +26,8 @@ elif [ "$#" -ge 1 ] && [ ! -d "$1" ]; then
   log_err "project dir not found. $1"; exit 0
 elif [ ! -t 0 ]; then
   STDIN_JSON="$(cat 2>/dev/null || true)"    # hook mode, payload on stdin
+  # An empty hook payload has no command to judge; falling back to scanning the working directory can take minutes.
+  [ -z "$STDIN_JSON" ] && exit 0
 fi
 
 if [ -n "$STDIN_JSON" ]; then

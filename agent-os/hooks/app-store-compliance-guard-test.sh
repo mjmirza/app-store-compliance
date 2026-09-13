@@ -199,6 +199,11 @@ OUT="$(printf '%s' '{not valid json [[[ command : oops }}}' | bash "$GUARD" 2>&1
 OUT="$(printf '' | bash "$GUARD" /tmp 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
 
+# 9b fail-open. Hook mode with an empty payload must not fall back to scanning the working directory
+D="$(mk_ios_bad)"; OUT="$(cd "$D" && printf '' | bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "Empty hook payload exits 0 without scanning cwd" || bad "Empty hook payload scanned cwd (rc=$RC)"
+rm -rf "$D"
+
 # 10 precision. The four known false-positive scenarios must NOT fire (no false alarms).
 D="$(mk_ios_precision_safe)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 if echo "$OUT" | grep -Eq 'STAGING-BACKEND|MISSING-USAGE-DESCRIPTION|BOTH-PLACEHOLDER|MISSING-ATT' || [ "$RC" -ne 0 ]; then
