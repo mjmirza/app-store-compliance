@@ -1147,6 +1147,397 @@ OUT="$(printf '%s' "$P_HD_THEN" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; 
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-54 submit after a heredoc terminator is scanned" || bad "610-54 submit after a heredoc terminator is scanned (rc=$RC bytes=${#OUT})"
 rm -rf "$D"
 
+# ===== Issue #612. Sibling apps in a monorepo are scanned on their own, deep apps are detected =====
+# apps/app is broken (no usage description, Stripe without StoreKit). apps/kiosk is clean and carries the mitigations.
+mk_pooled_mono() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/app/ios/App" "$d/apps/kiosk/ios/Kiosk" "$d/node_modules/x"
+  printf '{"name":"root","workspaces":["apps/*"]}' > "$d/package.json"
+  printf '{"expo":{"name":"app"}}' > "$d/apps/app/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/app/ios/App/Info.plist"
+  printf 'import CoreLocation\nimport Stripe\nlet m=CLLocationManager()\n' > "$d/apps/app/ios/App/A.swift"
+  printf '{"expo":{"name":"kiosk"}}' > "$d/apps/kiosk/app.json"
+  printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Show stores</string><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/apps/kiosk/ios/Kiosk/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/apps/kiosk/ios/Kiosk/PrivacyInfo.xcprivacy"
+  printf 'import StoreKit\nlet iap="react-native-iap"\nlet policy="https://kiosk.example.io/privacy-policy"\nfunc restorePurchases(){}\n' > "$d/apps/kiosk/ios/Kiosk/K.swift"
+  echo "$d"
+}
+# An Xcode project seven levels down. The old platform switch stopped at depth 4 and reported iOS=0.
+mk_deep_ios() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/a/b/c/d/e/ios/Acme.xcodeproj" "$d/a/b/c/d/e/ios/Acme"
+  printf 'X=1;\n' > "$d/a/b/c/d/e/ios/Acme.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/a/b/c/d/e/ios/Acme/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/a/b/c/d/e/ios/Acme/A.swift"
+  echo "$d"
+}
+# One app whose own ios/ and android/ folders each carry project markers. Those are parts of the app, never sibling apps.
+mk_nested_native() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App.xcworkspace" "$d/ios/App" "$d/android/app/src/main"
+  printf '{"expo":{"name":"one"}}' > "$d/app.json"
+  printf "platform :ios, '15.0'\n" > "$d/ios/Podfile"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/ios/App/A.swift"
+  printf "include ':app'\n" > "$d/android/settings.gradle"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+# Two native projects side by side, one per platform, with no marker at the root.
+mk_two_native() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios-app/App.xcodeproj" "$d/ios-app/App" "$d/android-app/app/src/main"
+  printf 'X=1;\n' > "$d/ios-app/App.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/ios-app/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/ios-app/App/A.swift"
+  printf "include ':app'\n" > "$d/android-app/settings.gradle"
+  printf '<manifest><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/></manifest>' > "$d/android-app/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+# A Swift package library next to one app. A library is not an app and never gets its own section.
+mk_app_plus_lib() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/app/ios/App" "$d/packages/kit/Sources/Kit"
+  printf '{"expo":{"name":"app"}}' > "$d/apps/app/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/app/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/apps/app/ios/App/A.swift"
+  printf '// swift-tools-version:5.9\nimport PackageDescription\nlet package = Package(name: "Kit")\n' > "$d/packages/kit/Package.swift"
+  printf 'public let k = 1\n' > "$d/packages/kit/Sources/Kit/K.swift"
+  echo "$d"
+}
+P_ROOT_SUBMIT='{"tool_input":{"command":"npx eas submit --platform ios"}}'
+
+# 116 a clean sibling app never vouches for a broken one. each app root is scanned on its own
+D="$(mk_pooled_mono)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+NCRIT="$(echo "$OUT" | grep -c '^  \[CRITICAL\] ')"
+[ "$RC" -eq 2 ] && [ "$NCRIT" -eq 2 ] && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && echo "$OUT" | grep -q 'EXTERNAL-PAYMENT' && ok "612-1 sibling app cannot vouch for a broken app" || bad "612-1 sibling app cannot vouch for a broken app (rc=$RC criticals=$NCRIT)"
+echo "$OUT" | grep -q "^Project\. $D$" && [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && ok "612-2 monorepo report keeps the root Project line and adds one App section per root" || bad "612-2 monorepo report keeps the root Project line and adds one App section per root"
+# the findings sit under the app they belong to, never under the clean sibling
+APP_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/app$/{p=1;next} /^App\. /{p=0} p')"
+KIOSK_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/kiosk$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+echo "$APP_SECTION" | grep -q '\[CRITICAL\]' && ! echo "$KIOSK_SECTION" | grep -q '\[CRITICAL\]' && ok "612-3 findings sit under their own app section" || bad "612-3 findings sit under their own app section"
+rm -rf "$D"
+
+# 117 in hook mode the per-app report is buffered and a block goes to stderr in full
+D="$(mk_pooled_mono)"
+ERR="$(mktemp)"; STDOUT="$(printf '%s' "$P_ROOT_SUBMIT" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>"$ERR")"; RC=$?
+[ "$RC" -eq 2 ] && [ -z "$STDOUT" ] && [ "$(grep -c '^App\. ' "$ERR")" -eq 2 ] && grep -q 'BLOCKED' "$ERR" && ok "612-4 hook mode block carries both app sections on stderr" || bad "612-4 hook mode block carries both app sections on stderr (rc=$RC stdout=${#STDOUT})"
+rm -rf "$D" "$ERR"
+
+# 118 a leading cd into one app still scopes the scan to that app alone, no App sections
+D="$(mk_pooled_mono)"
+OUT="$(printf '%s' "$P_CD_REL" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. .*/apps/app$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-5 cd into an app scopes to that app with a plain report" || bad "612-5 cd into an app scopes to that app with a plain report (rc=$RC)"
+rm -rf "$D"
+
+# 119 an Xcode project six levels down is still an iOS target
+D="$(mk_deep_ios)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'Platforms\. iOS=1' && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-6 Xcode project seven levels down is detected as iOS" || bad "612-6 Xcode project seven levels down is detected as iOS (rc=$RC)"
+rm -rf "$D"
+
+# 120 an app's own ios/ and android/ folders are parts of that app, so a single-app project keeps the plain report
+D="$(mk_nested_native)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && echo "$OUT" | grep -q 'Platforms\. iOS=1 Android=1' && ok "612-7 nested ios and android folders never split one app" || bad "612-7 nested ios and android folders never split one app (rc=$RC)"
+rm -rf "$D"
+
+# 121 two native projects side by side each get their own section and their own platform line
+D="$(mk_two_native)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q 'GOOGLE-PERM-BACKGROUND-LOCATION' && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-8 side by side native projects are scanned separately" || bad "612-8 side by side native projects are scanned separately (rc=$RC)"
+IOS_SECTION="$(echo "$OUT" | awk '/^App\. .*\/ios-app$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+echo "$IOS_SECTION" | grep -q 'Platforms\. iOS=1 Android=0' && ok "612-9 each section reports its own platforms" || bad "612-9 each section reports its own platforms"
+rm -rf "$D"
+
+# 122 a Swift package library next to one app is not a second app. one root means the plain whole-tree report
+D="$(mk_app_plus_lib)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-10 a library package never becomes an app section" || bad "612-10 a library package never becomes an app section (rc=$RC)"
+rm -rf "$D"
+
+# 123 a binary file is still skipped by the source scan
+D="$(mk_ios_clean)"
+printf 'fixed-odds\000\000betting\000' > "$D/App/blob.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q 'GAMBLING' && [ "$RC" -eq 0 ] && ok "612-11 binary files never feed the source scan" || bad "612-11 binary files never feed the source scan (rc=$RC)"
+rm -rf "$D"
+
+# 124 a symbol in one file and its mitigation in another still pair up
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf 'let x = "https://acme.example.io/.well-known/apple-app-site-association"\n' > "$D/App/C.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "612-12 a mitigation in another file still pairs with its trigger" || bad "612-12 a mitigation in another file still pairs with its trigger (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue #612, second round. The adversarial review findings, pinned =====
+# The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.
+mk_root_app_plus_child() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/apps/child/ios/Child"
+  printf '{"expo":{"name":"root"}}' > "$d/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/ios/App/A.swift"
+  printf '{"expo":{"name":"child"}}' > "$d/apps/child/app.json"
+  printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Show stores</string><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/apps/child/ios/Child/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/apps/child/ios/Child/PrivacyInfo.xcprivacy"
+  printf 'let policy="https://child.example.io/privacy-policy"\n' > "$d/apps/child/ios/Child/C.swift"
+  echo "$d"
+}
+# A native app at the root with a demo Xcode project nested under Examples. The demo is part of the repo, not a second app.
+mk_root_xcode_plus_demo() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App.xcodeproj/project.xcworkspace" "$d/App" "$d/Examples/Demo.xcodeproj" "$d/Examples/Demo"
+  printf 'X=1;\n' > "$d/App.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/App/A.swift"
+  printf 'X=1;\n' > "$d/Examples/Demo.xcodeproj/project.pbxproj"
+  printf 'let demo = 1\n' > "$d/Examples/Demo/D.swift"
+  echo "$d"
+}
+# A stray Pods tree under a root ios folder must not make the root an app and re-pool two real apps.
+mk_pods_at_root() {
+  local d; d="$(mk_pooled_mono)"; mkdir -p "$d/ios/Pods/Foo.xcodeproj"
+  printf 'X=1;\n' > "$d/ios/Pods/Foo.xcodeproj/project.pbxproj"
+  echo "$d"
+}
+# A Heroku-style app.json in a tooling folder is not an app. One real app means the plain report.
+mk_heroku_json_sibling() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/mobile/ios/App" "$d/tools/cli"
+  printf '{"expo":{"name":"mobile"}}' > "$d/apps/mobile/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/mobile/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/apps/mobile/ios/App/A.swift"
+  printf '{"name":"cli","description":"a deploy manifest","stack":"heroku-22"}' > "$d/tools/cli/app.json"
+  printf 'console.log(1)\n' > "$d/tools/cli/index.js"
+  echo "$d"
+}
+# A Flutter package (pubspec, no platform folder) next to a Flutter app is a library. One app means the plain report.
+mk_flutter_pkg_sibling() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/mobile/ios/Runner" "$d/apps/mobile/lib" "$d/packages/ui/lib"
+  printf 'name: mobile\ndependencies:\n  permission_handler: ^11.0.0\n' > "$d/apps/mobile/pubspec.yaml"
+  printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){Permission.camera.request();}\n" > "$d/apps/mobile/lib/main.dart"
+  printf '<plist><dict></dict></plist>' > "$d/apps/mobile/ios/Runner/Info.plist"
+  printf 'name: ui\n' > "$d/packages/ui/pubspec.yaml"
+  printf 'class Ui {}\n' > "$d/packages/ui/lib/ui.dart"
+  echo "$d"
+}
+# Two bare native projects under the conventional names, nothing at the root. Each is its own app.
+mk_bare_ios_android() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App.xcodeproj" "$d/ios/App" "$d/android/app/src/main"
+  printf 'X=1;\n' > "$d/ios/App.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/ios/App/A.swift"
+  printf "include ':app'\n" > "$d/android/settings.gradle"
+  printf '<manifest><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/></manifest>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+
+# 125 a nested clean app never vouches for the root app, and the root scan leaves the nested app out
+D="$(mk_root_app_plus_child)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D" '$0==r{p=1;next} /^App\. /{p=0} p')"
+CHILD_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/child$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+[ "$RC" -eq 2 ] && [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$ROOT_SECTION" | grep -q 'MISSING-USAGE-DESCRIPTION' && ! echo "$CHILD_SECTION" | grep -q '\[CRITICAL\]' && ok "612-13 root app plus nested app are scanned apart" || bad "612-13 root app plus nested app are scanned apart (rc=$RC)"
+rm -rf "$D"
+
+# 126 a demo Xcode project nested under a root native app stays part of that app. documented, pinned
+D="$(mk_root_xcode_plus_demo)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-14 a nested demo Xcode project never splits a root native app" || bad "612-14 a nested demo Xcode project never splits a root native app (rc=$RC)"
+rm -rf "$D"
+
+# 127 a Pods tree under a root ios folder cannot make the root an app
+D="$(mk_pods_at_root)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && [ "$RC" -eq 2 ] && ok "612-15 Pods under a root ios folder never re-pool the apps" || bad "612-15 Pods under a root ios folder never re-pool the apps (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -rf "$D"
+
+# 128 an app.json that is not Expo or React Native is not an app
+D="$(mk_heroku_json_sibling)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-16 a Heroku app.json never becomes an app section" || bad "612-16 a Heroku app.json never becomes an app section (rc=$RC)"
+rm -rf "$D"
+
+# 129 a Flutter package without a platform folder is a library, not an app
+D="$(mk_flutter_pkg_sibling)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ok "612-17 a Flutter package never becomes an app section" || bad "612-17 a Flutter package never becomes an app section (rc=$RC)"
+rm -rf "$D"
+
+# 130 two bare native projects under ios/ and android/ with nothing at the root are two apps
+D="$(mk_bare_ios_android)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q 'GOOGLE-PERM-BACKGROUND-LOCATION' && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-18 bare ios and android projects side by side are two apps" || bad "612-18 bare ios and android projects side by side are two apps (rc=$RC)"
+rm -rf "$D"
+
+# 131 the deadline section cannot be skipped from the environment
+D="$(mk_ios_clean)"
+OUT="$(DEADLINE_DONE=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'Regulatory Compliance Deadline Status' && ok "612-19 DEADLINE_DONE from the environment is ignored" || bad "612-19 DEADLINE_DONE from the environment is ignored (rc=$RC)"
+rm -rf "$D"
+
+# 132 a project path with a space still splits into its apps
+B="$(mktemp -d)"; D="$B/my app"; mkdir -p "$D"; SRC="$(mk_pooled_mono)"; cp -R "$SRC"/. "$D"/; rm -rf "$SRC"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && [ "$RC" -eq 2 ] && ok "612-20 a path with a space still splits into apps" || bad "612-20 a path with a space still splits into apps (rc=$RC)"
+rm -rf "$B"
+
+# 133 a truncated blob falls back to the per-file scan instead of passing silently
+D="$(mk_ios_bad)"
+OUT="$( ( ulimit -f 1; bash "$GUARD" "$D" 2>&1 ) )"; RC=$?
+echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-21 a blob that cannot be written falls back and still blocks" || bad "612-21 a blob that cannot be written falls back and still blocks (rc=$RC)"
+rm -rf "$D"
+
+# 134 a multi-app scan leaves no temp files behind
+D="$(mk_pooled_mono)"; T="$(mktemp -d)"
+TMPDIR="$T" bash "$GUARD" "$D" >/dev/null 2>&1
+[ -z "$(ls -A "$T")" ] && ok "612-22 a multi-app scan leaves no temp files" || bad "612-22 a multi-app scan leaves no temp files ($(ls -A "$T" | wc -l | tr -d ' ') left)"
+rm -rf "$D" "$T"
+
+# 135 a workspace inside an Xcode project bundle never becomes an app of its own
+D="$(mk_ios_precision_safe)"; mkdir -p "$D/App.xcodeproj/project.xcworkspace"; printf '<Workspace/>' > "$D/App.xcodeproj/project.xcworkspace/contents.xcworkspacedata"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 0 ] && ok "612-23 a workspace inside the project bundle never splits the app" || bad "612-23 a workspace inside the project bundle never splits the app (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue #612, third round. Second adversarial review, pinned =====
+# 136 a trailing slash on the project path still keeps the nested app out of the root scan
+D="$(mk_root_app_plus_child)"
+OUT="$(bash "$GUARD" "$D/" 2>&1)"; RC=$?
+ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D/" '$0==r{p=1;next} /^App\. /{p=0} p')"
+[ "$RC" -eq 2 ] && echo "$ROOT_SECTION" | grep -q 'MISSING-USAGE-DESCRIPTION' && ok "612-24 a trailing slash on the project path changes nothing" || bad "612-24 a trailing slash on the project path changes nothing (rc=$RC)"
+rm -rf "$D"
+
+# 137 a nested app's privacy manifest never vouches for the root app
+D="$(mk_root_app_plus_child)"
+printf 'let d = UserDefaults.standard\n' > "$D/ios/App/B.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D" '$0==r{p=1;next} /^App\. /{p=0} p')"
+echo "$ROOT_SECTION" | grep -q 'APPLE-PRIVACY-MANIFEST-MISSING' && ok "612-25 a nested app's privacy manifest never vouches for the root" || bad "612-25 a nested app's privacy manifest never vouches for the root (rc=$RC)"
+rm -rf "$D"
+
+# 138 a nested app's release minification never vouches for the root Android app
+D="$(mktemp -d)"; mkdir -p "$D/android/app/src/main" "$D/apps/child/android/app/src/main"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf "include ':app'\n" > "$D/android/settings.gradle"
+printf 'android { buildTypes { release { minifyEnabled false } } }\n' > "$D/android/app/build.gradle"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf '{"expo":{"name":"child"}}' > "$D/apps/child/app.json"
+printf "include ':app'\n" > "$D/apps/child/android/settings.gradle"
+printf 'android { buildTypes { release { minifyEnabled true } } }\n' > "$D/apps/child/android/app/build.gradle"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/child/android/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D" '$0==r{p=1;next} /^App\. /{p=0} p')"
+echo "$ROOT_SECTION" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "612-26 a nested app's minification never vouches for the root" || bad "612-26 a nested app's minification never vouches for the root (rc=$RC)"
+rm -rf "$D"
+
+# 139 a Flutter plugin has platform folders and is still a library
+D="$(mktemp -d)"; mkdir -p "$D/apps/mobile/ios/App" "$D/packages/camera_plugin/ios/Classes"
+printf '{"expo":{"name":"mobile"}}' > "$D/apps/mobile/app.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/mobile/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/apps/mobile/ios/App/A.swift"
+printf 'name: camera_plugin\nflutter:\n  plugin:\n    platforms:\n      ios:\n        pluginClass: CameraPlugin\n' > "$D/packages/camera_plugin/pubspec.yaml"
+printf 'final class CameraPlugin {}\n' > "$D/packages/camera_plugin/ios/Classes/CameraPlugin.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-27 a Flutter plugin never becomes an app section" || bad "612-27 a Flutter plugin never becomes an app section (rc=$RC)"
+rm -rf "$D"
+
+# 140 a source file that ends with the old static marker text cannot forge a complete blob
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist><dict></dict></plist>' > "$D/App/Info.plist"
+printf '%*s%s' 494 '' '~~ascg~blob~end~~' > "$D/App/a.swift"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/App/z.swift"
+OUT="$( ( ulimit -f 1; bash "$GUARD" "$D" 2>&1 ) )"; RC=$?
+echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-28 a forged end marker never certifies a truncated blob" || bad "612-28 a forged end marker never certifies a truncated blob (rc=$RC)"
+rm -rf "$D"
+
+# 141 an app eleven levels down is still detected, and the tree is scanned in one piece
+D="$(mktemp -d)"; P="$D/a/b/c/d/e/f/g/h/i/ios"; mkdir -p "$P/Acme.xcodeproj" "$P/Acme"
+printf 'X=1;\n' > "$P/Acme.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$P/Acme/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$P/Acme/A.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'Platforms\. iOS=1' && [ "$RC" -eq 2 ] && ok "612-29 an app eleven levels down is detected" || bad "612-29 an app eleven levels down is detected (rc=$RC)"
+rm -rf "$D"
+
+# 142 an Android app with no Gradle file at all still gets the R8 finding, as it always did
+D="$(mktemp -d)"; mkdir -p "$D/android/app/src/main"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/android/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "612-30 no Gradle file still means the R8 finding" || bad "612-30 no Gradle file still means the R8 finding (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue #612, fourth round. Third adversarial review, pinned =====
+# 143 a nested app whose name carries glob characters is still kept out of the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/apps/[child]/ios/Child"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/ios/App/A.swift"
+printf '{"expo":{"name":"child"}}' > "$D/apps/[child]/app.json"
+printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Stores</string></dict></plist>' > "$D/apps/[child]/ios/Child/Info.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D" '$0==r{p=1;next} /^App\. /{p=0} p')"
+echo "$ROOT_SECTION" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-31 a nested app named with brackets is still pruned from the root scan" || bad "612-31 a nested app named with brackets is still pruned from the root scan (rc=$RC)"
+rm -rf "$D"
+
+# 144 a Flutter plugin with an android folder under a root app is part of the repo, never a second app
+D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/packages/plugin/android/src/main"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/ios/App/A.swift"
+printf 'name: plugin\nflutter:\n  plugin:\n    platforms:\n      android:\n        package: com.example.plugin\n' > "$D/packages/plugin/pubspec.yaml"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/packages/plugin/android/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-32 a Flutter plugin's android folder never becomes an app" || bad "612-32 a Flutter plugin's android folder never becomes an app (rc=$RC)"
+rm -rf "$D"
+
+# 145 two Android app modules with no settings file are two apps, and the clean one never vouches
+D="$(mktemp -d)"; mkdir -p "$D/apps/a/app/src/main" "$D/apps/b/app/src/main"
+printf "plugins { id 'com.android.application' }\nandroid { buildTypes { release { minifyEnabled false } } }\n" > "$D/apps/a/app/build.gradle"
+printf "plugins { id 'com.android.application' }\nandroid { buildTypes { release { minifyEnabled true } } }\n" > "$D/apps/b/app/build.gradle"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/a/app/src/main/AndroidManifest.xml"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/b/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+A_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/a\/app$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$A_SECTION" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "612-33 Android app modules without a settings file are two apps" || bad "612-33 Android app modules without a settings file are two apps (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -rf "$D"
+
+# 146 a React Native native module (peerDependencies, an android folder, no app config) next to one app is a library
+D="$(mktemp -d)"; mkdir -p "$D/apps/mobile/ios/App" "$D/packages/rn-lib/android/src/main"
+printf '{"expo":{"name":"mobile"}}' > "$D/apps/mobile/app.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/mobile/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/apps/mobile/ios/App/A.swift"
+printf '{"name":"rn-lib","peerDependencies":{"react-native":"*"}}' > "$D/packages/rn-lib/package.json"
+printf "plugins { id 'com.android.library' }\nandroid { }\n" > "$D/packages/rn-lib/android/build.gradle"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/packages/rn-lib/android/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-34 a React Native module never becomes an app section" || bad "612-34 a React Native module never becomes an app section (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue #612, fifth round. Hook-contract persona findings, pinned =====
+# 147 a manifest inside a test fixture directory never becomes an app root
+D="$(mk_ios_bad)"; mkdir -p "$D/__tests__/fixtures/android/app/src/main"
+printf '<manifest><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/></manifest>' > "$D/__tests__/fixtures/android/app/src/main/AndroidManifest.xml"
+printf "plugins { id 'com.android.application' }\n" > "$D/__tests__/fixtures/android/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ! echo "$OUT" | grep -q 'BACKGROUND-LOCATION' && ok "612-35 a test fixture never becomes an app root" || bad "612-35 a test fixture never becomes an app root (rc=$RC)"
+rm -rf "$D"
+
+# 148 a project path that is a symlink is scanned through its target instead of passing silently
+REAL="$(mk_ios_bad)"; LINK="$(mktemp -d)/link"; ln -s "$REAL" "$LINK"
+OUT="$(bash "$GUARD" "$LINK" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-36 a symlinked project path is scanned" || bad "612-36 a symlinked project path is scanned (rc=$RC)"
+rm -rf "$REAL" "$(dirname "$LINK")"
+
+# 149 an app whose package.json carries a peer dependency is still an app when it owns its platform projects
+D="$(mktemp -d)"; mkdir -p "$D/apps/peer/ios/App.xcodeproj" "$D/apps/peer/ios/App" "$D/apps/peer/android/app/src/main" "$D/apps/other/ios/Other"
+printf '{"dependencies":{"react-native":"0.75.0"},"peerDependencies":{"react":"18.0.0"}}' > "$D/apps/peer/package.json"
+printf 'X=1;\n' > "$D/apps/peer/ios/App.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/apps/peer/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/apps/peer/ios/App/A.swift"
+printf "include ':app'\n" > "$D/apps/peer/android/settings.gradle"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/peer/android/app/src/main/AndroidManifest.xml"
+printf '{"expo":{"name":"other"}}' > "$D/apps/other/app.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/other/ios/Other/Info.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && [ "$RC" -eq 2 ] && ok "612-37 an app with a peer dependency and its own platform projects is an app" || bad "612-37 an app with a peer dependency and its own platform projects is an app (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

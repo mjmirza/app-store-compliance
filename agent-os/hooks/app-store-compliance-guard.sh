@@ -10,10 +10,10 @@ HOOK_LOG="$HOME/.claude/hooks/hook-log.sh"
 [ -f "$HOOK_LOG" ] && source "$HOOK_LOG" 2>/dev/null || true
 log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compliance-guard" "$@"; else echo "app-store-compliance-guard: $*" >&2; fi; }
 
-CRIT=0; HIGH=0; MED=0
+CRIT=0; HIGH=0; MED=0; DEADLINE_DONE=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -138,30 +138,22 @@ fi
 
 [ -z "$DIR" ] && DIR="$PWD"
 [ -d "$DIR" ] || { log_err "project dir not found. $DIR"; exit 0; }
+[ -L "${DIR%/}" ] && DIR="$(cd "$DIR" 2>/dev/null && pwd -P)"   # find never descends a symlinked start point (issue #612)
 
-# ----- build a source file list, excluding vendor dirs -----
-# Directories are pruned by name, and only below the project root (-mindepth 1). The old full-path
-# match also hit the folders ABOVE the root, so a project sitting under a folder named build was
-# scanned as empty, and it still walked every excluded tree. Test code, Python virtualenvs, and
-# bundled web output (dist) never ship in the binary, and a virtualenv's vendored JSON otherwise
-# reads as app source. .xcprivacy is scanned because NSPrivacyCollectedDataTypes lives there.
-FILELIST="$(mktemp 2>/dev/null || echo /tmp/ascg.$$)"
-find "$DIR" -mindepth 1 \
-  \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
-    -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
-    -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests \
-    -o -name integration_test -o -name .venv -o -name venv -o -name site-packages -o -name .pub-cache \) -prune \) \
-  -o -type f \( \
-  -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
-  -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
-  -o -name '*.json' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
-  -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
-  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
-  \) -print 2>/dev/null \
-  > "$FILELIST"
-
-grep_has() {  # 0 if regex found in any source file
+# Every text file once, into one blob, so a hundred grep_has calls read one file instead of every file
+# each (issue #612). The empty pattern keeps every line, -I drops binaries as before, the end marker proves a complete write.
+BLOB_END="~~ascg~blob~end~$$~${RANDOM}~~"
+build_blob() {
+  BLOB_OK=0
+  : > "$FILELIST.blob" 2>/dev/null || return 0
+  [ -s "$FILELIST" ] || { BLOB_OK=1; return 0; }
+  tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIh -e '' >> "$FILELIST.blob" 2>/dev/null
+  printf '\n%s\n' "$BLOB_END" >> "$FILELIST.blob" 2>/dev/null
+  [ "$(tail -n 1 "$FILELIST.blob" 2>/dev/null)" = "$BLOB_END" ] && BLOB_OK=1
+}
+grep_has() {  # 0 if regex found in any source file. Per-line regex, so the blob answers the same as a per-file grep
   [ -s "$FILELIST" ] || return 1
+  if [ "${BLOB_OK:-0}" -eq 1 ]; then grep -Eqs -e "$1" "$FILELIST.blob" 2>/dev/null; return; fi
   local out
   out="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
   [ -n "$out" ]
@@ -222,58 +214,73 @@ find_app() {  # find_app <maxdepth> <find name expression...>
   local depth="$1"; shift
   find "$DIR" -mindepth 1 -maxdepth "$depth" \
     \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
-      -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage -o -name .pub-cache \) -prune \) \
+      -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage -o -name .pub-cache \
+      ${NESTED_PRUNE[@]+"${NESTED_PRUNE[@]}"} \) -prune \) \
     -o \( "$@" \) -print 2>/dev/null
 }
+NESTED_PRUNE=()
+find_tree() {  # find "$DIR" <expr>, the whole tree as before, minus the nested app roots when the root is itself an app
+  if [ "${#NESTED_PRUNE[@]}" -eq 0 ]; then find "$DIR" "$@" 2>/dev/null
+  else find "$DIR" \( -type d \( -name '' "${NESTED_PRUNE[@]}" \) -prune \) -o "$@" 2>/dev/null; fi
+}
+FILELIST="$(mktemp 2>/dev/null || echo /tmp/ascg.$$)"
+
+# ----- the scan of one tree (issue #612). Runs once per app root, or once on the project root -----
+scan_tree() {
+
+# ----- build a source file list, excluding vendor dirs -----
+# Directories are pruned by name, and only below the project root (-mindepth 1). The old full-path
+# match also hit the folders ABOVE the root, so a project sitting under a folder named build was
+# scanned as empty, and it still walked every excluded tree. Test code, Python virtualenvs, and
+# bundled web output (dist) never ship in the binary, and a virtualenv's vendored JSON otherwise
+# reads as app source. .xcprivacy is scanned because NSPrivacyCollectedDataTypes lives there.
+find "$DIR" -mindepth 1 \
+  \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
+    -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
+    -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests \
+    -o -name integration_test -o -name .venv -o -name venv -o -name site-packages -o -name .pub-cache \
+    ${NESTED_PRUNE[@]+"${NESTED_PRUNE[@]}"} \) -prune \) \
+  -o -type f \( \
+  -name '*.swift' -o -name '*.m' -o -name '*.h' -o -name '*.kt' -o -name '*.java' \
+  -o -name '*.xml' -o -name '*.plist' -o -name '*.gradle' -o -name '*.kts' \
+  -o -name '*.json' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
+  -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
+  -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
+  \) -print 2>/dev/null \
+  > "$FILELIST"
+build_blob
 
 # ----- platform detection -----
 # Every find below pipes into `grep .`, never `grep -q .`, for the reason in release_string_has:
 # grep -q exits on the first match, find dies of SIGPIPE, and pipefail turns "found" into "missing".
-IS_IOS=0; IS_AND=0; IS_WEB=0
-find_app 4 -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' | grep . >/dev/null && IS_IOS=1
-find_app 4 -name 'Info.plist' | grep . >/dev/null && IS_IOS=1
-find_app 5 -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' | grep . >/dev/null && IS_AND=1
-find_app 4 -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' | grep . >/dev/null && IS_WEB=1
+IS_IOS=0; IS_AND=0; IS_WEB=0  # depth 12, the reach of the manifest probe. depth 4 left packages/mobile/app/ios invisible (issue #612)
+find_app 12 -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' | grep . >/dev/null && IS_IOS=1
+find_app 12 -name 'Info.plist' | grep . >/dev/null && IS_IOS=1
+find_app 12 -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' | grep . >/dev/null && IS_AND=1
+find_app 12 -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' | grep . >/dev/null && IS_WEB=1
 
 # ----- cross-platform framework detection -----
 # IS_IOS/IS_AND above still fire on the built artifact. This adds framework-specific checks.
 IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
-find_app 4 -name 'pubspec.yaml' | grep . >/dev/null && IS_FLUTTER=1
+find_app 12 -name 'pubspec.yaml' | grep . >/dev/null && IS_FLUTTER=1
 # Scan EVERY package.json within depth (not just the first), so a monorepo root's tooling
 # package.json never shadows a real apps/mobile/package.json deeper in the tree.
 while IFS= read -r pkg; do
   grep -qE '"react-native"|"expo"' "$pkg" 2>/dev/null && IS_RN=1
   grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$pkg" 2>/dev/null && IS_IONIC=1
-done < <(find "$DIR" -maxdepth 4 -name 'package.json' 2>/dev/null | grep -vE '/(node_modules|ios/Pods)/')
-find_app 4 -name 'capacitor.config.*' | grep . >/dev/null && IS_IONIC=1
+done < <(find_app 12 -name 'package.json' | grep -vE '/(node_modules|ios/Pods)/')
+find_app 12 -name 'capacitor.config.*' | grep . >/dev/null && IS_IONIC=1
 # config.xml alone is ambiguous (Maven/NuGet/tooling also use that filename), so require the
 # Cordova widget marker before it counts as a signal.
 while IFS= read -r cfg; do
   grep -qE '<widget|xmlns:cdv' "$cfg" 2>/dev/null && IS_IONIC=1
-done < <(find "$DIR" -maxdepth 4 -name 'config.xml' 2>/dev/null)
+done < <(find_app 12 -name 'config.xml')
 
 # The actual gate the framework checks below use: a committed ios/ folder AND the
 # invoking command (when known) does not explicitly target Android-only.
 IOS_TARGET_ACTIVE=0
 [ "$IS_IOS" -eq 1 ] && [ "$CMD_TARGET_ANDROID_ONLY" -eq 0 ] && IOS_TARGET_ACTIVE=1
 
-# ----- report routing (issue #610). Hook mode buffers the report. A block goes to stderr, the only
-# stream Claude Code shows on exit 2. A pass stays on stdout. Standalone mode prints straight to stdout.
-emit_report() {  # $1 is the exit code about to be returned
-  [ -n "$REPORT" ] || return 0
-  exec 1>&3 3>&-
-  if [ "$1" -eq 2 ]; then cat "$REPORT" >&2; else cat "$REPORT"; fi
-  rm -f "$REPORT" 2>/dev/null; REPORT=""
-}
-# A hook timeout sends TERM. Flush what was buffered to stderr so the partial report is not lost.
-trap 'emit_report 2; exit 143' INT TERM HUP
-if [ -n "$STDIN_JSON" ]; then
-  REPORT="$(mktemp 2>/dev/null)" || REPORT=""
-  if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
-fi
-
-echo "== App Store Compliance Guard =="
-echo "Project. $DIR"
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC"
 [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only framework checks suppressed for this run."
@@ -288,10 +295,11 @@ for candidate in \
   "$HOOK_DIR/../skills/app-store-compliance/scripts/deadline-checker.py"; do
   if [ -f "$candidate" ]; then DEADLINE_PY="$candidate"; break; fi
 done
-if [ -n "$DEADLINE_PY" ]; then
+if [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ]; then
   python3 "$DEADLINE_PY"
   echo ""
 fi
+DEADLINE_DONE=1
 
 # ===== shared checks =====
 # App Store Connect API 4.3 and 4.4 removed the old age-rating declaration endpoints. a pipeline that still calls them stops the release.
@@ -325,7 +333,7 @@ fi
 # iOS-only Apple requirement, gated on IS_IOS so an Android-only build is never blocked for it.
 if [ "$IS_FLUTTER" -eq 1 ]; then
   if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
+    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
       finding critical "FLUTTER-PRIVACY-MANIFEST-MISSING" "Flutter plugins that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere in the project" "Add an app-level PrivacyInfo.xcprivacy AND confirm each Flutter plugin ships its own (permission_handler, image_picker, and most first-party plugins added theirs from Flutter 3.19+). A missing plugin-level manifest is invisible to Apple's aggregator unless the app manifest also declares that plugin's reason codes. This check only runs against an iOS target."
     fi
   fi
@@ -343,7 +351,7 @@ if [ "$IS_RN" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     fi
   fi
   if grep_has 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
+    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
       finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side."
     fi
   fi
@@ -361,7 +369,7 @@ if [ "$IS_IONIC" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it."
   fi
   if grep_has '@capacitor/|Capacitor\.'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
+    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
       finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one."
     fi
   fi
@@ -439,7 +447,7 @@ if [ "$IS_IOS" -eq 1 ]; then
   fi
   # Privacy manifest, the top modern Apple upload rejection since 2024
   if grep_has 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'; then
-    if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep . >/dev/null; then
+    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
       finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest."
     fi
   fi
@@ -459,7 +467,8 @@ if [ "$IS_IOS" -eq 1 ]; then
       \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
         -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
         -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests \
-        -o -name integration_test -o -name .venv -o -name venv -o -name site-packages -o -name .pub-cache \) -prune \) \
+        -o -name integration_test -o -name .venv -o -name venv -o -name site-packages -o -name .pub-cache \
+      ${NESTED_PRUNE[@]+"${NESTED_PRUNE[@]}"} \) -prune \) \
       -o -name 'PrivacyInfo.xcprivacy' -print 2>/dev/null \
       | while IFS= read -r manifest; do
           python3 "$MANIFEST_VALIDATOR" "$manifest" 2>/dev/null
@@ -569,7 +578,11 @@ if [ "$IS_AND" -eq 1 ]; then
     finding high "GOOGLE-GENAI-NCII-CONTROLS" "Generative image or video feature without moderation controls" "Add input and output moderation for intimate and deepfake content, document tested safety prompts, and give the reviewer a full-access test account."
   fi
   # From February 2027 release builds must be R8-optimized (25 percent minimum coverage, Play Console Help 17492799).
-  if ! grep -rqE '(isMinifyEnabled|minifyEnabled)[[:space:]=]+true' "$DIR" --include='*.gradle' --include='*.kts' 2>/dev/null; then
+  R8_ON=0
+  while IFS= read -r g; do
+    grep -qE '(isMinifyEnabled|minifyEnabled)[[:space:]=]+true' "$g" 2>/dev/null && { R8_ON=1; break; }
+  done < <(find_tree -type f \( -name '*.gradle' -o -name '*.kts' \) -print)
+  if [ "$R8_ON" -eq 0 ]; then
     finding high "ANDROID-R8-OPTIMIZATION-MISSING" "No release build type with minifyEnabled true" "Enable R8 (isMinifyEnabled = true, isShrinkResources = true) in the release build type before February 2027."
   fi
   # From April 2027 sign-in apps must restore sign-in state on a new device (Restore Credentials API).
@@ -707,6 +720,110 @@ if [ "$IS_WEB" -eq 1 ]; then
       finding high "WEB-TRACKING-TECHNOLOGIES" "Third-party tracking technologies loaded without consent" "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
     fi
   fi
+fi
+
+}
+
+# ----- app roots (issue #612). A root is an Expo, React Native, Flutter, or Capacitor app, an Android project, or an
+# Xcode project. A platform folder is part of the app above it. A library, a Pods tree, or a Heroku app.json never counts.
+is_library() {  # $1 dir. a Flutter plugin, or a React Native module (peerDependencies and no app config)
+  local f
+  [ -f "$1/pubspec.yaml" ] && grep -qE '^[[:space:]]*plugin:' "$1/pubspec.yaml" 2>/dev/null && return 0
+  if [ -f "$1/package.json" ] && grep -q '"peerDependencies"' "$1/package.json" 2>/dev/null; then
+    [ -f "$1/app.json" ] && return 1
+    for f in app.config.js app.config.ts app.config.mjs app.config.cjs; do [ -f "$1/$f" ] && return 1; done
+    for f in "$1"/android/settings.gradle "$1"/android/settings.gradle.kts "$1"/ios/Podfile "$1"/ios/*.xcodeproj "$1"/ios/*.xcworkspace; do [ -e "$f" ] && return 1; done
+    return 0
+  fi
+  return 1
+}
+has_framework_marker() {  # $1 dir. Expo or React Native CLI app.json, app.config.*, Flutter pubspec, Capacitor config, RN package.json
+  local f
+  is_library "$1" && return 1
+  [ -f "$1/pubspec.yaml" ] && return 0
+  for f in "$1"/capacitor.config.*; do [ -e "$f" ] && return 0; done
+  for f in app.config.js app.config.ts app.config.mjs app.config.cjs; do [ -f "$1/$f" ] && return 0; done
+  [ -f "$1/app.json" ] && grep -qE '"(expo|displayName)"' "$1/app.json" 2>/dev/null && return 0
+  [ -f "$1/package.json" ] && grep -qE '"react-native"|"expo"' "$1/package.json" 2>/dev/null && return 0
+  return 1
+}
+app_roots() {  # prints the roots, one per line, only when two or more distinct apps exist. the project root itself may be one of them
+  local m d r k keep=() atroot=0
+  {
+    find_app 12 -name 'app.json' -o -name 'app.config.js' -o -name 'app.config.ts' -o -name 'app.config.mjs' -o -name 'app.config.cjs' \
+      -o -name 'pubspec.yaml' -o -name 'capacitor.config.*' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \
+      -o -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'build.gradle' -o -name 'build.gradle.kts' | while IFS= read -r m; do
+        case "$m" in *.xcodeproj/*|*.xcworkspace/*) continue ;; esac
+        case "/$m/" in *Tests/*|*/androidTest/*|*/__tests__/*|*/test/*|*/tests/*|*/integration_test/*) continue ;; esac
+        d="$(dirname "$m")"
+        case "$m" in
+          */app.json) grep -qE '"(expo|displayName)"' "$m" 2>/dev/null || continue ;;
+          */pubspec.yaml) { [ -d "$d/ios" ] || [ -d "$d/android" ]; } && ! is_library "$d" || continue ;;
+          */build.gradle|*/build.gradle.kts) grep -qE 'com\.android\.application|android\.application' "$m" 2>/dev/null || continue ;;
+        esac
+        printf '%s\n' "$d"
+      done
+    find_app 12 -type d \( -name ios -o -name android \) | while IFS= read -r d; do
+      case "/$d/" in *Tests/*|*/androidTest/*|*/__tests__/*|*/test/*|*/tests/*|*/integration_test/*) continue ;; esac
+      find "$d" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
+        -o \( -name 'Info.plist' -o -name '*.xcodeproj' -o -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
+        | grep . >/dev/null && printf '%s\n' "$d"
+    done
+  } 2>/dev/null | while IFS= read -r r; do
+    case "${r##*/}" in ios|android) is_library "$(dirname "$r")" && continue; has_framework_marker "$(dirname "$r")" && r="$(dirname "$r")" ;; esac
+    printf '%s\n' "$r"
+  done | sort -u | {
+    while IFS= read -r r; do
+      [ "${r%/}" = "${DIR%/}" ] && { atroot=1; continue; }
+      for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
+      [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue
+      keep+=("$r")
+    done
+    if [ "$atroot" -eq 1 ]; then
+      [ "${#keep[@]}" -ge 1 ] && printf '%s\n' "$DIR" "${keep[@]}"
+    else
+      [ "${#keep[@]}" -ge 2 ] && printf '%s\n' "${keep[@]}"
+    fi
+  }
+}
+
+# ----- report routing (issue #610). Hook mode buffers the report. A block goes to stderr, the only
+# stream Claude Code shows on exit 2. A pass stays on stdout. Standalone mode prints straight to stdout.
+emit_report() {  # $1 is the exit code about to be returned
+  [ -n "$REPORT" ] || return 0
+  exec 1>&3 3>&-
+  if [ "$1" -eq 2 ]; then cat "$REPORT" >&2; else cat "$REPORT"; fi
+  rm -f "$REPORT" 2>/dev/null; REPORT=""
+}
+# A hook timeout sends TERM. Flush what was buffered to stderr so the partial report is not lost.
+trap 'emit_report 2; exit 143' INT TERM HUP
+if [ -n "$STDIN_JSON" ]; then
+  REPORT="$(mktemp 2>/dev/null)" || REPORT=""
+  if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
+fi
+
+echo "== App Store Compliance Guard =="
+echo "Project. $DIR"
+ROOTS="$(app_roots)"
+if [ -n "$ROOTS" ]; then
+  PROJECT_ROOT="${DIR%/}"
+  echo "Apps. $(printf '%s\n' "$ROOTS" | grep -c .) app roots, each scanned on its own"
+  echo ""
+  while IFS= read -r ROOT; do
+    NESTED_PRUNE=()
+    if [ "${ROOT%/}" = "$PROJECT_ROOT" ]; then
+      while IFS= read -r OTHER; do [ "${OTHER%/}" != "$PROJECT_ROOT" ] && NESTED_PRUNE+=(-o -path "$(printf '%s' "$OTHER" | sed 's/[][*?\\]/\\&/g')"); done <<EOF2
+$ROOTS
+EOF2
+    fi
+    DIR="$ROOT"
+    echo "App. $ROOT"
+    scan_tree
+  done <<EOF
+$ROOTS
+EOF
+else
+  scan_tree
 fi
 
 # ===== summary and exit =====
