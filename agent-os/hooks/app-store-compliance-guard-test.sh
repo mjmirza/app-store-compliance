@@ -10,6 +10,8 @@ GUARD="$HERE/app-store-compliance-guard.sh"
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); printf 'PASS  %s\n' "$1"; }
 bad()  { FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
+# A privacy manifest is a plist. The validator rejects anything it cannot parse, so fixtures carry a real one.
+PLIST_EMPTY='<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict/></plist>'
 
 mk_ios_bad() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/App"
@@ -20,7 +22,7 @@ mk_ios_bad() {
 mk_ios_clean() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/App"
   printf '<plist><dict><key>NSCameraUsageDescription</key><string>Scan receipts to log expenses</string><key>NSLocationWhenInUseUsageDescription</key><string>Show nearby stores on the map</string><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/App/Info.plist"
-  printf '{}' > "$d/App/PrivacyInfo.xcprivacy"
+  printf '%s' "$PLIST_EMPTY" > "$d/App/PrivacyInfo.xcprivacy"
   printf 'import StoreKit\nimport CoreLocation\nimport AVFoundation\nclass A { func signIn(){} func createAccount(){} func deleteAccount(){} func restorePurchases(){} }\nlet dev=AVCaptureDevice.default(for:.video)\nlet m=CLLocationManager()\nlet p="https://api.realbackend.io"\nlet policy="https://realbackend.io/privacy-policy"\nlet prod:SKProduct?=nil\n' > "$d/App/X.swift"
   echo "$d"
 }
@@ -37,7 +39,7 @@ mk_android_bad() {
 mk_ios_precision_safe() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/App.xcodeproj" "$d/App" "$d/AppTests"
   printf 'INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "for prayer times";\nITSAppUsesNonExemptEncryption = NO;\n' > "$d/App.xcodeproj/project.pbxproj"
-  printf '{}' > "$d/App/PrivacyInfo.xcprivacy"
+  printf '%s' "$PLIST_EMPTY" > "$d/App/PrivacyInfo.xcprivacy"
   printf 'import CoreLocation\nimport SwiftUI\nlet m = CLLocationManager()\nlet policy = "https://app.com/privacy-policy"\nvar base: String {\n#if DEBUG\nreturn "http://localhost:8787"\n#else\nreturn "https://prod.app.com"\n#endif\n}\nstruct V: View { var body: some View { TextField("Search", text: .constant("")) } }\nlet label = "Adjust times"\n' > "$d/App/Main.swift"
   printf 'let testURL = "https://example.com/x"\n' > "$d/AppTests/T.swift"
   echo "$d"
@@ -491,6 +493,39 @@ printf '<plist/>' > "$D/App/Info.plist"
 printf '// curl https://api.appstoreconnect.apple.com/v1/appStoreVersions/123/ageRatingDeclaration\n' > "$D/App/A.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -q 'APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED' && ok "Removed ASC age-rating endpoint in a script fires" || bad "Removed ASC age-rating endpoint in a script fires"
+rm -rf "$D"
+
+# 43 A vendored build.gradle.kts under node_modules must not switch the Android section on for an iOS-only app
+D="$(mktemp -d)"; mkdir -p "$D/node_modules/react-native" "$D/ios"
+printf '{"name":"x"}' > "$D/package.json"
+touch "$D/node_modules/react-native/build.gradle.kts" "$D/ios/Podfile"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+if echo "$OUT" | grep -q 'Android=0' && ! echo "$OUT" | grep -Eq '^\s+\[(CRITICAL|HIGH|MEDIUM)\]\s+(ANDROID|GOOGLE)-'; then ok "Vendored gradle file does not flip Android on"; else bad "Vendored gradle file does not flip Android on"; fi
+rm -rf "$D"
+
+# 44 NSPrivacyTracking true with no NSPrivacyTrackingDomains is the ITMS-91064 upload rejection and must block
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/App/Info.plist"
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyTracking</key><true/><key>NSPrivacyTrackingDomains</key><array/></dict></plist>' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' && [ "$RC" -eq 2 ] && ok "Tracking true with empty domains blocks" || bad "Tracking true with empty domains blocks (rc=$RC)"
+rm -rf "$D"
+
+# 45 A manifest that is not a plist cannot be compiled by Xcode, so it is a finding, never a silent pass
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/App/Info.plist"
+printf '{}' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && ok "Malformed manifest fires" || bad "Malformed manifest fires"
+rm -rf "$D"
+
+# 46 A manifest inside a Tests dir is a fixture, not a shipped manifest, and is not validated
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/AppTests/Fixtures"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/App/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/App/PrivacyInfo.xcprivacy"
+printf '{}' > "$D/AppTests/Fixtures/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && bad "Manifest fixture under Tests is skipped" || ok "Manifest fixture under Tests is skipped"
 rm -rf "$D"
 
 echo ""

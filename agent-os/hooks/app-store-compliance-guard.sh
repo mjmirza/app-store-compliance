@@ -110,22 +110,22 @@ finding() {  # severity id title fix
 
 # ----- platform detection -----
 IS_IOS=0; IS_AND=0; IS_WEB=0
-find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep -q . && IS_IOS=1
-find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -q . && IS_IOS=1
-find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -q . && IS_AND=1
-find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep -q . && IS_WEB=1
+find "$DIR" -maxdepth 4 \( -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'Package.swift' -o -name 'Podfile' \) 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_IOS=1
+find "$DIR" -maxdepth 4 -name 'Info.plist' 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_IOS=1
+find "$DIR" -maxdepth 5 \( -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_AND=1
+find "$DIR" -maxdepth 4 \( -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.js' -o -name 'next.config.js' \) 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_WEB=1
 
 # ----- cross-platform framework detection -----
 # IS_IOS/IS_AND above still fire on the built artifact. This adds framework-specific checks.
 IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
-find "$DIR" -maxdepth 4 -name 'pubspec.yaml' 2>/dev/null | grep -q . && IS_FLUTTER=1
+find "$DIR" -maxdepth 4 -name 'pubspec.yaml' 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_FLUTTER=1
 # Scan EVERY package.json within depth (not just the first), so a monorepo root's tooling
 # package.json never shadows a real apps/mobile/package.json deeper in the tree.
 while IFS= read -r pkg; do
   grep -qE '"react-native"|"expo"' "$pkg" 2>/dev/null && IS_RN=1
   grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$pkg" 2>/dev/null && IS_IONIC=1
 done < <(find "$DIR" -maxdepth 4 -name 'package.json' 2>/dev/null | grep -vE '/(node_modules|ios/Pods)/')
-find "$DIR" -maxdepth 4 -name 'capacitor.config.*' 2>/dev/null | grep -q . && IS_IONIC=1
+find "$DIR" -maxdepth 4 -name 'capacitor.config.*' 2>/dev/null | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage)/' | grep -q . && IS_IONIC=1
 # config.xml alone is ambiguous (Maven/NuGet/tooling also use that filename), so require the
 # Cordova widget marker before it counts as a signal.
 while IFS= read -r cfg; do
@@ -305,6 +305,31 @@ if [ "$IS_IOS" -eq 1 ]; then
     if ! find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null | grep -q .; then
       finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest."
     fi
+  fi
+
+  # A manifest that exists can still be internally inconsistent. Apple validates
+  # these keys at upload and rejects by email (ITMS-91xxx) after processing, so
+  # the binary installs from TestFlight and is still barred from review.
+  MANIFEST_VALIDATOR=""
+  for candidate in \
+    "$(dirname "$0")/../../scripts/validate-privacy-manifest.py" \
+    "$HOME/.claude/skills/app-store-compliance/scripts/validate-privacy-manifest.py"; do
+    [ -f "$candidate" ] && { MANIFEST_VALIDATOR="$candidate"; break; }
+  done
+  if [ -n "$MANIFEST_VALIDATOR" ] && command -v python3 >/dev/null 2>&1; then
+    # Same exclusions as the source file list. A pod's manifest is the vendor's job, a Tests fixture never ships.
+    find "$DIR" -name 'PrivacyInfo.xcprivacy' 2>/dev/null \
+      | grep -vE '/(node_modules|Pods|\.git|build|DerivedData|vendor|\.dart_tool|Carthage|[A-Za-z0-9_]*Tests|androidTest|__tests__)/' \
+      | while IFS= read -r manifest; do
+          python3 "$MANIFEST_VALIDATOR" "$manifest" 2>/dev/null
+        done > "$FILELIST.manifest" 2>/dev/null || true
+    if [ -s "$FILELIST.manifest" ]; then
+      while IFS="$(printf '\t')" read -r sev id msg; do
+        [ -n "$id" ] || continue
+        finding "$sev" "$id" "$msg" "Correct the privacy manifest so its keys agree, then rebuild. Reference. https://developer.apple.com/documentation/bundleresources/privacy_manifest_files"
+      done < "$FILELIST.manifest"
+    fi
+    rm -f "$FILELIST.manifest" 2>/dev/null || true
   fi
   grep_has 'ITSAppUsesNonExemptEncryption' || finding high "APPLE-EXPORT-COMPLIANCE-MISSING" "ITSAppUsesNonExemptEncryption not set" "Set it in Info.plist or the build stalls in Missing Compliance and never reaches review."
   if grep_has 'SKProduct|Product\.purchase|StoreKit'; then
