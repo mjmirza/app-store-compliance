@@ -565,17 +565,27 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_citations = set()
+    processed_categories = set()
+
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
-        )
+        cit_key = (cat, u["title"], u["link"])
+        if cit_key not in seen_citations:
+            seen_citations.add(cit_key)
+            citations_list.append(
+                f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+            )
 
         # Pull affected files
         files = scan_results.get(cat, [])
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -824,7 +834,7 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+def update_documentation_report(updates, output_filepath, is_live=False):
     """Overwrites or updates the migration report in docs/SECURITY-POLICY-MIGRATION.md."""
     lines = [
         "<!-- SECURITY_POLICY_MONITOR_START -->",
@@ -832,9 +842,17 @@ def update_documentation_report(updates, output_filepath):
         "",
         "This report is continuously generated and updated by `scripts/monitor-security.py` to track compliance areas.",
         "",
+    ]
+    if not is_live:
+        lines.extend([
+            "> **Simulated output, not live announcements.** This report was generated using mock data for policy migration testing.",
+            "",
+        ])
+
+    lines.extend([
         "## Monitored Security Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -846,8 +864,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_task_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_task_categories:
+            continue
+        seen_task_categories.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -978,7 +1001,7 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_live=args.live)
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
