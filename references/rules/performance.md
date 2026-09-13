@@ -334,11 +334,11 @@ grep -rn 'NSBundleResourceRequest\|OnDemandResources\|on-demand-resource' --incl
 
 ## APPLE-MACOS-ROSETTA-SUNSET
 
-- Title. Intel-only macOS binary with Rosetta ending after macOS 27
+- Title. Intel-only macOS binary with Rosetta ending after macOS 26 or macOS 27
 - Platform. apple
-- Guideline or policy. Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026)
+- Guideline or policy. Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026, and k1mtkt1k, 9 September 2026)
 - Severity. high
-- What triggers it. macOS 27 is the final release to support Rosetta. An Intel-only (x86_64) macOS app will no longer run on Apple silicon after that release. Detection is manual. check the build architectures and any x86_64-only dependencies.
+- What triggers it. Apple's two notices disagree. The 1 September 2026 notice says macOS 27 is the final release to support Rosetta and that Intel-only apps stop running on Apple silicon after that update. The 9 September 2026 submissions notice says macOS 26 is the final release supporting Intel Mac computers and Rosetta, and that macOS 27 will be Apple silicon only. Plan for the earlier reading. an Intel-only (x86_64) macOS app must run natively on Apple silicon before macOS 27 ships. Detection is manual. check the build architectures and any x86_64-only dependencies.
 - How to fix it. Ship a universal or arm64 binary, replace x86_64-only dependencies, and test on Apple silicon without Rosetta installed.
 - Detection signals. x86_64, ONLY_ACTIVE_ARCH, VALID_ARCHS
 - Present means handled. arm64

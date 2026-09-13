@@ -42,7 +42,10 @@ The ask was how many people on r/appledevelopers report actually getting verifie
 | Guideline 1.2 UGC escalation and 4.5.3 Live Activities named (8 June 2026) | [Guidelines](https://developer.apple.com/app-store/review/guidelines/) | Pattern updates, APPLE-4.5.3-LIVE-ACTIVITY-SPAM |
 | On-Demand Resources deprecated from the 27 OS family | [WWDC26 App Store guide](https://developer.apple.com/wwdc26/guides/app-store/) | APPLE-ODR-DEPRECATED-27, guard check |
 | App Store Connect API 4.3 and 4.4 removed the old age-rating endpoints | [API 4.4 notes](https://developer.apple.com/documentation/appstoreconnectapi/app-store-connect-api-4-4-release-notes) | APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED, guard check |
-| macOS 27 is the last release with Rosetta | [w5ngl9k2](https://developer.apple.com/news/?id=w5ngl9k2) | APPLE-MACOS-ROSETTA-SUNSET |
+| Rosetta sunset, macOS 27 per the 1 September notice, macOS 26 per the 9 September notice | [w5ngl9k2](https://developer.apple.com/news/?id=w5ngl9k2), [k1mtkt1k](https://developer.apple.com/news/?id=k1mtkt1k) | APPLE-MACOS-ROSETTA-SUNSET |
+| April 2027 SDK 27 floor for uploads (iOS, iPadOS, tvOS, visionOS, watchOS) | [k1mtkt1k](https://developer.apple.com/news/?id=k1mtkt1k) | APPLE-SDK-27-REQ deadline, PLATFORM-MECHANICS section 1.6 |
+| App Review contact phone in international format, first in-app purchase of each type needs a new app version (19 August 2026) | [App Store Connect release notes](https://developer.apple.com/help/app-store-connect/release-notes/) | Pre-submission checklist, APPLE.md Notes for Review |
+| Screenshot specifications for iPhone Duo, iPhone 18 Pro and Pro Max, Apple Watch Ultra 4 and Series 12 (9 September 2026) | [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications) | PLATFORM-MECHANICS section 1.6, checklist |
 | EU unified terms from 1 October 2026, CTC replaces CTF, Attachment 14 | [gmws0jgp](https://developer.apple.com/news/?id=gmws0jgp), [0cgo95n6](https://developer.apple.com/news/?id=0cgo95n6) | EU-DMA-UNIFIED-TERMS-2026, EU-REGULATORY section 2.3 rewritten |
 | Brazil alternative distribution from iOS 26.5, Attachment 12 by 6 July 2026 | [dhwadr2x](https://developer.apple.com/news/?id=dhwadr2x), [umq9wxmm](https://developer.apple.com/news/?id=umq9wxmm) | Deadline, GLOBAL-REGULATORY section 3.3 |
 | Australia 15+ removed, Vietnam Decree 147 rating, Korea descriptor move | [yrrb45pw](https://developer.apple.com/news/?id=yrrb45pw), [oj3r9pvw](https://developer.apple.com/news/?id=oj3r9pvw) | Deadline, GLOBAL-REGULATORY sections 3.2, 3.5, 3.10 |
@@ -89,6 +92,7 @@ Thirty-eight deadlines were added and eight corrected. The full dated list is in
 ## 8. Unverified, deliberately not encoded
 
 - The exact day in September 2026 the social media declaration gate opened, the exact February and April 2027 days for Play technical quality and Restore Credentials, and the exact January 2027 day for the DMCCA regime. Tracked as the first of the month with the wording quoted.
+- The exact April 2027 day for the 27 SDK upload floor. Apple has named the month only. Tracked as 1 April 2027 with the wording quoted. The iPhone Duo asset upload date, which Apple gives only as later this year.
 - The global rollout date for Android developer verification beyond Brazil, Indonesia, Singapore, and Thailand. Google has not published it.
 - Whether the DOJ ADA interim final rule has been finalised, and whether the FTC AI-accuracy policy statement was adopted after 31 July 2026.
 - Japan APPI law number and the six-month penalty commencement, Korea mandatory certification (1 July 2027), Korea MyData expansion dates. secondary sources only.
