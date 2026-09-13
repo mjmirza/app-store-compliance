@@ -12,7 +12,8 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 
 CRIT=0; HIGH=0; MED=0
 FILELIST=""
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" 2>/dev/null || true; }
+REPORT=""; REPORT_DEGRADED=0
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -30,13 +31,95 @@ elif [ ! -t 0 ]; then
   [ -z "$STDIN_JSON" ] && exit 0
 fi
 
+# Read .tool_input.command as JSON (issue #610). The best installed parser decides. jq, else python3,
+# else a backslash-aware regex. A payload the chosen parser rejects yields no command, so the guard stays silent.
+tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # present AND able to run
+payload_command() {
+  local out
+  if tool_ok jq -n true; then
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if ((.tool_name? // "Bash") != "Bash") then empty else ((.tool_input.command? | strings) // (.command? | strings) // empty) end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+  fi
+  if tool_ok python3 -c pass; then
+    out="$(printf '%s' "$STDIN_JSON" | python3 -c '
+import json, sys
+try:
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+except Exception:
+    sys.exit(4)
+c = None
+if isinstance(d, dict) and d.get("tool_name", "Bash") == "Bash":
+    ti = d.get("tool_input")
+    if isinstance(ti, dict) and isinstance(ti.get("command"), str):
+        c = ti["command"]
+    elif isinstance(d.get("command"), str):
+        c = d["command"]
+sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
+    [ "$rc" -eq 0 ] && { printf '%s' "$out"; return 0; }
+    [ "$rc" -eq 4 ] && return 0
+  fi
+  # No working tool. Prefer the command inside tool_input, else the first command key, then unescape it.
+  local body
+  body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
+  [ -z "$body" ] && body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
+  [ -z "$body" ] && return 0
+  printf '%s' "$body" | sed -E 's/.*"command"[[:space:]]*:[[:space:]]*"//; s/"$//' \
+    | awk 'BEGIN { hx="0123456789abcdef" }
+      { n=split($0, part, /\\/); o=part[1]; lit=0
+        for (i=2; i<=n; i++) { p=part[i]
+          if (lit) { o=o p; lit=0; continue }
+          if (p=="") { o=o "\\"; lit=1; continue }
+          d=substr(p,1,1); rest=substr(p,2)
+          if (d=="n") o=o "\n" rest; else if (d=="t") o=o "\t" rest; else if (d=="r") o=o "\r" rest
+          else if (d=="\"") o=o "\"" rest; else if (d=="/") o=o "/" rest
+          else if (d=="f") o=o sprintf("%c", 12) rest; else if (d=="b") o=o sprintf("%c", 8) rest
+          else if (d=="u" && length(p)>=5) { h=tolower(substr(p,2,4)); v=0; ok=1
+            for (j=1;j<=4;j++) { q=index(hx,substr(h,j,1)); if (q==0) {ok=0; break}; v=v*16+q-1 }
+            if (ok && v>0 && v<128) o=o sprintf("%c", v) substr(p,6); else o=o "\\" p }
+          else o=o "\\" p }
+        printf "%s", o }'
+}
+
 if [ -n "$STDIN_JSON" ]; then
-  CMD="$(printf '%s' "$STDIN_JSON" | grep -oE '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
+  # Only a Bash tool call carries a shell command. The jq and python3 tiers check the top-level tool_name.
+  # The no-tools tier cannot tell a top-level key from a nested one, so it scans rather than skips.
+  CMD="$(payload_command 2>/dev/null | tr -d '\000')"
+  # Fold a backslash-newline continuation (odd trailing backslashes) into one space. Bare newlines stay,
+  # and grep matches per line, so a trigger split across two commands is never invented.
+  CMD="$(printf '%s' "$CMD" | tr -d '\r' | awk '
+    { l=$0; if (cont) { sub(/^[ \t]*/, "", l); cont=0 }
+      n=length(l); k=0; while (k<n && substr(l,n-k,1)=="\\") k++
+      if (k%2==1) { acc=acc substr(l,1,n-1) " "; cont=1 } else { printf "%s%s\n", acc, l; acc="" } }
+    END { if (cont) printf "%s\n", acc }' 2>/dev/null)"
+  [ -z "$CMD" ] && exit 0
+  # Match raw with quote characters and letter escapes stripped (eas "submit", eas s\ubmit, bash -c "eas submit"
+  # all match). Only a single simple line led by an inert text command (echo, grep, cat ...) has quoted spans blanked.
+  CMD_MATCH="$(printf '%s' "$CMD" | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96) }
+    { l=$0; f=l; sub(/^[ \t]*/, "", f)
+      while (f ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", f)
+      split(f, w, /[ \t]+/); c=w[1]
+      simple = (index(l, "$(") == 0 && index(l, bt) == 0 && l !~ /[|;&<>]/)
+      if (simple && c ~ /^(echo|printf|grep|egrep|fgrep|cat|head|tail|wc|sort|uniq|tee)$/) {
+        gsub(sq "[^" sq "]*" sq, sq sq, l); gsub(dq "[^" dq "]*" dq, dq dq, l); sub(/(^|[ \t])#.*$/, "", l) }
+      else { gsub(sq, "", l); gsub(dq, "", l) }
+      print l }' 2>/dev/null | sed -E 's/\\([A-Za-z0-9])/\1/g')"
   # Only act on submission style commands. Otherwise stay silent.
-  if ! printf '%s' "$CMD" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'; then
+  if ! printf '%s' "$CMD_MATCH" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+  # A leading "cd <dir> &&" scopes the scan to that app (an EAS monorepo submits from apps/<app>).
+  # The target must resolve inside the project root, otherwise the root is scanned as before.
+  FIRST="$(printf '%s' "$CMD" | head -1)"
+  CD_COUNT="$(printf '%s' "$CMD" | grep -oE '(^|[;&|(][[:space:]]*)(cd|pushd|popd|source|\.)[[:space:]]' | wc -l | tr -d ' ')"
+  if [ "$CD_COUNT" -eq 1 ] && printf '%s' "$FIRST" | grep -qE '^[[:space:]]*cd[[:space:]]+[^&|;]+(&&|;)'; then
+    TARGET="$(printf '%s' "$FIRST" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*(&&|;).*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/')"
+    TARGET="${TARGET//\$\{CLAUDE_PROJECT_DIR\}/$DIR}"; TARGET="${TARGET//\$CLAUDE_PROJECT_DIR/$DIR}"
+    case "$TARGET" in /*) ;; '~'*) TARGET="$HOME${TARGET#\~}" ;; *) TARGET="$DIR/$TARGET" ;; esac
+    if [ -d "$TARGET" ]; then
+      REAL_T="$(cd "$TARGET" 2>/dev/null && pwd -P)"; REAL_R="$(cd "$DIR" 2>/dev/null && pwd -P)"
+      case "$REAL_T/" in "$REAL_R"/*) DIR="$REAL_T" ;; esac
+    fi
+  fi
 fi
 
 # See docs/CROSS-PLATFORM-FRAMEWORKS.md: an Android-only command beats a committed ios/
@@ -168,6 +251,21 @@ done < <(find "$DIR" -maxdepth 4 -name 'config.xml' 2>/dev/null)
 # invoking command (when known) does not explicitly target Android-only.
 IOS_TARGET_ACTIVE=0
 [ "$IS_IOS" -eq 1 ] && [ "$CMD_TARGET_ANDROID_ONLY" -eq 0 ] && IOS_TARGET_ACTIVE=1
+
+# ----- report routing (issue #610). Hook mode buffers the report. A block goes to stderr, the only
+# stream Claude Code shows on exit 2. A pass stays on stdout. Standalone mode prints straight to stdout.
+emit_report() {  # $1 is the exit code about to be returned
+  [ -n "$REPORT" ] || return 0
+  exec 1>&3 3>&-
+  if [ "$1" -eq 2 ]; then cat "$REPORT" >&2; else cat "$REPORT"; fi
+  rm -f "$REPORT" 2>/dev/null; REPORT=""
+}
+# A hook timeout sends TERM. Flush what was buffered to stderr so the partial report is not lost.
+trap 'emit_report 2; exit 143' INT TERM HUP
+if [ -n "$STDIN_JSON" ]; then
+  REPORT="$(mktemp 2>/dev/null)" || REPORT=""
+  if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
+fi
 
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
@@ -615,10 +713,11 @@ if [ "$CRIT" -gt 0 ]; then
   if [ "${APP_STORE_GUARD_OK:-0}" = "1" ]; then
     echo "APP_STORE_GUARD_OK set. Critical findings present but the submission is allowed."
     log_err "override used with $CRIT critical findings"
-    exit 0
+    emit_report 0; exit 0
   fi
   echo ""
   echo "BLOCKED. $CRIT critical rejection risk(s) above. Fix them, or set APP_STORE_GUARD_OK=1 to override."
-  exit 2
+  [ "${REPORT_DEGRADED:-0}" = "1" ] && echo "BLOCKED. $CRIT critical rejection risk(s). Full report on stdout (no temp file available for buffering)." >&2
+  emit_report 2; exit 2
 fi
-exit 0
+emit_report 0; exit 0

@@ -683,6 +683,444 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && [ "$RC" -eq 2 ] && ok "Array-root manifest blocks" || bad "Array-root manifest blocks (rc=$RC)"
 rm -rf "$D"
 
+# ===== Issue #610. The hook payload parser must be JSON-aware. Real Claude Code payloads below =====
+# (.tool_input.command inside JSON). The old regex truncated at an escaped quote and left \n literal.
+BS='\'
+P_QUOTED='{"tool_name":"Bash","tool_input":{"command":"cd '"$BS"'"$CLAUDE_PROJECT_DIR/apps/app'"$BS"'" && npx eas submit --platform ios"}}'
+P_CONT='{"tool_input":{"command":"npx eas '"$BS$BS$BS"'n  submit --platform ios"}}'
+P_TWOCMD='{"tool_input":{"command":"echo eas'"$BS"'nsubmit --platform ios"}}'
+P_TABCRLF='{"tool_input":{"command":"npx'"$BS"'teas'"$BS"'tsubmit --platform ios'"$BS"'r'"$BS"'n"}}'
+P_QUOTED_CONT='{"tool_input":{"command":"cd '"$BS"'"$CLAUDE_PROJECT_DIR/apps/app'"$BS"'" && npx eas '"$BS$BS$BS"'n submit --platform ios"}}'
+P_QUOTED_TEST='{"tool_input":{"command":"cd '"$BS"'"$HOME/my app'"$BS"'" && npm test"}}'
+P_COMMITMSG='{"tool_input":{"command":"git commit -m '"$BS"'"docs: note that eas submit needs a profile'"$BS"'""}}'
+
+# 63 a quoted path before the submit command must still be scanned
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_QUOTED" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-1 quoted path before eas submit is scanned" || bad "610-1 quoted path before eas submit is scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 64 a backslash-newline continuation must not hide the trigger
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_CONT" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-2 line continuation before submit is scanned" || bad "610-2 line continuation before submit is scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 65 a bare newline separates commands. "eas" on one line and "submit" on the next is NOT a submit
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_TWOCMD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-3 trigger split across two commands is never invented" || bad "610-3 trigger split across two commands is never invented (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 66 on a block in hook mode the report reaches stderr (the only stream Claude Code shows on exit 2)
+D="$(mk_ios_bad)"
+ERR="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
+echo "$ERR" | grep -q 'BLOCKED' && echo "$ERR" | grep -q 'CRITICAL' && [ "$RC" -eq 2 ] && ok "610-4 hook-mode block report is on stderr" || bad "610-4 hook-mode block report is on stderr (rc=$RC bytes=${#ERR})"
+rm -rf "$D"
+
+# 67 a passing hook-mode scan keeps its report on stdout, and stderr stays quiet
+D="$(mk_ios_clean)"
+STDOUT="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>/dev/null)"; RC=$?
+ERR="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"
+echo "$STDOUT" | grep -q 'Summary\.' && [ "$RC" -eq 0 ] && ! echo "$ERR" | grep -q 'Summary\.' && ok "610-5 hook-mode pass report stays on stdout" || bad "610-5 hook-mode pass report stays on stdout (rc=$RC)"
+rm -rf "$D"
+
+# 68 standalone mode is unchanged. the report is on stdout even when it blocks
+D="$(mk_ios_bad)"
+STDOUT="$(bash "$GUARD" "$D" 2>/dev/null)"; RC=$?
+echo "$STDOUT" | grep -q 'BLOCKED' && [ "$RC" -eq 2 ] && ok "610-6 standalone block report stays on stdout" || bad "610-6 standalone block report stays on stdout (rc=$RC)"
+rm -rf "$D"
+
+# 69 CRLF inside the command and a tab between the words are folded, the trigger still matches
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_TABCRLF" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-7 tabs and CRLF inside the command still match" || bad "610-7 tabs and CRLF inside the command still match (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 70 without jq the fallback decoder still handles the quoted path (a vendored copy on a runner without jq)
+D="$(mk_ios_bad)"
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+OUT="$(printf '%s' "$P_QUOTED" | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-8 quoted path is scanned without jq on PATH" || bad "610-8 quoted path is scanned without jq on PATH (rc=$RC bytes=${#OUT})"
+rm -rf "$D" "$NOJQ"
+
+# 71 without jq AND python3 the last-resort decoder still unescapes the quoted path and the continuation
+D="$(mk_ios_bad)"
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+OUT="$(printf '%s' "$P_QUOTED_CONT" | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-9 quoted path plus continuation is scanned with neither jq nor python3" || bad "610-9 quoted path plus continuation is scanned with neither jq nor python3 (rc=$RC bytes=${#OUT})"
+rm -rf "$D" "$NOJQ"
+
+# 72 a payload with the command at the top level (older hook shape) is still read
+D="$(mk_ios_bad)"
+OUT="$(printf '{"command":"fastlane pilot upload"}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-10 top-level command key is read" || bad "610-10 top-level command key is read (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 73 malformed JSON payload fails open, silently
+OUT="$(printf '{"tool_input":{"command":"fastlane deliver' | bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "610-11 malformed payload fails open silently" || bad "610-11 malformed payload fails open silently (rc=$RC out=$OUT)"
+
+# 74 a non-string command (object) fails open, silently
+OUT="$(printf '{"tool_input":{"command":{"nested":true}}}' | bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "610-12 non-string command fails open silently" || bad "610-12 non-string command fails open silently (rc=$RC out=$OUT)"
+
+# 75 a quoted non-submit command stays silent (decoding must not widen the trigger)
+OUT="$(printf '%s' "$P_QUOTED_TEST" | bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-13 quoted non-submit command stays silent" || bad "610-13 quoted non-submit command stays silent (rc=$RC out=$OUT)"
+
+# 76 the trigger phrase inside a commit message is scanned on the conservative side, never a silent skip.
+# The scan on a clean project must exit 0, so a commit message never blocks anyone.
+D="$(mk_ios_clean)"
+OUT="$(printf '%s' "$P_COMMITMSG" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "610-14 trigger phrase inside a commit message never blocks a clean project" || bad "610-14 trigger phrase inside a commit message never blocks a clean project (rc=$RC)"
+rm -rf "$D"
+
+# 77 a 200KB payload with the command at the end is decoded and scanned
+D="$(mk_ios_bad)"
+PAD="$(head -c 200000 /dev/zero | tr '\0' 'x')"
+OUT="$(printf '{"tool_input":{"description":"%s","command":"npx eas submit --platform ios"}}' "$PAD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-15 large payload is decoded and scanned" || bad "610-15 large payload is decoded and scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# ===== Issue #610, second round. Counterexamples from the adversarial review, pinned =====
+NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+P_ESCBS='{"tool_input":{"command":"gradlew '"$BS$BS$BS$BS$BS"'nbundleRelease"}}'
+P_BSSPACE='{"tool_input":{"command":"npx eas '"$BS$BS"' '"$BS"'nsubmit --platform ios"}}'
+P_META_OK='{"meta":{"command":"eas submit"},"tool_input":{"command":"ls"}}'
+P_META_BROKEN='{"meta":{"command":"eas submit"},"tool_input":{"command":"ls"},BROKEN'
+P_FALSE='{"tool_input":{"command":false},"command":"fastlane pilot upload"}'
+P_UESC='{"tool_input":{"command":"'"$BS"'u0065as submit --platform ios"}}'
+
+# 78 two backslashes before a newline are an escaped backslash plus a separator, not a continuation
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_ESCBS" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-16 escaped backslash before a newline is not folded" || bad "610-16 escaped backslash before a newline is not folded (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 79 a backslash followed by a space and then a newline is not a continuation either
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_BSSPACE" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-17 backslash space newline is not folded" || bad "610-17 backslash space newline is not folded (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 80 a trigger under a sibling key never wins over tool_input.command, on every tier
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ" "$NOTOOLS"; do
+  OUT="$(printf '%s' "$P_META_OK" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  [ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-18 sibling command key is ignored (tier=${tier##*/})" || bad "610-18 sibling command key is ignored (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 81 a malformed payload with a trigger under a sibling key stays silent when a real parser is installed
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ"; do
+  OUT="$(printf '%s' "$P_META_BROKEN" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  [ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-19 malformed payload never scans a sibling key (tier=${tier##*/})" || bad "610-19 malformed payload never scans a sibling key (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 82 a non-string tool_input.command falls through to the top-level command identically on jq and python3
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ"; do
+  OUT="$(printf '%s' "$P_FALSE" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-20 false tool_input.command falls through to top-level (tier=${tier##*/})" || bad "610-20 false tool_input.command falls through to top-level (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 83 an ASCII unicode escape in the command is read on every tier, including the no-tools fallback
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ" "$NOTOOLS"; do
+  OUT="$(printf '%s' "$P_UESC" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-21 unicode-escaped trigger is read (tier=${tier##*/})" || bad "610-21 unicode-escaped trigger is read (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 84 the three tiers agree byte for byte on the two payloads from the issue
+D="$(mk_ios_bad)"
+for p in "$P_QUOTED" "$P_CONT"; do
+  A="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 | grep -E '^  \[|^Summary\.|^BLOCKED')"
+  B="$(printf '%s' "$p" | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 | grep -E '^  \[|^Summary\.|^BLOCKED')"
+  C="$(printf '%s' "$p" | PATH="$NOTOOLS" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 | grep -E '^  \[|^Summary\.|^BLOCKED')"
+  [ -n "$A" ] && [ "$A" = "$B" ] && [ "$B" = "$C" ] && ok "610-22 tiers agree on an issue payload" || bad "610-22 tiers agree on an issue payload (jq=${#A} py=${#B} none=${#C})"
+done
+rm -rf "$D"
+
+# 85 there is no stdin cap. a 34MB valid payload with the command up front is read and scanned
+D="$(mk_ios_bad)"
+BIG="$(mktemp)"; { printf '{"tool_input":{"command":"npx eas submit --platform ios","description":"'; head -c 34000000 /dev/zero | tr '\0' 'x'; printf '"}}'; } > "$BIG"
+OUT="$(CLAUDE_PROJECT_DIR="$D" bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-23 34MB valid payload is read and scanned" || bad "610-23 34MB valid payload is read and scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+rm -rf "$NOTOOLS" "$NOJQ"
+
+# ===== Issue #610, third round. Reporter persona findings, pinned =====
+P_ECHO='{"tool_input":{"command":"echo '"$BS"'"eas submit --platform ios'"$BS"'""}}'
+P_GREP='{"tool_input":{"command":"grep -rn '"'"'eas submit'"'"' docs/"}}'
+P_COMMENT='{"tool_input":{"command":"ls -la # then npx eas submit --platform ios"}}'
+P_COMMENT_ECHO='{"tool_input":{"command":"echo hi # then npx eas submit --platform ios"}}'
+P_SHC='{"tool_input":{"command":"bash -c '"$BS"'"npx eas submit --platform ios'"$BS"'""}}'
+P_CD_APP='{"tool_input":{"command":"cd '"$BS"'"$CLAUDE_PROJECT_DIR/apps/app'"$BS"'" && npx eas submit --platform ios"}}'
+P_CD_REL='{"tool_input":{"command":"cd apps/app; eas submit -p ios --latest"}}'
+P_CD_OUT='{"tool_input":{"command":"cd /tmp && npx eas submit --platform ios"}}'
+P_BOM="$(printf '\357\273\277')"'{"tool_input":{"command":"fastlane pilot upload"}}'
+
+mk_expo_mono() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/app/ios/App" "$d/apps/kiosk/ios/Kiosk" "$d/node_modules/x"
+  printf '{"name":"root","workspaces":["apps/*"]}' > "$d/package.json"
+  printf '{"expo":{"name":"app"}}' > "$d/apps/app/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/app/ios/App/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\nlet u="https://staging.example.com"\n' > "$d/apps/app/ios/App/A.swift"
+  printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Show stores</string><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/apps/kiosk/ios/Kiosk/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/apps/kiosk/ios/Kiosk/PrivacyInfo.xcprivacy"
+  printf 'import StoreKit\nlet policy="https://kiosk.example.io/privacy-policy"\n' > "$d/apps/kiosk/ios/Kiosk/K.swift"
+  echo "$d"
+}
+
+# 86 echo of the trigger text is not a submit
+OUT="$(printf '%s' "$P_ECHO" | bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-24 echo of the trigger text stays silent" || bad "610-24 echo of the trigger text stays silent (rc=$RC bytes=${#OUT})"
+
+# 87 grep for the trigger text is not a submit
+OUT="$(printf '%s' "$P_GREP" | bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-25 grep for the trigger text stays silent" || bad "610-25 grep for the trigger text stays silent (rc=$RC bytes=${#OUT})"
+
+# 88 a trailing comment is blanked only behind a text-only command. behind anything else it scans on the
+# conservative side (a comment can start inside a quoted wrapper argument) and a clean project still passes.
+D="$(mk_ios_clean)"
+OUT="$(printf '%s' "$P_COMMENT_ECHO" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-26 comment behind echo stays silent" || bad "610-26 comment behind echo stays silent (rc=$RC bytes=${#OUT})"
+OUT="$(printf '%s' "$P_COMMENT" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "610-26 comment behind ls scans and a clean project passes" || bad "610-26 comment behind ls scans and a clean project passes (rc=$RC)"
+rm -rf "$D"
+
+# 89 a submit wrapped in bash -c "..." is still a submit and is scanned
+D="$(mk_ios_bad)"
+OUT="$(printf '%s' "$P_SHC" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-27 submit inside bash -c is scanned" || bad "610-27 submit inside bash -c is scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 90 a leading cd into an app inside the project scopes the scan to that app, quoted and relative forms
+D="$(mk_expo_mono)"
+for p in "$P_CD_APP" "$P_CD_REL"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q "^Project\. .*/apps/app$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "610-28 leading cd scopes the scan to the app" || bad "610-28 leading cd scopes the scan to the app (rc=$RC)"
+done
+rm -rf "$D"
+
+# 91 a leading cd outside the project root is ignored and the root is scanned
+D="$(mk_expo_mono)"
+OUT="$(printf '%s' "$P_CD_OUT" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ok "610-29 cd outside the project root is ignored" || bad "610-29 cd outside the project root is ignored (rc=$RC)"
+rm -rf "$D"
+
+# 92 a UTF-8 BOM before the payload is read on every tier
+D="$(mk_ios_bad)"
+NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+for tier in "$PATH" "$NOJQ" "$NOTOOLS"; do
+  OUT="$(printf '%s' "$P_BOM" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-30 BOM payload is read (tier=${tier##*/})" || bad "610-30 BOM payload is read (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D" "$NOTOOLS" "$NOJQ"
+
+# ===== Issue #610, fourth round. Hook-contract persona findings, pinned =====
+P_MCP='{"hook_event_name":"PreToolUse","tool_name":"mcp__some__runner","tool_input":{"command":"eas submit --platform ios"}}'
+P_EDIT='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"x.md","new_string":"run eas submit"},"command":"eas submit --platform ios"}'
+P_NUL='{"tool_name":"Bash","tool_input":{"command":"./gradlew '"$BS"'u0000 bundleRelease"}}'
+
+# 93 a payload from any tool other than Bash is never scanned, even when it carries a command key
+D="$(mk_ios_bad)"
+for p in "$P_MCP" "$P_EDIT"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  [ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-31 non-Bash tool payload stays silent" || bad "610-31 non-Bash tool payload stays silent (rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 94 a 5MB payload that is valid JSON with the command up front is scanned, well under the cap
+D="$(mk_ios_bad)"
+BIG="$(mktemp)"; { printf '{"tool_name":"Bash","tool_input":{"command":"npx eas submit --platform ios","description":"'; head -c 5000000 /dev/zero | tr '\0' 'x'; printf '"}}'; } > "$BIG"
+OUT="$(bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-32 5MB valid payload is scanned" || bad "610-32 5MB valid payload is scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# 95 a NUL byte inside the command never leaks a bash warning to stderr on a pass
+D="$(mk_ios_clean)"
+ERR="$(printf '%s' "$P_NUL" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$ERR" ] && ok "610-33 NUL byte in the command keeps stderr empty on a pass" || bad "610-33 NUL byte in the command keeps stderr empty on a pass (rc=$RC err=${ERR:0:80})"
+rm -rf "$D"
+
+# ===== Issue #610, fifth round. Second adversarial review, pinned. A submit can never hide in quotes =====
+P_QSUB='{"tool_input":{"command":"eas '"$BS"'"submit'"$BS"'" --platform ios"}}'
+P_SEMI_SHC='{"tool_input":{"command":"true;bash -c '"'"'eas submit --platform ios'"'"'"}}'
+P_PY_OS='{"tool_input":{"command":"python3 -c '"'"'import os; os.system('"$BS"'"eas submit --platform ios'"$BS"'")'"'"'"}}'
+P_SUBST='{"tool_input":{"command":"x='"$BS"'"$(bash -c '"'"'npx eas submit --platform ios'"'"')'"$BS"'""}}'
+P_ABS_SH='{"tool_input":{"command":"/bin/sh -c '"'"'eas submit --platform ios'"'"'"}}'
+P_TWO_CD='{"tool_input":{"command":"cd apps/app && cd ../kiosk && npx eas submit --platform ios"}}'
+P_TWO_DOCS='{"tool_input":{"command":"eas submit --platform ios"}} {"tool_input":{"command":"echo"}}'
+P_NESTED_TN='{"metadata":{"tool_name":"Edit"},"tool_name":"Bash","tool_input":{"command":"fastlane pilot upload"}}'
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+
+# 96 a submit is scanned however it is quoted or wrapped
+D="$(mk_ios_bad)"
+for p in "$P_QSUB" "$P_SEMI_SHC" "$P_PY_OS" "$P_SUBST" "$P_ABS_SH"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-34 quoted or wrapped submit is scanned" || bad "610-34 quoted or wrapped submit is scanned (rc=$RC bytes=${#OUT} payload=${p:0:60})"
+done
+rm -rf "$D"
+
+# 97 two cd's in one command never scope the scan. the root is scanned as before
+D="$(mk_expo_mono)"
+OUT="$(printf '%s' "$P_TWO_CD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ok "610-35 two cd's fall back to the project root" || bad "610-35 two cd's fall back to the project root (rc=$RC)"
+rm -rf "$D"
+
+# 98 two concatenated JSON documents are not one payload. silent on jq and on python3
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ"; do
+  OUT="$(printf '%s' "$P_TWO_DOCS" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  [ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-36 concatenated documents stay silent (tier=${tier##*/})" || bad "610-36 concatenated documents stay silent (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D"
+
+# 99 a nested metadata tool_name never masks the real top-level Bash tool_name on the JSON tiers
+D="$(mk_ios_bad)"
+for tier in "$PATH" "$NOJQ"; do
+  OUT="$(printf '%s' "$P_NESTED_TN" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-37 nested tool_name does not mask Bash (tier=${tier##*/})" || bad "610-37 nested tool_name does not mask Bash (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+rm -rf "$D" "$NOJQ"
+
+# ===== Issue #610, sixth round. Portability persona. the no-tools unescape must stay linear =====
+# 100 a 300KB command reaches the no-tools tier and is unescaped and scanned in seconds, not minutes
+D="$(mk_ios_bad)"
+NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
+BIG="$(mktemp)"; { printf '{"tool_input":{"command":"npx eas submit --platform ios && echo '; head -c 300000 /dev/zero | tr '\0' 'x'; printf '"}}'; } > "$BIG"
+T0=$(date +%s); OUT="$(PATH="$NOTOOLS" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; T1=$(date +%s); rm -f "$BIG"
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && [ $((T1-T0)) -lt 20 ] && ok "610-38 300KB command is scanned on the no-tools tier in $((T1-T0))s" || bad "610-38 300KB command is scanned on the no-tools tier (rc=$RC secs=$((T1-T0)) bytes=${#OUT})"
+rm -rf "$D" "$NOTOOLS"
+
+# ===== Issue #610, seventh round. Fuzz persona. a present but broken parser never disables the guard =====
+mk_broken_tool_path() {  # $1 = name of the tool to break, everything else real, jq and python3 otherwise absent
+  local d; d="$(mktemp -d)"
+  for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
+  printf '#!/bin/sh\necho "xcrun: error: invalid active developer path" >&2\nexit 1\n' > "$d/$1"; chmod +x "$d/$1"
+  echo "$d"
+}
+P_FF='{"tool_input":{"command":"eas'"$BS"'fsubmit --platform ios"}}'
+P_NESTED_TI='{"command":"ls","tool_input":{"env":{"x":"y"},"command":"eas submit --platform ios"}}'
+
+# 101 the macOS python3 stub (no Command Line Tools) or a stale pyenv shim must fall through, never silence the guard
+D="$(mk_ios_bad)"
+for tool in python3 jq; do
+  BROKEN="$(mk_broken_tool_path "$tool")"
+  OUT="$(printf '%s' "$P_QUOTED" | PATH="$BROKEN" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-39 broken $tool on PATH falls through and the submit is scanned" || bad "610-39 broken $tool on PATH falls through and the submit is scanned (rc=$RC bytes=${#OUT})"
+  rm -rf "$BROKEN"
+done
+rm -rf "$D"
+
+# 102 a form feed between the tool and the verb is whitespace on every tier
+D="$(mk_ios_bad)"
+NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
+for tier in "$PATH" "$NOTOOLS"; do
+  OUT="$(printf '%s' "$P_FF" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-40 form feed separator is read (tier=${tier##*/})" || bad "610-40 form feed separator is read (tier=${tier##*/} rc=$RC bytes=${#OUT})"
+done
+
+# 103 a nested object ahead of the command key inside tool_input does not fool the no-tools tier
+OUT="$(printf '%s' "$P_NESTED_TI" | PATH="$NOTOOLS" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-41 nested object inside tool_input is skipped over" || bad "610-41 nested object inside tool_input is skipped over (rc=$RC bytes=${#OUT})"
+rm -rf "$D" "$NOTOOLS"
+
+# ===== Issue #610, eighth round. Third adversarial review. an inert text command cannot smuggle a submit =====
+P_ECHO_SUBST='{"tool_input":{"command":"echo '"$BS"'"$(eas submit --platform ios)'"$BS"'""}}'
+P_ECHO_PIPE='{"tool_input":{"command":"echo '"$BS"'"eas submit --platform ios'"$BS"'" | sh"}}'
+P_GIT_ALIAS='{"tool_input":{"command":"git -c alias.ship='"'"'!npx eas submit --platform ios'"'"' ship"}}'
+P_GIT_MSG='{"tool_input":{"command":"git commit -m '"$BS"'"docs: note that eas submit needs a profile'"$BS"'""}}'
+
+# 104 a submit inside a command substitution, a pipe, or a git alias behind an inert-looking command is scanned
+D="$(mk_ios_bad)"
+for p in "$P_ECHO_SUBST" "$P_ECHO_PIPE" "$P_GIT_ALIAS"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-42 smuggled submit behind a text command is scanned" || bad "610-42 smuggled submit behind a text command is scanned (rc=$RC bytes=${#OUT} payload=${p:0:60})"
+done
+rm -rf "$D"
+
+# 105 a plain echo of the trigger with no substitution, pipe, or separator is still silent
+OUT="$(printf '%s' "$P_ECHO" | bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-43 plain echo of the trigger stays silent" || bad "610-43 plain echo of the trigger stays silent (rc=$RC bytes=${#OUT})"
+
+# 106 git is no longer inert (aliases and exec flags run commands). a commit message scans and a clean project passes
+D="$(mk_ios_clean)"
+OUT="$(printf '%s' "$P_GIT_MSG" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "610-44 git commit message scans and a clean project passes" || bad "610-44 git commit message scans and a clean project passes (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue #610, ninth round. Fourth adversarial review. a parser that passes its probe but fails for real falls through =====
+mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to keep real on PATH besides the shim
+  local d; d="$(mktemp -d)"
+  for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
+  [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(command -v python3)" "$d/python3"
+  printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
+  echo "$d"
+}
+P_UNI='{"tool_input":{"command":"cd apps/caf\xc3\xa9 && npx eas submit --platform ios"}}'
+
+# 107 a jq that answers the probe but dies on real input falls through to python3 and the submit is scanned
+D="$(mk_ios_bad)"
+SHIM="$(mk_shim_path jq '#!/bin/sh
+[ "$1" = "-n" ] && exit 0
+echo "jq: error: segfault" >&2; exit 2' python3)"
+OUT="$(printf '%s' "$P_QUOTED" | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-45 jq that fails on real input falls through" || bad "610-45 jq that fails on real input falls through (rc=$RC bytes=${#OUT})"
+rm -rf "$SHIM"
+
+# 108 a python3 that answers the probe but dies on real input falls through to the regex tier and the submit is scanned
+SHIM="$(mk_shim_path python3 '#!/bin/sh
+[ "$2" = "pass" ] && exit 0
+echo "Fatal Python error" >&2; exit 1' none)"
+OUT="$(printf '%s' "$P_QUOTED" | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-46 python3 that fails on real input falls through" || bad "610-46 python3 that fails on real input falls through (rc=$RC bytes=${#OUT})"
+rm -rf "$SHIM"
+
+# 109 a genuinely invalid payload rejected by python3 stays silent (rejection is authoritative, not a crash)
+SHIM="$(mk_shim_path jq '#!/bin/sh
+exit 2' python3)"
+OUT="$(printf '{"tool_input":{"command":"fastlane deliver' | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-47 python3 rejecting invalid JSON stays silent" || bad "610-47 python3 rejecting invalid JSON stays silent (rc=$RC bytes=${#OUT})"
+rm -rf "$SHIM"
+
+# 110 PYTHONIOENCODING=ascii never drops a command with a non-ASCII path on the python3 tier
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+OUT="$(printf "$P_UNI" | PYTHONIOENCODING=ascii PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-48 non-ASCII path survives PYTHONIOENCODING=ascii" || bad "610-48 non-ASCII path survives PYTHONIOENCODING=ascii (rc=$RC bytes=${#OUT})"
+rm -rf "$NOJQ"
+
+# 111 with no temp file available the pass report stays on stdout and a block still puts its reason on stderr
+SHIM="$(mk_shim_path mktemp '#!/bin/sh
+exit 1' jq)"; ln -s "$(command -v python3)" "$SHIM/python3"
+ERR="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
+echo "$ERR" | grep -q '^BLOCKED\.' && [ "$RC" -eq 2 ] && ok "610-49 degraded routing still puts the block reason on stderr" || bad "610-49 degraded routing still puts the block reason on stderr (rc=$RC err=${ERR:0:80})"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+STDOUT="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>/dev/null)"; RC=$?
+echo "$STDOUT" | grep -q 'Summary\.' && [ "$RC" -eq 0 ] && ok "610-50 degraded routing keeps the pass report on stdout" || bad "610-50 degraded routing keeps the pass report on stdout (rc=$RC bytes=${#STDOUT})"
+rm -rf "$D" "$SHIM"
+
+# ===== Issue #610, tenth round. Fifth adversarial review. a backslash before a letter is the letter =====
+P_LETTER_ESC='{"tool_input":{"command":"eas s'"$BS$BS"'ubmit --platform ios"}}'
+P_CONT_ESC='{"tool_input":{"command":"eas '"$BS$BS$BS"'n'"$BS$BS"'submit --platform ios"}}'
+
+# 112 eas s\ubmit and a continuation followed by \submit are both plain eas submit to the shell, and are scanned
+D="$(mk_ios_bad)"
+for p in "$P_LETTER_ESC" "$P_CONT_ESC"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-51 letter escape inside the verb is scanned" || bad "610-51 letter escape inside the verb is scanned (rc=$RC bytes=${#OUT} payload=${p:0:60})"
+done
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
