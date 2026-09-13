@@ -91,10 +91,15 @@ if [ -n "$STDIN_JSON" ]; then
       if (k%2==1) { acc=acc substr(l,1,n-1) " "; cont=1 } else { printf "%s%s\n", acc, l; acc="" } }
     END { if (cont) printf "%s\n", acc }' 2>/dev/null)"
   [ -z "$CMD" ] && exit 0
-  # Match raw with quote characters and letter escapes stripped (eas "submit", eas s\ubmit, bash -c "eas submit"
-  # all match). Only a single simple line led by an inert text command (echo, grep, cat ...) has quoted spans blanked.
-  CMD_MATCH="$(printf '%s' "$CMD" | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96) }
-    { l=$0; f=l; sub(/^[ \t]*/, "", f)
+  # Match raw with quotes and letter escapes stripped. Only a single simple line led by an inert text command
+  # (echo, grep, cat) has quoted spans blanked, and a heredoc body is blanked unless an interpreter consumes it.
+  CMD_MATCH="$(printf '%s' "$CMD" | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96); hd=0 }
+    { l=$0
+      if (hd) { t=l; sub(/^\t+/, "", t); if (t == hd_end) { hd=0 } else if (!hd_keep) { l="" } ; print l; next }
+      if (match(l, /<<-?[ \t]*[\047"]?[A-Za-z_][A-Za-z0-9_]*[\047"]?/) && substr(l, RSTART+2, 1) != "<") {
+        tag=substr(l, RSTART, RLENGTH); sub(/^<<-?[ \t]*/, "", tag); gsub(/[\047"]/, "", tag); hd=1; hd_end=tag
+        hd_keep = (l ~ /(^|[^A-Za-z0-9_\/-])((ba|z|da|k)?sh|eval|ssh|sudo|su|xargs|python[0-9.]*|node|ruby|perl|docker|kubectl|source)([^A-Za-z0-9_-]|$)/) }
+      f=l; sub(/^[ \t]*/, "", f)
       while (f ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", f)
       split(f, w, /[ \t]+/); c=w[1]
       simple = (index(l, "$(") == 0 && index(l, bt) == 0 && l !~ /[|;&<>]/)

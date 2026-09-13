@@ -1121,6 +1121,32 @@ for p in "$P_LETTER_ESC" "$P_CONT_ESC"; do
 done
 rm -rf "$D"
 
+# ===== Issue #610, eleventh round. A heredoc body is data unless an interpreter consumes it =====
+P_HD_GH='{"tool_input":{"command":"gh pr create --title x --body-file - <<'"$BS"'"EOF'"$BS"'"'"$BS"'nFixes the guard so npx eas submit --platform ios is scanned.'"$BS"'nEOF"}}'
+P_HD_CAT='{"tool_input":{"command":"cat > notes.md <<EOF'"$BS"'nrun npx eas submit --platform ios later'"$BS"'nEOF"}}'
+P_HD_BASH='{"tool_input":{"command":"bash <<EOF'"$BS"'nnpx eas submit --platform ios'"$BS"'nEOF"}}'
+P_HD_PIPE='{"tool_input":{"command":"cat <<EOF | sh'"$BS"'nnpx eas submit --platform ios'"$BS"'nEOF"}}'
+P_HD_DOCKER='{"tool_input":{"command":"docker exec build sh <<'"'"'EOF'"'"''"$BS"'nfastlane pilot upload'"$BS"'nEOF"}}'
+P_HD_THEN='{"tool_input":{"command":"cat > x.txt <<EOF'"$BS"'nhello'"$BS"'nEOF'"$BS"'nnpx eas submit --platform ios"}}'
+
+# 113 a heredoc handed to gh or cat is prose, not a submit
+D="$(mk_ios_bad)"
+for p in "$P_HD_GH" "$P_HD_CAT"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  [ -z "$OUT" ] && [ "$RC" -eq 0 ] && ok "610-52 heredoc prose behind gh or cat stays silent" || bad "610-52 heredoc prose behind gh or cat stays silent (rc=$RC bytes=${#OUT} payload=${p:0:50})"
+done
+
+# 114 a heredoc handed to an interpreter, directly, through a pipe, or inside docker exec, is scanned
+for p in "$P_HD_BASH" "$P_HD_PIPE" "$P_HD_DOCKER"; do
+  OUT="$(printf '%s' "$p" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-53 heredoc fed to an interpreter is scanned" || bad "610-53 heredoc fed to an interpreter is scanned (rc=$RC bytes=${#OUT} payload=${p:0:50})"
+done
+
+# 115 a real submit on the line after a heredoc terminator is still scanned
+OUT="$(printf '%s' "$P_HD_THEN" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-54 submit after a heredoc terminator is scanned" || bad "610-54 submit after a heredoc terminator is scanned (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
