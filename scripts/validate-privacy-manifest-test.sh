@@ -64,6 +64,31 @@ printf 'not a plist' > "$T/g.xcprivacy"
 $V "$T/g.xcprivacy" >/dev/null 2>&1
 [ $? -eq 2 ] && ok "unreadable manifest exits 2" || bad "unreadable exit code"
 
+# 8 a plist whose root is an array is not a manifest, and must be a finding rather than a crash into a silent pass
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><string>x</string></array></plist>' > "$T/h.xcprivacy"
+OUT="$($V "$T/h.xcprivacy" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && [ $RC -eq 2 ] && ok "root array is unreadable, exit 2" || bad "root array (rc=$RC)"
+
+# 9 an empty NSPrivacyAccessedAPITypes array is invalid per TN3181
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyAccessedAPITypes</key><array/></dict></plist>' > "$T/i.xcprivacy"
+OUT="$($V "$T/i.xcprivacy" 2>&1)"
+echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-API-TYPES-EMPTY' && ok "empty accessed API array is critical" || bad "empty accessed API array"
+
+# 10 an accessed API with an empty reasons array is invalid per TN3181, and blocks
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyAccessedAPITypes</key><array><dict><key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string><key>NSPrivacyAccessedAPITypeReasons</key><array/></dict></array></dict></plist>' > "$T/j.xcprivacy"
+OUT="$($V "$T/j.xcprivacy" 2>&1)"
+echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-API-NO-REASON' && ok "empty reason array is critical" || bad "empty reason array"
+
+# 11 a collected type with the wrong value type is reported, never a crash
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyCollectedDataTypes</key><string>oops</string></dict></plist>' > "$T/k.xcprivacy"
+OUT="$($V "$T/k.xcprivacy" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-MANIFEST-BAD-VALUE' && [ $RC -eq 1 ] && ok "wrong value type is a finding" || bad "wrong value type (rc=$RC)"
+
+# 12 a NSPrivacyTracking that is not a Boolean is invalid per TN3181
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyTracking</key><string>yes</string></dict></plist>' > "$T/l.xcprivacy"
+OUT="$($V "$T/l.xcprivacy" 2>&1)"
+echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-BAD-VALUE' && ok "non-boolean tracking is critical" || bad "non-boolean tracking"
+
 echo ""
 echo "validate-privacy-manifest-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

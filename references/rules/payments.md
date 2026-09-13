@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-10 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+11 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -16,7 +16,7 @@
 How to detect.
 
 ```bash
-grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' . && ! grep -rn 'StoreKit\|SKProduct\|Product.purchase' --include='*.swift' .
+grep -rn 'Stripe\|PayPalCheckout\|braintree\|razorpay' --include='*.swift' --include='pubspec.yaml' --include='package.json' . && ! grep -rnE 'StoreKit|SKProduct|Product.purchase|in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor' --include='*.swift' --include='pubspec.yaml' --include='package.json' .
 ```
 
 ## APPLE-GAMBLING-BRAZIL-LICENSE
@@ -49,7 +49,23 @@ grep -rni 'gambling\|fixed-odds\|betting' --include='*.swift' .   # then verify 
 How to detect.
 
 ```bash
-grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' . && ! grep -rn 'BillingClient\|com.android.billingclient' .
+grep -rn 'Stripe\|PayPal\|razorpay' --include='*.kt' --include='*.java' --include='pubspec.yaml' --include='package.json' . && ! grep -rnE 'BillingClient|com.android.billingclient|in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor' .
+```
+
+## GOOGLE-PLAY-BILLING-V8-REQUIRED
+
+- Title. Play Billing Library below version 8
+- Platform. google
+- Guideline or policy. Payments
+- Severity. critical
+- What triggers it. A com.android.billingclient:billing dependency with a major version below 8. New apps and updates must use Play Billing Library 8 or later from 31 August 2026 (deprecation ladder), with a Play Console extension available until 1 November 2026. Already published v7 binaries keep transacting until the 2027 all-apps deadline.
+- How to fix it. Upgrade to com.android.billingclient:billing 8.x, or request the Play Console extension before 1 November 2026. Reference https://developer.android.com/google/play/billing/deprecation-faq
+- Detection signals. com.android.billingclient:billing:7, com.android.billingclient:billing-ktx:7, com.android.billingclient:billing:6
+
+How to detect.
+
+```bash
+grep -rnoE 'com\.android\.billingclient:billing(-ktx)?:[0-9]+' --include='*.gradle' --include='*.kts' .   # major must be 8 or higher from 31 Aug 2026
 ```
 
 ## APPLE-3.1.2-MISLEADING-PRICING
@@ -113,7 +129,7 @@ grep -rni 'lootbox\|loot box\|gacha\|mystery box\|random reward' .
 How to detect.
 
 ```bash
-grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE 'call.{0,25}cancel|cancel.{0,25}call|mail.{0,25}cancel|write.{0,25}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
+grep -rniE 'subscri(be|ption)|auto.renew|membership' --include='*.swift' --include='*.kt' --include='*.java' --include='*.html' --include='*.md' . 2>/dev/null | grep -iE '(^|[^a-z])call[^a-z].{0,24}cancel|cancel.{0,25}[^a-z]call([^a-z]|$)|mail.{0,25}cancel|(^|[^a-z])write[^a-z].{0,24}cancel|cancel.{0,15}(in.person|by.phone|by.mail)'
 ```
 
 ## BOTH-WITHDRAWAL-BUTTON-MISSING

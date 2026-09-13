@@ -200,24 +200,52 @@
       "fix": "Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully."
     },
     {
+      "id": "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION",
+      "platform": "google",
+      "guideline": "Photo and Video Permissions",
+      "title": "READ_MEDIA_IMAGES or READ_MEDIA_VIDEO declared without the Android photo picker",
+      "severity": "high",
+      "detection": "Apps targeting API 33 or higher may only request READ_MEDIA_IMAGES and READ_MEDIA_VIDEO when the system photo picker is not sufficient for core functionality, and every app that keeps them must complete the Photo and Video Permissions declaration in Play Console. A manifest that declares them with no photo picker usage in source is the usual rejection shape.",
+      "signals": [
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ],
+      "counterSignals": [
+        "PickVisualMedia",
+        "ACTION_PICK_IMAGES",
+        "PhotoPicker",
+        "photo_picker"
+      ],
+      "fix": "Use the Android photo picker for one-off selection. Keep broad access only for a core gallery-style feature and complete the Photo and Video Permissions declaration in Play Console. Reference https://support.google.com/googleplay/android-developer/answer/14115180"
+    },
+    {
       "id": "ANDROID-USER-DATA-DISCLOSURE",
       "platform": "google",
       "guideline": "User Data",
       "title": "Missing prominent disclosure for sensitive user data",
       "severity": "critical",
-      "detection": "Collecting personal user data (e.g. contacts, SMS, device accounts, files) without a prominent disclosure and explicit user consent block.",
+      "detection": "A declared permission that reads contacts, SMS, call logs, device accounts, or all files (the surface Play enforces prominent disclosure on) with no disclosure or consent flow in the app.",
       "signals": [
-        "contacts",
-        "SMS",
-        "device accounts",
-        "files",
-        "personalData"
+        "READ_CONTACTS",
+        "WRITE_CONTACTS",
+        "READ_SMS",
+        "SEND_SMS",
+        "RECEIVE_SMS",
+        "READ_CALL_LOG",
+        "WRITE_CALL_LOG",
+        "GET_ACCOUNTS",
+        "MANAGE_EXTERNAL_STORAGE"
       ],
       "counterSignals": [
         "prominent disclosure",
         "user consent",
         "privacy consent",
-        "accept policy"
+        "accept policy",
+        "prominentDisclosure",
+        "disclosureDialog",
+        "consentDialog",
+        "showDisclosure",
+        "requestConsent"
       ],
       "fix": "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent."
     },
@@ -1205,13 +1233,27 @@
       "platform": "google",
       "guideline": "Target API level",
       "title": "App does not target the current required API level",
-      "severity": "high",
+      "severity": "critical",
       "detection": "targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher. A Play Console extension to 1 November 2026 is available. Wear OS and Automotive OS must target API 35 or higher, TV and XR API 34 or higher.",
       "signals": [
         "targetSdkVersion",
         "targetSdk"
       ],
       "fix": "Build against the current required Android target API level. From 31 August 2026 that is API 36 or higher. Submissions below the threshold are rejected automatically."
+    },
+    {
+      "id": "GOOGLE-PLAY-BILLING-V8-REQUIRED",
+      "platform": "google",
+      "guideline": "Payments",
+      "title": "Play Billing Library below version 8",
+      "severity": "critical",
+      "detection": "A com.android.billingclient:billing dependency with a major version below 8. New apps and updates must use Play Billing Library 8 or later from 31 August 2026 (deprecation ladder), with a Play Console extension available until 1 November 2026. Already published v7 binaries keep transacting until the 2027 all-apps deadline.",
+      "signals": [
+        "com.android.billingclient:billing:7",
+        "com.android.billingclient:billing-ktx:7",
+        "com.android.billingclient:billing:6"
+      ],
+      "fix": "Upgrade to com.android.billingclient:billing 8.x, or request the Play Console extension before 1 November 2026. Reference https://developer.android.com/google/play/billing/deprecation-faq"
     },
     {
       "id": "IONIC-4.2-THIN-WRAPPER",

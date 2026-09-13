@@ -64,7 +64,7 @@ mk_ios_bad_nutrition() {
 
 mk_android_bad_privacy() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/app/src/main"
-  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="com.google.android.gms.permission.AD_ID"/><uses-permission android:name="android.permission.READ_STEPS"/></manifest>' > "$d/app/src/main/AndroidManifest.xml"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="com.google.android.gms.permission.AD_ID"/><uses-permission android:name="android.permission.READ_STEPS"/><uses-permission android:name="android.permission.READ_CONTACTS"/></manifest>' > "$d/app/src/main/AndroidManifest.xml"
   printf 'android { defaultConfig { targetSdkVersion 34 } }\n' > "$d/app/build.gradle"
   printf 'class MyActivity { void test() { requestPermissions(new String[]{"camera"}, 1); HealthConnectClient client = null; contacts = "john"; } }\n' > "$d/app/src/main/MyActivity.java"
   echo "$d"
@@ -526,6 +526,161 @@ printf '%s' "$PLIST_EMPTY" > "$D/App/PrivacyInfo.xcprivacy"
 printf '{}' > "$D/AppTests/Fixtures/PrivacyInfo.xcprivacy"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && bad "Manifest fixture under Tests is skipped" || ok "Manifest fixture under Tests is skipped"
+
+# 47 A Python virtualenv inside the project is not app source. Its vendored JSON mentions betting,
+# background location, and localhost, none of which the app ships.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/app/src/main" "$D/tool/.venv/lib/python3.12/site-packages/api"
+printf '<plist/>' > "$D/App/Info.plist"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf '{"a": "fixed-odds betting", "b": "ACCESS_BACKGROUND_LOCATION", "c": "http://localhost:8080"}\n' > "$D/tool/.venv/lib/python3.12/site-packages/api/discovery.json"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(APPLE-GAMBLING-BRAZIL-LICENSE|APPLE-2\.1-STAGING-BACKEND|GOOGLE-PERM-BACKGROUND-LOCATION) ' && bad "Virtualenv contents are not scanned as app source" || ok "Virtualenv contents are not scanned as app source"
+rm -rf "$D"
+
+# 48 Many privacy manifests, as every CocoaPods or SPM project has. `find | grep -q .` exited 141
+# under pipefail once grep stopped reading, and reported the app's own manifest missing.
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/lib"
+printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$D/pubspec.yaml"
+printf "import 'package:permission_handler/permission_handler.dart';\n" > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf '{}' > "$D/ios/Runner/PrivacyInfo.xcprivacy"
+for i in $(seq 1 1500); do mkdir -p "$D/ios/Pods/SomeVendoredPod$i/Resources"; printf '{}' > "$D/ios/Pods/SomeVendoredPod$i/Resources/PrivacyInfo.xcprivacy"; done
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(FLUTTER|APPLE)-PRIVACY-MANIFEST-MISSING ' && bad "Existing privacy manifest is found among many (no SIGPIPE under pipefail)" || ok "Existing privacy manifest is found among many (no SIGPIPE under pipefail)"
+rm -rf "$D"
+
+# 49 A project that itself sits under folders named build and test is still scanned. Exclusions
+# apply only below the project root.
+P="$(mktemp -d)"; D="$P/build/test/app"; mkdir -p "$D"
+S="$(mk_ios_bad)"; cp -R "$S/." "$D/"; rm -rf "$S"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-3.1.1-EXTERNAL-PAYMENT' && [ "$RC" -eq 2 ] && ok "Project under build/ and test/ parent folders is still scanned" || bad "Project under build/ and test/ parent folders is still scanned (rc=$RC)"
+rm -rf "$P"
+
+# 50 NSPrivacyCollectedDataTypes lives in PrivacyInfo.xcprivacy, so declaring it there satisfies the check.
+D="$(mk_ios_bad_nutrition)"
+printf '<plist><dict><key>NSPrivacyCollectedDataTypes</key><array/></dict></plist>' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-PRIVACY-NUTRITION-LABELS ' && bad "Privacy manifest declaring collected data types satisfies nutrition labels" || ok "Privacy manifest declaring collected data types satisfies nutrition labels"
+rm -rf "$D"
+
+# 51 Lowercase test folders (Flutter test/ and integration_test/, JS tests/) never ship either.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/test"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.delete("/users/me") }\n' > "$D/App/A.swift"
+printf '// the outgoing page must finish sliding after it is deactivated\n' > "$D/test/T.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "Words in a lowercase test/ folder are not app source" || ok "Words in a lowercase test/ folder are not app source"
+rm -rf "$D"
+
+# 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
+# payment SDK, is not an external-payment violation. Without the plugin it still is.
+mk_flutter_pay() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/android/app/src/main" "$d/lib"
+  printf 'name: t\ndependencies:\n  razorpay_flutter: ^1.3.0\n%b' "$1" > "$d/pubspec.yaml"
+  printf '<plist><dict></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '{}' > "$d/ios/Runner/PrivacyInfo.xcprivacy"
+  printf '<manifest package="t"/>' > "$d/android/app/src/main/AndroidManifest.xml"
+  echo "$d"
+}
+D="$(mk_flutter_pay '  in_app_purchase: ^3.2.0\n')"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +(GOOGLE-PLAY-BILLING|APPLE-3\.1\.1-EXTERNAL-PAYMENT) ' && bad "Store purchase plugin satisfies both IAP checks" || ok "Store purchase plugin satisfies both IAP checks"
+rm -rf "$D"
+D="$(mk_flutter_pay '')"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PLAY-BILLING' && echo "$OUT" | grep -q 'APPLE-3.1.1-EXTERNAL-PAYMENT' && ok "Payment SDK with no store plugin still fires both IAP checks" || bad "Payment SDK with no store plugin still fires both IAP checks"
+rm -rf "$D"
+
+# 53 "renew automatically until cancelled" is a renewal notice, not an instruction to call.
+D="$(mktemp -d)"
+printf '{"name":"t"}' > "$D/package.json"
+printf '<html><body>Your subscription renews automatically until cancelled in your store account settings.</body></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +BOTH-SUBSCRIPTION-HARD-CANCEL ' && bad "Call inside automatically does not read as call to cancel" || ok "Call inside automatically does not read as call to cancel"
+rm -rf "$D"
+
+# 54 and 51, the two fixtures from #542. Prose about files is not a sensitive permission. READ_CONTACTS is.
+mk_android_perm() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/android/app/src/main"
+  printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/>%s</manifest>' "$1" > "$d/android/app/src/main/AndroidManifest.xml"
+  printf 'android { compileSdk 36 }\n' > "$d/android/app/build.gradle"
+  echo "$d"
+}
+D="$(mk_android_perm '')"
+printf '<html><body>%s</body></html>' "$(for i in $(seq 1 20); do printf 'Export the files. '; done)" > "$D/notes.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +ANDROID-USER-DATA-DISCLOSURE ' && bad "#542 fixture A: prose about files stays silent" || ok "#542 fixture A: prose about files stays silent"
+rm -rf "$D"
+D="$(mk_android_perm '<uses-permission android:name="android.permission.READ_CONTACTS"/>')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'ANDROID-USER-DATA-DISCLOSURE' && ok "#542 fixture B: READ_CONTACTS without disclosure fires" || bad "#542 fixture B: READ_CONTACTS without disclosure fires"
+rm -rf "$D"
+
+# 56 #542. Bundled web output under dist/ is a build artifact, not source.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/web/dist/assets"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'const u="http://localhost:54321/auth/v1";\n' > "$D/web/dist/assets/index-abc123.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-2\.1-STAGING-BACKEND ' && bad "Bundled dist/ output is not scanned as source" || ok "Bundled dist/ output is not scanned as source"
+rm -rf "$D"
+
+# 57 targetSdk lives two levels down in every real project. The old ** glob never read android/app/build.gradle
+D="$(mktemp -d)"; mkdir -p "$D/android/app/src/main"
+printf '<manifest package="t"/>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 35 } buildTypes { release { minifyEnabled true } } }\n' > "$D/android/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^ +\[CRITICAL\] +GOOGLE-TARGET-API ' && ok "targetSdk 35 two levels deep fires the API 36 floor" || bad "targetSdk 35 two levels deep fires the API 36 floor"
+printf 'android { defaultConfig { targetSdk = 36 } buildTypes { release { isMinifyEnabled = true } } }\n' > "$D/android/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^ +\[CRITICAL\] +GOOGLE-TARGET-API ' && bad "targetSdk 36 stays silent" || ok "targetSdk 36 stays silent"
+rm -rf "$D"
+
+# 58 Play Billing Library 7 dependency fires the v8 floor, 8 stays silent
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\ndependencies { implementation "com.android.billingclient:billing-ktx:7.1.1" }\n' > "$D/app/build.gradle"
+printf 'val c = BillingClient.newBuilder(ctx)\n' > "$D/app/src/main/java/t/Pay.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^ +\[CRITICAL\] +GOOGLE-PLAY-BILLING-V8-REQUIRED ' && ok "Billing Library 7 fires the v8 floor" || bad "Billing Library 7 fires the v8 floor"
+sed -i.bak 's/billing-ktx:7.1.1/billing-ktx:8.0.0/' "$D/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^ +\[CRITICAL\] +GOOGLE-PLAY-BILLING-V8-REQUIRED ' && bad "Billing Library 8 stays silent" || ok "Billing Library 8 stays silent"
+rm -rf "$D"
+
+# 59 READ_MEDIA_IMAGES without the photo picker surfaces the declaration, with the picker it stays silent
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest><uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION' && ok "READ_MEDIA_IMAGES without a picker surfaces the declaration" || bad "READ_MEDIA_IMAGES without a picker surfaces the declaration"
+printf 'val p = registerForActivityResult(PickVisualMedia()) {}\n' > "$D/app/src/main/java/t/Pick.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION' && bad "READ_MEDIA_IMAGES with the photo picker stays silent" || ok "READ_MEDIA_IMAGES with the photo picker stays silent"
+rm -rf "$D"
+
+# 60 an AccountManager import with no declared permission is not a data-collection signal
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main/java/t"
+printf '<manifest><uses-permission android:name="android.permission.INTERNET"/></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'import android.accounts.AccountManager\n// ContactsContract is not used here\n' > "$D/app/src/main/java/t/A.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'ANDROID-USER-DATA-DISCLOSURE' && bad "Symbol in an import without a declared permission stays silent" || ok "Symbol in an import without a declared permission stays silent"
+rm -rf "$D"
+
+# 61 src/dist is an Android product-flavor source set and must be scanned, web/dist is build output and must not
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main" "$D/app/src/dist/java/t"
+printf '<manifest package="t"/>' > "$D/app/src/main/AndroidManifest.xml"
+printf 'android { defaultConfig { targetSdkVersion 36 } buildTypes { release { minifyEnabled true } } }\n' > "$D/app/build.gradle"
+printf 'import com.stripe.android.Stripe\n' > "$D/app/src/dist/java/t/Pay.kt"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'GOOGLE-PLAY-BILLING' && ok "Stripe inside a src/dist flavor tree is still seen" || bad "Stripe inside a src/dist flavor tree is still seen"
+rm -rf "$D"
+
+# 62 a privacy manifest whose root is an array fires through the guard, never a silent pass
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/App/Info.plist"
+printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array/></plist>' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && [ "$RC" -eq 2 ] && ok "Array-root manifest blocks" || bad "Array-root manifest blocks (rc=$RC)"
 rm -rf "$D"
 
 echo ""

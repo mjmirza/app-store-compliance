@@ -420,7 +420,8 @@
       "mandatory_date": "2026-08-31",
       "enforcement_date": "2026-08-31",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "GOOGLE-PLAY-BILLING-V8-REQUIRED"
     },
     {
       "id": "GOOGLE-PLAY-TARGET-API-35",
@@ -445,7 +446,8 @@
       "mandatory_date": "2026-08-31",
       "enforcement_date": "2026-08-31",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md",
-      "priority": "high"
+      "priority": "high",
+      "absorbed_into": "GOOGLE-TARGET-API"
     },
     {
       "id": "ANDROID-DEVELOPER-VERIFICATION",
