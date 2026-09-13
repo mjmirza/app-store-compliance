@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-34 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+35 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## ANDROID-HEALTH-PERMISSIONS
 
@@ -25,15 +25,15 @@ grep -rn 'HealthConnectClient\|com.google.android.gms.permission.HealthConnect\|
 - Platform. google
 - Guideline or policy. User Data
 - Severity. critical
-- What triggers it. Collecting personal user data (e.g. contacts, SMS, device accounts, files) without a prominent disclosure and explicit user consent block.
+- What triggers it. A declared permission that reads contacts, SMS, call logs, device accounts, or all files (the surface Play enforces prominent disclosure on) with no disclosure or consent flow in the app.
 - How to fix it. Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent.
-- Detection signals. contacts, SMS, device accounts, files, personalData
-- Present means handled. prominent disclosure, user consent, privacy consent, accept policy
+- Detection signals. READ_CONTACTS, WRITE_CONTACTS, READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, WRITE_CALL_LOG, GET_ACCOUNTS, MANAGE_EXTERNAL_STORAGE
+- Present means handled. prominent disclosure, user consent, privacy consent, accept policy, prominentDisclosure, disclosureDialog, consentDialog, showDisclosure, requestConsent
 
 How to detect.
 
 ```bash
-grep -rn 'contacts\|SMS\|device accounts\|files\|personalData' --include='*.kt' --include='*.java' --include='*.xml' . && ! grep -rn 'prominent disclosure\|user consent\|privacy consent\|accept policy' .
+grep -rnE 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)' --include='AndroidManifest.xml' . && ! grep -rnE 'prominent disclosure|user consent|privacy consent|accept policy|[Pp]rominentDisclosure|[Dd]isclosureDialog|[Cc]onsentDialog|showDisclosure|requestConsent' .
 ```
 
 ## GOOGLE-DATASAFETY-MISMATCH
@@ -146,6 +146,22 @@ How to detect.
 
 ```bash
 grep -rn 'com.google.android.play:age-signals\|AgeSignalsManager\|AgeSignalsRequest' --include='*.gradle' --include='*.kts' --include='*.kt' --include='*.java' .   # if present, confirm age signals are never passed to ad, marketing, profiling, or analytics SDKs
+```
+
+## GOOGLE-TARGET-API
+
+- Title. App does not target the current required API level
+- Platform. google
+- Guideline or policy. Target API level
+- Severity. critical
+- What triggers it. targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher. A Play Console extension to 1 November 2026 is available. Wear OS and Automotive OS must target API 35 or higher, TV and XR API 34 or higher.
+- How to fix it. Build against the current required Android target API level. From 31 August 2026 that is API 36 or higher. Submissions below the threshold are rejected automatically.
+- Detection signals. targetSdkVersion, targetSdk
+
+How to detect.
+
+```bash
+grep -rnE 'targetSdk(Version)?[ =]+[0-9]+' --include='*.gradle' --include='*.kts' .   # must be 36 or higher from 31 Aug 2026
 ```
 
 ## GOOGLE-ORG-REGISTRATION-REQUIRED
@@ -313,6 +329,23 @@ How to detect.
 grep -rn 'requestPermissions\|checkSelfPermission\|shouldShowRequestPermissionRationale' --include='*.kt' --include='*.java' . && ! grep -rn 'permission explanation\|showPermissionRationale\|explainPermission' .
 ```
 
+## GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION
+
+- Title. READ_MEDIA_IMAGES or READ_MEDIA_VIDEO declared without the Android photo picker
+- Platform. google
+- Guideline or policy. Photo and Video Permissions
+- Severity. high
+- What triggers it. Apps targeting API 33 or higher may only request READ_MEDIA_IMAGES and READ_MEDIA_VIDEO when the system photo picker is not sufficient for core functionality, and every app that keeps them must complete the Photo and Video Permissions declaration in Play Console. A manifest that declares them with no photo picker usage in source is the usual rejection shape.
+- How to fix it. Use the Android photo picker for one-off selection. Keep broad access only for a core gallery-style feature and complete the Photo and Video Permissions declaration in Play Console. Reference https://support.google.com/googleplay/android-developer/answer/14115180
+- Detection signals. READ_MEDIA_IMAGES, READ_MEDIA_VIDEO
+- Present means handled. PickVisualMedia, ACTION_PICK_IMAGES, PhotoPicker, photo_picker
+
+How to detect.
+
+```bash
+grep -rnE 'android\.permission\.READ_MEDIA_(IMAGES|VIDEO)' --include='AndroidManifest.xml' . && ! grep -rnE 'PickVisualMedia|ACTION_PICK_IMAGES|PhotoPicker|photo_picker' .
+```
+
 ## GOOGLE-12-TESTER-RULE
 
 - Title. New personal account without the closed test
@@ -330,22 +363,6 @@ grep -rn 'requestPermissions\|checkSelfPermission\|shouldShowRequestPermissionRa
 - Severity. high
 - What triggers it. Manual check. The store listing, screenshots, and description must match the app's actual functionality.
 - How to fix it. Make the listing match the build exactly, with screenshots of real in app screens.
-
-## GOOGLE-TARGET-API
-
-- Title. App does not target the current required API level
-- Platform. google
-- Guideline or policy. Target API level
-- Severity. high
-- What triggers it. targetSdkVersion in build.gradle is below the current Google Play requirement. From 31 August 2026, new apps and updates must target Android 16, API level 36, or higher. A Play Console extension to 1 November 2026 is available. Wear OS and Automotive OS must target API 35 or higher, TV and XR API 34 or higher.
-- How to fix it. Build against the current required Android target API level. From 31 August 2026 that is API 36 or higher. Submissions below the threshold are rejected automatically.
-- Detection signals. targetSdkVersion, targetSdk
-
-How to detect.
-
-```bash
-grep -rnE 'targetSdk(Version)?[ =]+[0-9]+' --include='*.gradle' --include='*.kts' .   # must be 36 or higher from 31 Aug 2026
-```
 
 ## GOOGLE-PAYMENTS-DONATION-LINK
 
