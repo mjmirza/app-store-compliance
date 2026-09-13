@@ -56,6 +56,10 @@ For a deep-dive reference across platform best practices, see `docs/MOBILE-SECUR
 - [ ] Any personal data shared with a third party AI has a consent modal naming the provider and data types.
 - [ ] Regulated category apps are submitted under the legal entity and geo restricted where required.
 - [ ] App name is 30 characters or fewer.
+- [ ] App Review contact phone number is in international format with the country code, for example +852, not digits only.
+- [ ] The first consumable, first non-consumable, first auto-renewable subscription, and first non-renewing subscription are each submitted together with a new app version, never added on their own to an already approved version.
+- [ ] Screenshots cover the required 6.9 inch iPhone size and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
+- [ ] The build meets the SDK floor. the 26 SDKs today, the 27 SDKs from April 2027.
 
 ## Google Play specific
 

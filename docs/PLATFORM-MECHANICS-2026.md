@@ -53,9 +53,10 @@ App Store Connect asks, before each submission, whether the app contains, shows,
 - visionOS App Motion. if the app contains movement such as quick turns or sudden camera changes, indicate it in App Store Connect. the product page then shows a motion badge for motion-sensitive users.
 - visionOS Developer Capture. screenshots and previews use the Developer Capture feature in Reality Composer Pro, not a Control Center screen recording (which is foveated and low resolution).
 - SDK minimums, effective 28 April 2026. watchOS apps build with the watchOS 26 SDK, tvOS apps with the tvOS 26 SDK, all with Xcode 26, the same deadline as iOS 26 and visionOS 26.
-- App completeness (Guideline 2.1) and the privacy declarations apply to every platform, including watchOS and tvOS. Pull the exact per-device screenshot and asset dimensions live from the App Store Connect screenshot-spec page, as they change per device.
+- SDK minimums, from April 2027. uploads must be built with the iOS 27, iPadOS 27, tvOS 27, visionOS 27, or watchOS 27 SDK or later. Apple has named the month and not the day, tracked as 1 April 2027 in the deadline data. macOS is not in Apple's list. Xcode 27 shipped as a Release Candidate on 9 September 2026.
+- App completeness (Guideline 2.1) and the privacy declarations apply to every platform, including watchOS and tvOS. Pull the exact per-device screenshot and asset dimensions live from the App Store Connect screenshot-spec page, as they change per device. The 9 September 2026 update added iPhone Duo (outer display 1398 x 2034, inner display 2007 x 2853), iPhone 18 Pro Max (1260 x 2736), iPhone 18 Pro (1179 x 2556), Apple Watch Ultra 4 (422 x 514), and Apple Watch Series 12 (416 x 496). Asset upload for iPhone Duo opens later in 2026. The 6.9 inch iPhone set remains the required one, and watch screenshots use one size across every localization.
 
-Sources. [Apple submit visionOS apps](https://developer.apple.com/visionos/submit/), [Apple SDK minimums 28 April 2026](https://developer.apple.com/news/upcoming-requirements/?id=02032026a).
+Sources. [Apple submit visionOS apps](https://developer.apple.com/visionos/submit/), [Apple SDK minimums 28 April 2026](https://developer.apple.com/news/upcoming-requirements/?id=02032026a), [Apple submissions open for the 27 OS family, April 2027 SDK floor](https://developer.apple.com/news/?id=k1mtkt1k), [App Store Connect screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications), [App Store Connect release notes](https://developer.apple.com/help/app-store-connect/release-notes/).
 
 ### 1.7 In-App Events, Custom Product Pages, and the submission-concurrency limit
 
@@ -186,6 +187,7 @@ Verify. if the app takes EU or UK card payments for real goods, SCA and 3D Secur
 | Content rights | ASC third-party-content question answered, proof available | Apple |
 | visionOS App Motion | Declared, Developer Capture screenshots | Apple |
 | SDK 26 (all platforms) | Built with Xcode 26 and the platform-26 SDK by 28 April 2026 | Apple |
+| SDK 27 (all platforms except macOS) | Built with the platform-27 SDK from April 2027, exact day not yet published | Apple |
 | Developer verification | Verified before 30 Sep 2026 if distributing to Brazil, Indonesia, Singapore, Thailand | Android |
 | Foreground service types | Manifest type + matching permission + Play Console declaration with demo video | Android |
 | Play Integrity | No SafetyNet Attestation, verdict verified server-side | Android |

@@ -1654,10 +1654,10 @@
     {
       "id": "APPLE-MACOS-ROSETTA-SUNSET",
       "platform": "apple",
-      "guideline": "Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026)",
-      "title": "Intel-only macOS binary with Rosetta ending after macOS 27",
+      "guideline": "Rosetta sunset (Apple Developer news w5ngl9k2, 1 September 2026, and k1mtkt1k, 9 September 2026)",
+      "title": "Intel-only macOS binary with Rosetta ending after macOS 26 or macOS 27",
       "severity": "high",
-      "detection": "macOS 27 is the final release to support Rosetta. An Intel-only (x86_64) macOS app will no longer run on Apple silicon after that release. Detection is manual. check the build architectures and any x86_64-only dependencies.",
+      "detection": "Apple's two notices disagree. The 1 September 2026 notice says macOS 27 is the final release to support Rosetta and that Intel-only apps stop running on Apple silicon after that update. The 9 September 2026 submissions notice says macOS 26 is the final release supporting Intel Mac computers and Rosetta, and that macOS 27 will be Apple silicon only. Plan for the earlier reading. an Intel-only (x86_64) macOS app must run natively on Apple silicon before macOS 27 ships. Detection is manual. check the build architectures and any x86_64-only dependencies.",
       "signals": [
         "x86_64",
         "ONLY_ACTIVE_ARCH",

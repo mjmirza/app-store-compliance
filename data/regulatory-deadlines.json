@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-09-05",
+  "updated": "2026-09-13",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -396,6 +396,18 @@
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6",
       "priority": "critical",
       "absorbed_into": "docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6"
+    },
+    {
+      "id": "APPLE-SDK-27-REQ",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple App Store Submission Requirements",
+      "requirement": "Starting April 2027 apps and games uploaded to App Store Connect must be built with the iOS 27 and iPadOS 27 SDK or later, and the matching tvOS 27, visionOS 27, and watchOS 27 SDKs. Apple has published the month only, no exact day, so this entry is tracked as 1 April 2027 and must be re-checked when Apple names the date. macOS is not in Apple's list. Announced 9 September 2026 with the Xcode 27 Release Candidate. Source https://developer.apple.com/news/?id=k1mtkt1k",
+      "effective_date": "2026-09-09",
+      "grace_period": "about 7 months",
+      "mandatory_date": "2027-04-01",
+      "enforcement_date": "2027-04-01",
+      "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.6, docs/APPLE.md 2026 changes, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific",
+      "priority": "critical"
     },
     {
       "id": "APPLE-18-PLUS-BLOCK",
