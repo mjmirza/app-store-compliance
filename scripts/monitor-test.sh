@@ -29,6 +29,22 @@ JSON_OUT="$($MONITOR --simulate "Required Reason APIs" --json 2>&1)"
 # Validate if it is well-formed JSON
 echo "$JSON_OUT" | python3 -c "import sys, json; data = json.load(sys.stdin); assert len(data) > 0; assert data[0]['track'] == 'Required Reason APIs'" 2>/dev/null && ok "json output format is valid and contains matched track" || bad "json output"
 
+# Validate all 15 numbered section headings exist in the PR description
+SECTIONS=("Summary" "Background" "Regulatory change" "Official citations" "Affected files" "Risk assessment" "Migration steps" "Backward compatibility" "Implementation checklist" "Testing checklist" "Documentation checklist" "Compliance impact" "Breaking changes" "Review checklist" "Approver recommendations")
+PR_MISSING=0
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! echo "$JSON_OUT" | grep -q "## ${sec_num}\. ${sec_name}"; then
+    PR_MISSING=$((PR_MISSING + 1))
+  fi
+done
+if [ "$PR_MISSING" -eq 0 ]; then
+  ok "monitor.py PR output contains all 15 required numbered compliance sections"
+else
+  bad "monitor.py PR output missing $PR_MISSING required numbered compliance sections"
+fi
+
 # 5. Repository scanning verification
 T=$(mktemp -d)
 # Create a dummy project structure with a signature matching Swift requirements
