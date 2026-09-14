@@ -20,7 +20,7 @@ jobs:
           allow='^(google-labs-jules(\[bot\])?|dependabot\[bot\]|github-actions\[bot\]|copilot(-swe-agent)?(\[bot\])?)$'
           if [ "$AUTHOR_TYPE" != "Bot" ] && ! printf '%s' "$AUTHOR" | grep -qE '\[bot\]$'; then
             echo "human author $AUTHOR, leaving open for review"
-          elif printf '%s' "$AUTHOR" | grep -qE "$allow"; then
+          elif printf '%s' "$AUTHOR" | grep -qiE "$allow"; then
             echo "allowlisted bot $AUTHOR, leaving open for review"
           else
             gh pr close "$PR" --repo "$REPO" --comment "Closed automatically. This repo does not accept pull requests from unknown bot accounts. Owner-run bots such as Jules, Copilot, and Dependabot are reviewed by hand. See AGENTS.md."
