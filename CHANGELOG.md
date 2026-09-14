@@ -4,6 +4,10 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Removed
+
+- The auto-close workflow for scheduled bot PRs (added in #442 on 30 August 2026). Pull requests opened by Jules scheduled tasks now stay open, are added to the project board as Backlog by the auto-add workflow, and wait for a real review like any other contribution. The eleven PRs it closed on 14 September 2026 had their branches deleted by the workflow and cannot be reopened.
+
 ### Added
 
 - Project board at github.com/users/mjmirza/projects/3 with the roadmap, one issue per dated deadline milestone through May 2027, and the guard limits from #614 as tracked enhancements. Labels for area, priority, type, and platform on the repo. README links to it from Contributing.
