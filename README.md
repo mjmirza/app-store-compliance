@@ -288,7 +288,7 @@ Treat the store reviewer as an adversarial integration test that runs once, on a
 
 ## Contributing
 
-Contributions are welcome and wanted. App store rules change constantly, and this playbook stays accurate only when many practitioners keep it current. Open an issue or a pull request, and look for issues labelled good first issue. See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md). The one standard. every factual claim traces to a live Apple or Google source, and no guideline number or statistic is ever invented.
+Contributions are welcome and wanted. App store rules change constantly, and this playbook stays accurate only when many practitioners keep it current. Open an issue or a pull request, and look for issues labelled good first issue. See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md). The roadmap, every open deadline milestone, and what is in progress live on the [project board](https://github.com/users/mjmirza/projects/3). The one standard. every factual claim traces to a live Apple or Google source, and no guideline number or statistic is ever invented.
 
 ## Logo attribution
 

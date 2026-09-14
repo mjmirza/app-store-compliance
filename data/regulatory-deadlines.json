@@ -141,7 +141,8 @@
       "mandatory_date": "2026-09-12",
       "enforcement_date": "2026-09-12",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
-      "priority": "medium"
+      "priority": "medium",
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5"
     },
     {
       "id": "EU-CRA-REPORTING",
@@ -153,7 +154,8 @@
       "mandatory_date": "2026-09-11",
       "enforcement_date": "2026-09-11",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
-      "priority": "medium"
+      "priority": "medium",
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5"
     },
     {
       "id": "EU-CRA-MAIN",
@@ -905,7 +907,8 @@
       "mandatory_date": "2026-09-11",
       "enforcement_date": "2026-09-11",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
-      "priority": "high"
+      "priority": "high",
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md"
     },
     {
       "id": "CN-AI-COMPANION-MINORS-2026",
@@ -967,7 +970,8 @@
       "mandatory_date": "2026-09-09",
       "enforcement_date": "2026-09-09",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md"
     },
     {
       "id": "AU-PRIVACY-ADM-DISCLOSURE-2026",
