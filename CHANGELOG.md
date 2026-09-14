@@ -4,9 +4,9 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-### Removed
+### Changed
 
-- The auto-close workflow for scheduled bot PRs (added in #442 on 30 August 2026). Pull requests opened by Jules scheduled tasks now stay open, are added to the project board as Backlog by the auto-add workflow, and wait for a real review like any other contribution. The eleven PRs it closed on 14 September 2026 had their branches deleted by the workflow and cannot be reopened.
+- The bot PR gate. The workflow from #442 closed every PR whose branch looked bot-generated, which caught the owner's own Jules scheduled tasks. It is replaced by a gate that closes only pull requests from bot accounts not on the allowlist (Jules, Copilot, Dependabot, GitHub Actions), without deleting the branch. Owner-run bot PRs stay open, land on the project board as Backlog through the auto-add workflow, and are reviewed by hand. The eleven Jules PRs closed on 14 September 2026 had their branches deleted by the old workflow and cannot be reopened.
 
 ### Added
 

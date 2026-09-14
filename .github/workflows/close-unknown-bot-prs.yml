@@ -1,0 +1,27 @@
+name: Close unknown bot PRs
+# Owner-run bots (Jules, Copilot, Dependabot) stay open for manual review. Criteria doc 2026-09-14.
+on:
+  pull_request_target:
+    types: [opened, reopened]
+permissions:
+  pull-requests: write
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close only bot accounts that are not on the allowlist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        run: |
+          allow='^(google-labs-jules(\[bot\])?|dependabot\[bot\]|github-actions\[bot\]|copilot(-swe-agent)?(\[bot\])?)$'
+          if [ "$AUTHOR_TYPE" != "Bot" ] && ! printf '%s' "$AUTHOR" | grep -qE '\[bot\]$'; then
+            echo "human author $AUTHOR, leaving open for review"
+          elif printf '%s' "$AUTHOR" | grep -qE "$allow"; then
+            echo "allowlisted bot $AUTHOR, leaving open for review"
+          else
+            gh pr close "$PR" --repo "$REPO" --comment "Closed automatically. This repo does not accept pull requests from unknown bot accounts. Owner-run bots such as Jules, Copilot, and Dependabot are reviewed by hand. See AGENTS.md."
+          fi
