@@ -56,7 +56,7 @@ SECTIONS=(
 
 for sect in "${SECTIONS[@]}"; do
   # Check if the section header exists as a markdown heading in the description field of the JSON
-  if ! echo "$EU_JSON" | grep -q "## $sect"; then
+  if ! echo "$EU_JSON" | grep -qE "## ([0-9]+\. )?$sect"; then
     echo "[ERROR] Missing expected section in output: $sect"
     exit 1
   fi
