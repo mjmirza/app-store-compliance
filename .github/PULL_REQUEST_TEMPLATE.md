@@ -1,38 +1,78 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- One or two concise sentences summarizing what this pull request changes. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- The origin of the requirement, rejection history, or regulatory context driving this pull request. -->
 
-## Sources
+## 3. Regulatory change
+
+<!-- Detailed explanation of the specific regulatory or platform policy update requiring this repository update. -->
+
+## 4. Official citations
 
 <!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
-
-If this PR adds no factual claims, write "none, no new claims".
+Every factual claim must trace to a primary source (European Commission, EUR-Lex, Official Journal, EDPB, FTC, NIST, CISA, ICO, Apple, Google).
+Paste the direct URLs. Unverified Priority 4 or 5 sources are strictly prohibited.
 -->
 
 - 
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of affected repository files and configuration components. -->
+
+-
+
+## 6. Risk assessment
+
+<!-- Assessment of non-compliance risk level (CRITICAL, HIGH, MEDIUM, LOW) and consequences of inaction. -->
+
+## 7. Migration steps
+
+<!-- Step-by-step technical and operational actions required to achieve full compliance. -->
+
+1.
+
+## 8. Backward compatibility
+
+<!-- Details on backward compatibility, state transitions, API compatibility, and migration paths. -->
+
+## 9. Implementation checklist
+
+- [ ] Code changes implemented and aligned with primary regulatory requirements
+- [ ] No temporary debug flags, bypasses, or missing placeholders left in source
+
+## 10. Testing checklist
+
+- [ ] Automated validation scripts executed successfully
+- [ ] Unit and integration tests added or updated to cover new compliance behavior
 
 ```
 python3 scripts/validate.py
 python3 scripts/verify-citations.py --files docs/ data/
 ```
 
-## Declarations
+## 11. Documentation checklist
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+- [ ] Platform policy migration reports updated in docs/
+- [ ] Compliance checklists and timelines refreshed
 
-## Anything a reviewer should look at first
+## 12. Compliance impact
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+<!-- Assessment of store approval readiness, legal standing, and privacy posture. -->
+
+## 13. Breaking changes
+
+<!-- Analysis of potential breaking functional, schema, or configuration modifications. -->
+
+## 14. Review checklist
+
+- [ ] Every guideline number, date, and statistic traces to an official primary citation above
+- [ ] No simulate-mode or sample monitor output committed as real announcements
+- [ ] Entire diff strictly follows emoji-free policy
+
+## 15. Approver recommendations
+
+<!-- Recommended roles and domain experts required for pull request approval. -->
