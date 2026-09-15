@@ -9,6 +9,7 @@ import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
+import html
 
 # Define default RSS/Atom feed URLs
 APPLE_RSS = "https://developer.apple.com/news/rss/news.rss"
@@ -61,6 +62,15 @@ AI_SIGNALS = [
     r"generative[ -_]ai",
 ]
 
+# Source trust domains and keywords for verification
+TRUST_HIERARCHY = {
+    "Priority 1": "Official sources (European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications, Apple Developer, Android Developer)",
+    "Priority 2": "Reputable news (Reuters, AP, Bloomberg)",
+    "Priority 3": "Academic papers",
+    "Priority 4": "Industry blogs",
+    "Priority 5": "LinkedIn, Reddit, Twitter, AI generated summaries"
+}
+
 # Illustrative fallback only (real landing pages, invented wording). See README.
 MOCK_ANNOUNCEMENTS = [
     {
@@ -80,6 +90,124 @@ MOCK_ANNOUNCEMENTS = [
         "pubDate": "Thu, 02 Apr 2026 09:00:00 PDT",
     },
 ]
+
+
+def clean_html_text(text, max_len=500):
+    """
+    Strips raw HTML tags, unescapes HTML entities, collapses whitespace,
+    and truncates RSS entry descriptions to clean plain-text summaries.
+    """
+    if not text:
+        return ""
+    clean = re.sub(r"<[^>]+>", "", text)
+    clean = html.unescape(clean)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    if max_len and len(clean) > max_len:
+        clean = clean[:max_len] + "..."
+    return clean
+
+
+def classify_source_and_verify(announcement, all_announcements=None):
+    """
+    Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "europa.eu", "eur-lex.europa.eu", "enisa.europa.eu", "edpb.europa.eu",
+        "ftc.gov", "nist.gov", "cisa.gov", "ico.org.uk", "gov.uk", "gov.sg",
+        "imda.gov.sg", "pdpc.gov.sg", "anpd.gov.br", "esafety.gov.au",
+        "apple.com", "developer.apple.com", "android.com", "developer.android.com",
+        "support.google.com", "play.google"
+    ]
+    p1_keywords = [
+        "european commission", "eur-lex", "official journal", "enisa", "edpb",
+        "ftc", "nist", "cisa", "ico", "government publication", "imda", "pdpc",
+        "anpd", "esafety commissioner", "federal register", "apple developer", "android developer"
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study", "university research", "peer-reviewed"]
+
+    p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog"]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary", "chatgpt summary"]
+
+    priority = 4
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if ".gov" in combined:
+            has_p1_ref_in_text = True
+
+        if has_p1_ref_in_text:
+            is_verified = True
+        elif all_announcements:
+            words = set(re.findall(r"[a-z]+", combined))
+            for other in all_announcements:
+                if other == announcement:
+                    continue
+                other_p, _ = classify_source_and_verify(other, None)
+                if other_p == 1:
+                    other_combined = f"{other.get('title', '')} {other.get('description', '')} {other.get('link', '')}".lower()
+                    other_words = set(re.findall(r"[a-z]+", other_combined))
+                    common_terms = {"ai", "generative", "llm", "apple", "google", "policy"}
+                    overlap = words.intersection(other_words).intersection(common_terms)
+                    if overlap:
+                        is_verified = True
+                        break
+
+    return priority, is_verified
+
+
+def enforce_strict_source_trust_hierarchy(policy_matches):
+    """
+    Logs verification alerts to stderr and enforces source credibility restrictions.
+    """
+    for m in policy_matches:
+        priority, is_verified = classify_source_and_verify(m)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        m["priority"] = priority
+        m["is_verified"] = is_verified
+        m["source_status"] = status_str
+        if priority in (4, 5) and not is_verified:
+            print(
+                f"Source Trust Alert: [{m['platform']}] {m['title']} is a Priority {priority} unverified source.",
+                file=sys.stderr,
+            )
 
 
 def scan_codebase(start_dir="."):
@@ -186,9 +314,9 @@ def parse_rss_feed(url):
                     for child in elem:
                         ctag = clean_tag(child.tag)
                         if ctag == "title":
-                            title = child.text or ""
+                            title = clean_html_text(child.text or "")
                         elif ctag in ("description", "summary", "content"):
-                            desc = child.text or ""
+                            desc = clean_html_text(child.text or "")
                         elif ctag == "link":
                             link_val = child.get("href")
                             if link_val:
@@ -219,8 +347,8 @@ def analyze_announcements(announcements, keywords):
     keywords_lower = [k.lower() for k in keywords]
 
     for ann in announcements:
-        title = ann.get("title", "")
-        desc = ann.get("description", "")
+        title = clean_html_text(ann.get("title", ""))
+        desc = clean_html_text(ann.get("description", ""))
         text_to_search = (title + " " + desc).lower()
 
         # Check if any keyword matches
@@ -426,19 +554,35 @@ Ensure that the privacy consent modal explicitly mentions the specific third-par
     return pr_template
 
 
-def update_documentation(policy_matches, output_filepath):
+def update_documentation(policy_matches, output_filepath, is_simulated=True):
     """
     Appends the latest policy findings and migration tasks directly to the output compliance file.
+    Retains the simulation disclaimer notice when running in mock/simulated mode.
     """
     report_content = [
         "<!-- AI_POLICY_MONITOR_START -->",
+    ]
+
+    if is_simulated:
+        report_content.extend([
+            "",
+            "> **Simulated output, not live announcements.** This file is generated by the monitor",
+            "> script in `--simulate` mode, which uses illustrative sample announcements to show the",
+            "> shape of a migration report. The titles, publish dates, and descriptions below are",
+            "> examples, not real Apple or Google publications. Only the linked official",
+            "> documentation URLs are real. Re-run the monitor without `--simulate` against the live",
+            "> feed before treating anything here as an actual requirement.",
+            "",
+        ])
+
+    report_content.extend([
         "# AI Policy Monitoring & Compliance Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-ai-policy.py` to keep track of platform policy changes.",
         "",
         "## Latest Monitored Policy Changes",
         "",
-    ]
+    ])
 
     for m in policy_matches:
         report_content.append(f"### {m['title']} ({m['platform']})")
@@ -491,24 +635,31 @@ def main():
     parser.add_argument(
         "--pr-output",
         type=str,
-        help="Filepath to save the drafted PR (will output to stdout if omitted)",
+        default="docs/AI_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR (defaults to docs/AI_COMPLIANCE_PR_DRAFT.md)",
     )
 
     args = parser.parse_args()
 
     keywords_list = [k.strip() for k in args.keywords.split(",")]
     announcements = []
+    is_simulated = True
 
     # 1. Gather announcements
     if args.live:
         print("Fetching live Apple RSS feed...")
-        announcements.extend(parse_rss_feed(APPLE_RSS))
+        live_apple = parse_rss_feed(APPLE_RSS)
+        announcements.extend(live_apple)
         print("Fetching live Google Blog RSS/Atom feed...")
-        announcements.extend(parse_rss_feed(GOOGLE_RSS))
+        live_google = parse_rss_feed(GOOGLE_RSS)
+        announcements.extend(live_google)
+        if live_apple or live_google:
+            is_simulated = False
 
-    if args.mock or (not args.live and not args.mock):
+    if args.mock or (not args.live and not args.mock) or not announcements:
         # Default or explicit inline mock mode
         print("Using mock policy update data for analysis...")
+        is_simulated = True
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
             try:
                 with open(args.mock, "r") as f:
@@ -529,6 +680,9 @@ def main():
         print("No new AI platform policy changes detected.")
         sys.exit(0)
 
+    # Enforce strict source trust hierarchy validation
+    enforce_strict_source_trust_hierarchy(matched_policies)
+
     print(f"Detected {len(matched_policies)} AI-related platform policy announcements:")
     for idx, m in enumerate(matched_policies, 1):
         print(f" {idx}. [{m['platform']}] {m['title']}")
@@ -541,12 +695,13 @@ def main():
 
     # 4. Generate documentation updates and migration tasks
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation(matched_policies, args.output_docs)
+    update_documentation(matched_policies, args.output_docs, is_simulated=is_simulated)
 
     # 5. Draft the Pull Request with exactly 15 sections
     pr_draft = generate_pull_request_draft(matched_policies, affected_features)
 
     if args.pr_output:
+        os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
         try:
             with open(args.pr_output, "w", encoding="utf-8") as f:
                 f.write(pr_draft)
