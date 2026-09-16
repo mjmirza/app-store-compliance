@@ -34,7 +34,7 @@ CATEGORIES = [
 
 # Keywords used to classify incoming policy announcements/articles into the 16 categories
 CATEGORY_KEYWORDS = {
-    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy", "manifest"],
+    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy"],
     "Required Reason APIs": ["required reason api", "required reason", "userdefaults", "nsfilemanager", "systemuptime", "processinfo"],
     "App Tracking Transparency": ["app tracking transparency", "att", "idfa", "tracking authorization", "tracking usage description"],
     "Privacy Nutrition Labels": ["privacy nutrition label", "nutrition label", "privacy label", "app store connect privacy"],
@@ -537,24 +537,33 @@ def generate_pull_request_draft(updates, scan_results):
     Generates a draft of a pull request complying with the exact 15 required sections.
     """
     citations_list = []
+    seen_citations = set()
     affected_files_set = set()
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
         status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
-        )
+        cite_key = (cat, u['title'], u['link'])
+        if cite_key not in seen_citations:
+            seen_citations.add(cite_key)
+            citations_list.append(
+                f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']}, Source: {status_str})"
+            )
 
         # Pull affected files
         files = scan_results.get(cat, [])
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,9 +764,15 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_task_categories = set()
     for u in updates:
         cat = u["category"]
         priority, is_verified = classify_source_and_verify(u)
+        task_key = (cat, is_verified)
+        if task_key in processed_task_categories:
+            continue
+        processed_task_categories.add(task_key)
+
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
             lines.append("- **Regulatory Status**: Suspended. Source is an unverified Priority 4/5 secondary source.")
