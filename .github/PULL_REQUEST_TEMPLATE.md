@@ -1,38 +1,68 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Concise summary of the changes introduced by this pull request. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Contextual background, rationale, and underlying motivation for this update. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Details of the regulatory requirement, policy update, or platform guideline change being addressed. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
+
+<!-- Primary official citations (e.g., Apple, Google, EUR-Lex, FTC, NIST, official journal/regulator links). -->
 
 - 
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of files modified or added in this pull request and their specific operational roles. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Analysis of potential risks, impact on release timelines, and severity ranking. -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 7. Migration steps
 
-## Anything a reviewer should look at first
+<!-- Step-by-step instructions for adopting or integrating these changes. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 8. Backward compatibility
+
+<!-- Confirmation of backward compatibility or details on legacy platform behavior. -->
+
+## 9. Implementation checklist
+
+- [ ] All required policy declarations and codebase modifications implemented
+- [ ] No unverified Priority 4/5 secondary sources cited
+- [ ] Strictly emoji-free content and commit history verified
+
+## 10. Testing checklist
+
+- [ ] Ran automated validation tools (`python3 scripts/validate.py`)
+- [ ] Verified citations and URLs (`python3 scripts/verify-citations.py --files docs/ data/`)
+- [ ] Tested platform compliance monitors and guard scripts
+
+## 11. Documentation checklist
+
+- [ ] Relevant documentation updated in `docs/`
+- [ ] Citation allowlist updated if new valid external domains added
+
+## 12. Compliance impact
+
+<!-- Overall compliance posture impact and risk level reduction. -->
+
+## 13. Breaking changes
+
+<!-- Explicit declaration of any breaking changes or confirmation that none exist. -->
+
+## 14. Review checklist
+
+- [ ] Every guideline number, date, and statistic traces to an official source
+- [ ] No simulate-mode or sample monitor output committed as real announcements
+- [ ] No emoji and no AI-assistant attribution in the commits
+
+## 15. Approver recommendations
+
+<!-- Recommended roles for reviewing and approving this pull request. -->

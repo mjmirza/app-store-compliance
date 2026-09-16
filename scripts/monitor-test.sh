@@ -46,6 +46,25 @@ rm -rf "$T"
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of 15 numbered PR section headings
+PR_DESC=$(echo "$JSON_OUT" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data[0]['proposed_pull_request']['description'])")
+SECTIONS=(
+  "Summary" "Background" "Regulatory change" "Official citations" "Affected files"
+  "Risk assessment" "Migration steps" "Backward compatibility" "Implementation checklist"
+  "Testing checklist" "Documentation checklist" "Compliance impact" "Breaking changes"
+  "Review checklist" "Approver recommendations"
+)
+PR_SECT_PASS=1
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! echo "$PR_DESC" | grep -q "## ${sec_num}\. ${sec_name}"; then
+    PR_SECT_PASS=0
+    break
+  fi
+done
+[ "$PR_SECT_PASS" -eq 1 ] && ok "PR description contains all 15 numbered compliance section headings" || bad "PR description missing numbered section headings"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
