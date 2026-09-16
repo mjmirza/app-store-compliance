@@ -6,3 +6,5 @@ node_modules/
 __pycache__/
 *.pyc
 RELEASE-READINESS-REPORT.md
+docs/*_PR_DRAFT.md
+docs/*_COMPLIANCE_PR_DRAFT.md

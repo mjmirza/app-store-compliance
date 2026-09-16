@@ -20,8 +20,24 @@ https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restric
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
 
-# Real landing page flagged as fabricated due to Apple's soft-404 behavior.
+# Real landing page or test script fixture URLs flagged as soft-404 or unreachable test endpoints.
 https://developer.apple.com/news/
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Test fixtures in test scripts (localhost and mock domains)
+http://localhost:54321/auth/v1
+http://localhost:8080
+http://localhost:8787
+http://localhost:9000
+https://acme.example.io/.well-known/apple-app-site-association
+https://api.realbackend.io
+https://child.example.io/privacy-policy
+https://example.com/x
+https://github.com/mjmirza/app-store-compliance/stargazers
+https://kiosk.example.io/privacy-policy
+https://realbackend.io/privacy-policy
+https://staging.example.com
 
 # Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
