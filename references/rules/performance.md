@@ -299,6 +299,12 @@ grep -rn 'gtag\|fbq\|google-analytics\|trackingPixel\|analytics.js\|hotjar' --in
 - Detection signals. ageCategory, minorUser, parentalConsent, DeclaredAgeRange, age-signals
 - Present means handled. verifyParentalConsent, handleAgeCategorySignal, rescindConsent, deleteAgeVerificationData
 
+How to detect.
+
+```bash
+grep -rqn 'DeclaredAgeRange\|age-signals\|com.google.android.play:age-signals' . && ! grep -rqn 'verifyParentalConsent\|handleAgeCategorySignal\|rescindConsent\|deleteAgeVerificationData' .
+```
+
 ## APPLE-4.5.3-LIVE-ACTIVITY-SPAM
 
 - Title. Live Activities used for promotional or unsolicited messages

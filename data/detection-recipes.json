@@ -106,6 +106,7 @@
     "GOOGLE-UNRATED-APP-BANNED": "echo 'manual. open Play Console, App content, Content rating, and confirm the questionnaire is complete and current'",
     "APPLE-ENROLLMENT-VERIFICATION-PENDING": "echo 'manual. open developer.apple.com/account, confirm Membership is Active, every agreement and attachment is accepted, and no migration is pending, at least six weeks before the first submission'",
     "GOOGLE-PLAY-BILLING-V8-REQUIRED": "grep -rnoE 'com\\.android\\.billingclient:billing(-ktx)?:[0-9]+' --include='*.gradle' --include='*.kts' .   # major must be 8 or higher from 31 Aug 2026",
-    "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION": "grep -rnE 'android\\.permission\\.READ_MEDIA_(IMAGES|VIDEO)' --include='AndroidManifest.xml' . && ! grep -rnE 'PickVisualMedia|ACTION_PICK_IMAGES|PhotoPicker|photo_picker' ."
+    "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION": "grep -rnE 'android\\.permission\\.READ_MEDIA_(IMAGES|VIDEO)' --include='AndroidManifest.xml' . && ! grep -rnE 'PickVisualMedia|ACTION_PICK_IMAGES|PhotoPicker|photo_picker' .",
+    "BOTH-US-ASAA-AGE-SIGNALS-MISSING": "grep -rqn 'DeclaredAgeRange\\|age-signals\\|com.google.android.play:age-signals' . && ! grep -rqn 'verifyParentalConsent\\|handleAgeCategorySignal\\|rescindConsent\\|deleteAgeVerificationData' ."
   }
 }
