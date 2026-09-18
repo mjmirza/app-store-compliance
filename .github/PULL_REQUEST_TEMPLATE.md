@@ -1,38 +1,64 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- What is different after this merges. One or two concise sentences. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- The context, rejection, policy update, or regulatory gap this addresses. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Details of the specific statutory, regulatory, or developer policy change. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
+
+<!-- Primary official sources (e.g. Apple, Google, EUR-Lex, FTC, NIST, official journal/regulator links). -->
 
 - 
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of affected repository files and their role. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Assessment of severity (CRITICAL, HIGH, MEDIUM, LOW) and consequences of non-compliance. -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
+## 7. Migration steps
+
+<!-- Actionable, step-by-step instructions for updating the codebase or configuration. -->
+
+## 8. Backward compatibility
+
+<!-- Analysis of backward compatibility impact across supported platform versions. -->
+
+## 9. Implementation checklist
+
+- [ ] Implementation task 1
+
+## 10. Testing checklist
+
+- [ ] Run validation tools (`python3 scripts/validate.py`)
+- [ ] Run citation verifier (`python3 scripts/verify-citations.py --files docs/ data/`)
+
+## 11. Documentation checklist
+
+- [ ] Updated policy migration docs or reference documentation as required
+
+## 12. Compliance impact
+
+<!-- Summary of how compliance readiness and audit trails are improved or impacted. -->
+
+## 13. Breaking changes
+
+<!-- Specify any breaking changes, schema updates, or API deprecations. -->
+
+## 14. Review checklist
+
+- [ ] Every guideline number, date, and statistic here traces to a primary source above. Nothing is from memory
 - [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
 - [ ] No emoji, and no AI-assistant attribution in the commits
 
-## Anything a reviewer should look at first
+## 15. Approver recommendations
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+<!-- Recommended reviewer roles (e.g., Senior Mobile Engineer, Compliance Counsel, Security Lead). -->
