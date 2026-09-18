@@ -34,7 +34,7 @@ CATEGORIES = [
 
 # Keywords used to classify incoming policy announcements/articles into the 16 categories
 CATEGORY_KEYWORDS = {
-    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy", "manifest"],
+    "Privacy Manifest": ["privacy manifest", "privacyinfo.xcprivacy", "xcprivacy"],
     "Required Reason APIs": ["required reason api", "required reason", "userdefaults", "nsfilemanager", "systemuptime", "processinfo"],
     "App Tracking Transparency": ["app tracking transparency", "att", "idfa", "tracking authorization", "tracking usage description"],
     "Privacy Nutrition Labels": ["privacy nutrition label", "nutrition label", "privacy label", "app store connect privacy"],
@@ -541,6 +541,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    seen_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -555,6 +556,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
 
         # Category-specific details
         if cat == "Privacy Manifest":
@@ -755,8 +760,13 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    seen_task_categories = set()
     for u in updates:
         cat = u["category"]
+        if cat in seen_task_categories:
+            continue
+        seen_task_categories.add(cat)
+
         priority, is_verified = classify_source_and_verify(u)
         if priority in (4, 5) and not is_verified:
             lines.append(f"### Tasks for {cat} (BLOCKED: Announcement source is unverified)")
