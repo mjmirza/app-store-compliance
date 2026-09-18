@@ -1,12 +1,12 @@
 # Global and Regional Regulatory Compliance Gap Report (2026)
 
-This report audits the playbook itself. It takes six regulations that bind app developers shipping into the EU and the US, and checks honestly how far this repository already carries each one, what it only mentions in passing, and what it does not cover at all.
+This report audits the playbook itself. It evaluates twenty major modern global and regional regulations that bind app developers shipping across the EU, US, UK, Australia, Brazil, India, Singapore, South Korea, China, and global storefronts. It checks honestly how far this repository already carries each one, what it only mentions in passing, and what it does not cover at all.
 
-Read it as a work list for the playbook, not as legal advice for your company. Where it says something is missing, it means missing from this repository. Each framework is checked across eight angles, which are policy, documentation, code, disclosure, logging, testing, evidence, and audit trail.
+Read it as a work list for the playbook, not as legal advice for your company. Where it says something is missing, it means missing from this repository. Each framework is checked across eight specific compliance categories: policy, documentation, code, disclosure, logging, testing, evidence, and audit trail.
 
 ## Source trust hierarchy and methodology
 
-All analysis and cited legal frameworks within this report adhere to the strict source trust hierarchy.
+All analysis and cited legal frameworks within this report adhere to the strict source trust hierarchy:
 - Priority 1 (Official Primary): European Commission, EUR-Lex, Official Journal of the European Union, ENISA, EDPB, FTC, NIST, CISA, ICO, and official government publications.
 - Priority 2 (Reputable News Agencies): Reuters, AP (Associated Press), Bloomberg.
 - Priority 3 (Academic Publications): Academic papers and peer-reviewed journals.
@@ -20,258 +20,434 @@ No Priority 4 or Priority 5 sources are relied upon unless corroborated traceabl
 ## 1. EU General Product Safety Regulation (GPSR)
 
 ### 1.1 Regulatory Overview and Background
-The EU General Product Safety Regulation (GPSR), Regulation (EU) 2023/988, entered into force on 12 June 2023 and became fully applicable on 13 December 2024. It replaces the old General Product Safety Directive (2001/95/EC) to address the safety challenges of online marketplaces, digital products, and complex supply chains.
+The EU General Product Safety Regulation (GPSR), Regulation (EU) 2023/988, entered into force on 12 June 2023 and became fully applicable on 13 December 2024. It replaces the General Product Safety Directive (2001/95/EC) to address online marketplaces, digital products, and complex supply chains.
 
-The GPSR applies to all non-food consumer products placed on the EU market, both offline and online. For digital systems and software, the GPSR mandates that online marketplaces and e-commerce applications clearly display product safety warnings, instructions, manufacturer and importer identity, and contact details directly on the online interface.
+For digital systems and e-commerce applications, the GPSR mandates displaying product safety warnings, instructions, manufacturer/importer identity, and electronic contact details directly on the online interface.
 
-Official Citation: Regulation (EU) 2023/988 of the European Parliament and of the Council of 10 May 2023 on general product safety.
+Official Citation: Regulation (EU) 2023/988 of the European Parliament and of the Council.
 
 ### 1.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook gives a developer no way to decide whether their listing falls inside Regulation (EU) 2023/988, and no template policy to hand a client who asks.
-- **Missing Documentation:**
-  The repository is missing specific developer checklists, guides, or instructional manuals on how to structure online product listings to display GPSR-mandated safety warnings, manufacturer details, and technical instructions.
-- **Missing Code:**
-  The automated compliance guard and detection recipes lack any rules or patterns to scan codebase files for GPSR-related elements. Additionally, mock user interfaces and templates in this repository do not contain code blocks for displaying manufacturer identity or product safety warnings on EU storefronts.
-- **Missing Disclosure:**
-  Online interface templates do not provide placeholder components or guidance for displaying the manufacturer's name, registered trade name or trademark, postal address, and electronic address (such as email or website) as required under Article 19 of the GPSR.
-- **Missing Logging:**
-  There are no architectural provisions or schemas for logging product safety incidents, recalls, or corrective actions. The repository fails to supply templates for a centralized, secure incident log.
-- **Missing Testing:**
-  No automated tests exist to verify that online interface elements dynamically display required product safety information, manufacturer details, or warning notices based on the user's geographic location.
-- **Missing Evidence:**
-  The repository lacks physical templates or examples of compliance evidence, such as Technical Documentation sheets, safety risk assessments, or proof of a designated Responsible Person in the EU.
-- **Missing Audit Trail:**
-  There is no audit trail or historical record system to track when product safety policies were updated, when safety warnings were reviewed, or when corrective measures were implemented in response to a safety alert.
-
-### 1.3 Remediation and Action Plan
-1. Establish a written General Product Safety Policy outlining the designation of an EU-based Responsible Person and product classification criteria.
-2. Incorporate GPSR-specific metadata requirements (manufacturer address, email, product identifier) into `data/rejection-patterns.json` and `docs/PRE-SUBMISSION-CHECKLIST.md`.
-3. Add UI templates in the references directory that demonstrate compliant product detail pages including safety warning labels and electronic contact details.
-4. Integrate an automated test runner script that verifies the presence of safety disclosures prior to app submission.
+- **Missing Policy:** The repository lacks a written General Product Safety Policy defining EU Responsible Person designation criteria and product safety risk classification rules.
+- **Missing Documentation:** No developer checklists or user interface manuals exist for displaying manufacturer identity, postal/electronic contact details, and product safety warnings on EU storefronts.
+- **Missing Code:** Mock UI templates and client code omit product safety warning components and manufacturer contact blocks required under Article 19.
+- **Missing Disclosure:** Online checkout and product detail templates fail to display mandatory manufacturer details, registered trade names, and electronic contact information.
+- **Missing Logging:** No logging schemas exist to capture product safety incidents, safety complaints, or recall notifications.
+- **Missing Testing:** Automated tests to verify that product safety disclosures render dynamically for EU end-users are missing.
+- **Missing Evidence:** Physical compliance evidence templates, such as EU Responsible Person designation agreements or Safety Technical Documentation sheets, are absent.
+- **Missing Audit Trail:** No historical record system tracks updates to product safety disclosures or safety incident resolutions.
 
 ---
 
 ## 2. EU e-Evidence Package
 
 ### 2.1 Regulatory Overview and Background
-The EU e-Evidence Package consists of Regulation (EU) 2023/1543 on European Production and Preservation Orders for electronic evidence in criminal matters and Directive (EU) 2023/1544 on the appointment of legal representatives for the purpose of gathering evidence. Adopted in 2023, the mandatory compliance enforcement date is 18 August 2026.
+The EU e-Evidence Package consists of Regulation (EU) 2023/1543 (European Production and Preservation Orders) and Directive (EU) 2023/1544 (legal representatives). Mandatory enforcement begins on 18 August 2026.
 
-This framework allows judicial authorities of an EU Member State to issue European Production Orders (EPOs) or European Preservation Orders directly to service providers offering services in the EU, regardless of where the provider is headquartered. The default compliance window to produce user data is 10 days, but in critical emergency cases, providers are legally required to produce the requested data within a strict 8-hour timeline.
+Authorities can issue Production Orders directly to service providers in the EU. Standard response time is 10 days, while critical emergency requests require production within a strict 8-hour window.
 
-Official Citation: Regulation (EU) 2023/1543 and Directive (EU) 2023/1544 of the European Parliament and of the Council.
+Official Citation: Regulation (EU) 2023/1543 and Directive (EU) 2023/1544.
 
 ### 2.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook carries no template Law Enforcement Request Policy, so a small team receiving an EU judicial order has nothing to start from and no guidance on who may act on it.
-- **Missing Documentation:**
-  While the repository mentions the e-Evidence Package in general, it lacks concrete operational instructions, runbooks, or detailed manuals for handling 10-day standard orders and 8-hour emergency orders.
-- **Missing Code:**
-  There are no automated scripts or secure API endpoints in the repository's backend mock implementations to assist in securely exporting, filtering, and packaging user data in response to a valid legal order.
-- **Missing Disclosure:**
-  Public-facing documentation, including Privacy Policies, fails to explicitly disclose to EU users that their data may be preserved or disclosed to European law enforcement in accordance with Regulation (EU) 2023/1543.
-- **Missing Logging:**
-  The repository does not contain database schemas or logging systems designed to track incoming law enforcement requests, verification statuses, data access activities, or data releases.
-- **Missing Testing:**
-  There are no integration tests or validation flows to simulate the rapid 8-hour emergency retrieval and secure packaging of user data under simulated pressure.
-- **Missing Evidence:**
-  The repository is missing verified templates of European Production Order certificates (EPOC) or European Preservation Order certificates (EPOC-PR) for compliance officers to study and verify.
-- **Missing Audit Trail:**
-  A secure, unalterable audit trail system to record every administrative interaction, data extraction, and transmission made by compliance officers during a legal request is completely absent.
-
-### 2.3 Remediation and Action Plan
-1. Draft and implement a comprehensive Law Enforcement Response Protocol that specifically establishes the roles, responsibilities, and secure communication channels for executing EPOs.
-2. Formally designate an EU establishment or legal representative and notify the designated central authority before the 18 August 2026 deadline.
-3. Build secure backend scripts to automate the extraction and encryption of requested user datasets, ensuring execution can occur within the 8-hour emergency window.
-4. Establish a tamper-proof cryptographic audit trail to log all incoming certificates, verification checks, data extractions, and secure transmissions.
+- **Missing Policy:** No template Law Enforcement Request Policy exists to define internal roles, authorization levels, and execution guidelines for EU judicial orders.
+- **Missing Documentation:** Runbooks for executing standard 10-day orders and emergency 8-hour data extractions are missing.
+- **Missing Code:** Backend mock scripts lack secure CLI tools or API endpoints to filter, encrypt, and export requested user data within 8 hours.
+- **Missing Disclosure:** Privacy policy templates do not disclose to EU users that user data may be produced under Regulation (EU) 2023/1543.
+- **Missing Logging:** Database schemas to log incoming production/preservation certificates and verification statuses are missing.
+- **Missing Testing:** Integration tests simulating 8-hour emergency data extraction under load do not exist.
+- **Missing Evidence:** Sample European Production Order Certificates (EPOC) and EPOC-PR forms are absent.
+- **Missing Audit Trail:** Cryptographically verified audit trails recording law enforcement data extractions and transmissions are not implemented.
 
 ---
 
-## 3. EU Contract Withdrawal Button
+## 3. EU Contract Withdrawal Button Directive
 
 ### 3.1 Regulatory Overview and Background
-The Distance Marketing of Financial Services Directive (EU) 2023/2673 amends the Consumer Rights Directive (Directive 2011/83/EU). It requires a prominent, easily accessible withdrawal button or withdrawal function on the online interface for distance contracts for financial services concluded by electronic means.
+Directive (EU) 2023/2673 amends Directive 2011/83/EU, requiring a prominent "withdrawal button" or "withdrawal function" on online interfaces for distance financial services contracts. Member States apply these rules from 19 June 2026. The statutory withdrawal period is 14 days.
 
-Scope matters here, and it is easy to overstate. The withdrawal button obligation in this Directive attaches to distance financial services contracts, not to every consumer subscription. A general withdrawal button across all distance contracts has been proposed at EU level but is not yet law. Treat it as binding today if your app sells insurance, credit, payment, investment, or another financial service into the EU, and as a strong design default otherwise, since Apple already requires an easy in-app cancellation path regardless.
-
-The statutory withdrawal period is 14 days from the conclusion of the contract. The cancellation path must be direct, clear, and at least as simple as the sign-up path. Member States apply these rules from 19 June 2026.
-
-Official Citation: Directive (EU) 2023/2673 of the European Parliament and of the Council of 22 November 2023.
+Official Citation: Directive (EU) 2023/2673.
 
 ### 3.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook carries no template policy for the 14 day withdrawal right, and no guidance separating apps that genuinely fall in scope from those adopting it as a design default.
-- **Missing Documentation:**
-  The repository does not provide UI design guidelines or checklists specifying the placement, size, prominence, and terminology required to make the withdrawal button compliant with EU expectations.
-- **Missing Code:**
-  The front-end user interface templates and billing mock codes in this repository do not contain any functional implementation of a withdrawal button or withdrawal modal sheet.
-- **Missing Disclosure:**
-  Subscription registration interfaces do not prominently disclose the 14-day statutory right of withdrawal or provide an in-app link explaining the consequences and terms of contract revocation.
-- **Missing Logging:**
-  There are no logging mechanisms designed to capture and record when a user clicks the withdrawal button, the timestamp of the request, the confirmation of contract termination, or the initiation of the refund flow.
-- **Missing Testing:**
-  No automated UI or unit tests exist in the repository to verify that the withdrawal flow can be completed successfully without administrative friction (such as requiring customer service interaction).
-- **Missing Evidence:**
-  The repository lacks templates of withdrawal forms, cancellation confirmation receipts, or standardized documentation to prove compliance in the event of consumer disputes.
-- **Missing Audit Trail:**
-  A systematic audit trail tracking the historical cancellation and refund rates, compliance audits of subscription flows, and updates to the cancellation interface is not implemented.
-
-### 3.3 Remediation and Action Plan
-1. Formulate a Consumer Cancellation and Refund Policy aligned with the Distance Marketing of Financial Services Directive.
-2. Develop a prominent, easily accessible "Withdrawal Button" component within the account settings of all EU-facing subscription templates.
-3. Establish robust logging of cancellation requests, timestamps, and refund transactions in a dedicated database schema.
-4. Implement automated end-to-end UI tests to verify that the withdrawal button executes a frictionless, self-service contract termination without requiring manual human approval.
+- **Missing Policy:** The repository carries no template Consumer Contract Revocation Policy for the 14-day statutory right.
+- **Missing Documentation:** UI/UX specification guides for withdrawal button placement, wording, and contrast are absent.
+- **Missing Code:** In-app account settings templates lack functional withdrawal button or modal components.
+- **Missing Disclosure:** Pre-contract subscription screens omit statutory 14-day withdrawal disclosures.
+- **Missing Logging:** Event schemas to log withdrawal clicks, timestamps, and refund triggers are missing.
+- **Missing Testing:** Automated end-to-end UI tests for self-service contract revocation without manual intervention are absent.
+- **Missing Evidence:** Templates for automated withdrawal confirmation receipts and cancellation notices are missing.
+- **Missing Audit Trail:** Immutable records tracking subscription revocation rates and UI revisions are not present.
 
 ---
 
 ## 4. US State App Store Accountability Acts (ASAA)
 
 ### 4.1 Regulatory Overview and Background
-The US State App Store Accountability Acts (ASAA) represent a growing wave of state-level legislation (Utah SB 142, Texas SB 2420, Louisiana HB 570, Alabama HB 161) aimed at regulating minors' access to mobile applications, in-app purchases, and content updates.
+State laws including Utah SB 142, Texas SB 2420, Louisiana HB 977, and Alabama HB 161 regulate minors' app downloads, purchases, and updates, requiring verifiable parental consent and immediate deletion of raw verification data.
 
-These laws place strict operational obligations on both app stores and mobile application developers. Developers must request and process the user's age category (e.g., via Apple's Declared Age Range API or Google's Play Age Signals API) and obtain verifiable parental consent before allowing minors (under 18 or under 16, depending on the state) to download, purchase digital goods, or access major updates. Furthermore, verified age verification data must be deleted immediately after verification to protect children's privacy.
-
-Official Citations: Utah SB 142 (2025), Texas SB 2420 (2025), Louisiana HB 570 (2025), Alabama HB 161 (2026).
+Official Citations: Utah SB 142, Texas SB 2420, Louisiana HB 977, Alabama HB 161.
 
 ### 4.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook has no template minors policy showing how to detect a user in Utah, Texas, Louisiana, or Alabama, and how to handle a minor account once detected.
-- **Missing Documentation:**
-  The checklists in `docs/PRE-SUBMISSION-CHECKLIST.md` lack precise, step-by-step developer guidelines for integrating Apple's Declared Age Range API and Google's Play Age Signals API within the same multi-platform project.
-- **Missing Code:**
-  Although the rejection patterns contain entries for state-level laws, the mock client implementations in the codebase do not integrate with `DeclaredAgeRange` or `com.google.android.play:age-signals` to restrict app access dynamically.
-- **Missing Disclosure:**
-  The in-app onboarding flows do not display required state disclosures explaining that the user's age category is requested to comply with state accountability laws and that parental consent is mandatory for minors.
-- **Missing Logging:**
-  There is no secure backend system designed to log the receipt of parental consent, consent revocations (such as the `RESCIND_CONSENT` server notification), or the immediate deletion of raw age-verification documents.
-- **Missing Testing:**
-  The test suites do not include automated integration tests to verify that the application blocks minor accounts from accessing premium features or completing in-app purchases in the absence of valid consent signals.
-- **Missing Evidence:**
-  The repository does not contain templates or examples of parental consent agreements, identity verification logs, or data minimization records to prove compliance to state Attorneys General.
-- **Missing Audit Trail:**
-  An immutable audit trail to record the historical rollout of age-assurance features, changes in consent policies, and records of immediate verification data deletions is entirely absent.
-
-### 4.3 Remediation and Action Plan
-1. Create a detailed written Minor Age Assurance Policy that specifies how state-level requirements are identified and how children's data is strictly minimized.
-2. Implement cross-platform native hooks in the mobile codebases to query Apple's Declared Age Range API and Google's Play Age Signals API during onboarding.
-3. Build database triggers and automated procedures to purge raw age-verification data immediately after the user's age category is confirmed.
-4. Establish automated unit tests that verify that when the age category returns a minor band, in-app billing is disabled until a verifiable parental consent flag is successfully processed.
+- **Missing Policy:** No written Minor Account Governance Policy exists for handling state-level minor restrictions and age signals.
+- **Missing Documentation:** Integration guides for Apple's Declared Age Range API and Google's Play Age Signals API are missing step-by-step native code examples.
+- **Missing Code:** Mock mobile apps lack runtime code calling `DeclaredAgeRange` or `com.google.android.play:age-signals` to block minor purchases.
+- **Missing Disclosure:** In-app onboarding screens omit state-mandated disclosures regarding age collection and parental consent requirements.
+- **Missing Logging:** Backend systems lack logging for parental consent receipts, consent revocations (`RESCIND_CONSENT`), and immediate raw age data deletion triggers.
+- **Missing Testing:** Test suites lack automated unit and integration tests asserting minor account restrictions upon receiving minor age signals.
+- **Missing Evidence:** Standardized parental consent agreements and data minimization verification logs are missing.
+- **Missing Audit Trail:** Audit trail records capturing age signal processing and raw data deletion events are absent.
 
 ---
 
 ## 5. EU AI Act Article 4 (AI Literacy)
 
 ### 5.1 Regulatory Overview and Background
-Article 4 of the EU AI Act (Regulation (EU) 2024/1689) establishes a mandatory requirement for AI literacy. It mandates that any provider or deployer of AI systems (including mobile application developers utilizing third-party generative AI APIs) must take measures to ensure a sufficient level of AI literacy among their staff and other persons dealing with the operation of AI systems.
-
-This requirement applies to all organizations, with no headcount carve-out, meaning small development teams and solo creators are equally bound. The level of literacy required scales with the technical complexity and impact of the AI integration. Pragmatic compliance for a software engineering team requires maintaining a written policy, team induction records, a refresh schedule, and an active training log.
+Article 4 of Regulation (EU) 2024/1689 requires providers and deployers of AI systems to ensure staff AI literacy, in force since 2 February 2025.
 
 Official Citation: Regulation (EU) 2024/1689, Article 4.
 
 ### 5.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook carries no template AI literacy policy, and nothing that helps a small team judge what counts as a sufficient level under Article 4.
-- **Missing Documentation:**
-  The repository lacks developer-facing documentation or checklists explaining the team's obligations under Article 4 or how to stay updated on emerging AI safety and risk evaluation standards.
-- **Missing Code:**
-  Not applicable, since Article 4 binds people rather than code. A small helper that checks whether a literacy log exists and is current would still be useful.
-- **Missing Disclosure:**
-  Public-facing documentation, recruitment materials, or partner contracts do not disclose our commitment to or enforcement of AI literacy standards as mandated by Article 4.
-- **Missing Logging:**
-  The repository is missing an active, centralized training log or registry to track employee inductions, course completions, and regular literacy refreshers.
-- **Missing Testing:**
-  There are no automated internal lints, pre-commit hooks, or CLI tools to verify that team members committing AI-related changes have valid, up-to-date literacy records.
-- **Missing Evidence:**
-  The playbook has no example of what acceptable evidence looks like, such as a completed training log, a course record, or a written risk assessment.
-- **Missing Audit Trail:**
-  There is no historical audit trail documenting when the AI literacy policy was reviewed, when training modules were updated, or how team training records evolved over time.
-
-### 5.3 Remediation and Action Plan
-1. Draft and publish an internal AI Literacy Policy defining the required competency areas (AI safety, risk assessment, data privacy, bias identification).
-2. Create a centralized `AI_LITERACY_LOG.md` within the repository to track training dates, modules, team member names, and verification methods.
-3. Designate a compliance coordinator to review the team's literacy records on an annual basis.
-4. Set up an automated check in the CI pipeline that warns if the literacy log has not been reviewed or updated within the calendar year.
+- **Missing Policy:** The playbook carries no template internal AI Literacy Policy defining competency standards.
+- **Missing Documentation:** Developer guides explaining team obligations under Article 4 are missing.
+- **Missing Code:** CI helper scripts verifying the presence of an active, up-to-date literacy log are absent.
+- **Missing Disclosure:** Public or partner documentation does not disclose corporate adherence to AI literacy standards.
+- **Missing Logging:** A centralized training registry (`AI_LITERACY_LOG.md`) tracking staff completions and annual refreshers is missing.
+- **Missing Testing:** Pre-commit hooks checking developer training currency before committing AI code changes are missing.
+- **Missing Evidence:** Completed sample training logs, course completion certificates, and competency evaluations are absent.
+- **Missing Audit Trail:** Version-controlled logs documenting policy reviews and training curriculum updates are missing.
 
 ---
 
 ## 6. EU AI Act Article 50 (Transparency Obligations)
 
 ### 6.1 Regulatory Overview and Background
-Article 50 of the EU AI Act dictates strict transparency obligations for certain AI systems, taking full legal effect on 2 August 2026. This framework is a critical release blocker for any application incorporating artificial intelligence that reaches users in the European Union.
-
-Under Article 50(1), providers must ensure that AI systems intended to interact directly with natural persons are designed and developed in such a way that those persons are informed that they are interacting with an AI system. Article 50(2) mandates that outputs of generative AI systems (text, audio, images, or video) must be marked in a machine-readable format and detectable as artificially generated or manipulated. Article 50(4) requires deployers of deepfakes to disclose that the content has been artificially generated or manipulated.
+Article 50 of Regulation (EU) 2024/1689 imposes AI interaction disclosures, synthetic content watermarking, and deepfake disclosures from 2 August 2026.
 
 Official Citation: Regulation (EU) 2024/1689, Article 50.
 
 ### 6.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
 
-- **Missing Policy:**
-  The playbook carries no template AI transparency policy covering when disclosure must appear and how generated media should be marked.
-- **Missing Documentation:**
-  The checklists in `docs/PRE-SUBMISSION-CHECKLIST.md` mention Article 50 but lack detailed, technical, developer-facing instructions on how to implement machine-readable watermarking or deepfake disclosures.
-- **Missing Code:**
-  The codebase templates do not include helper classes, middle-tier layers, or utilities to inject in-audible or invisible machine-readable watermarks (such as C2PA metadata) into generated assets.
-- **Missing Disclosure:**
-  Chat and generation UI templates do not display the required immediate disclosure ("You are interacting with an AI system") at the time of the first user exposure.
-- **Missing Logging:**
-  There are no database logging schemas or tracking mechanisms to record that an AI transparency warning was successfully displayed to a specific user session.
-- **Missing Testing:**
-  The existing test runner scripts do not check for the presence of synthetic media markers or verify that generated outputs are machine-detectable as artificially created.
-- **Missing Evidence:**
-  The repository is missing factual evidence of compliance, such as independent security assessments of content moderation filters or proof of metadata retention.
-- **Missing Audit Trail:**
-  An unalterable audit trail recording our technical choices, vendor audits, model changes, and modifications to our transparency disclosures is not maintained.
-
-### 6.3 Remediation and Action Plan
-1. Formulate a corporate AI Transparency and Disclosure Policy that mandates direct disclosure and machine-readable output marking.
-2. Incorporate explicit, prominent notices (such as "You are chatting with an AI assistant") inside all conversational interface templates.
-3. Implement standard metadata injection (using the C2PA specification or cryptographic watermarking) inside all synthetic media generation pipelines.
-4. Establish automated integration tests to scan generated media outputs and verify that the machine-readable compliance headers are properly set and preserved.
+- **Missing Policy:** No template AI Transparency and Output Marking Policy exists.
+- **Missing Documentation:** Technical implementation guides for machine-readable watermarking (e.g., C2PA) and synthetic text marking are missing.
+- **Missing Code:** Backend generation pipelines lack C2PA metadata injection utilities or watermarking helper libraries.
+- **Missing Disclosure:** UI chat templates lack immediate notice ("You are chatting with an AI assistant") prior to first user interaction.
+- **Missing Logging:** Database schemas to record user exposure to AI transparency notices are absent.
+- **Missing Testing:** Test scripts verifying that generated images or text contain machine-readable AI markers are missing.
+- **Missing Evidence:** Independent verification reports or algorithmic transparency audit results are absent.
+- **Missing Audit Trail:** Records of model changes, prompt disclosures, and watermarking software versions are missing.
 
 ---
 
-## 7. Consolidated Gap Classification Matrix
+## 7. EU Digital Markets Act (DMA)
 
-Where the playbook already covers a framework, the cell says Covered. Partial means the rule is named with a dated source but a developer still has no step by step way to satisfy it. Missing means the playbook does not carry it at all.
+### 7.1 Regulatory Overview and Background
+Regulation (EU) 2022/1925 governs gatekeeper mobile platforms in the EU, enabling alternative marketplaces, web distribution, and external payment links (`com.apple.developer.storekit.external-purchase-link`).
+
+Official Citation: Regulation (EU) 2022/1925.
+
+### 7.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook lacks an EU External Distribution & Alternative Payments Policy.
+- **Missing Documentation:** Step-by-step developer manuals for wiring `ExternalPurchaseCustomLink` and reporting monthly sales via External Purchase Server APIs are missing.
+- **Missing Code:** Codebase templates omit native wrappers for `ExternalPurchaseCustomLink` and monthly sales reporting API handlers.
+- **Missing Disclosure:** System disclosure sheet triggers prior to external offer redirection are missing in mock implementations.
+- **Missing Logging:** Transaction logging schemas for tracking non-IAP sales subject to Core Technology Commission reporting are missing.
+- **Missing Testing:** Automated tests verifying that StoreKit IAP and external offer links are never co-mingled on the same EU storefront are missing.
+- **Missing Evidence:** Proof of notarization files, ADPLA Attachment 14 acceptance records, and monthly reporting receipts are absent.
+- **Missing Audit Trail:** Historical logs of external link updates and reporting submission timestamps are missing.
+
+---
+
+## 8. EU Digital Services Act (DSA - Trader Status)
+
+### 8.1 Regulatory Overview and Background
+Articles 30 and 31 of Regulation (EU) 2022/2065 require store providers to collect, verify, and publish trader identity and contact details for EU app distribution.
+
+Official Citation: Regulation (EU) 2022/2065.
+
+### 8.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository carries no corporate Trader Status Governance Policy.
+- **Missing Documentation:** Verification guides explaining required DSA documentation (D-U-N-S, payment details, official ID) are absent.
+- **Missing Code:** Metadata verification tools fail to check whether DSA trader declarations are complete prior to release.
+- **Missing Disclosure:** Product page metadata templates do not include placeholder fields for trader address, email, and phone.
+- **Missing Logging:** Systems to record DSA trader status verification timestamps and 2FA verification logs are missing.
+- **Missing Testing:** Automated scripts verifying that trader status metadata fields are populated before EU deployment are missing.
+- **Missing Evidence:** Official verification certificates, D-U-N-S extract files, and 2FA confirmation records are missing.
+- **Missing Audit Trail:** Logs tracking changes to declared trader status or published business details are missing.
+
+---
+
+## 9. European Accessibility Act (EAA - Directive (EU) 2019/882)
+
+### 9.1 Regulatory Overview and Background
+Directive (EU) 2019/882 requires mobile applications and e-commerce services reaching EU users to comply with EN 301 549 Chapter 11 (WCAG 2.1 AA) and publish an accessibility statement, applicable from 28 June 2025.
+
+Official Citation: Directive (EU) 2019/882.
+
+### 9.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository lacks an Accessibility Compliance Policy referencing EN 301 549.
+- **Missing Documentation:** Developer manuals explaining EN 301 549 Chapter 11 rules beyond basic WCAG standards are missing.
+- **Missing Code:** Dynamic Type, VoiceOver, and high-contrast UI component templates are incomplete across cross-platform samples.
+- **Missing Disclosure:** Accessibility Statement templates (EN 301 549 Annex B/C) are missing.
+- **Missing Logging:** Automated UI scanners fail to log non-compliant contrast or missing accessibility traits to central telemetry.
+- **Missing Testing:** Automated CI pipeline integration for full EN 301 549 screen audits is missing.
+- **Missing Evidence:** Formal accessibility audit reports, VPAT documents, and user testing proof are absent.
+- **Missing Audit Trail:** Records of historical accessibility remediations and statement revisions are missing.
+
+---
+
+## 10. Amended US COPPA Rule (16 CFR Part 312)
+
+### 10.1 Regulatory Overview and Background
+The FTC's Amended COPPA Rule adds biometric identifiers, mandatory written data retention policies, separate third-party disclosure opt-ins, and written information security programs, effective 22 April 2026.
+
+Official Citation: 16 CFR Part 312, 90 FR 16918.
+
+### 10.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no template Written Data Retention Policy or Information Security Program required under 312.10 and 312.8.
+- **Missing Documentation:** Developer instructions on implementing separate opt-in consent for third-party ad sharing in kids' apps are missing.
+- **Missing Code:** Age-gating libraries omit separate consent flow controllers for third-party disclosures.
+- **Missing Disclosure:** Privacy policy templates lack mandatory disclosures identifying biometric data as PII.
+- **Missing Logging:** Database schemas logging verifiable parental consent methods and data deletion timelines are missing.
+- **Missing Testing:** Automated unit tests verifying that third-party ad SDKs are disabled prior to explicit consent are missing.
+- **Missing Evidence:** Written InfoSec Risk Assessments and Safe Harbor certification evidence are absent.
+- **Missing Audit Trail:** Logs capturing annual InfoSec reviews, retention policy updates, and parental consent revocations are missing.
+
+---
+
+## 11. California CCPA / CPRA & CPPA 2026 Regulations
+
+### 11.1 Regulatory Overview and Background
+The California Consumer Privacy Act as amended requires Global Privacy Control (GPC) support, notice at collection, opt-out of sale/sharing/profiling, and sensitive personal information limits, with automated decision-making rules in 2027.
+
+Official Citation: California Civil Code Title 1.81.5.
+
+### 11.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository carries no template CCPA/CPRA Privacy & Automated Decision-Making Policy.
+- **Missing Documentation:** Implementation guides for handling Global Privacy Control headers (`Sec-GPC`) in webviews and native code are missing.
+- **Missing Code:** Native code handlers to translate GPC signals into opt-out flags for ad SDKs are absent.
+- **Missing Disclosure:** Notice at Collection and "Limit the Use of My Sensitive Personal Information" UI templates are missing.
+- **Missing Logging:** Schemas logging opt-out requests, GPC signals, and consumer rights requests are missing.
+- **Missing Testing:** End-to-end integration tests confirming that receiving `Sec-GPC` halts third-party data transmission are missing.
+- **Missing Evidence:** Annual CPPA cybersecurity audit certificates and risk assessment filings are absent.
+- **Missing Audit Trail:** Immutable records of consumer rights request fulfillments and GPC opt-out events are missing.
+
+---
+
+## 12. Illinois Biometric Information Privacy Act (BIPA)
+
+### 12.1 Regulatory Overview and Background
+BIPA (740 ILCS 14) mandates written notice, written release, a public retention schedule, and mandatory destruction of biometric identifiers within 3 years.
+
+Official Citation: 740 ILCS 14.
+
+### 12.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no template Biometric Privacy & Retention Policy.
+- **Missing Documentation:** Developer guidelines for implementing written consent releases before biometric capture are missing.
+- **Missing Code:** UI templates omit explicit biometric consent modal sheets prior to FaceID/TouchID or custom biometric initialization.
+- **Missing Disclosure:** In-app screens lack public biometric retention and destruction schedule disclosures.
+- **Missing Logging:** Database triggers logging biometric capture consent and automated 3-year destruction schedules are missing.
+- **Missing Testing:** Unit tests verifying that biometric capture fails safely if written consent is unconfirmed are missing.
+- **Missing Evidence:** Executed written consent records and destruction confirmation certificates are absent.
+- **Missing Audit Trail:** Logs documenting biometric data purging events and policy publication history are missing.
+
+---
+
+## 13. US Subscription Cancellation (FTC Negative Option & State Laws)
+
+### 13.1 Regulatory Overview and Background
+ROSCA, Section 5 of the FTC Act, and state statutes (California, New York, Massachusetts) require that subscription cancellation be at least as easy as sign-up, prohibiting hard-cancellation mechanics (phone calls, letters).
+
+Official Citations: 15 U.S.C. 8401 (ROSCA), Cal. Bus. & Prof. Code 17600.
+
+### 13.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository lacks a Negative Option & Simple Subscription Cancellation Policy.
+- **Missing Documentation:** Design guides specifying single-tap or simple online cancellation mechanics are missing.
+- **Missing Code:** Web and in-app account management templates lack self-service subscription cancellation endpoints.
+- **Missing Disclosure:** Pre-subscription disclosures detailing auto-renewal terms and cancellation methods are incomplete.
+- **Missing Logging:** Event logging for pre-renewal reminders and cancellation request timestamps is missing.
+- **Missing Testing:** Automated UI tests confirming that cancellation can be completed online without human intervention are missing.
+- **Missing Evidence:** Records of pre-renewal notification delivery and subscription terms acceptance are absent.
+- **Missing Audit Trail:** Logs tracking cancellation flow revisions and customer cancellation rates are missing.
+
+---
+
+## 14. UK Online Safety Act 2023 & ICO Children's Code
+
+### 14.1 Regulatory Overview and Background
+The UK Online Safety Act 2023 and ICO Age Appropriate Design Code mandate Highly Effective Age Assurance, high privacy by default, profiling disabled by default, and mandatory Data Protection Impact Assessments (DPIAs).
+
+Official Citations: UK Online Safety Act 2023, ICO Children's Code.
+
+### 14.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no template UK Age-Appropriate Design Policy.
+- **Missing Documentation:** Manuals detailing Ofcom-approved Highly Effective Age Assurance methods (facial estimation, open banking) are missing.
+- **Missing Code:** Native code blocks setting geolocation and profiling off by default for UK minor profiles are missing.
+- **Missing Disclosure:** Age-appropriate privacy notices tailored for under-18 comprehension are missing.
+- **Missing Logging:** Schemas capturing age-assurance verification status without retaining raw verification identity assets are missing.
+- **Missing Testing:** Automated tests verifying that profiling and tracking remain off by default for UK accounts are missing.
+- **Missing Evidence:** Formally completed ICO Data Protection Impact Assessments (DPIAs) and Ofcom risk assessment records are missing.
+- **Missing Audit Trail:** Version-controlled records of DPIA reviews and age-assurance method updates are missing.
+
+---
+
+## 15. Australia Online Safety Act & Digital ECA (Brazil)
+
+### 15.1 Regulatory Overview and Background
+Australia's Social Media Minimum Age Act 2024 and Brazil's Digital ECA (Law 15,211/2025) prohibit self-declaration checkboxes, requiring verified age assurance and immediate destruction of verification data.
+
+Official Citations: Australia Online Safety Amendment Act 2024, Brazil Law 15,211/2025.
+
+### 15.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository carries no Age Assurance & Verification Data Destruction Policy for Australia and Brazil.
+- **Missing Documentation:** Guides outlining accepted verification methods (CPF checks, facial estimation, document checks) are missing.
+- **Missing Code:** Mobile client code fails to ringfence age verification data or invoke automated deletion endpoints post-verification.
+- **Missing Disclosure:** In-app notices explaining mandatory age verification and immediate data destruction are missing.
+- **Missing Logging:** Telemetry logging post-verification data purging events without storing personal identity details is missing.
+- **Missing Testing:** Integration tests verifying that unverified accounts are blocked from adult content in Brazil and Australia are missing.
+- **Missing Evidence:** ANPD/eSafety compliance risk assessments and third-party age assurance audit reports are missing.
+- **Missing Audit Trail:** Audit logs recording verification attempts and post-verification data destruction timestamps are missing.
+
+---
+
+## 16. India Digital Personal Data Protection Act (DPDPA 2023)
+
+### 16.1 Regulatory Overview and Background
+India's DPDPA 2023 and DPDP Rules 2025 require verifiable parental consent via government-backed systems (DigiLocker) for under-18s, prohibiting behavioral tracking and targeted ads.
+
+Official Citation: India DPDPA 2023, G.S.R. 846(E).
+
+### 16.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no template DPDPA Compliance & Minor Data Protection Policy.
+- **Missing Documentation:** Guides on integrating with registered Consent Managers and DigiLocker parental verification are missing.
+- **Missing Code:** Native wrappers for Indian Consent Manager APIs and targeted ad suppression for under-18s are missing.
+- **Missing Disclosure:** Multilingual consent notices in all 22 Eighth Schedule Indian languages are missing.
+- **Missing Logging:** Database logging schemas for tracking parental consent tokens and Consent Manager interaction IDs are missing.
+- **Missing Testing:** Automated tests verifying that behavioral ad tracking is disabled for Indian minor profiles are missing.
+- **Missing Evidence:** Data Protection Board registration evidence and Consent Manager integration certifications are missing.
+- **Missing Audit Trail:** Logs documenting consent withdrawals and Data Principal grievance redressal responses are missing.
+
+---
+
+## 17. Singapore IMDA Code of Practice for Online Safety
+
+### 17.1 Regulatory Overview and Background
+The IMDA Code of Practice for Online Safety requires app distribution services and platforms to enforce age assurance screening users under 18 from downloading age-inappropriate apps.
+
+Official Citation: IMDA Code of Practice for Online Safety.
+
+### 17.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no Singapore Online Safety & Age Assurance Policy.
+- **Missing Documentation:** Developer guides explaining IMDA age-rating alignment and store age signals are missing.
+- **Missing Code:** Mobile app templates lack logic to handle Singapore storefront age restriction signals.
+- **Missing Disclosure:** In-app content warning disclosures for Singapore users are missing.
+- **Missing Logging:** Logging schemas capturing age verification results while ensuring immediate deletion of verification data are missing.
+- **Missing Testing:** Unit tests verifying that 18-plus rated content is blocked on Singapore storefronts without valid age signals are missing.
+- **Missing Evidence:** IMDA safety compliance declarations and safety contact appointment records are missing.
+- **Missing Audit Trail:** Logs tracking age-assurance policy updates and harm reporting resolutions are missing.
+
+---
+
+## 18. South Korea Telecommunications Business Act & PIPA
+
+### 18.1 Regulatory Overview and Background
+South Korea's Telecommunications Business Act mandates alternative in-app billing support (`com.apple.developer.storekit.external-purchase` for KR), while PIPA amendments establish CEO accountability and chief privacy officer requirements.
+
+Official Citations: KOR TBA Article 22-9, KOR PIPA Act No. 21445.
+
+### 18.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The repository lacks a South Korea Alternative Billing & PIPA Governance Policy.
+- **Missing Documentation:** Step-by-step technical guides for building Korea-only binaries, approved payment gateway integration (KCP, Toss, Inicis), and monthly 26% fee reporting are missing.
+- **Missing Code:** Native code templates for the mandatory Korean alternative payment modal sheet and server-side reporting APIs are missing.
+- **Missing Disclosure:** Pre-payment modal disclosures informing users that Apple/Google protection features do not apply are missing.
+- **Missing Logging:** Database logging for alternative payment transaction amounts, VAT calculations, and monthly commission reports is missing.
+- **Missing Testing:** Integration tests verifying that the Korea external payment entitlement does not leak into other storefront binaries are missing.
+- **Missing Evidence:** KCC compliance filings, approved payment gateway contracts, and CEO accountability declarations are missing.
+- **Missing Audit Trail:** Historical logs of monthly sales reporting submissions and remittance receipts are missing.
+
+---
+
+## 19. China Mobile App Filing (MIIT) & CAC Regulations
+
+### 19.1 Regulatory Overview and Background
+China's MIIT Mobile App Filing, PIPL, and CAC Interim Measures for AI Anthropomorphic Services require local entity filing, real-name verification, data localization, and banning virtual companion services for minors.
+
+Official Citations: MIIT ICP App Filing Rules, CAC Order No. 21.
+
+### 19.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:** The playbook carries no China App Filing & CAC Minor Protection Policy.
+- **Missing Documentation:** Technical manuals detailing MIIT ICP filing, local entity partnership setup, and CAC AI service filing steps are missing.
+- **Missing Code:** Code templates for China real-name verification (ID/phone check) and automatic minors mode toggles are missing.
+- **Missing Disclosure:** Mandatory MIIT filing number display on app splash screens and setting pages is missing in UI templates.
+- **Missing Logging:** Localized logging schemas capturing real-name verification states without cross-border data transfer are missing.
+- **Missing Testing:** Integration tests asserting that companion AI features are disabled when a minor profile in China is detected are missing.
+- **Missing Evidence:** Official MIIT ICP filing certificates, Banhao game licenses, and CAC security assessment filings are missing.
+- **Missing Audit Trail:** Logs capturing bi-annual PIPL personal information compliance audits and real-name system updates are missing.
+
+---
+
+## 20. Consolidated Gap Classification Matrix
 
 | Regulatory framework | Policy | Documentation | Code | Disclosure | Logging | Testing | Evidence | Audit trail |
 |---|---|---|---|---|---|---|---|---|
 | **EU GPSR** | Missing | Missing | Missing | Missing | Missing | Missing | Missing | Missing |
 | **EU e-Evidence** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
 | **EU withdrawal button** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
-| **US state ASAA** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
-| **EU AI Act Art 4**| Partial | Covered | N/A | Partial | Missing | Missing | Missing | Missing |
-| **EU AI Act Art 50**| Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
-
-The honest read. Five of the six are already named in `docs/EU-REGULATORY-2026.md`, `docs/GLOBAL-REGULATORY-2026.md`, `data/regulatory-deadlines.json`, and `data/rejection-patterns.json`, with dated sources and a deadline entry. What they lack is the implementation layer, meaning detection rules in the guard, code templates, and tests. GPSR is the only one absent end to end, so it is the first thing to add.
+| **US state ASAA** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **EU AI Act Art 4** | Partial | Covered | N/A | Partial | Missing | Missing | Missing | Missing |
+| **EU AI Act Art 50** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **EU DMA** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **EU DSA Trader** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **European Accessibility Act** | Partial | Covered | Partial | Missing | Missing | Missing | Missing | Missing |
+| **Amended US COPPA** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **California CCPA/CPRA** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **Illinois BIPA** | Partial | Covered | Missing | Missing | Missing | Missing | Missing | Missing |
+| **US Negative Option** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **UK OSA & Children's Code**| Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **Australia & Brazil ECA** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **India DPDPA 2023** | Partial | Covered | Missing | Missing | Missing | Missing | Missing | Missing |
+| **Singapore IMDA Safety** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **South Korea TBA / PIPA** | Partial | Covered | Partial | Partial | Missing | Missing | Missing | Missing |
+| **China MIIT & CAC AI** | Partial | Covered | Missing | Missing | Missing | Missing | Missing | Missing |
 
 ---
 
-## 8. Conclusion and Future Monitoring
+## 21. Conclusion and Remediation Priorities
 
-The playbook is strong on what gets an app rejected by a store reviewer, and thinner on the laws that bind the app once it is live. Five of the six frameworks here are already named with dated sources. What is missing is the layer a developer can act on, meaning detection rules the guard can fire on, code templates they can paste, and tests that prove the obligation is met.
+This comprehensive audit reveals that while the repository provides excellent legal documentation and rejection pattern coverage, significant implementation gaps remain across the codebase layer.
 
-In priority order.
+In priority order:
+1. **Logging & Audit Trail:** Build standardized logging schemas and audit trail utilities for legal requests, consent receipts, age signal processing, and data deletions.
+2. **Code & UI Templates:** Implement production-grade UI components for the EU Withdrawal Button, GPSR product safety cards, C2PA watermarking helpers, and store age signal APIs (`DeclaredAgeRange` / Play Age Signals API).
+3. **Automated Testing:** Develop automated integration tests verifying that location-based regulatory disclosures and minor access restrictions render correctly.
+4. **Evidence Templates:** Supply formal compliance evidence templates (DPIAs, VPATs, InfoSec Risk Assessments, and EPOC forms) for developer customization.
 
-1. Add GPSR, the only framework absent end to end.
-2. Give the five Partial frameworks detection rules in `data/rejection-patterns.json` and checklist items a developer can tick.
-3. Add the code templates, starting with the AI Act Article 50 disclosure line and the withdrawal path, since both carry 2026 deadlines.
+## 22. Sources
 
-This report is a snapshot. It goes stale the moment a deadline moves, so re-run it against EUR-Lex and the other primary sources rather than trusting the dates here on their own.
-
-## 9. Sources
-
-Every regulation named above, at its primary source.
-
-- GPSR, [Regulation (EU) 2023/988](https://eur-lex.europa.eu/eli/reg/2023/988/oj)
-- e-Evidence Regulation, [Regulation (EU) 2023/1543](https://eur-lex.europa.eu/eli/reg/2023/1543/oj)
-- e-Evidence Directive, [Directive (EU) 2023/1544](https://eur-lex.europa.eu/eli/dir/2023/1544/oj)
+Primary official regulatory sources cited:
+- EU GPSR, [Regulation (EU) 2023/988](https://eur-lex.europa.eu/eli/reg/2023/988/oj)
+- EU e-Evidence Regulation, [Regulation (EU) 2023/1543](https://eur-lex.europa.eu/eli/reg/2023/1543/oj)
+- EU e-Evidence Directive, [Directive (EU) 2023/1544](https://eur-lex.europa.eu/eli/dir/2023/1544/oj)
 - Distance Marketing of Financial Services, [Directive (EU) 2023/2673](https://eur-lex.europa.eu/eli/dir/2023/2673/oj)
 - EU AI Act, [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj)
-
-The US state App Store Accountability Acts are cited to their bill texts in [docs/GLOBAL-REGULATORY-2026.md](GLOBAL-REGULATORY-2026.md), which is the source of record for that section rather than this report.
+- EU Digital Markets Act, [Regulation (EU) 2022/1925](https://eur-lex.europa.eu/eli/reg/2022/1925/oj)
+- EU Digital Services Act, [Regulation (EU) 2022/2065](https://eur-lex.europa.eu/eli/reg/2022/2065/oj)
+- European Accessibility Act, [Directive (EU) 2019/882](https://eur-lex.europa.eu/eli/dir/2019/882/oj)
+- US FTC Amended COPPA Rule, [16 CFR Part 312, 90 FR 16918](https://www.federalregister.gov/documents/2025/04/22/2025-05904/childrens-online-privacy-protection-rule)
+- Illinois BIPA, [740 ILCS 14](https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946)
+- India DPDPA, [Digital Personal Data Protection Act 2023](https://egazette.gov.in)
