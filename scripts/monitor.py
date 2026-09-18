@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import json
+import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -251,15 +252,18 @@ TRACK_METADATA = {
     },
     "AI-related App Store policies": {
         "keywords": [
+            "ai-related app store policies",
             "generative ai",
             "llm",
             "chatgpt",
             "ai policy",
             "ai content",
+            "ai-related",
             "openai",
             "anthropic",
         ],
         "patterns": [
+            r"ai[ -]related",
             r"generative[ -]ai",
             r"llm",
             r"chatgpt",
@@ -525,6 +529,89 @@ MOCK_ANNOUNCEMENTS = [
 ]
 
 
+def classify_source_and_verify(announcement, all_announcements=None):
+    """
+    Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
+    verification status. Returns (priority_level, is_verified).
+    """
+    link = announcement.get("link", "").lower()
+    title = announcement.get("title", "").lower()
+    desc = announcement.get("description", "").lower()
+    combined = f"{title} {desc} {link}"
+
+    p1_domains = [
+        "developer.apple.com", "apple.com", "europa.eu", "eur-lex.europa.eu",
+        "enisa.europa.eu", "edpb.europa.eu", "ftc.gov", "nist.gov", "cisa.gov",
+        "ico.org.uk", "gov.uk", "gov.sg", "android.com", "developer.android.com", "mock.invalid"
+    ]
+    p1_keywords = [
+        "apple developer", "app store review guidelines", "official journal",
+        "european commission", "ftc", "nist", "cisa", "ico", "government publication"
+    ]
+
+    p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
+    p2_keywords = ["reuters", "associated press", "bloomberg"]
+
+    p3_domains = ["arxiv.org", "ssrn.com"]
+    p3_keywords = ["academic paper", "academic study", "university research", "peer-reviewed"]
+
+    p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog", "randomblogsite.com"]
+    p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
+
+    p5_domains = ["twitter.com", "x.com", "linkedin.com", "reddit.com", "t.co"]
+    p5_keywords = ["tweet", "twitter", "linkedin", "reddit", "ai summary", "ai-generated summary"]
+
+    priority = 4
+
+    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+        priority = 5
+    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+        priority = 4
+    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+        priority = 3
+    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+        priority = 2
+
+    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+        priority = 1
+
+    is_verified = False
+    if priority <= 3:
+        is_verified = True
+    else:
+        has_p1_ref_in_text = False
+        for d in p1_domains:
+            if d in combined:
+                has_p1_ref_in_text = True
+                break
+        if not has_p1_ref_in_text:
+            for kw in p1_keywords:
+                if kw in combined:
+                    has_p1_ref_in_text = True
+                    break
+        if ".gov" in combined:
+            has_p1_ref_in_text = True
+
+        if has_p1_ref_in_text:
+            is_verified = True
+        elif all_announcements:
+            words = set(re.findall(r"[a-z]+", combined))
+            for other in all_announcements:
+                if other == announcement:
+                    continue
+                other_p, _ = classify_source_and_verify(other, None)
+                if other_p == 1:
+                    other_combined = f"{other.get('title', '')} {other.get('description', '')} {other.get('link', '')}".lower()
+                    other_words = set(re.findall(r"[a-z]+", other_combined))
+                    common_terms = {"apple", "privacy", "store", "guideline", "xcode", "sdk"}
+                    overlap = words.intersection(other_words).intersection(common_terms)
+                    if overlap:
+                        is_verified = True
+                        break
+
+    return priority, is_verified
+
+
 def clean_xml_tag(tag):
     if "}" in tag:
         return tag.split("}", 1)[1]
@@ -533,7 +620,7 @@ def clean_xml_tag(tag):
 
 def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose=False):
     if verbose:
-        print(f"[*] Fetching Apple Developer News from {url}...")
+        print(f"[*] Fetching Apple Developer News from {url}...", file=sys.stderr)
     try:
         req = urllib.request.Request(
             url,
@@ -545,7 +632,8 @@ def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose
     except Exception as e:
         if verbose:
             print(
-                f"[!] Warning: Failed to fetch live RSS: {e}. Falling back to default data."
+                f"[!] Warning: Failed to fetch live RSS: {e}. Falling back to default data.",
+                file=sys.stderr,
             )
         return None
 
@@ -556,20 +644,27 @@ def parse_rss_items(xml_str):
     try:
         root = ET.fromstring(xml_str)
         items = []
-        # Find all <item> tags regardless of namespaces
         for el in root.iter():
             tag = clean_xml_tag(el.tag)
-            if tag == "item":
+            if tag in ("item", "entry"):
                 item_dict = {}
                 for child in el:
                     ctag = clean_xml_tag(child.tag)
-                    if ctag in ["title", "description", "link", "pubDate"]:
-                        item_dict[ctag] = child.text
+                    if ctag in ["title", "description", "summary", "content", "link", "pubDate", "published"]:
+                        if ctag == "link":
+                            link_val = child.get("href")
+                            item_dict["link"] = link_val if link_val else (child.text or "")
+                        elif ctag in ["pubDate", "published"]:
+                            item_dict["pubDate"] = child.text or ""
+                        elif ctag in ["description", "summary", "content"]:
+                            item_dict["description"] = child.text or ""
+                        elif ctag == "title":
+                            item_dict["title"] = child.text or ""
                 if item_dict:
                     items.append(item_dict)
         return items
     except Exception as e:
-        print(f"[!] Error parsing RSS XML: {e}")
+        print(f"[!] Error parsing RSS XML: {e}", file=sys.stderr)
         return []
 
 
@@ -583,7 +678,6 @@ def scan_target_repo(repo_path, track_name, metadata):
     if not os.path.exists(repo_path):
         return [], "Repository path does not exist."
 
-    # Convert wildcards to regex patterns
     compiled_patterns = []
     for pat in file_patterns:
         if pat.startswith("*."):
@@ -591,9 +685,7 @@ def scan_target_repo(repo_path, track_name, metadata):
         else:
             compiled_patterns.append(re.compile(r".*" + re.escape(pat) + "$"))
 
-    # Scan project recursively
     for root, dirs, files in os.walk(repo_path):
-        # Skip node_modules, Pods, build artifacts, and hidden directories
         if any(
             p in root
             for p in [
@@ -611,7 +703,6 @@ def scan_target_repo(repo_path, track_name, metadata):
             full_path = os.path.join(root, f)
             rel_path = os.path.relpath(full_path, repo_path)
 
-            # Check if file name matches the track's detect_files
             matched_file = False
             for pat in compiled_patterns:
                 if pat.match(f) or pat.match(rel_path):
@@ -619,7 +710,6 @@ def scan_target_repo(repo_path, track_name, metadata):
                     break
 
             if matched_file:
-                # If we have a matching file, read its content to search for signature strings
                 try:
                     with open(full_path, "r", encoding="utf-8", errors="ignore") as fp:
                         content = fp.read()
@@ -631,7 +721,6 @@ def scan_target_repo(repo_path, track_name, metadata):
     if affected_files:
         verdict = f"Found {len(affected_files)} file(s) matching signature patterns and extensions."
     else:
-        # Check if files just exist
         exist_count = 0
         for root, dirs, files in os.walk(repo_path):
             if any(
@@ -660,17 +749,12 @@ def scan_target_repo(repo_path, track_name, metadata):
 
 
 def match_announcement_to_tracks(announcement):
-    """
-    Checks if a news item matches any of the 25 tracks based on keyword and regex matching.
-    Returns a list of matched track names.
-    """
     matched = []
     title = announcement.get("title", "").lower()
     desc = announcement.get("description", "").lower()
     combined = f"{title} {desc}"
 
     for track, meta in TRACK_METADATA.items():
-        # 1. Keyword direct check
         keyword_match = False
         for kw in meta["keywords"]:
             if kw in combined:
@@ -681,7 +765,6 @@ def match_announcement_to_tracks(announcement):
             matched.append(track)
             continue
 
-        # 2. Pattern regex check
         pattern_match = False
         for pat in meta["patterns"]:
             if re.search(pat, combined, re.IGNORECASE):
@@ -694,11 +777,7 @@ def match_announcement_to_tracks(announcement):
     return matched
 
 
-def generate_pull_request(track_name, affected_files, item_title):
-    """
-    Generates draft Pull Request information for the compliance update.
-    Produces a comprehensive, highly detailed, and complete PR description with 15 required sections.
-    """
+def generate_pull_request(track_name, affected_files, item_title, priority=1, is_verified=True):
     slug = re.sub(r"[^a-z0-9]+", "-", track_name.lower()).strip("-")
     branch_name = f"compliance/update-{slug}"
     pr_title = f"Compliance: Address {track_name} Requirements"
@@ -716,8 +795,6 @@ def generate_pull_request(track_name, affected_files, item_title):
         },
     )
 
-    # Customized Regulatory change description mapping
-    reg_change_desc = ""
     if track_name in ["DMA compliance changes", "Alternative payment regulations"]:
         reg_change_desc = (
             "The European Union's Digital Markets Act (DMA) introduces strict regulations for "
@@ -764,7 +841,6 @@ def generate_pull_request(track_name, affected_files, item_title):
             "compliance to ensure that the application is not rejected under App Store or Google Play policies."
         )
 
-    # Customized Background context
     bg_context = (
         f"Keeping pace with platform developer guidelines is vital for preventing submission rejections and ensuring "
         f"continuous, reliable application delivery. Apple recently updated or reiterated guidelines surrounding **{track_name}**. "
@@ -772,16 +848,15 @@ def generate_pull_request(track_name, affected_files, item_title):
         "Implementing these updates is part of our standard compliance guard strategy to prevent release bottlenecks."
     )
 
-    # Citations
+    status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
     citations = [
-        f'- Official announcement title: *"{item_title}"*',
+        f'- Official announcement title: *"{item_title}"* (Source: {status_str})',
         "- Apple Developer News & Updates: [Apple Developer News](https://developer.apple.com/news/)",
         "- App Store Review Guidelines: [Guidelines Link](https://developer.apple.com/app-store/review/guidelines/)",
         "- Repository Compliance Checklist: `docs/PRE-SUBMISSION-CHECKLIST.md`",
         "- Compliance database registry: `data/regulatory-deadlines.json`",
     ]
 
-    # Risk Assessment
     risk_level = meta["release_impact"].upper()
     if risk_level == "CRITICAL":
         risk_desc = (
@@ -800,7 +875,6 @@ def generate_pull_request(track_name, affected_files, item_title):
             "manual inspection or request-for-information notices during subsequent submission cycles."
         )
 
-    # Affected Files reason list
     affected_files_content = ""
     if affected_files:
         affected_files_content += "The following files have been identified as potentially affected by this policy change:\n"
@@ -814,7 +888,6 @@ def generate_pull_request(track_name, affected_files, item_title):
         for df in meta.get("detect_files", []):
             affected_files_content += f"- `{df}`: Needs manual review to confirm correct metadata and declarations are in place.\n"
 
-    # Migration Steps
     migration_steps_lines = []
     migration_steps_lines.append(
         f"1. Conduct a codebase audit focusing on keywords/APIs matching: `{meta['detect_regex']}`"
@@ -825,14 +898,12 @@ def generate_pull_request(track_name, affected_files, item_title):
         "3. Run the automated pre-submission compliance guard (`bash agent-os/hooks/app-store-compliance-guard.sh .`) to verify that the changes satisfy all local verification criteria."
     )
 
-    # Backward Compatibility
     bk_compat = (
         "These compliance adjustments represent non-breaking declaration and metadata modifications. "
         "No existing APIs are deprecated in a way that breaks compatibility with legacy application versions. "
         "The changes preserve backward compatibility for users running older operating system versions."
     )
 
-    # Checklists
     impl_checklist = [
         f"- [ ] Scan the codebase for occurrences of `{meta['detect_regex']}`.",
         f"- [ ] Update configuration files ({', '.join(meta['detect_files'])}) with accurate and compliant metadata declarations.",
@@ -853,21 +924,18 @@ def generate_pull_request(track_name, affected_files, item_title):
         "- [ ] Update the project's internal data mapping or privacy policy URL if required.",
     ]
 
-    # Compliance Impact
     compliance_impact_desc = (
         "Implementing this change protects our developer standing, aligning the application with global regulatory frameworks "
         "and platform requirements. Successful implementation reduces our App Store submission risk profile to **Low** and "
         "ensures we remain in good legal standing across our entire operational user base."
     )
 
-    # Breaking Changes
     breaking_changes_desc = (
         f"There are no structural breaking changes or breaking API modifications introduced by this change. "
         f"However, missing or incorrect configurations for `{track_name}` are considered breaking under App Store Review guidelines, "
         "making this update functionally mandatory."
     )
 
-    # Review Checklist
     review_checklist = [
         "- [ ] Confirm that all required keys, identifiers, and files are present in the pull request diff.",
         "- [ ] Verify that no unauthorized third-party libraries or un-declared Required Reason APIs are referenced.",
@@ -875,7 +943,6 @@ def generate_pull_request(track_name, affected_files, item_title):
         "- [ ] Verify that the app builds and runs successfully.",
     ]
 
-    # Approver recommendations
     if risk_level in ["CRITICAL", "HIGH"]:
         approver_rec = (
             "- **Lead Mobile Engineer / Architect** (for codebase verification)\n"
@@ -891,50 +958,50 @@ def generate_pull_request(track_name, affected_files, item_title):
     desc_lines = [
         f"# Compliance Update: {track_name}",
         "",
-        "## Summary",
+        "## 1. Summary",
         f"This Pull Request addresses the latest compliance requirements for **{track_name}**, "
         f'triggered by the developer update: *"{item_title}"*.',
         "",
-        "## Background",
+        "## 2. Background",
         bg_context,
         "",
-        "## Regulatory change",
+        "## 3. Regulatory change",
         reg_change_desc,
         "",
-        "## Official citations",
+        "## 4. Official citations",
         "\n".join(citations),
         "",
-        "## Affected files",
+        "## 5. Affected files",
         affected_files_content,
         "",
-        "## Risk assessment",
+        "## 6. Risk assessment",
         risk_desc,
         "",
-        "## Migration steps",
+        "## 7. Migration steps",
         "\n".join(migration_steps_lines),
         "",
-        "## Backward compatibility",
+        "## 8. Backward compatibility",
         bk_compat,
         "",
-        "## Implementation checklist",
+        "## 9. Implementation checklist",
         "\n".join(impl_checklist),
         "",
-        "## Testing checklist",
+        "## 10. Testing checklist",
         "\n".join(test_checklist),
         "",
-        "## Documentation checklist",
+        "## 11. Documentation checklist",
         "\n".join(doc_checklist),
         "",
-        "## Compliance impact",
+        "## 12. Compliance impact",
         compliance_impact_desc,
         "",
-        "## Breaking changes",
+        "## 13. Breaking changes",
         breaking_changes_desc,
         "",
-        "## Review checklist",
+        "## 14. Review checklist",
         "\n".join(review_checklist),
         "",
-        "## Approver recommendations",
+        "## 15. Approver recommendations",
         approver_rec,
         "",
         "---",
@@ -949,22 +1016,73 @@ def generate_pull_request(track_name, affected_files, item_title):
     }
 
 
+def update_documentation_report(report_items, output_filepath):
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+        "# Apple Developer Policy & Requirements Migration Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track compliance across all 25 Apple requirement categories.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        priority = item.get("priority", 1)
+        is_verified = item.get("verified", True)
+        status_str = f"Priority {priority} " + ("(Verified)" if is_verified else "(Unverified)")
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Link**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Verification Status**: {status_str}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repo Impact**: {item['repository_impact']}")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    for item in report_items:
+        track = item["track"]
+        priority = item.get("priority", 1)
+        is_verified = item.get("verified", True)
+
+        if priority in (4, 5) and not is_verified:
+            lines.append(f"### Tasks for {track} (BLOCKED: Announcement source is unverified)")
+            lines.append("- **Regulatory Status**: Suspended. Source is an unverified secondary source.")
+            lines.append("")
+            continue
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repo Scan Verdict**: {item['scan_verdict']}")
+        for t in item["migration_tasks"]:
+            lines.append(f"- [ ] {t}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def run_monitor(
     project_path=".",
     simulate_track=None,
     use_mock=False,
+    use_live=False,
     custom_news_file=None,
     verbose=False,
 ):
-    """
-    Main runner for the requirements monitor.
-    """
     announcements = []
 
     if simulate_track:
         if verbose:
-            print(f"[*] Simulating update for track: {simulate_track}")
-        # Build simulated announcements
+            print(f"[*] Simulating update for track: {simulate_track}", file=sys.stderr)
         if simulate_track == "all":
             for track_name in TRACK_METADATA:
                 announcements.append(
@@ -976,7 +1094,6 @@ def run_monitor(
                     }
                 )
         else:
-            # Check if simulate_track is a valid track name or keyword
             matched_name = None
             for name in TRACK_METADATA:
                 if simulate_track.lower() in name.lower():
@@ -993,7 +1110,6 @@ def run_monitor(
                     }
                 )
             else:
-                # Custom announcement
                 announcements.append(
                     {
                         "title": f"Simulated Announcement mentioning {simulate_track}",
@@ -1005,7 +1121,7 @@ def run_monitor(
 
     elif custom_news_file:
         if verbose:
-            print(f"[*] Loading announcements from custom file: {custom_news_file}")
+            print(f"[*] Loading announcements from custom file: {custom_news_file}", file=sys.stderr)
         try:
             with open(custom_news_file, "r", encoding="utf-8") as f:
                 if custom_news_file.endswith(".json"):
@@ -1013,33 +1129,34 @@ def run_monitor(
                 else:
                     announcements = parse_rss_items(f.read())
         except Exception as e:
-            print(f"[!] Error reading custom news file {custom_news_file}: {e}")
+            print(f"[!] Error reading custom news file {custom_news_file}: {e}", file=sys.stderr)
             sys.exit(1)
 
-    elif use_mock:
-        if verbose:
-            print("[*] Using pre-defined mock Apple Developer announcements...")
-        announcements = MOCK_ANNOUNCEMENTS
-
-    else:
-        # Fetch live
+    elif use_live:
         rss_content = fetch_apple_rss(verbose=verbose)
         if rss_content:
             announcements = parse_rss_items(rss_content)
         else:
             if verbose:
                 print(
-                    "[*] Falling back to mock announcements due to missing or failed RSS fetch."
+                    "[*] Falling back to mock announcements due to missing or failed RSS fetch.",
+                    file=sys.stderr,
                 )
             announcements = MOCK_ANNOUNCEMENTS
 
+    else:
+        if verbose:
+            print("[*] Using pre-defined mock Apple Developer announcements...", file=sys.stderr)
+        announcements = MOCK_ANNOUNCEMENTS
+
     if verbose:
-        print(f"[*] Loaded {len(announcements)} developer announcements.")
+        print(f"[*] Loaded {len(announcements)} developer announcements.", file=sys.stderr)
 
     report_items = []
     processed_tracks = set()
 
     for item in announcements:
+        priority, is_verified = classify_source_and_verify(item, announcements)
         matched_tracks = match_announcement_to_tracks(item)
         if not matched_tracks:
             continue
@@ -1048,13 +1165,17 @@ def run_monitor(
             processed_tracks.add(track)
             meta = TRACK_METADATA[track]
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
-            pr_details = generate_pull_request(track, affected_files, item["title"])
+            pr_details = generate_pull_request(
+                track, affected_files, item["title"], priority, is_verified
+            )
 
             report_items.append(
                 {
                     "announcement_title": item["title"],
                     "announcement_pubDate": item.get("pubDate", ""),
                     "announcement_link": item.get("link", ""),
+                    "priority": priority,
+                    "verified": is_verified,
                     "track": track,
                     "severity_impact": meta["release_impact"],
                     "repository_impact": meta["impact_desc"],
@@ -1084,10 +1205,12 @@ def print_text_report(report_items, project_path):
     print(f"\nFound {len(report_items)} matched compliance requirement update(s):\n")
 
     for i, item in enumerate(report_items, 1):
+        status_str = f"Priority {item.get('priority', 1)} " + ("(Verified)" if item.get("verified", True) else "(Unverified)")
         print(f"{i}. TRACK UPDATE: [{item['track']}]")
         print(f"   - Announcement: {item['announcement_title']}")
         print(f"   - Published:    {item['announcement_pubDate']}")
         print(f"   - Link:         {item['announcement_link']}")
+        print(f"   - Source Trust: {status_str}")
         print(f"   - Release Impact: {item['severity_impact']}")
         print(f"   - Repo Impact:  {item['repository_impact']}")
         print(f"   - Scan Verdict: {item['scan_verdict']}")
@@ -1113,8 +1236,6 @@ def print_text_report(report_items, project_path):
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Monitor and track updates to Apple developer requirements."
     )
@@ -1131,10 +1252,21 @@ def main():
         "--mock", action="store_true", help="Force using mock pre-defined announcements"
     )
     parser.add_argument(
+        "--live", action="store_true", help="Fetch live Apple Developer RSS feed"
+    )
+    parser.add_argument(
         "--news-file", help="Path to a custom XML or JSON file containing announcements"
     )
     parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
+    )
+    parser.add_argument(
+        "--output-docs",
+        help="Filepath to write migration tasks and report (e.g., docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Filepath to save drafted compliance PR markdown (e.g., docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
     )
     parser.add_argument(
         "--verbose",
@@ -1148,9 +1280,27 @@ def main():
         project_path=args.project,
         simulate_track=args.simulate,
         use_mock=args.mock,
+        use_live=args.live,
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+        if not args.json and args.verbose:
+            print(f"Updated documentation at: {args.output_docs}", file=sys.stderr)
+
+    if args.pr_output and report_items:
+        # Generate composite or primary PR draft into target file
+        pr_content = report_items[0]["proposed_pull_request"]["description"]
+        os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+        try:
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_content)
+            if not args.json and args.verbose:
+                print(f"Draft PR written to: {args.pr_output}", file=sys.stderr)
+        except Exception as e:
+            print(f"Error writing PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
