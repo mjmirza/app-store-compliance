@@ -67,6 +67,20 @@ Sources. [Apple submit visionOS apps](https://developer.apple.com/visionos/submi
 
 Sources. [Apple In-App Events](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-event/), [Apple Custom Product Pages](https://developer.apple.com/app-store/custom-product-pages/), [Apple StoreKit external purchase](https://developer.apple.com/documentation/storekit/external-purchase).
 
+### 1.8 iPhone Duo readiness (foldable iPhone, ships 23 October 2026)
+
+Deadline ID APPLE-IPHONE-DUO-LAUNCH, tracked in issue #724. iPhone Duo has a 5.4 inch outer display and a 7.6 inch inner display joined by a hinge, a front camera on each, and launches on iOS 27.1. Pre-orders open 16 October 2026 and it ships 23 October 2026. Apple does not require a Duo rebuild to stay on the store, but an app that ignores the form factor looks broken on it.
+
+- Build. Apps built with Xcode 26 or earlier run but do not extend under the status bar and camera. Build with Xcode 27.1 (beta from 18 September 2026) and the iOS 27.1 SDK, which ships the iPhone Duo simulator. Test the outer display, the inner display fully open, the inner display partially folded, and each rotation.
+- Resize, never assume a size. Use size classes (compact width on the outer display, regular width on the inner) and scene or container bounds. Apple says not to use `userInterfaceIdiom` or `UIInterfaceOrientation` for layout decisions, and not to size views from fixed iPhone dimensions or screen dimensions.
+- Reserved regions. The outer front camera always occludes content, the inner front camera does when active, and the folding region divides the inner display when partially open. System containers (split views, navigation stacks, sheets, alerts, context menus) adapt on their own. Custom views read `ReservedRegion` from the geometry proxy in SwiftUI or the view in UIKit and move content clear of them. `ArrangementView` (SwiftUI) and `UIArrangementViewController` (UIKit) lay out a primary and secondary view around the fold.
+- Vertical bars. On the outer display, and for trailing views on the inner display, the system presents navigation bars, toolbars, and tab bars vertically on the side. Only bars supplied through `NavigationStack`, `NavigationSplitView`, or a navigation controller get this. A hand-built `UIToolbar`, `UINavigationBar`, or `UITabBar` does not. A toolbar item with a title and no icon, or with a custom view, is never shown vertically, so give every item both an icon and a title.
+- Same function in every pose. Controls can move or overflow, but the same controls and content stay reachable whether the phone is open or closed. Games may lock orientation but must fill the display as the pose changes.
+- Camera apps. Opening, closing, or rotating the phone can move the app to the other display and flip which way the active camera faces. Choose cameras by the direction they face.
+- App Store assets. Screenshot specifications exist (outer 1398 x 2034, inner 2007 x 2853, both orientations) but App Store Connect does not accept Duo uploads yet. Apple says later this year. Until then the 6.9 inch iPhone set is required and scaled for Duo. No Duo-specific App Review guideline or App Store Connect validation has been published, so none is enforced here. Re-check both before claiming either.
+
+Sources. [Apple Newsroom, iPhone Duo announcement](https://www.apple.com/newsroom/2026/09/apple-unveils-iphone-duo/), [Preparing your app for iPhone Duo](https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo), [Designing for iPhone Duo (HIG)](https://developer.apple.com/design/human-interface-guidelines/designing-for-iphone-duo), [Get ready for iPhone Duo](https://developer.apple.com/iphone-duo/), [App Store Connect release notes](https://developer.apple.com/help/app-store-connect/release-notes/), [Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications).
+
 ## 2. Google Play and Android mechanics
 
 ### 2.1 Android developer verification (identity, all Android apps including sideloaded)
