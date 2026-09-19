@@ -1154,6 +1154,18 @@
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/rules/privacy.md",
       "priority": "medium"
+    },
+    {
+      "id": "APPLE-IPHONE-DUO-LAUNCH",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple iPhone Duo platform readiness",
+      "requirement": "iPhone Duo, Apple's first foldable iPhone, opens for pre-order on 16 October 2026 and ships 23 October 2026, launching on iOS 27.1. Apps built with Xcode 26 or earlier still run but do not extend under the status bar and camera. Build with Xcode 27.1 (beta from 18 September 2026) and the iOS 27.1 SDK, test every pose in the Duo simulator, resize from size classes and scene bounds, handle reserved regions (outer camera, inner camera when active, the folding region), and let navigation bars, toolbars, and tab bars present vertically. App Store Connect does not accept iPhone Duo screenshots yet (Apple says later this year), so the 6.9 inch set stays required. Tracked in issue #724. Sources https://www.apple.com/newsroom/2026/09/apple-unveils-iphone-duo/ https://developer.apple.com/documentation/technologyoverviews/preparing-your-app-for-iphone-duo",
+      "effective_date": "2026-09-09",
+      "grace_period": "about 6 weeks",
+      "mandatory_date": "2026-10-23",
+      "enforcement_date": "2026-10-23",
+      "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific, docs/GAP-ANALYSIS-2026-09.md open items",
+      "priority": "high"
     }
   ]
 }

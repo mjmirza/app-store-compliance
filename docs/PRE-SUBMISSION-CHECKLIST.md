@@ -59,6 +59,9 @@ For a deep-dive reference across platform best practices, see `docs/MOBILE-SECUR
 - [ ] App Review contact phone number is in international format with the country code, for example +852, not digits only.
 - [ ] The first consumable, first non-consumable, first auto-renewable subscription, and first non-renewing subscription are each submitted together with a new app version, never added on their own to an already approved version.
 - [ ] Screenshots cover the required 6.9 inch iPhone size and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
+- [ ] iPhone Duo (APPLE-IPHONE-DUO-LAUNCH, ships 23 October 2026). Built with Xcode 27.1 and the iOS 27.1 SDK, and checked in the Duo simulator on the outer display, the inner display open, and the inner display partially folded, in each rotation.
+- [ ] iPhone Duo layout. Layout comes from size classes and scene bounds, never `userInterfaceIdiom`, `UIInterfaceOrientation`, or fixed screen sizes. Custom views stay clear of reserved regions (cameras and the fold).
+- [ ] iPhone Duo bars. Navigation bars, toolbars, and tab bars come from the system navigation containers, and every toolbar item has both an icon and a title so it can present vertically.
 - [ ] The build meets the SDK floor. the 26 SDKs today, the 27 SDKs from April 2027.
 
 ## Google Play specific
