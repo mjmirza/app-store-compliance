@@ -353,11 +353,18 @@ def main():
     i = 0
     while i < len(lines):
         line = lines[i]
+        # deadline-checker lines ("[HIGH] EU AI Act ... (mandatory ...) absorbed into ...") are not findings
+        if "absorbed into" in line and "(mandatory " in line:
+            i += 1
+            continue
         match = re.match(
             r"^\s*\[(CRITICAL|HIGH|MEDIUM|LOW)\]\s+([A-Z0-9-._]+)\s+(.+)$",
             line,
             re.IGNORECASE,
         )
+        # every real finding id is hyphenated (APPLE-5.1.1-..., BOTH-PLACEHOLDER); a bare word is prose
+        if match and "-" not in match.group(2):
+            match = None
         if match:
             sev = match.group(1).lower()
             pid = match.group(2)

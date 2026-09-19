@@ -421,24 +421,40 @@ All changes are purely additive. Older clients will default to safe local fallba
 - [ ] Verification tests for the content moderation engine pass.
 
 ## 15. Approver recommendations
-Ensure that the privacy consent modal explicitly mentions the specific third-party AI processor (e.g., OpenAI, Anthropic, Gemini) as mandated by Apple 5.1.2(i). Confirm that the content reporting UI is functional and triggers 24-hour moderation capabilities.
+Apple 5.1.2(i) requires clearly disclosing where personal data is shared with third parties, including third-party AI, and obtaining explicit permission first. Naming the AI provider in the consent modal is the clearest way to meet it. Confirm the content reporting UI works and that reports get a timely response.
 """
     return pr_template
 
 
-def update_documentation(policy_matches, output_filepath):
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation(policy_matches, output_filepath, is_simulated=False):
     """
     Appends the latest policy findings and migration tasks directly to the output compliance file.
     """
     report_content = [
         "<!-- AI_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        report_content.extend(SIMULATED_NOTICE)
+    report_content.extend([
         "# AI Policy Monitoring & Compliance Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-ai-policy.py` to keep track of platform policy changes.",
         "",
         "## Latest Monitored Policy Changes",
         "",
-    ]
+    ])
 
     for m in policy_matches:
         report_content.append(f"### {m['title']} ({m['platform']})")
@@ -506,7 +522,9 @@ def main():
         print("Fetching live Google Blog RSS/Atom feed...")
         announcements.extend(parse_rss_feed(GOOGLE_RSS))
 
+    used_mock = False
     if args.mock or (not args.live and not args.mock):
+        used_mock = True
         # Default or explicit inline mock mode
         print("Using mock policy update data for analysis...")
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
@@ -541,10 +559,12 @@ def main():
 
     # 4. Generate documentation updates and migration tasks
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation(matched_policies, args.output_docs)
+    update_documentation(matched_policies, args.output_docs, is_simulated=used_mock)
 
     # 5. Draft the Pull Request with exactly 15 sections
     pr_draft = generate_pull_request_draft(matched_policies, affected_features)
+    if used_mock:
+        pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
     if args.pr_output:
         try:
