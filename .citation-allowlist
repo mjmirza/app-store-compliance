@@ -23,6 +23,26 @@ https://lumina.app/privacy
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
 
+# Mock RSS fixtures in scripts/monitor-ai-policy-test.sh. Never cited as fact.
+https://developer.apple.com/news/?id=ai_test_2026
+https://developer.apple.com/news/?id=arcade_spring
+
+# Fixture app and backend URLs used as inputs by agent-os/hooks/app-store-compliance-guard-test.sh. Never cited as fact.
+http://localhost:54321/auth/v1
+http://localhost:8080
+http://localhost:8787
+http://localhost:9000
+https://acme.example.io/.well-known/apple-app-site-association
+https://api.realbackend.io
+https://child.example.io/privacy-policy
+https://example.com/x
+https://kiosk.example.io/privacy-policy
+https://realbackend.io/privacy-policy
+https://staging.example.com
+
+# Real GitHub page that returns 404 to logged-out clients (README stars badge link).
+https://github.com/mjmirza/app-store-compliance/stargazers
+
 # Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
