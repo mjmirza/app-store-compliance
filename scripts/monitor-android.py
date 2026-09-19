@@ -759,13 +759,13 @@ def generate_pull_request_draft(updates, scan_results):
             )
         elif cat == "Privacy Sandbox":
             migration_steps.append(
-                f"- **{cat}**: Remove or avoid calls to the Privacy Sandbox Topics and Attribution Reporting APIs, which are being phased out,, and keep advertising and analytics on supported Advertising ID flows with accurate disclosures."
+                f"- **{cat}**: Remove or avoid calls to the Privacy Sandbox Topics and Attribution Reporting APIs, which are scheduled for phase-out, and keep advertising and analytics on supported Advertising ID flows with accurate disclosures."
             )
             impl_checklist.append(
                 "- [ ] Remove any Privacy Sandbox (TopicsManager, AdSelectionManager) integration and update SDKs that still depend on it."
             )
             risk_assessment.append(
-                f"- *{cat}*: Code that depends on Privacy Sandbox APIs scheduled for phase-out will stop returning useful data."
+                f"- *{cat}*: Code that depends on these APIs may stop working once Google completes the phase-out."
             )
         elif cat == "Play Integrity API":
             migration_steps.append(
@@ -965,8 +965,8 @@ Ensure that the Play Console account owner has completed the personal/organizati
 
 SIMULATED_NOTICE = [
     "",
-    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
-    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
     "> publish dates, and descriptions below are examples that show the shape of a migration",
     "> report, not real publications. Only the linked official documentation URLs are real.",
     "> Re-run the monitor with `--live` against the real feeds before treating anything here",

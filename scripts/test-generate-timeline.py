@@ -22,6 +22,9 @@ class TestGenerateTimeline(unittest.TestCase):
 
         # 10 days overdue
         self.overdue_date = (now - timedelta(days=10)).strftime("%Y-%m-%d")
+        # distinct dates for the overdue item, so a swapped column cannot pass
+        self.overdue_effective = (now - timedelta(days=40)).strftime("%Y-%m-%d")
+        self.overdue_enforcement = (now - timedelta(days=3)).strftime("%Y-%m-%d")
         # 5 days in the future (approaching)
         self.upcoming_date = (now + timedelta(days=5)).strftime("%Y-%m-%d")
         # 200 days in the future (far future)
@@ -46,10 +49,10 @@ class TestGenerateTimeline(unittest.TestCase):
                     "jurisdiction": "Jurisdiction A",
                     "law": "Passed Act A",
                     "requirement": "Requirement A",
-                    "effective_date": self.overdue_date,
-                    "grace_period": "None",
+                    "effective_date": self.overdue_effective,
+                    "grace_period": "30 days",
                     "mandatory_date": self.overdue_date,
-                    "enforcement_date": self.overdue_date,
+                    "enforcement_date": self.overdue_enforcement,
                     "affected_repository_sections": ["docs/GOOGLE-PLAY.md"],
                     "priority": "Critical"
                 },
@@ -140,17 +143,18 @@ class TestGenerateTimeline(unittest.TestCase):
             self.assertIn("| Effective Date | Grace Period | Mandatory Date | Enforcement Date | Overdue Days |", md_content)
             self.assertIn("| Effective Date | Grace Period | Mandatory Date | Enforcement Date | Days Remaining |", md_content)
             self.assertIn("| Mandatory Date | Law | Requirement | Jurisdiction | Effective Date | Grace Period | Enforcement Date |", md_content)
-            self.assertIn(f"| Requirement A | {self.overdue_date} | None | {self.overdue_date} | {self.overdue_date} |", md_content)
+            self.assertIn(f"| Requirement A | {self.overdue_effective} | 30 days | {self.overdue_date} | {self.overdue_enforcement} |", md_content)
+            self.assertIn(f"| {self.overdue_date} | Passed Act A | Requirement A | Jurisdiction A | {self.overdue_effective} | 30 days | {self.overdue_enforcement} |", md_content)
 
             # Check detailed record fields
             self.assertIn("ID: TEST-OVERDUE-1", md_content)
             self.assertIn("- **Jurisdiction:** Jurisdiction A", md_content)
             self.assertIn("- **Law:** Passed Act A", md_content)
             self.assertIn("- **Requirement:** Requirement A", md_content)
-            self.assertIn(f"- **Effective Date:** {self.overdue_date}", md_content)
+            self.assertIn(f"- **Effective Date:** {self.overdue_effective}", md_content)
             self.assertIn("- **Grace Period:** None", md_content)
             self.assertIn(f"- **Mandatory Date:** {self.overdue_date}", md_content)
-            self.assertIn(f"- **Enforcement Date:** {self.overdue_date}", md_content)
+            self.assertIn(f"- **Enforcement Date:** {self.overdue_enforcement}", md_content)
             self.assertIn("- **Priority:** CRITICAL", md_content)
             self.assertIn("- **Affected Repository Sections:** docs/GOOGLE-PLAY.md", md_content)
 

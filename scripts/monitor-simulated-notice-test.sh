@@ -38,17 +38,20 @@ def run(name, argv, feed):
         docs, pr = os.path.join(d, "docs.md"), os.path.join(d, "pr.md")
         sys.argv = [name] + argv + ["--dir", d, "--output-docs", docs, "--pr-output", pr]
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            code = 0
             try:
                 mod.main()
-            except SystemExit:
-                pass
+            except SystemExit as e:
+                code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
         text = open(docs).read() if os.path.exists(docs) else ""
         draft = open(pr).read() if os.path.exists(pr) else ""
     run.draft = draft
+    run.code = code
     return mod, text
 
 for name, (falls_back, live_text) in MONITORS.items():
     mod, text = run(name, [], [])
+    check(run.code == 0, f"{name}: default run exits cleanly")
     check(len(text) > 200, f"{name}: default run writes a report")
     check(text.count(NOTICE) == 1, f"{name}: default run writes the notice once")
     check(run.draft.lstrip().startswith("> **" + NOTICE), f"{name}: default run PR draft opens with the notice")
@@ -76,6 +79,7 @@ for name, (falls_back, live_text) in MONITORS.items():
     if falls_back:
         check(NOTICE in text, f"{name}: --live with an empty feed falls back and says so")
     else:
+        check(run.code == 0, f"{name}: --live with an empty feed exits cleanly")
         check(NOTICE not in text, f"{name}: --live with an empty feed uses no samples")
 
 print(f"Simulated notice test suite: {passed} passed, {failed} failed")

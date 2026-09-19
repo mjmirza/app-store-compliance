@@ -739,8 +739,8 @@ Verify that the published web-based data deletion URL functions correctly before
 
 SIMULATED_NOTICE = [
     "",
-    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
-    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
     "> publish dates, and descriptions below are examples that show the shape of a migration",
     "> report, not real publications. Only the linked official documentation URLs are real.",
     "> Re-run the monitor with `--live` against the real feeds before treating anything here",

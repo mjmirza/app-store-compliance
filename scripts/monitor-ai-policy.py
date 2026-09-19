@@ -421,15 +421,15 @@ All changes are purely additive. Older clients will default to safe local fallba
 - [ ] Verification tests for the content moderation engine pass.
 
 ## 15. Approver recommendations
-Ensure that the privacy consent modal explicitly mentions the specific third-party AI processor (e.g., OpenAI, Anthropic, Gemini) as mandated by Apple 5.1.2(i). Confirm that the content reporting UI is functional and triggers 24-hour moderation capabilities.
+Apple 5.1.2(i) requires clearly disclosing where personal data is shared with third parties, including third-party AI, and obtaining explicit permission first. Naming the AI provider in the consent modal is the clearest way to meet it. Confirm the content reporting UI works and that reports get a timely response.
 """
     return pr_template
 
 
 SIMULATED_NOTICE = [
     "",
-    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
-    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
     "> publish dates, and descriptions below are examples that show the shape of a migration",
     "> report, not real publications. Only the linked official documentation URLs are real.",
     "> Re-run the monitor with `--live` against the real feeds before treating anything here",

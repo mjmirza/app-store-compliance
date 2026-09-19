@@ -831,12 +831,12 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
 
 SIMULATED_NOTICE = [
     "",
-    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
-    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
     "> publish dates, and descriptions below are examples that show the shape of a migration",
     "> report, not real publications. Only the linked official documentation URLs are real.",
-    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
-    "> as an actual requirement.",
+    "> This monitor has no live feed (Android security bulletins publish no RSS), so check the",
+    "> linked official pages before treating anything here as an actual requirement.",
     "",
 ]
 
@@ -956,7 +956,7 @@ def main():
     announcements = []
 
     if args.live:
-        print("Fetching live Security RSS feeds...")
+        print("No live security feed exists (Android security bulletins publish no RSS); using sample announcements.")
         # Android Security Bulletins publish no RSS feed. The canonical page is
         # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
