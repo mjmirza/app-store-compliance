@@ -426,19 +426,35 @@ Ensure that the privacy consent modal explicitly mentions the specific third-par
     return pr_template
 
 
-def update_documentation(policy_matches, output_filepath):
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
+    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation(policy_matches, output_filepath, is_simulated=False):
     """
     Appends the latest policy findings and migration tasks directly to the output compliance file.
     """
     report_content = [
         "<!-- AI_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        report_content.extend(SIMULATED_NOTICE)
+    report_content.extend([
         "# AI Policy Monitoring & Compliance Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-ai-policy.py` to keep track of platform policy changes.",
         "",
         "## Latest Monitored Policy Changes",
         "",
-    ]
+    ])
 
     for m in policy_matches:
         report_content.append(f"### {m['title']} ({m['platform']})")
@@ -506,7 +522,9 @@ def main():
         print("Fetching live Google Blog RSS/Atom feed...")
         announcements.extend(parse_rss_feed(GOOGLE_RSS))
 
+    used_mock = False
     if args.mock or (not args.live and not args.mock):
+        used_mock = True
         # Default or explicit inline mock mode
         print("Using mock policy update data for analysis...")
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
@@ -541,7 +559,7 @@ def main():
 
     # 4. Generate documentation updates and migration tasks
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation(matched_policies, args.output_docs)
+    update_documentation(matched_policies, args.output_docs, is_simulated=used_mock)
 
     # 5. Draft the Pull Request with exactly 15 sections
     pr_draft = generate_pull_request_draft(matched_policies, affected_features)

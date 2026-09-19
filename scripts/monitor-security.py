@@ -564,6 +564,7 @@ def generate_pull_request_draft(updates, scan_results):
     migration_steps = []
     impl_checklist = []
     risk_assessment = []
+    processed_categories = set()
 
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
@@ -576,6 +577,10 @@ def generate_pull_request_draft(updates, scan_results):
         if files:
             for f in files:
                 affected_files_set.add(f["file"])
+
+        if cat in processed_categories:
+            continue
+        processed_categories.add(cat)
 
         # Category-specific migration details
         if cat == "secure storage":
@@ -824,17 +829,33 @@ Verify that the production certificate authority (CA) SPKI hashes match the valu
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
+    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(updates, output_filepath, is_simulated=False):
     """Overwrites or updates the migration report in docs/SECURITY-POLICY-MIGRATION.md."""
     lines = [
         "<!-- SECURITY_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
         "# Mobile Security Requirements Policy Migration & Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-security.py` to track compliance areas.",
         "",
         "## Monitored Security Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -846,8 +867,12 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_doc_cats = set()
     for u in updates:
         cat = u["category"]
+        if cat in processed_doc_cats:
+            continue
+        processed_doc_cats.add(cat)
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Security audit mandates action."
@@ -936,7 +961,9 @@ def main():
         # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
+    used_mock = False
     if args.mock or (not args.live and not args.mock) or not announcements:
+        used_mock = True
         print(
             "Using comprehensive mock Security policy updates for compliance scanning..."
         )
@@ -978,7 +1005,7 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)

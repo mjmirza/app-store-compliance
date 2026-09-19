@@ -29,6 +29,9 @@ jobs:
       - name: Metadata audit test suite
         run: bash scripts/metadata-audit-test.sh
 
+      - name: Policy monitor test suites
+        run: bash scripts/run-monitor-tests.sh
+
       - name: References are in sync with the taxonomy
         run: |
           python3 scripts/generate-references.py

@@ -376,9 +376,9 @@ MOCK_ANNOUNCEMENTS = [
     {
         "id": "ANDROID-MOCK-PRIVACY-SANDBOX",
         "category": "Privacy Sandbox",
-        "title": "Google Play Privacy Sandbox Beta Rollout and Advertising ID Phase-Out",
-        "description": "Google is expanding the Privacy Sandbox Beta on Android, initiating the gradual phase-out of the legacy persistent Advertising ID (GAID) in favor of the privacy-preserving Topics API, Attribution Reporting, and SDK Runtime environments.",
-        "link": "https://developer.android.com/design-for-safety/privacy-sandbox",
+        "title": "Privacy Sandbox Technologies Retired on Android",
+        "description": "Google is retiring Privacy Sandbox technologies, including the Topics and Attribution Reporting APIs on Android. Apps and SDKs should not build on these APIs and should review any code that still calls them.",
+        "link": "https://privacysandbox.google.com/blog/update-on-plans-for-privacy-sandbox-technologies",
         "pubDate": "Wed, 01 Apr 2026 10:00:00 PDT",
     },
     {
@@ -638,11 +638,15 @@ def generate_pull_request_draft(updates, scan_results):
     impl_checklist = []
     risk_assessment = []
 
+    seen_citations = set()
+    processed_cats = set()
+
     for idx, u in enumerate(updates, 1):
         cat = u["category"]
-        citations_list.append(
-            f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
-        )
+        citation_entry = f"- **{cat}**: [{u['title']}]({u['link']}) (Published: {u['pubDate']})"
+        if citation_entry not in seen_citations:
+            seen_citations.add(citation_entry)
+            citations_list.append(citation_entry)
 
         # Pull affected files
         files = scan_results.get(cat, [])
@@ -650,8 +654,38 @@ def generate_pull_request_draft(updates, scan_results):
             for f in files:
                 affected_files_set.add(f["file"])
 
-        # Category-specific migration details
-        if cat == "Target SDK requirements":
+        if cat in processed_cats:
+            continue
+        processed_cats.add(cat)
+
+        # Category-specific migration details for all 19 tracked categories
+        if cat == "Google Play Developer Policies":
+            migration_steps.append(
+                f"- **{cat}**: Review app metadata, listing content, and in-app behavior against updated Google Play Developer Policy guidelines to avoid enforcement actions."
+            )
+            impl_checklist.append(
+                "- [ ] Perform metadata audit against Google Play Developer Policies."
+            )
+            impl_checklist.append(
+                "- [ ] Resolve any outstanding developer account policy enforcement warnings."
+            )
+            risk_assessment.append(
+                f"- *{cat}*: App removal, limited store visibility, or account suspension if policy violations occur."
+            )
+        elif cat == "Play Console announcements":
+            migration_steps.append(
+                f"- **{cat}**: Complete mandatory Play Console identity verification and monitor console inbox announcements for new publishing rules."
+            )
+            impl_checklist.append(
+                "- [ ] Verify developer account identity details in Google Play Console."
+            )
+            impl_checklist.append(
+                "- [ ] Check Play Console inbox for impending policy deadline notifications."
+            )
+            risk_assessment.append(
+                f"- *{cat}*: Blocked app updates and potential store listing removal if verification deadlines are missed."
+            )
+        elif cat == "Target SDK requirements":
             migration_steps.append(
                 f"- **{cat}**: Update targetSdkVersion and compileSdkVersion in all build.gradle or build.gradle.kts files to API 36 (Android 16) before the August 31, 2026 deadline."
             )
@@ -708,7 +742,7 @@ def generate_pull_request_draft(updates, scan_results):
                 "- [ ] Audit exact alarm declarations; replace with inexact alarms unless qualifies for exemption."
             )
             risk_assessment.append(
-                f"- *{cat}*: Automated background service thottling or foreground service crash on target devices."
+                f"- *{cat}*: Automated background service throttling or foreground service crash on target devices."
             )
         elif cat == "Foreground service policies":
             migration_steps.append(
@@ -725,13 +759,13 @@ def generate_pull_request_draft(updates, scan_results):
             )
         elif cat == "Privacy Sandbox":
             migration_steps.append(
-                f"- **{cat}**: Migrate marketing/analytics workflows from legacy Advertising ID (GAID) tracking to the modern Privacy Sandbox Topics and Attribution APIs."
+                f"- **{cat}**: Remove or avoid calls to the retired Privacy Sandbox Topics and Attribution Reporting APIs, and keep advertising and analytics on supported Advertising ID flows with accurate disclosures."
             )
             impl_checklist.append(
-                "- [ ] Update third-party tracking dependencies; configure privacy sandbox topics opt-in."
+                "- [ ] Remove any Privacy Sandbox (TopicsManager, AdSelectionManager) integration and update SDKs that still depend on it."
             )
             risk_assessment.append(
-                f"- *{cat}*: Gradual tracking disruption as GAID is sunset across modern Android devices."
+                f"- *{cat}*: Code that depends on retired Privacy Sandbox APIs will stop returning useful data."
             )
         elif cat == "Play Integrity API":
             migration_steps.append(
@@ -929,19 +963,35 @@ Ensure that the Play Console account owner has completed the personal/organizati
     return pr_template
 
 
-def update_documentation_report(updates, output_filepath):
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from the monitor's",
+    "> built-in sample announcements (mock mode, which is the default, or `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(updates, output_filepath, is_simulated=False):
     """
     Overwrites or updates the migration report in docs/ANDROID-POLICY-MIGRATION.md.
     """
     lines = [
         "<!-- ANDROID_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
         "# Android and Google Play Policy Migration & Requirements Report",
         "",
         "This report is continuously generated and updated by `scripts/monitor-android.py` to track compliance areas.",
         "",
         "## Monitored Requirements Update Log",
         "",
-    ]
+    ])
 
     for idx, u in enumerate(updates, 1):
         lines.append(f"### {idx}. [{u['category']}] {u['title']}")
@@ -953,40 +1003,150 @@ def update_documentation_report(updates, output_filepath):
     lines.append("## Automated Migration Recommendations & Implementation Tasks")
     lines.append("")
 
+    processed_doc_cats = set()
     for u in updates:
         cat = u["category"]
+        if cat in processed_doc_cats:
+            continue
+        processed_doc_cats.add(cat)
+
         lines.append(f"### Tasks for {cat}")
         lines.append(
             "- **Regulatory Impact**: High priority. Publishing gates require action."
         )
 
-        if cat == "Target SDK requirements":
+        if cat == "Google Play Developer Policies":
             lines.append(
-                "- [ ] **Task 1**: Update `targetSdkVersion` in build.gradle files to 36."
+                "- [ ] **Task 1**: Audit app metadata, store listing content, and in-app experiences against Developer Policies."
             )
             lines.append(
-                "- [ ] **Task 2**: Test target API level 36 behaviors on devices."
+                "- [ ] **Task 2**: Review Play Console policy enforcement notices and clear active warnings."
             )
-        elif cat == "Play Billing":
+        elif cat == "Play Console announcements":
             lines.append(
-                "- [ ] **Task 1**: Migrate project dependencies to Billing Library version 8.0."
-            )
-            lines.append(
-                "- [ ] **Task 2**: Perform test transactions on Google Play console sandbox."
-            )
-        elif cat == "User Data policy":
-            lines.append(
-                "- [ ] **Task 1**: Publish a public account and data deletion URL."
+                "- [ ] **Task 1**: Complete mandatory Play Console identity verification for developer accounts."
             )
             lines.append(
-                "- [ ] **Task 2**: Connect the URL to the Play Console User Data safety form."
+                "- [ ] **Task 2**: Monitor Play Console inbox announcements weekly for mandatory publishing gate updates."
+            )
+        elif cat == "Target SDK requirements":
+            lines.append(
+                "- [ ] **Task 1**: Update `targetSdkVersion` and `compileSdkVersion` in Gradle build files to API 36 (Android 16)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Perform regression testing for Android 16 target API behavior changes."
+            )
+        elif cat == "Minimum SDK requirements":
+            lines.append(
+                "- [ ] **Task 1**: Check `minSdkVersion` against the minimum your AndroidX, Play services, and Firebase dependencies require. Google Play itself sets a target API floor, not a minSdk floor."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Clean up legacy conditional checks for deprecated API levels 21/22."
+            )
+        elif cat == "Android API deprecations":
+            lines.append(
+                "- [ ] **Task 1**: Audit codebase for deprecated APIs (e.g., legacy SafetyNet Attestation) and replace with modern APIs."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Remove references to deprecated Android classes across module dependencies."
+            )
+        elif cat == "Android permission model":
+            lines.append(
+                "- [ ] **Task 1**: Audit `<uses-permission>` tags in `AndroidManifest.xml` and eliminate unnecessary sensitive permissions."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Adopt native Android Photo Picker and scoped media storage permissions."
+            )
+        elif cat == "Background execution restrictions":
+            lines.append(
+                "- [ ] **Task 1**: Audit `WorkManager`, `JobScheduler`, and `AlarmManager` usage for execution time limits."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Review `SCHEDULE_EXACT_ALARM` usage and migrate to inexact alarms where applicable."
             )
         elif cat == "Foreground service policies":
             lines.append(
-                "- [ ] **Task 1**: Specify foregroundServiceType inside the manifest service tags."
+                "- [ ] **Task 1**: Specify `foregroundServiceType` inside manifest `<service>` declarations for API 34+."
             )
             lines.append(
-                "- [ ] **Task 2**: Register foreground service type video verification demo on Play Console."
+                "- [ ] **Task 2**: Complete the foreground service declaration on the Play Console App content page, including a video link for each foreground service feature."
+            )
+        elif cat == "Privacy Sandbox":
+            lines.append(
+                "- [ ] **Task 1**: Review Advertising ID and attribution SDK usage. Google retired the Topics and Attribution Reporting APIs on Android in October 2025, so do not adopt them."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Confirm the Advertising ID permission and the Data safety form match what the advertising and analytics SDKs actually collect."
+            )
+        elif cat == "Play Integrity API":
+            lines.append(
+                "- [ ] **Task 1**: Implement client-side Play Integrity API token requests with cryptographic nonces."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Deploy server-side token decryption and verification checks."
+            )
+        elif cat == "Play Billing":
+            lines.append(
+                "- [ ] **Task 1**: Migrate project dependencies to Play Billing Library version 8.0 or higher."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Perform test transactions on Google Play Console sandbox environment."
+            )
+        elif cat == "User Data policy":
+            lines.append(
+                "- [ ] **Task 1**: Implement an in-app account and data deletion path for users."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Publish a public web data deletion URL and link it in the Play Console User Data safety form."
+            )
+        elif cat == "Data Safety section":
+            lines.append(
+                "- [ ] **Task 1**: Audit runtime network traffic from third-party SDKs (Firebase, Facebook, AppsFlyer)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Update Play Console Data Safety questionnaire declarations to align with runtime actions."
+            )
+        elif cat == "AI-generated content policies":
+            lines.append(
+                "- [ ] **Task 1**: Add safeguards so generative AI features cannot produce content restricted by the Play Inappropriate Content policies."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Provide in-app reporting or flagging for offensive AI-generated content that works without leaving the app."
+            )
+        elif cat == "Accessibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Ensure all touch targets measure at least 48dp in physical size."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add `contentDescription` attributes on all ImageViews and ImageButtons."
+            )
+        elif cat == "Device compatibility requirements":
+            lines.append(
+                "- [ ] **Task 1**: Configure `android:resizeableActivity=true` in manifest."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify layout responsiveness on large screens, foldables, and tablet viewports."
+            )
+        elif cat == "Security Bulletins":
+            lines.append(
+                "- [ ] **Task 1**: Implement cryptographic token storage wrapper backed by Android Keystore."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Review Android Security Bulletins and resolve applicable CVE vulnerabilities."
+            )
+        elif cat == "Android Enterprise requirements":
+            lines.append(
+                "- [ ] **Task 1**: Implement Work Profile boundaries and secure inter-profile data exchange under `DevicePolicyManager`."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Ensure compatibility with enterprise managed configurations."
+            )
+        elif cat == "Firebase policy updates":
+            lines.append(
+                "- [ ] **Task 1**: Migrate deprecated Firebase Dynamic Links configurations to Firebase Hosting deep links or App Links."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Update Cloud Firestore and Realtime Database security rules to enforce strict data isolation."
             )
         else:
             lines.append(
@@ -1053,7 +1213,9 @@ def main():
         # https://source.android.com/docs/security/bulletin/asb-overview (checked live).
 
     # Fallback to mock data if live has no updates or mock is explicitly requested
+    used_mock = False
     if args.mock or (not args.live and not args.mock) or not announcements:
+        used_mock = True
         print(
             "Using comprehensive mock Android policy updates for compliance scanning..."
         )
@@ -1095,7 +1257,7 @@ def main():
 
     # 4. Write/Update documentation
     os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs)
+    update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
