@@ -42,6 +42,14 @@ echo "$OUT_SCAN" | grep -q "Sources/App.swift" && ok "repo scanner correctly ide
 # Clean up
 rm -rf "$T"
 
+# 5. The proposed pull request carries sections numbered 1 to 15, in order
+echo "$JSON_OUT" | python3 -c "
+import sys, json, re
+body = json.load(sys.stdin)[0]['proposed_pull_request']['description']
+nums = [int(n) for n in re.findall(r'^## (\d+)\. ', body, re.M)]
+assert nums == list(range(1, 16)), nums
+" 2>/dev/null && ok "proposed pull request has sections 1 to 15 in order" || bad "numbered PR sections"
+
 # 6. Mock announcements fallback or manual trigger
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
