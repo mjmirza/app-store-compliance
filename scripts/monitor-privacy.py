@@ -954,6 +954,8 @@ def main():
 
     # 5. Generate Pull Request draft using verified updates
     pr_draft = generate_pull_request_draft(verified_updates, scan_results)
+    if used_mock:
+        pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
     # Save drafted PR
     os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)

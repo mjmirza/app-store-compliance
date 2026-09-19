@@ -43,11 +43,15 @@ def run(name, argv, feed):
             except SystemExit:
                 pass
         text = open(docs).read() if os.path.exists(docs) else ""
+        draft = open(pr).read() if os.path.exists(pr) else ""
+    run.draft = draft
     return mod, text
 
 for name, (falls_back, live_text) in MONITORS.items():
     mod, text = run(name, [], [])
+    check(len(text) > 200, f"{name}: default run writes a report")
     check(text.count(NOTICE) == 1, f"{name}: default run writes the notice once")
+    check(run.draft.lstrip().startswith("> **" + NOTICE), f"{name}: default run PR draft opens with the notice")
     lines = text.splitlines()
     check(bool(lines) and "MONITOR_START" in lines[0] and any(NOTICE in l for l in lines[1:4]),
           f"{name}: notice sits right after the START marker")
@@ -63,7 +67,9 @@ for name, (falls_back, live_text) in MONITORS.items():
     else:
         mod, text = run(name, ["--live"], [LIVE_ITEM(live_text)])
         mock_titles = [a["title"] for a in getattr(mod, "MOCK_ANNOUNCEMENTS", [])]
+        check(live_text in text, f"{name}: --live report contains the live feed item")
         check(NOTICE not in text, f"{name}: --live with feed items writes no notice")
+        check(NOTICE not in run.draft, f"{name}: --live PR draft carries no notice")
         check(not any(t in text for t in mock_titles), f"{name}: --live output contains no sample announcements")
 
     mod, text = run(name, ["--live"], [])

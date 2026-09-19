@@ -140,6 +140,7 @@ class TestGenerateTimeline(unittest.TestCase):
             self.assertIn("| Effective Date | Grace Period | Mandatory Date | Enforcement Date | Overdue Days |", md_content)
             self.assertIn("| Effective Date | Grace Period | Mandatory Date | Enforcement Date | Days Remaining |", md_content)
             self.assertIn("| Mandatory Date | Law | Requirement | Jurisdiction | Effective Date | Grace Period | Enforcement Date |", md_content)
+            self.assertIn(f"| Requirement A | {self.overdue_date} | None | {self.overdue_date} | {self.overdue_date} |", md_content)
 
             # Check detailed record fields
             self.assertIn("ID: TEST-OVERDUE-1", md_content)

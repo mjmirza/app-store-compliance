@@ -376,8 +376,8 @@ MOCK_ANNOUNCEMENTS = [
     {
         "id": "ANDROID-MOCK-PRIVACY-SANDBOX",
         "category": "Privacy Sandbox",
-        "title": "Privacy Sandbox Technologies Retired on Android",
-        "description": "Google is retiring Privacy Sandbox technologies, including the Topics and Attribution Reporting APIs on Android. Apps and SDKs should not build on these APIs and should review any code that still calls them.",
+        "title": "Privacy Sandbox Technologies Scheduled for Phase-Out on Android",
+        "description": "Google has scheduled Privacy Sandbox technologies for phase-out, including the Topics and Attribution Reporting APIs on Android. Apps and SDKs should not build on these APIs and should review any code that still calls them.",
         "link": "https://privacysandbox.google.com/blog/update-on-plans-for-privacy-sandbox-technologies",
         "pubDate": "Wed, 01 Apr 2026 10:00:00 PDT",
     },
@@ -759,13 +759,13 @@ def generate_pull_request_draft(updates, scan_results):
             )
         elif cat == "Privacy Sandbox":
             migration_steps.append(
-                f"- **{cat}**: Remove or avoid calls to the retired Privacy Sandbox Topics and Attribution Reporting APIs, and keep advertising and analytics on supported Advertising ID flows with accurate disclosures."
+                f"- **{cat}**: Remove or avoid calls to the Privacy Sandbox Topics and Attribution Reporting APIs, which are being phased out,, and keep advertising and analytics on supported Advertising ID flows with accurate disclosures."
             )
             impl_checklist.append(
                 "- [ ] Remove any Privacy Sandbox (TopicsManager, AdSelectionManager) integration and update SDKs that still depend on it."
             )
             risk_assessment.append(
-                f"- *{cat}*: Code that depends on retired Privacy Sandbox APIs will stop returning useful data."
+                f"- *{cat}*: Code that depends on Privacy Sandbox APIs scheduled for phase-out will stop returning useful data."
             )
         elif cat == "Play Integrity API":
             migration_steps.append(
@@ -1073,7 +1073,7 @@ def update_documentation_report(updates, output_filepath, is_simulated=False):
             )
         elif cat == "Privacy Sandbox":
             lines.append(
-                "- [ ] **Task 1**: Review Advertising ID and attribution SDK usage. Google retired the Topics and Attribution Reporting APIs on Android in October 2025, so do not adopt them."
+                "- [ ] **Task 1**: Review Advertising ID and attribution SDK usage. Since October 2025 Google has scheduled the Topics and Attribution Reporting APIs on Android for phase-out, so do not adopt them."
             )
             lines.append(
                 "- [ ] **Task 2**: Confirm the Advertising ID permission and the Data safety form match what the advertising and analytics SDKs actually collect."
@@ -1261,6 +1261,8 @@ def main():
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
+    if used_mock:
+        pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
     if args.pr_output:
         try:

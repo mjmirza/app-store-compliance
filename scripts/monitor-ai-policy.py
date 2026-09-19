@@ -563,6 +563,8 @@ def main():
 
     # 5. Draft the Pull Request with exactly 15 sections
     pr_draft = generate_pull_request_draft(matched_policies, affected_features)
+    if used_mock:
+        pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
     if args.pr_output:
         try:

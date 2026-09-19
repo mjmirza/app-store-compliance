@@ -83,10 +83,10 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 - **Official Resource**: [https://developer.android.com/guide/components/foreground-services](https://developer.android.com/guide/components/foreground-services)
 - **Description**: All applications targeting API 34+ that run foreground services must declare valid foregroundServiceType attributes in their manifest, hold matching FOREGROUND_SERVICE permissions, and submit a detailed Play Console foreground service declaration and video.
 
-### 15. [Privacy Sandbox] Privacy Sandbox Technologies Retired on Android
+### 15. [Privacy Sandbox] Privacy Sandbox Technologies Scheduled for Phase-Out on Android
 - **Published Date**: Wed, 01 Apr 2026 10:00:00 PDT
 - **Official Resource**: [https://privacysandbox.google.com/blog/update-on-plans-for-privacy-sandbox-technologies](https://privacysandbox.google.com/blog/update-on-plans-for-privacy-sandbox-technologies)
-- **Description**: Google is retiring Privacy Sandbox technologies, including the Topics and Attribution Reporting APIs on Android. Apps and SDKs should not build on these APIs and should review any code that still calls them.
+- **Description**: Google has scheduled Privacy Sandbox technologies for phase-out, including the Topics and Attribution Reporting APIs on Android. Apps and SDKs should not build on these APIs and should review any code that still calls them.
 
 ### 16. [Google Play Developer Policies] Play Integrity API Update: Nonce Verification and Integrity Token Enforcement
 - **Published Date**: Mon, 06 Apr 2026 11:00:00 PDT
@@ -237,7 +237,7 @@ This report is continuously generated and updated by `scripts/monitor-android.py
 
 ### Tasks for Privacy Sandbox
 - **Regulatory Impact**: High priority. Publishing gates require action.
-- [ ] **Task 1**: Review Advertising ID and attribution SDK usage. Google retired the Topics and Attribution Reporting APIs on Android in October 2025, so do not adopt them.
+- [ ] **Task 1**: Review Advertising ID and attribution SDK usage. Since October 2025 Google has scheduled the Topics and Attribution Reporting APIs on Android for phase-out, so do not adopt them.
 - [ ] **Task 2**: Confirm the Advertising ID permission and the Data safety form match what the advertising and analytics SDKs actually collect.
 
 ### Tasks for Play Billing

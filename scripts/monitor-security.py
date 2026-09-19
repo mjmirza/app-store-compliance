@@ -922,7 +922,7 @@ def main():
         description="Monitor all Mobile Security Requirements"
     )
     parser.add_argument(
-        "--live", action="store_true", help="Fetch live mobile security policy feeds"
+        "--live", action="store_true", help="No live security feed exists (Android security bulletins publish no RSS), so this still uses the sample announcements and labels the report as simulated"
     )
     parser.add_argument(
         "--mock",
@@ -1009,6 +1009,8 @@ def main():
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
+    if used_mock:
+        pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
     if args.pr_output:
         try:
