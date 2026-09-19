@@ -6,7 +6,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 python3 - <<'PY'
-import importlib.util, io, os, sys, tempfile, contextlib
+import importlib.util, io, json, os, sys, tempfile, contextlib
 
 MONITORS = {
     # name: (fallback_on_empty_live, live item text, or None when the monitor has no live feed)
@@ -43,6 +43,8 @@ def run(name, argv, feed):
                 mod.main()
             except SystemExit as e:
                 code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+            except Exception as e:
+                code = f"crashed: {type(e).__name__}: {e}"
         text = open(docs).read() if os.path.exists(docs) else ""
         draft = open(pr).read() if os.path.exists(pr) else ""
     run.draft = draft
@@ -64,11 +66,21 @@ for name, (falls_back, live_text) in MONITORS.items():
     mod, text = run(name, ["--mock", "inline"], [])
     check(NOTICE in text, f"{name}: --mock inline writes the notice")
 
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump([{"id": "CUSTOM-MOCK", "category": "Privacy Manifest", "title": live_text or "Keychain storage",
+                    "description": live_text or "Keychain secure storage", "link": "https://developer.apple.com/news/",
+                    "pubDate": "Mon, 14 Sep 2026 10:00:00 GMT"}], fh)
+    mod, text = run(name, ["--mock", fh.name], [])
+    os.unlink(fh.name)
+    check(run.code == 0, f"{name}: --mock FILE exits cleanly")
+    check(NOTICE in text, f"{name}: --mock FILE output is labelled as sample data")
+
     if live_text is None:
         mod, text = run(name, ["--live"], [LIVE_ITEM("unused")])
         check(NOTICE in text, f"{name}: has no live feed, so --live output says it is sample data")
     else:
         mod, text = run(name, ["--live"], [LIVE_ITEM(live_text)])
+        check(run.code == 0, f"{name}: --live with feed items exits cleanly")
         mock_titles = [a["title"] for a in getattr(mod, "MOCK_ANNOUNCEMENTS", [])]
         check(live_text in text, f"{name}: --live report contains the live feed item")
         check(NOTICE not in text, f"{name}: --live with feed items writes no notice")

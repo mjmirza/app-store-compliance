@@ -25,6 +25,8 @@ class TestGenerateTimeline(unittest.TestCase):
         # distinct dates for the overdue item, so a swapped column cannot pass
         self.overdue_effective = (now - timedelta(days=40)).strftime("%Y-%m-%d")
         self.overdue_enforcement = (now - timedelta(days=3)).strftime("%Y-%m-%d")
+        self.upcoming_effective = (now - timedelta(days=20)).strftime("%Y-%m-%d")
+        self.upcoming_enforcement = (now + timedelta(days=35)).strftime("%Y-%m-%d")
         # 5 days in the future (approaching)
         self.upcoming_date = (now + timedelta(days=5)).strftime("%Y-%m-%d")
         # 200 days in the future (far future)
@@ -37,10 +39,10 @@ class TestGenerateTimeline(unittest.TestCase):
                     "jurisdiction": "Jurisdiction B",
                     "law": "Upcoming Regulation B",
                     "requirement": "Requirement B",
-                    "effective_date": self.upcoming_date,
-                    "grace_period": "None",
+                    "effective_date": self.upcoming_effective,
+                    "grace_period": "25 days",
                     "mandatory_date": self.upcoming_date,
-                    "enforcement_date": self.upcoming_date,
+                    "enforcement_date": self.upcoming_enforcement,
                     "affected_repository_sections": "docs/APPLE.md",
                     "priority": "High"
                 },
@@ -144,6 +146,7 @@ class TestGenerateTimeline(unittest.TestCase):
             self.assertIn("| Effective Date | Grace Period | Mandatory Date | Enforcement Date | Days Remaining |", md_content)
             self.assertIn("| Mandatory Date | Law | Requirement | Jurisdiction | Effective Date | Grace Period | Enforcement Date |", md_content)
             self.assertIn(f"| Requirement A | {self.overdue_effective} | 30 days | {self.overdue_date} | {self.overdue_enforcement} |", md_content)
+            self.assertIn(f"| Requirement B | {self.upcoming_effective} | 25 days | {self.upcoming_date} | {self.upcoming_enforcement} |", md_content)
             self.assertIn(f"| {self.overdue_date} | Passed Act A | Requirement A | Jurisdiction A | {self.overdue_effective} | 30 days | {self.overdue_enforcement} |", md_content)
 
             # Check detailed record fields
@@ -152,7 +155,7 @@ class TestGenerateTimeline(unittest.TestCase):
             self.assertIn("- **Law:** Passed Act A", md_content)
             self.assertIn("- **Requirement:** Requirement A", md_content)
             self.assertIn(f"- **Effective Date:** {self.overdue_effective}", md_content)
-            self.assertIn("- **Grace Period:** None", md_content)
+            self.assertIn("- **Grace Period:** 30 days", md_content)
             self.assertIn(f"- **Mandatory Date:** {self.overdue_date}", md_content)
             self.assertIn(f"- **Enforcement Date:** {self.overdue_enforcement}", md_content)
             self.assertIn("- **Priority:** CRITICAL", md_content)
