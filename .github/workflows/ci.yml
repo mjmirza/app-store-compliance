@@ -32,6 +32,9 @@ jobs:
       - name: Policy monitor test suites
         run: bash scripts/run-monitor-tests.sh
 
+      - name: Release audit test
+        run: bash scripts/release-audit-test.sh
+
       - name: Timeline and deadline checker tests
         run: |
           python3 scripts/test-generate-timeline.py
