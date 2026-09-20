@@ -5,7 +5,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
 status=0
-for t in monitor monitor-regulatory monitor-ai-policy monitor-android monitor-security monitor-privacy monitor-simulated-notice; do
+for t in monitor monitor-regulatory monitor-ai-policy monitor-android monitor-security monitor-privacy monitor-standards monitor-simulated-notice; do
   if bash "scripts/${t}-test.sh"; then
     echo "OK    ${t}"
   else
