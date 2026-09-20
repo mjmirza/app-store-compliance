@@ -1,38 +1,66 @@
-## What this changes
+## 1. Summary
 
-<!-- One or two sentences. What is different after this merges. -->
+<!-- Provide a concise summary of the proposed pull request changes. -->
 
-## Why
+## 2. Background
 
-<!-- The rejection, the policy change, or the gap this closes. Link the issue if there is one. -->
+<!-- Context, motivation, regulatory requirement, or issue link. -->
 
-## Sources
+## 3. Regulatory change
 
-<!--
-Every factual claim needs a primary source. Apple, Google, EUR-Lex, a state
-legislature, a regulator. Paste the URLs you actually opened.
+<!-- Details on the specific regulatory change driving these updates. -->
 
-If this PR adds no factual claims, write "none, no new claims".
--->
+## 4. Official citations
 
-- 
+<!-- Official primary sources (EU, FTC, Apple, Google, NIST, etc.). -->
 
-## Checks I ran
+## 5. Affected files
 
-<!-- Paste the real output, not a tick. A checked box with no output is not evidence. -->
+<!-- List of affected files in the repository. -->
 
-```
-python3 scripts/validate.py
-python3 scripts/verify-citations.py --files docs/ data/
-```
+## 6. Risk assessment
 
-## Declarations
+<!-- Analysis of potential risks, severity, and mitigation strategies. -->
 
-- [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
-- [ ] No simulate-mode or sample monitor output is committed as if it were a real announcement
-- [ ] This is not a point-in-time generated report. Generated snapshots go stale, the generator is what belongs in the repo
-- [ ] No emoji, and no AI-assistant attribution in the commits
+## 7. Migration steps
 
-## Anything a reviewer should look at first
+<!-- Steps required to migrate or adopt these compliance changes. -->
 
-<!-- The riskiest part, or the part you are least sure about. Say so plainly. -->
+## 8. Backward compatibility
+
+<!-- Details on backward compatibility and potential impact on existing flows. -->
+
+## 9. Implementation checklist
+
+- [ ] Core compliance requirements implemented
+- [ ] Policy and pattern mappings updated
+- [ ] Relevant configuration files updated
+
+## 10. Testing checklist
+
+- [ ] Unit tests updated and passing
+- [ ] Integration and automated compliance guard tests verified
+- [ ] No regression detected in existing flows
+
+## 11. Documentation checklist
+
+- [ ] Relevant documentation updated
+- [ ] Migration and compliance guides reflected in docs/
+
+## 12. Compliance impact
+
+<!-- Assessment of overall compliance readiness and store approval impact. -->
+
+## 13. Breaking changes
+
+<!-- Specify whether any breaking changes are introduced. -->
+
+## 14. Review checklist
+
+- [ ] All 15 required sections complete and non-vague
+- [ ] Primary official citations verified
+- [ ] No emojis or unicode graphical emoticons present
+
+## 15. Approver recommendations
+
+<!-- Final recommendations and approval sign-off notes for reviewers. -->
