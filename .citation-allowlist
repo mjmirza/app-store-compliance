@@ -43,6 +43,9 @@ https://staging.example.com
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
 
+# Tech Transparency Project article unreachable from automated checks
+https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores
+
 # Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
