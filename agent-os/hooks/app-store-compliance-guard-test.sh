@@ -739,7 +739,7 @@ rm -rf "$D"
 
 # 70 without jq the fallback decoder still handles the quoted path (a vendored copy on a runner without jq)
 D="$(mk_ios_bad)"
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 OUT="$(printf '%s' "$P_QUOTED" | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-8 quoted path is scanned without jq on PATH" || bad "610-8 quoted path is scanned without jq on PATH (rc=$RC bytes=${#OUT})"
 rm -rf "$D" "$NOJQ"
@@ -785,7 +785,7 @@ rm -rf "$D"
 
 # ===== Issue #610, second round. Counterexamples from the adversarial review, pinned =====
 NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 P_ESCBS='{"tool_input":{"command":"gradlew '"$BS$BS$BS$BS$BS"'nbundleRelease"}}'
 P_BSSPACE='{"tool_input":{"command":"npx eas '"$BS$BS"' '"$BS"'nsubmit --platform ios"}}'
 P_META_OK='{"meta":{"command":"eas submit"},"tool_input":{"command":"ls"}}'
@@ -918,7 +918,7 @@ rm -rf "$D"
 # 92 a UTF-8 BOM before the payload is read on every tier
 D="$(mk_ios_bad)"
 NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 for tier in "$PATH" "$NOJQ" "$NOTOOLS"; do
   OUT="$(printf '%s' "$P_BOM" | PATH="$tier" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
   echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-30 BOM payload is read (tier=${tier##*/})" || bad "610-30 BOM payload is read (tier=${tier##*/} rc=$RC bytes=${#OUT})"
@@ -960,7 +960,7 @@ P_ABS_SH='{"tool_input":{"command":"/bin/sh -c '"'"'eas submit --platform ios'"'
 P_TWO_CD='{"tool_input":{"command":"cd apps/app && cd ../kiosk && npx eas submit --platform ios"}}'
 P_TWO_DOCS='{"tool_input":{"command":"eas submit --platform ios"}} {"tool_input":{"command":"echo"}}'
 P_NESTED_TN='{"metadata":{"tool_name":"Edit"},"tool_name":"Bash","tool_input":{"command":"fastlane pilot upload"}}'
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 
 # 96 a submit is scanned however it is quoted or wrapped
 D="$(mk_ios_bad)"
@@ -1062,8 +1062,8 @@ rm -rf "$D"
 mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to keep real on PATH besides the shim
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
-  [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(command -v python3)" "$d/python3"
-  printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
+  [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$d/python3"
+  rm -f "$d/$1" 2>/dev/null; printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
   echo "$d"
 }
 P_UNI='{"tool_input":{"command":"cd apps/caf\xc3\xa9 && npx eas submit --platform ios"}}'
@@ -1093,14 +1093,14 @@ OUT="$(printf '{"tool_input":{"command":"fastlane deliver' | PATH="$SHIM" CLAUDE
 rm -rf "$SHIM"
 
 # 110 PYTHONIOENCODING=ascii never drops a command with a non-ASCII path on the python3 tier
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 OUT="$(printf "$P_UNI" | PYTHONIOENCODING=ascii PATH="$NOJQ" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-48 non-ASCII path survives PYTHONIOENCODING=ascii" || bad "610-48 non-ASCII path survives PYTHONIOENCODING=ascii (rc=$RC bytes=${#OUT})"
 rm -rf "$NOJQ"
 
 # 111 with no temp file available the pass report stays on stdout and a block still puts its reason on stderr
 SHIM="$(mk_shim_path mktemp '#!/bin/sh
-exit 1' jq)"; ln -s "$(command -v python3)" "$SHIM/python3"
+exit 1' jq)"; ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$SHIM/python3"
 ERR="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
 echo "$ERR" | grep -q '^BLOCKED\.' && [ "$RC" -eq 2 ] && ok "610-49 degraded routing still puts the block reason on stderr" || bad "610-49 degraded routing still puts the block reason on stderr (rc=$RC err=${ERR:0:80})"
 rm -rf "$D"

@@ -177,7 +177,7 @@ Neither rule is a general developer duty. Both bind the entity that provides the
 
 ### 3.4 Canada
 
-- PIPEDA is the federal baseline. informed consent, purpose limitation, and breach reporting. Quebec Law 25 is stricter. explicit opt-in consent for tracking and profiling, a named privacy officer, privacy impact assessments, and breach notification. Penalty up to the greater of 25 million Canadian dollars or 4 percent of global turnover. Sources. [Quebec Law 25](https://www.cookieyes.com/blog/quebec-law-25/).
+- PIPEDA is the federal baseline. informed consent, purpose limitation, and breach reporting. Quebec Law 25 is stricter. explicit opt-in consent for tracking and profiling, a named privacy officer, privacy impact assessments, and breach notification. Penalty up to the greater of 25 million Canadian dollars or 4 percent of global turnover. Sources. [Quebec Law 25](https://www.cai.gouv.qc.ca/).
 
 - Checked 5 September 2026. No AI statute exists (no government AI bill in the 45th Parliament), Bill C-36 (privacy) is at first reading, Bill S-209 (age verification) passed the Senate on 15 April 2026 and is at House first reading, and the Online Harms bill was reintroduced as C-34 at second reading. Bill C-8 (cyber security, Royal Assent 15 June 2026) binds vital-services operators, not consumer apps. No new dated app obligation. Source. [LEGISinfo](https://www.parl.ca/legisinfo/).
 
