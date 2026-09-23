@@ -7,6 +7,7 @@ import sys
 import subprocess
 import json
 import re
+import argparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -44,65 +45,107 @@ RECOMMENDED_REVIEWERS = {
     "Platform announcements": "Lead Developer, Mobile Release Manager",
 }
 
-# Manual mapping of specific patterns to areas
+# 15 Specific App Store & Google Play Review Domains
+REVIEW_DOMAINS_15 = [
+    "permissions",
+    "privacy disclosures",
+    "screenshots",
+    "metadata",
+    "age rating",
+    "AI disclosures",
+    "subscription disclosures",
+    "payment compliance",
+    "accessibility",
+    "legal documents",
+    "support URL",
+    "privacy policy",
+    "terms of service",
+    "export compliance",
+    "encryption declarations",
+]
+
+RECOMMENDED_REVIEWERS_15 = {
+    "permissions": "Lead Developer, Mobile Platform Leads",
+    "privacy disclosures": "Data Protection Officer (DPO), Legal Counsel (Privacy)",
+    "screenshots": "Product Marketing Manager (PMM), App Store Optimization (ASO) Specialist",
+    "metadata": "Product Marketing Manager (PMM), App Store Optimization (ASO) Specialist",
+    "age rating": "Compliance Officer, Product Safety Lead",
+    "AI disclosures": "AI Ethics and Governance Committee, Lead AI Architect",
+    "subscription disclosures": "Legal Counsel (Commercial/IP), Monetization Lead",
+    "payment compliance": "Payments Lead, Finance & Legal Counsel",
+    "accessibility": "Frontend QA Team, Accessibility Specialist",
+    "legal documents": "Legal Counsel (Commercial/IP), Compliance Officer",
+    "support URL": "Customer Support Lead, Product Marketing Manager",
+    "privacy policy": "Data Protection Officer (DPO), Legal Counsel (Privacy)",
+    "terms of service": "Legal Counsel (Commercial/IP), Compliance Officer",
+    "export compliance": "Trade Compliance Specialist, Legal Counsel",
+    "encryption declarations": "Product Security Engineering Team, Cryptography Specialist",
+}
+
+# Manual mapping of specific patterns to areas & domains
 MAP_PATTERNS_TO_AREAS = {
+    "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED": ["Apple requirements", "age rating"],
     "APPLE-2.1-MISSING-DEMO-ACCOUNT": ["Apple requirements"],
-    "APPLE-2.1-PLACEHOLDER-CONTENT": ["Apple requirements", "Store metadata"],
+    "APPLE-2.1-PLACEHOLDER-CONTENT": ["Apple requirements", "Store metadata", "metadata"],
     "APPLE-2.1-STAGING-BACKEND": ["Apple requirements", "Security"],
-    "APPLE-5.1.1-MISSING-PRIVACY-POLICY": ["Apple requirements", "Privacy"],
-    "APPLE-5.1.1-VAGUE-PURPOSE-STRING": ["Apple requirements", "Permissions"],
-    "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION": ["Apple requirements", "Permissions"],
-    "APPLE-5.1.1-NO-ACCOUNT-DELETION": ["Apple requirements", "Privacy"],
-    "APPLE-5.1.2-MISSING-ATT": ["Apple requirements", "Privacy"],
-    "APPLE-3.1.1-EXTERNAL-PAYMENT": ["Apple requirements", "SDK compatibility"],
+    "APPLE-5.1.1-MISSING-PRIVACY-POLICY": ["Apple requirements", "Privacy", "privacy policy", "privacy disclosures"],
+    "APPLE-5.1.1-VAGUE-PURPOSE-STRING": ["Apple requirements", "Permissions", "permissions"],
+    "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION": ["Apple requirements", "Permissions", "permissions"],
+    "APPLE-5.1.1-NO-ACCOUNT-DELETION": ["Apple requirements", "Privacy", "privacy policy", "privacy disclosures"],
+    "APPLE-5.1.2-MISSING-ATT": ["Apple requirements", "Privacy", "privacy disclosures"],
+    "APPLE-3.1.1-EXTERNAL-PAYMENT": ["Apple requirements", "SDK compatibility", "payment compliance", "subscription disclosures"],
     "APPLE-4.8-SOCIAL-LOGIN-ONLY": ["Apple requirements", "Privacy"],
     "APPLE-4.2-WEB-WRAPPER": ["Apple requirements", "Web requirements"],
     "APPLE-2.5.1-PRIVATE-API": ["Apple requirements", "Deprecated APIs", "Security"],
-    "APPLE-2.3-CROSS-PLATFORM-REFERENCE": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3-AGE-RATING-2026": ["Apple requirements", "Platform announcements"],
+    "APPLE-2.3-CROSS-PLATFORM-REFERENCE": ["Apple requirements", "Store metadata", "metadata"],
+    "APPLE-2.3-AGE-RATING-2026": ["Apple requirements", "Platform announcements", "age rating"],
     "APPLE-5.1.2-AI-NO-CONSENT-MODAL": [
         "Apple requirements",
         "AI regulations",
         "Privacy",
+        "AI disclosures",
+        "privacy disclosures",
     ],
-    "GOOGLE-DATASAFETY-MISMATCH": ["Google Play requirements", "Privacy"],
-    "GOOGLE-PERM-BACKGROUND-LOCATION": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-ALL-FILES": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-SMS-CALLLOG": ["Google Play requirements", "Permissions"],
-    "GOOGLE-PERM-ACCESSIBILITY-MISUSE": ["Google Play requirements", "Accessibility"],
+    "GOOGLE-DATASAFETY-MISMATCH": ["Google Play requirements", "Privacy", "privacy disclosures"],
+    "GOOGLE-PERM-BACKGROUND-LOCATION": ["Google Play requirements", "Permissions", "permissions"],
+    "GOOGLE-PERM-ALL-FILES": ["Google Play requirements", "Permissions", "permissions"],
+    "GOOGLE-PERM-SMS-CALLLOG": ["Google Play requirements", "Permissions", "permissions"],
+    "GOOGLE-PERM-ACCESSIBILITY-MISUSE": ["Google Play requirements", "Accessibility", "accessibility"],
     "GOOGLE-TARGET-API": ["Google Play requirements", "Platform announcements"],
     "GOOGLE-12-TESTER-RULE": ["Google Play requirements", "Platform announcements"],
-    "GOOGLE-PLAY-BILLING": ["Google Play requirements", "SDK compatibility"],
-    "GOOGLE-MISSING-PRIVACY-POLICY": ["Google Play requirements", "Privacy"],
-    "GOOGLE-MISLEADING-LISTING": ["Google Play requirements", "Store metadata"],
+    "GOOGLE-PLAY-BILLING": ["Google Play requirements", "SDK compatibility", "payment compliance", "subscription disclosures"],
+    "GOOGLE-MISSING-PRIVACY-POLICY": ["Google Play requirements", "Privacy", "privacy policy", "privacy disclosures"],
+    "GOOGLE-MISLEADING-LISTING": ["Google Play requirements", "Store metadata", "metadata"],
     "GOOGLE-FAMILIES-AD-SDK": ["Google Play requirements", "SDK compatibility"],
     "BOTH-SDK-SUPPLY-CHAIN": ["SDK compatibility"],
-    "BOTH-LOOTBOX-ODDS": ["Legal documentation"],
-    "APPLE-PRIVACY-MANIFEST-MISSING": ["Apple requirements", "Privacy"],
-    "APPLE-EXPORT-COMPLIANCE-MISSING": ["Apple requirements", "Legal documentation"],
-    "APPLE-RESTORE-PURCHASES-MISSING": ["Apple requirements"],
-    "APPLE-ACCOUNT-DELETION-WEAK": ["Apple requirements", "Privacy"],
+    "BOTH-LOOTBOX-ODDS": ["Legal documentation", "legal documents", "payment compliance"],
+    "APPLE-PRIVACY-MANIFEST-MISSING": ["Apple requirements", "Privacy", "privacy disclosures"],
+    "APPLE-EXPORT-COMPLIANCE-MISSING": ["Apple requirements", "Legal documentation", "export compliance", "encryption declarations"],
+    "APPLE-RESTORE-PURCHASES-MISSING": ["Apple requirements", "payment compliance", "subscription disclosures"],
+    "APPLE-ACCOUNT-DELETION-WEAK": ["Apple requirements", "Privacy", "privacy policy"],
     "ANDROID-DYNAMIC-CODE-LOADING": ["Google Play requirements", "Security"],
-    "ANDROID-QUERY-ALL-PACKAGES": ["Google Play requirements", "Permissions"],
+    "ANDROID-QUERY-ALL-PACKAGES": ["Google Play requirements", "Permissions", "permissions"],
     "ANDROID-OVERLAY-TAPJACKING": ["Google Play requirements", "Security"],
-    "ANDROID-ACCOUNT-DELETION-URL": ["Google Play requirements", "Privacy"],
-    "BOTH-AI-GENERATED-CONTENT": ["AI regulations"],
-    "BOTH-METADATA-DECORATION": ["Store metadata"],
-    "BOTH-FINGERPRINTING": ["Privacy", "Security"],
-    "APPLE-2.3-FUTURE-FUNCTIONALITY": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": ["Apple requirements", "Store metadata"],
-    "BOTH-UNREACHABLE-METADATA-URL": ["Store metadata"],
-    "APPLE-5.2.5-APPLE-DEVICE-IMAGE": ["Apple requirements", "Store metadata"],
-    "APPLE-2.3.4-DEVICE-FRAMES-PREVIEW": ["Apple requirements", "Store metadata"],
-    "APPLE-3.1.2-MISLEADING-PRICING": ["Apple requirements", "Store metadata"],
-    "APPLE-1.2-UGC-24H-ACTION": ["Apple requirements", "Legal documentation"],
-    "CHINA-AI-REFERENCES": ["AI regulations"],
+    "ANDROID-ACCOUNT-DELETION-URL": ["Google Play requirements", "Privacy", "privacy policy"],
+    "BOTH-AI-GENERATED-CONTENT": ["AI regulations", "AI disclosures"],
+    "BOTH-METADATA-DECORATION": ["Store metadata", "metadata"],
+    "BOTH-FINGERPRINTING": ["Privacy", "Security", "privacy disclosures"],
+    "APPLE-2.3-FUTURE-FUNCTIONALITY": ["Apple requirements", "Store metadata", "metadata"],
+    "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": ["Apple requirements", "Store metadata", "metadata"],
+    "BOTH-UNREACHABLE-METADATA-URL": ["Store metadata", "support URL", "privacy policy", "metadata"],
+    "APPLE-5.2.5-APPLE-DEVICE-IMAGE": ["Apple requirements", "Store metadata", "metadata", "screenshots"],
+    "APPLE-2.3.4-DEVICE-FRAMES-PREVIEW": ["Apple requirements", "Store metadata", "metadata", "screenshots"],
+    "APPLE-3.1.2-MISLEADING-PRICING": ["Apple requirements", "Store metadata", "subscription disclosures", "payment compliance", "terms of service"],
+    "APPLE-1.2-UGC-24H-ACTION": ["Apple requirements", "Legal documentation", "legal documents", "terms of service"],
+    "CHINA-AI-REFERENCES": ["AI regulations", "AI disclosures"],
     "APPLE-2.4.5-UNUSED-ENTITLEMENTS": ["Apple requirements"],
     "APPLE-4.0-SIWA-UX": ["Apple requirements"],
-    "APPLE-5.1.1-UNNECESSARY-DATA": ["Apple requirements", "Privacy"],
+    "APPLE-5.1.1-UNNECESSARY-DATA": ["Apple requirements", "Privacy", "privacy disclosures"],
     "APPLE-2.1-DEBUG-FEATURES": ["Apple requirements", "Security"],
     "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION": ["Apple requirements"],
-    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["Apple requirements", "Store metadata"],
+    "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["Apple requirements", "Store metadata", "metadata"],
+    "BOTH-PLACEHOLDER": ["Store metadata", "metadata", "screenshots", "support URL"],
+    "BOTH-SUBSCRIPTION-HARD-CANCEL": ["Apple requirements", "Google Play requirements", "AI regulations", "subscription disclosures", "payment compliance", "terms of service"],
 }
 
 
@@ -152,7 +195,7 @@ def get_areas_for_pattern(pid, patterns_dict):
         or "tracking" in title_lower
         or "fingerprinting" in title_lower
     ):
-        areas.append("Privacy")
+        areas.extend(["Privacy", "privacy disclosures", "privacy policy"])
     if (
         "security" in title_lower
         or "staging" in title_lower
@@ -163,25 +206,25 @@ def get_areas_for_pattern(pid, patterns_dict):
     ):
         areas.append("Security")
     if "accessibility" in title_lower:
-        areas.append("Accessibility")
+        areas.extend(["Accessibility", "accessibility"])
     if (
         "ai" in title_lower
         or "openai" in title_lower
         or "gemini" in title_lower
         or "claude" in title_lower
     ):
-        areas.append("AI regulations")
+        areas.extend(["AI regulations", "AI disclosures"])
     if (
         "metadata" in title_lower
         or "placeholder" in title_lower
         or "future-func" in title_lower
         or "unreachable" in title_lower
     ):
-        areas.append("Store metadata")
+        areas.extend(["Store metadata", "metadata"])
     if "perm" in title_lower or "usage-description" in title_lower:
-        areas.append("Permissions")
+        areas.extend(["Permissions", "permissions"])
     if "billing" in title_lower or "payment" in title_lower or "sdk" in title_lower:
-        areas.append("SDK compatibility")
+        areas.extend(["SDK compatibility", "payment compliance", "subscription disclosures"])
 
     if not areas:
         areas.append("Apple requirements")
@@ -225,7 +268,6 @@ def find_affected_files(target_dir, patterns_dict):
     }
 
     for root, dirs, files in os.walk(target_dir):
-        # modify dirs in place to prune excluded dirs
         dirs[:] = [
             d
             for d in dirs
@@ -253,10 +295,8 @@ def find_affected_files(target_dir, patterns_dict):
                 if not signals:
                     continue
 
-                # BOTH-PLACEHOLDER needs a refined regex; the JSON signal is a plain word.
                 has_signal = False
                 if pid == "BOTH-PLACEHOLDER":
-                    # Check custom regexes or simple substrings
                     ph_regex = r'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
                     if re.search(ph_regex, content, re.IGNORECASE):
                         has_signal = True
@@ -277,12 +317,12 @@ def find_affected_files(target_dir, patterns_dict):
                         rel_path = os.path.relpath(filepath, target_dir)
                         if pid not in affected:
                             affected[pid] = []
-                        # Avoid adding the tool's own definition files if possible, unless they are the target
                         if (
                             "rejection-patterns.json" not in rel_path
                             and "release-audit.py" not in rel_path
                             and "app-store-compliance-guard.sh" not in rel_path
                             and "RELEASE-READINESS-REPORT.md" not in rel_path
+                            and "RELEASE-REVIEW-REPORT" not in rel_path
                         ):
                             affected[pid].append(rel_path)
 
@@ -290,9 +330,12 @@ def find_affected_files(target_dir, patterns_dict):
 
 
 def main():
-    target_dir = ROOT
-    if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]):
-        target_dir = os.path.abspath(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Runs release readiness compliance audit.")
+    parser.add_argument("target_dir", nargs="?", default=ROOT, help="Target directory to audit")
+    parser.add_argument("--report-out", dest="report_out", default=None, help="Output file path for the release review report")
+    args = parser.parse_args()
+
+    target_dir = os.path.abspath(args.target_dir)
 
     print("== Starting Release Readiness Compliance Audit ==")
     print(f"Target Directory: {target_dir}")
@@ -338,7 +381,6 @@ def main():
     )
 
     # Run metadata-audit.py
-    # If en-US metadata exists, use it, otherwise let it run with default empty metadata scan
     meta_code, meta_out, meta_err = run_command(
         ["python3", "scripts/metadata-audit.py", target_dir]
     )
@@ -347,13 +389,12 @@ def main():
     patterns_dict = load_patterns()
     findings = []
 
-    # Simple parse function for stdout of guard and metadata scripts
     all_scanner_stdout = guard_out + "\n" + meta_out
     lines = all_scanner_stdout.splitlines()
     i = 0
     while i < len(lines):
         line = lines[i]
-        # deadline-checker lines ("[HIGH] EU AI Act ... (mandatory ...) absorbed into ...") are not findings
+        # Ignore absorbed deadline notices
         if "absorbed into" in line and "(mandatory " in line:
             i += 1
             continue
@@ -362,14 +403,12 @@ def main():
             line,
             re.IGNORECASE,
         )
-        # every real finding id is hyphenated (APPLE-5.1.1-..., BOTH-PLACEHOLDER); a bare word is prose
         if match and "-" not in match.group(2):
             match = None
         if match:
             sev = match.group(1).lower()
             pid = match.group(2)
             title = match.group(3).strip()
-            # Trim trailing (field) suffix in case of metadata-audit format
             title = re.sub(r"\s*\([^)]+\)$", "", title)
 
             fix = ""
@@ -380,18 +419,17 @@ def main():
                     fix = fix_match.group(1).strip()
                     i += 1
 
-            # Avoid duplicate findings
             if not any(f["id"] == pid for f in findings):
                 findings.append(
                     {"id": pid, "severity": sev, "title": title, "fix": fix}
                 )
         i += 1
 
-    # Programmatically scan for affected files
     affected_files_map = find_affected_files(target_dir, patterns_dict)
 
-    # --- Step 3. Compile Report and Map to 13 Areas ---
-    area_findings = {area: [] for area in REQUIRED_AREAS}
+    # --- Step 3. Compile Report ---
+    all_known_areas = REQUIRED_AREAS + REVIEW_DOMAINS_15
+    area_findings = {area: [] for area in all_known_areas}
     has_critical = False
 
     for f in findings:
@@ -403,10 +441,8 @@ def main():
         areas = get_areas_for_pattern(pid, patterns_dict)
         for area in areas:
             if area in area_findings:
-                # Add finding to this area's list
                 area_findings[area].append(f)
 
-    # Compile the Markdown report text (Strictly NO EMOJIS or emoticons)
     report_lines = []
     report_lines.append("# Release Readiness Compliance Report")
     report_lines.append("")
@@ -433,14 +469,14 @@ def main():
         )
     report_lines.append("")
 
-    report_lines.append("## Compliance Summary Table")
+    report_lines.append("## Compliance Summary Table (13 Required Areas)")
     report_lines.append("")
     report_lines.append("| Area | Status | Risks Found | Recommended Reviewers |")
     report_lines.append("| --- | --- | --- | --- |")
 
     for area in REQUIRED_AREAS:
-        area_status = "PASSED"
         area_f = area_findings[area]
+        area_status = "PASSED"
         if area_f:
             if any(af["severity"] == "critical" for af in area_f):
                 area_status = "BLOCKED"
@@ -452,7 +488,26 @@ def main():
         report_lines.append(f"| {area} | {area_status} | {num_risks} | {reviewers} |")
     report_lines.append("")
 
-    report_lines.append("## Detailed Compliance Analysis")
+    report_lines.append("## App Store & Google Play Review Domains (15 Verification Areas)")
+    report_lines.append("")
+    report_lines.append("| Domain | Status | Risks Found | Recommended Reviewers |")
+    report_lines.append("| --- | --- | --- | --- |")
+
+    for domain in REVIEW_DOMAINS_15:
+        dom_f = area_findings[domain]
+        dom_status = "PASSED"
+        if dom_f:
+            if any(af["severity"] == "critical" for af in dom_f):
+                dom_status = "BLOCKED"
+            else:
+                dom_status = "ADVISORY"
+
+        num_risks = len(dom_f)
+        reviewers = RECOMMENDED_REVIEWERS_15.get(domain, "Lead Developer")
+        report_lines.append(f"| {domain} | {dom_status} | {num_risks} | {reviewers} |")
+    report_lines.append("")
+
+    report_lines.append("## Detailed Compliance Analysis (13 Required Areas)")
     report_lines.append("")
 
     for idx, area in enumerate(REQUIRED_AREAS, 1):
@@ -487,12 +542,10 @@ def main():
             title = af["title"]
             fix = af["fix"] or "Refer to guidelines for remediation."
 
-            # Retrieve programmatically scanned affected files
             aff_files = affected_files_map.get(pid, [])
             if not aff_files:
                 files_str = "None detected (Config/Listing check)"
             else:
-                # Limit to first 5 paths to keep the table clean
                 files_str = "<br>".join(aff_files[:5])
                 if len(aff_files) > 5:
                     files_str += f"<br>... and {len(aff_files) - 5} more files"
@@ -500,10 +553,66 @@ def main():
             report_lines.append(f"| {pid} | {sev} | {title} | {fix} | {files_str} |")
         report_lines.append("")
 
-    # Write report file into the audited target, not this playbook's own root
+    report_lines.append("## Detailed Analysis of 15 Verification Review Domains")
+    report_lines.append("")
+
+    for idx, domain in enumerate(REVIEW_DOMAINS_15, 1):
+        dom_f = area_findings[domain]
+        dom_status = "PASSED"
+        if dom_f:
+            if any(af["severity"] == "critical" for af in dom_f):
+                dom_status = "BLOCKED"
+            else:
+                dom_status = "ADVISORY"
+
+        report_lines.append(f"### {idx}. {domain}")
+        report_lines.append(f"- Status: {dom_status}")
+        report_lines.append(
+            f"- Recommended Reviewers: {RECOMMENDED_REVIEWERS_15.get(domain, 'Lead Developer')}"
+        )
+        report_lines.append("")
+
+        if not dom_f:
+            report_lines.append(f"No outstanding risks found for domain: {domain}.")
+            report_lines.append("")
+            continue
+
+        report_lines.append(
+            "| Finding ID | Severity | Description | Required Action | Affected Files |"
+        )
+        report_lines.append("| --- | --- | --- | --- | --- |")
+
+        for af in dom_f:
+            pid = af["id"]
+            sev = af["severity"].upper()
+            title = af["title"]
+            fix = af["fix"] or "Refer to guidelines for remediation."
+
+            aff_files = affected_files_map.get(pid, [])
+            if not aff_files:
+                files_str = "None detected (Config/Listing check)"
+            else:
+                files_str = "<br>".join(aff_files[:5])
+                if len(aff_files) > 5:
+                    files_str += f"<br>... and {len(aff_files) - 5} more files"
+
+            report_lines.append(f"| {pid} | {sev} | {title} | {fix} | {files_str} |")
+        report_lines.append("")
+
+    report_content = "\n".join(report_lines) + "\n"
+
+    # Write primary report in target directory
     report_path = os.path.join(target_dir, "RELEASE-READINESS-REPORT.md")
     with open(report_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(report_lines) + "\n")
+        f.write(report_content)
+
+    # Write explicit --report-out file if specified
+    if args.report_out:
+        out_path = os.path.abspath(args.report_out)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(report_content)
+        print(f"Custom release review report generated successfully at: {out_path}")
 
     print(f"Release readiness report generated successfully at: {report_path}")
     print(
