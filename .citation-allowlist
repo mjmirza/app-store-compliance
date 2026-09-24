@@ -39,6 +39,8 @@ https://example.com/x
 https://kiosk.example.io/privacy-policy
 https://realbackend.io/privacy-policy
 https://staging.example.com
+https://app.com/privacy-policy
+https://prod.app.com
 
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
@@ -49,3 +51,7 @@ https://cppa.ca.gov/regulations/ccpa_updates.html
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
 https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
 https://www.miit.gov.cn/
+https://oag.ca.gov/privacy/ccpa
+https://oag.ca.gov/sb976
+https://www.gov.br/anpd/pt-br/assuntos/eca-digital
+https://www.ppc.go.jp/personalinfo/legal/r8kaiseihogohou/
