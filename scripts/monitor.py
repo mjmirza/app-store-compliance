@@ -1068,6 +1068,79 @@ def run_monitor(
     return report_items, processed_tracks
 
 
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock` or `--simulate`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(report_items, output_filepath, is_simulated=False):
+    """
+    Overwrites or updates the migration report in docs/APPLE-POLICY-MIGRATION.md.
+    """
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Apple Developer Requirements Migration & Policy Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track Apple developer requirements.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ])
+
+    for idx, u in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{u['track']}] {u['announcement_title']}")
+        lines.append(f"- **Published Date**: {u['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{u['announcement_link']}]({u['announcement_link']})")
+        lines.append(f"- **Severity Impact**: {u['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {u['repository_impact']}")
+        lines.append(f"- **Scan Verdict**: {u['scan_verdict']}")
+        if u['affected_files']:
+            lines.append("- **Identified Affected Files**:")
+            for f in u['affected_files']:
+                lines.append(f"  * `{f}`")
+        else:
+            lines.append("- **Affected Files**: None found.")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    processed_doc_tracks = set()
+    for u in report_items:
+        track = u["track"]
+        if track in processed_doc_tracks:
+            continue
+        processed_doc_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {u['severity_impact']}")
+
+        for step in u["migration_tasks"]:
+            lines.append(f"- [ ] **Task**: {step}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        print(f"Apple documentation updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def print_text_report(report_items, project_path):
     print("=" * 80)
     print("                  APPLE DEVELOPER REQUIREMENTS MONITOR REPORT")
@@ -1134,6 +1207,14 @@ def main():
         "--news-file", help="Path to a custom XML or JSON file containing announcements"
     )
     parser.add_argument(
+        "--output-docs",
+        help="Filepath to write migration tasks and logs (e.g. docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Filepath to save the drafted PR (e.g. docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1152,9 +1233,28 @@ def main():
         verbose=args.verbose,
     )
 
+    is_simulated = bool(args.simulate or args.mock or (not args.news_file and not report_items))
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs, is_simulated=is_simulated)
+
+    if args.pr_output and report_items:
+        # Build combined PR draft if multiple items exist, or use first item
+        pr_content = report_items[0]["proposed_pull_request"]["description"]
+        if is_simulated:
+            pr_content = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_content
+        try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_content)
+            if not args.json:
+                print(f"Apple compliance PR draft written successfully to: {args.pr_output}")
+        except Exception as e:
+            print(f"Error writing PR draft to {args.pr_output}: {e}", file=sys.stderr)
+
     if args.json:
         print(json.dumps(report_items, indent=2))
-    else:
+    elif not args.output_docs and not args.pr_output:
         print_text_report(report_items, args.project)
 
 

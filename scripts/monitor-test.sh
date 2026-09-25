@@ -54,6 +54,15 @@ assert nums == list(range(1, 16)), nums
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. File output flags verification (--output-docs and --pr-output)
+T_OUT=$(mktemp -d)
+DOCS_FILE="$T_OUT/APPLE-POLICY-MIGRATION.md"
+PR_FILE="$T_OUT/APPLE_COMPLIANCE_PR_DRAFT.md"
+$MONITOR --simulate "Privacy Manifests" --output-docs "$DOCS_FILE" --pr-output "$PR_FILE" >/dev/null 2>&1
+[ -f "$DOCS_FILE" ] && grep -q "Apple Developer Requirements Migration & Policy Report" "$DOCS_FILE" && ok "--output-docs writes migration documentation" || bad "--output-docs"
+[ -f "$PR_FILE" ] && grep -q "Compliance Update: Privacy Manifests" "$PR_FILE" && ok "--pr-output writes pull request draft" || bad "--pr-output"
+rm -rf "$T_OUT"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
