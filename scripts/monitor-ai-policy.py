@@ -247,29 +247,29 @@ def analyze_announcements(announcements, keywords):
                     review_items.append("App Review AI guidance")
                 if any(
                     x in text_to_search
-                    for x in ["safety", "abuse", "nsfw", "moderation", "filter"]
+                    for x in ["safe", "safety", "abuse", "nsfw", "moderation", "filter", "flag", "harmful"]
                 ):
                     review_items.append("Safety expectations")
                 if any(
                     x in text_to_search
-                    for x in ["disclosure", "consent", "modal", "inform"]
+                    for x in ["disclos", "consent", "modal", "inform", "notice"]
                 ):
                     review_items.append("User disclosure requirements")
                 if not review_items:
                     review_items = ["General Apple AI policy"]
             else:
                 if any(
-                    x in text_to_search for x in ["policy", "guideline", "requirement"]
+                    x in text_to_search for x in ["policy", "policies", "guideline", "requirement"]
                 ):
                     review_items.append("Google Play AI policies")
                 if any(
                     x in text_to_search
-                    for x in ["disclosure", "consent", "modal", "inform"]
+                    for x in ["disclos", "consent", "modal", "inform", "notice"]
                 ):
                     review_items.append("AI-generated content disclosures")
                 if any(
                     x in text_to_search
-                    for x in ["safety", "abuse", "nsfw", "moderation", "filter"]
+                    for x in ["safe", "safety", "abuse", "nsfw", "moderation", "filter", "flag", "harmful"]
                 ):
                     review_items.append("User safety requirements")
                 if not review_items:
