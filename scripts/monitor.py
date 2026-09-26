@@ -251,6 +251,7 @@ TRACK_METADATA = {
     },
     "AI-related App Store policies": {
         "keywords": [
+            "ai-related app store policies",
             "generative ai",
             "llm",
             "chatgpt",
@@ -260,6 +261,7 @@ TRACK_METADATA = {
             "anthropic",
         ],
         "patterns": [
+            r"ai-related[ -]app[ -]store[ -]policies",
             r"generative[ -]ai",
             r"llm",
             r"chatgpt",
