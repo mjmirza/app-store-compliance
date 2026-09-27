@@ -111,6 +111,39 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output CLI option flags
+echo "[TEST] Verifying --output-docs and --pr-output CLI file generation..."
+TEST_DOC_FILE="/tmp/test_regulatory_monitor_doc.md"
+TEST_PR_FILE="/tmp/test_regulatory_monitor_pr.md"
+rm -f "$TEST_DOC_FILE" "$TEST_PR_FILE"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TEST_DOC_FILE" --pr-output "$TEST_PR_FILE" > /dev/null
+
+if [ ! -f "$TEST_DOC_FILE" ]; then
+  echo "[ERROR] --output-docs failed to create $TEST_DOC_FILE"
+  exit 1
+fi
+echo "[PASS] --output-docs created documentation report file successfully"
+
+if [ ! -f "$TEST_PR_FILE" ]; then
+  echo "[ERROR] --pr-output failed to create $TEST_PR_FILE"
+  exit 1
+fi
+echo "[PASS] --pr-output created PR draft file successfully"
+
+# Check 15 sections in the generated PR file
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! grep -q "## ${sec_num}\. ${sec_name}" "$TEST_PR_FILE"; then
+    echo "[ERROR] Missing expected section in generated PR file $TEST_PR_FILE: ## ${sec_num}. ${sec_name}"
+    exit 1
+  fi
+done
+echo "[PASS] Generated PR draft file contains all 15 required sections"
+
+rm -f "$TEST_DOC_FILE" "$TEST_PR_FILE"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0

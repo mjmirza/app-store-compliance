@@ -1045,6 +1045,93 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
     return report_items, processed_tracks
 
 
+def update_documentation_report(report_items, output_filepath):
+    """
+    Writes or updates the comprehensive Regulatory Intelligence Monitoring Report in markdown format.
+    Ensures 100% emoji-free output adhering to source trust hierarchy.
+    """
+    lines = [
+        "# Regulatory Intelligence Monitoring Report (2026)",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments and repository compliance status across major international jurisdictions.",
+        "",
+        "## Source Trust Hierarchy Verification",
+        "- Priority 1: Official Regulatory and Standardization Bodies (European Commission, EUR-Lex, Official Journal, ENISA, EDPB, FTC, NIST, CISA, ICO, Government publications)",
+        "- Priority 2: Reputable News Agencies (Reuters, AP, Bloomberg)",
+        "- Priority 3: Academic Publications",
+        "- Priority 4: Industry Publications",
+        "- Priority 5: Social Media and AI Summaries (Blocked unless verified by Priority 1)",
+        "",
+        "## Monitored Global Regulatory Track Log",
+        "",
+    ]
+
+    if not report_items:
+        lines.append("No active global regulatory updates detected.")
+    else:
+        for i, item in enumerate(report_items, 1):
+            lines.append(f"### {i}. [{item['track']}] {item['announcement_title']}")
+            lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+            lines.append(f"- **Compliance Impact**: {item['compliance_impact']}")
+            lines.append(f"- **Publication Date**: {item['announcement_pubDate']}")
+            lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+            lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+            lines.append("")
+
+            lines.append("#### Identified Affected Files")
+            if item["affected_files"]:
+                for f in item["affected_files"]:
+                    lines.append(f"- `{f}`")
+            else:
+                lines.append("- No code-level signal matches detected in scanned repository files.")
+            lines.append("")
+
+            lines.append("#### Suggested Migration Tasks")
+            for task in item["migration_tasks"]:
+                lines.append(f"- [ ] {task}")
+            lines.append("")
+
+            pr = item["proposed_pull_request"]
+            lines.append("#### Compliance Pull Request Proposal")
+            if pr is None:
+                lines.append("- PR Generation Status: BLOCKED (Unverified secondary source).")
+            else:
+                lines.append(f"- **Branch**: `{pr['branch_name']}`")
+                lines.append(f"- **Title**: {pr['title']}")
+                lines.append("- **Status**: 15-Section Draft Proposal Generated.")
+            lines.append("")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as fp:
+            fp.write("\n".join(lines))
+        print(f"Regulatory documentation report written successfully to: {output_filepath}")
+    except Exception as e:
+        print(f"Failed to write regulatory documentation report to {output_filepath}: {e}")
+
+
+def write_pr_draft(report_items, pr_filepath):
+    """
+    Writes the proposed 15-section Pull Request draft description to the specified filepath.
+    """
+    valid_prs = [item["proposed_pull_request"] for item in report_items if item.get("proposed_pull_request")]
+
+    if not valid_prs:
+        content = "# PULL REQUEST DRAFT: BLOCKED\n\nCompliance Pull Request generation was blocked because no valid, verified Priority 1-3 regulatory updates were available."
+    else:
+        # Write primary valid PR draft description
+        primary_pr = valid_prs[0]
+        content = primary_pr["description"]
+
+    try:
+        os.makedirs(os.path.dirname(pr_filepath) or ".", exist_ok=True)
+        with open(pr_filepath, "w", encoding="utf-8") as fp:
+            fp.write(content)
+        print(f"Regulatory compliance PR draft written successfully to: {pr_filepath}")
+    except Exception as e:
+        print(f"Failed to write PR draft to {pr_filepath}: {e}")
+
+
 def print_text_report(report_items, project_path):
     print("=" * 80)
     print("               REGULATORY INTELLIGENCE MONITOR COMPLIANCE REPORT")
@@ -1106,6 +1193,18 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        nargs="?",
+        const="docs/REGULATORY-MONITOR-REPORT-2026.md",
+        help="Filepath to write migration tasks and logs report (default: docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        nargs="?",
+        const="docs/REGULATORY_COMPLIANCE_PR_DRAFT.md",
+        help="Filepath to save the drafted PR (default: docs/REGULATORY_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1117,6 +1216,12 @@ def main():
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+
+    if args.pr_output:
+        write_pr_draft(report_items, args.pr_output)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
