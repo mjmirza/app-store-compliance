@@ -14,10 +14,12 @@ bad()  { FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
 MOCK_JSON="/tmp/test_ai_announcements.json"
 OUT_DOCS="/tmp/test_ai_migration.md"
 OUT_PR="/tmp/test_ai_pr.md"
+OUT_DEFAULT_DOCS="/tmp/test_ai_default_migration.md"
+OUT_DEFAULT_PR="/tmp/test_ai_default_pr.md"
 
 # Cleanup files first
 cleanup() {
-  rm -f "$MOCK_JSON" "$OUT_DOCS" "$OUT_PR" 2>/dev/null || true
+  rm -f "$MOCK_JSON" "$OUT_DOCS" "$OUT_PR" "$OUT_DEFAULT_DOCS" "$OUT_DEFAULT_PR" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -133,6 +135,35 @@ if [ -f "$OUT_PR" ]; then
   fi
 else
   bad "PR Draft file was not created"
+fi
+
+# 6. Test default inline mock run to verify all 4 Apple and 3 Google Play AI policy topics are covered
+python3 scripts/monitor-ai-policy.py --dir . --output-docs "$OUT_DEFAULT_DOCS" --pr-output "$OUT_DEFAULT_PR" > /tmp/monitor_default_run.log 2>&1
+RC_DEF=$?
+
+if [ "$RC_DEF" -eq 0 ] && [ -f "$OUT_DEFAULT_DOCS" ]; then
+  ok "Default inline mock run executed successfully"
+
+  # Verify Apple policy categories
+  if grep -q "AI-generated content requirements" "$OUT_DEFAULT_DOCS" && \
+     grep -q "App Review AI guidance" "$OUT_DEFAULT_DOCS" && \
+     grep -q "Safety expectations" "$OUT_DEFAULT_DOCS" && \
+     grep -q "User disclosure requirements" "$OUT_DEFAULT_DOCS"; then
+    ok "Default run matched all 4 Apple AI policy categories"
+  else
+    bad "Default run missing some Apple AI policy categories in docs"
+  fi
+
+  # Verify Google Play policy categories
+  if grep -q "Google Play AI policies" "$OUT_DEFAULT_DOCS" && \
+     grep -q "AI-generated content disclosures" "$OUT_DEFAULT_DOCS" && \
+     grep -q "User safety requirements" "$OUT_DEFAULT_DOCS"; then
+    ok "Default run matched all 3 Google Play AI policy categories"
+  else
+    bad "Default run missing some Google Play AI policy categories in docs"
+  fi
+else
+  bad "Default inline mock run failed"
 fi
 
 echo ""

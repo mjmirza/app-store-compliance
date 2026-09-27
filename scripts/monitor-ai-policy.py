@@ -67,7 +67,7 @@ MOCK_ANNOUNCEMENTS = [
         "id": "APPLE-AI-2026-UPDATE",
         "platform": "Apple",
         "title": "Sample. Apple App Review Guidelines, generative AI section (illustrative)",
-        "description": "Illustrative example only. Apps with generative AI features are expected to implement input/output moderation and user-reporting, disclose data shared with third-party LLM providers, and reflect AI-generated content in the age rating questionnaire. Verify the current wording at the linked guidelines page before citing it as fact.",
+        "description": "Illustrative example only. Apps with generative AI features are expected to comply with App Review AI guidance, implement input/output moderation for safety expectations, disclose data shared with third-party LLM providers to fulfill user disclosure requirements, and adhere to AI-generated content requirements. Verify the current wording at the linked guidelines page before citing it as fact.",
         "link": "https://developer.apple.com/app-store/review/guidelines/",
         "pubDate": "Wed, 01 Apr 2026 10:00:00 PDT",
     },
@@ -75,7 +75,7 @@ MOCK_ANNOUNCEMENTS = [
         "id": "GOOGLE-AI-2026-POLICY",
         "platform": "Google Play",
         "title": "Sample. Google Play generative AI content policy (illustrative)",
-        "description": "Illustrative example only. Apps featuring generative AI are expected to disclose AI-generated content, let users flag or report harmful output, and prevent deepfakes, face-swaps, and non-consensual sexual content. Verify the current wording at the linked developer policy center before citing it as fact.",
+        "description": "Illustrative example only. Apps featuring generative AI are expected to adhere to Google Play AI policies, provide clear AI-generated content disclosures, let users flag or report harmful output for user safety requirements, and prevent deepfakes, face-swaps, and non-consensual sexual content. Verify the current wording at the linked developer policy center before citing it as fact.",
         "link": "https://play.google/developer-content-policy/",
         "pubDate": "Thu, 02 Apr 2026 09:00:00 PDT",
     },
@@ -242,34 +242,34 @@ def analyze_announcements(announcements, keywords):
                 ):
                     review_items.append("AI-generated content requirements")
                 if any(
-                    x in text_to_search for x in ["review", "guideline", "guidance"]
+                    x in text_to_search for x in ["review", "guideline", "guidelines", "guidance"]
                 ):
                     review_items.append("App Review AI guidance")
                 if any(
                     x in text_to_search
-                    for x in ["safety", "abuse", "nsfw", "moderation", "filter"]
+                    for x in ["safety", "abuse", "nsfw", "moderation", "filter", "flag", "report", "harmful", "deepfake"]
                 ):
                     review_items.append("Safety expectations")
                 if any(
                     x in text_to_search
-                    for x in ["disclosure", "consent", "modal", "inform"]
+                    for x in ["disclosure", "disclose", "consent", "modal", "inform"]
                 ):
                     review_items.append("User disclosure requirements")
                 if not review_items:
                     review_items = ["General Apple AI policy"]
             else:
                 if any(
-                    x in text_to_search for x in ["policy", "guideline", "requirement"]
+                    x in text_to_search for x in ["policy", "guideline", "guidelines", "requirement", "requirements"]
                 ):
                     review_items.append("Google Play AI policies")
                 if any(
                     x in text_to_search
-                    for x in ["disclosure", "consent", "modal", "inform"]
+                    for x in ["disclosure", "disclose", "consent", "modal", "inform"]
                 ):
                     review_items.append("AI-generated content disclosures")
                 if any(
                     x in text_to_search
-                    for x in ["safety", "abuse", "nsfw", "moderation", "filter"]
+                    for x in ["safety", "abuse", "nsfw", "moderation", "filter", "flag", "report", "harmful", "deepfake"]
                 ):
                     review_items.append("User safety requirements")
                 if not review_items:
