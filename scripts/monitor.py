@@ -256,6 +256,7 @@ TRACK_METADATA = {
             "chatgpt",
             "ai policy",
             "ai content",
+            "ai-related",
             "openai",
             "anthropic",
         ],
@@ -265,6 +266,7 @@ TRACK_METADATA = {
             r"chatgpt",
             r"ai[ -]policy",
             r"ai[ -]content",
+            r"ai[ -]related",
         ],
         "detect_files": ["*.swift", "Info.plist"],
         "detect_regex": r"api\.openai\.com|anthropic|generativelanguage|chat/completions|stable[ -]diffusion|openai",
@@ -1065,7 +1067,185 @@ def run_monitor(
                 }
             )
 
-    return report_items, processed_tracks
+    is_simulated = bool(simulate_track or use_mock or custom_news_file or (not rss_content if 'rss_content' in locals() else False))
+    return report_items, processed_tracks, is_simulated
+
+
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(report_items, output_filepath, is_simulated=False):
+    """Writes or updates docs/APPLE-POLICY-MIGRATION.md with the monitored tracks and migration tasks."""
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Apple Developer Requirements Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track 25 Apple developer requirement categories.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ])
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {item['repository_impact']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        if item["affected_files"]:
+            lines.append("- **Identified Affected Files**:")
+            for f in item["affected_files"]:
+                lines.append(f"  - `{f}`")
+        else:
+            lines.append("- **Affected Files**: None found.")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    processed_doc_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        if track in processed_doc_tracks:
+            continue
+        processed_doc_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {item['repository_impact']}")
+        for step in item["migration_tasks"]:
+            lines.append(f"- [ ] {step}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    try:
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        print(f"Apple documentation report updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def generate_consolidated_pr_draft(report_items, is_simulated=False):
+    """Generates a 15-section draft pull request for matched tracks."""
+    if not report_items:
+        return ""
+
+    if len(report_items) == 1:
+        body = report_items[0]['proposed_pull_request']['description']
+        if is_simulated:
+            body = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + body
+        return body
+
+    tracks_str = ", ".join(sorted(list(set(item['track'] for item in report_items))))
+
+    citations = []
+    affected_files_set = set()
+    migration_steps = []
+    impl_checklist = []
+    risk_assessments = []
+
+    processed_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        citations.append(f"- **{track}**: [{item['announcement_title']}]({item['announcement_link']}) (Published: {item['announcement_pubDate']})")
+        if item["affected_files"]:
+            for f in item["affected_files"]:
+                affected_files_set.add(f)
+
+        if track in processed_tracks:
+            continue
+        processed_tracks.add(track)
+
+        risk_assessments.append(f"- **{track}** ({item['severity_impact']} Impact): {item['repository_impact']}")
+        for step in item["migration_tasks"]:
+            migration_steps.append(f"- **{track}**: {step}")
+            impl_checklist.append(f"- [ ] [{track}] {step}")
+
+    citations_str = "\n".join(citations)
+    if affected_files_set:
+        affected_files_str = "\n".join(f"- `{f}`" for f in sorted(list(affected_files_set)))
+    else:
+        affected_files_str = "- *No active files matching specific code-level signatures were automatically detected during scanning. Perform manual review of configuration files.*"
+
+    migration_steps_str = "\n".join(migration_steps)
+    impl_checklist_str = "\n".join(impl_checklist)
+    risk_assessment_str = "\n".join(risk_assessments)
+
+    desc_lines = [
+        "# Compliance Update: Apple Developer Requirements",
+        "",
+        "## 1. Summary",
+        f"This Pull Request addresses the latest Apple developer requirement updates across the following tracks: **{tracks_str}**.",
+        "",
+        "## 2. Background",
+        "Apple continuously updates its App Store Review Guidelines, Developer Program License Agreements, human interface recommendations, security, and privacy policies. Maintaining full compliance across all 25 requirement categories is required to prevent submission rejections and ensure uninterrupted distribution.",
+        "",
+        "## 3. Regulatory change",
+        "Official platform policy updates have been enacted by Apple. These changes mandate specific API declarations, permission prompt modifications, privacy manifest updates, or procedural compliance across affected tracking categories.",
+        "",
+        "## 4. Official citations",
+        citations_str,
+        "",
+        "## 5. Affected files",
+        affected_files_str,
+        "",
+        "## 6. Risk assessment",
+        risk_assessment_str,
+        "",
+        "## 7. Migration steps",
+        migration_steps_str,
+        "",
+        "## 8. Backward compatibility",
+        "These compliance adjustments represent non-breaking declaration and metadata modifications. Existing APIs remain supported, preserving backward compatibility for users running older iOS versions.",
+        "",
+        "## 9. Implementation checklist",
+        impl_checklist_str,
+        "",
+        "## 10. Testing checklist",
+        "- [ ] Perform a clean build on physical test devices and simulators.",
+        "- [ ] Validate permission prompts, privacy disclosures, and billing flows.",
+        "- [ ] Execute the pre-submission guard script (`bash agent-os/hooks/app-store-compliance-guard.sh .`).",
+        "",
+        "## 11. Documentation checklist",
+        "- [ ] Update `docs/APPLE-POLICY-MIGRATION.md` with completed tasks.",
+        "- [ ] Update App Store Review Notes with test account details.",
+        "",
+        "## 12. Compliance impact",
+        "Implementing these updates protects developer standing and aligns the application with platform requirements and global regulatory standards.",
+        "",
+        "## 13. Breaking changes",
+        "No structural breaking changes are introduced. Missing required declarations or privacy manifests are treated as blocking by App Store Review.",
+        "",
+        "## 14. Review checklist",
+        "- [ ] Confirm all required keys, identifiers, and files are present in the pull request diff.",
+        "- [ ] Verify that no un-declared Required Reason APIs or unauthorized third-party libraries are referenced.",
+        "- [ ] Confirm that the app builds and executes successfully.",
+        "",
+        "## 15. Approver recommendations",
+        "Confirm that all privacy manifests and required reason API declarations are verified prior to submitting the build to App Store Connect.",
+    ]
+
+    body = "\n".join(desc_lines)
+    if is_simulated:
+        body = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + body
+    return body
 
 
 def print_text_report(report_items, project_path):
@@ -1137,6 +1317,14 @@ def main():
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
+        "--output-docs",
+        help="Filepath to write migration tasks and logs (default: docs/APPLE-POLICY-MIGRATION.md when specified)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        help="Filepath to save the drafted PR (default: docs/APPLE_COMPLIANCE_PR_DRAFT.md when specified)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print verbose execution and scanning logs",
@@ -1144,13 +1332,27 @@ def main():
 
     args = parser.parse_args()
 
-    report_items, processed = run_monitor(
+    report_items, processed, is_simulated = run_monitor(
         project_path=args.project,
         simulate_track=args.simulate,
         use_mock=args.mock,
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs, is_simulated=is_simulated)
+
+    if args.pr_output:
+        pr_draft = generate_consolidated_pr_draft(report_items, is_simulated=is_simulated)
+        os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+        try:
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_draft)
+            if not args.json:
+                print(f"PR draft written successfully to: {args.pr_output}")
+        except Exception as e:
+            print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
