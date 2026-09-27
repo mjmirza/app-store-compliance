@@ -34,9 +34,11 @@ http://localhost:8787
 http://localhost:9000
 https://acme.example.io/.well-known/apple-app-site-association
 https://api.realbackend.io
+https://app.com/privacy-policy
 https://child.example.io/privacy-policy
 https://example.com/x
 https://kiosk.example.io/privacy-policy
+https://prod.app.com
 https://realbackend.io/privacy-policy
 https://staging.example.com
 
