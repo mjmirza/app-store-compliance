@@ -785,7 +785,7 @@ rm -rf "$D"
 
 # ===== Issue #610, second round. Counterexamples from the adversarial review, pinned =====
 NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ "$b" = "python3" ] && p="$(pyenv which python3 2>/dev/null || echo "$p")"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 P_ESCBS='{"tool_input":{"command":"gradlew '"$BS$BS$BS$BS$BS"'nbundleRelease"}}'
 P_BSSPACE='{"tool_input":{"command":"npx eas '"$BS$BS"' '"$BS"'nsubmit --platform ios"}}'
 P_META_OK='{"meta":{"command":"eas submit"},"tool_input":{"command":"ls"}}'
@@ -960,7 +960,7 @@ P_ABS_SH='{"tool_input":{"command":"/bin/sh -c '"'"'eas submit --platform ios'"'
 P_TWO_CD='{"tool_input":{"command":"cd apps/app && cd ../kiosk && npx eas submit --platform ios"}}'
 P_TWO_DOCS='{"tool_input":{"command":"eas submit --platform ios"}} {"tool_input":{"command":"echo"}}'
 P_NESTED_TN='{"metadata":{"tool_name":"Edit"},"tool_name":"Bash","tool_input":{"command":"fastlane pilot upload"}}'
-NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ "$b" = "python3" ] && p="$(pyenv which python3 2>/dev/null || echo "$p")"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 
 # 96 a submit is scanned however it is quoted or wrapped
 D="$(mk_ios_bad)"
@@ -1062,7 +1062,8 @@ rm -rf "$D"
 mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to keep real on PATH besides the shim
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
-  [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(command -v python3)" "$d/python3"
+  [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$d/python3"
+  rm -f "$d/$1"
   printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
   echo "$d"
 }
@@ -1100,7 +1101,7 @@ rm -rf "$NOJQ"
 
 # 111 with no temp file available the pass report stays on stdout and a block still puts its reason on stderr
 SHIM="$(mk_shim_path mktemp '#!/bin/sh
-exit 1' jq)"; ln -s "$(command -v python3)" "$SHIM/python3"
+exit 1' jq)"; ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$SHIM/python3"
 ERR="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | PATH="$SHIM" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
 echo "$ERR" | grep -q '^BLOCKED\.' && [ "$RC" -eq 2 ] && ok "610-49 degraded routing still puts the block reason on stderr" || bad "610-49 degraded routing still puts the block reason on stderr (rc=$RC err=${ERR:0:80})"
 rm -rf "$D"
