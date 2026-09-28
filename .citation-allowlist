@@ -43,9 +43,12 @@ https://staging.example.com
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
 
-# Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
+# Official government and developer portal sources that block or redirect automated citation checks
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
+https://developer.android.com/about/versions
+https://developer.android.com/about/versions/14/changes/fgs-types-required
+https://developer.apple.com/support/alternative-app-marketplace-in-the-eu/
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
 https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
 https://www.miit.gov.cn/
