@@ -889,21 +889,113 @@ def update_documentation_report(updates, output_filepath, is_simulated=False):
             lines.append(
                 "- [ ] **Task 1**: Configure Keychain accessibility to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly."
             )
+            lines.append(
+                "- [ ] **Task 2**: Ensure kSecAttrSynchronizable is set to false unless iCloud Sync is explicitly required."
+            )
         elif cat == "Android Keystore":
             lines.append(
                 "- [ ] **Task 1**: Enforce StrongBox and check KeyInfo.isInsideSecureHardware() on key creation."
             )
+            lines.append(
+                "- [ ] **Task 2**: Configure user authentication parameters for sensitive signing and decryption keys."
+            )
         elif cat == "biometric authentication":
             lines.append(
-                "- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt."
+                "- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt on Android."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement SecAccessControl with biometric constraints on iOS Keychain items."
             )
         elif cat == "certificate pinning":
             lines.append(
-                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml on Android."
             )
-        else:
             lines.append(
-                f"- [ ] **Task**: Verify that all security criteria for {cat} are checked and handled."
+                "- [ ] **Task 2**: Configure NSPinnedDomains in Info.plist for iOS network session pinning."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement multi-layered jailbreak heuristics (file existence, directory permissions, symlinks)."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add dynamic linker (dyld) inspection to detect injected hooks and runtime libraries."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Integrate Google Play Integrity API with cryptographically signed backend verification."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Implement local root binary heuristics as defensive fallback checks."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Set usesCleartextTraffic='false' in AndroidManifest.xml and cleartextTrafficPermitted='false'."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify App Transport Security (ATS) is enabled in Info.plist without arbitrary loads."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure dataExtractionRules (Android 12+) and fullBackupContent to exclude tokens and databases."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Set isExcludedFromBackup resource property on sensitive iOS local files."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Enforce android:exported='false' on all non-launcher activities and internal components."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Protect mandatory exported activities with signature-level custom permissions."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Replace implicit intents with explicit class intents for internal component transitions."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Verify caller package names and signatures using getCallingPackage() in exposed receivers."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Sanitize and strictly validate all incoming deep link path parameters as untrusted input."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Eliminate transmission of auth tokens or sensitive session data via deep link URLs."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Host a valid apple-app-site-association file at domain root with Content-Type application/json."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Configure Associated Domains entitlement in iOS app entitlements."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Publish assetlinks.json on host domain containing application signing certificate SHA-256 fingerprint."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add android:autoVerify='true' to HTTPS intent filters in AndroidManifest.xml."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Implement OAuth 2.1 authentication flow with PKCE challenge/verifier parameters."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Transition authentication screens to system secure browsers (Custom Tabs / ASWebAuthenticationSession)."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Implement server-side session invalidation on user logout."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Add background multitasking blur window transitions to protect user data from snapshots."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Store access and refresh tokens strictly inside Keychain or EncryptedSharedPreferences."
+            )
+            lines.append(
+                "- [ ] **Task 2**: Enforce short lifetimes for access tokens and isolate long-lived refresh tokens with cryptographic constraints."
             )
         lines.append("")
 

@@ -122,66 +122,82 @@ This report is continuously generated and updated by `scripts/monitor-security.p
 
 ### Tasks for root detection
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for root detection are checked and handled.
+- [ ] **Task 1**: Integrate Google Play Integrity API with cryptographically signed backend verification.
+- [ ] **Task 2**: Implement local root binary heuristics as defensive fallback checks.
 
 ### Tasks for Keychain
 - **Regulatory Impact**: High priority. Security audit mandates action.
 - [ ] **Task 1**: Configure Keychain accessibility to kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.
+- [ ] **Task 2**: Ensure kSecAttrSynchronizable is set to false unless iCloud Sync is explicitly required.
 
 ### Tasks for Android Keystore
 - **Regulatory Impact**: High priority. Security audit mandates action.
 - [ ] **Task 1**: Enforce StrongBox and check KeyInfo.isInsideSecureHardware() on key creation.
+- [ ] **Task 2**: Configure user authentication parameters for sensitive signing and decryption keys.
 
 ### Tasks for biometric authentication
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt.
+- [ ] **Task 1**: Integrate Keystore CryptoObject-backed BiometricPrompt on Android.
+- [ ] **Task 2**: Implement SecAccessControl with biometric constraints on iOS Keychain items.
 
 ### Tasks for certificate pinning
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml.
+- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml on Android.
+- [ ] **Task 2**: Configure NSPinnedDomains in Info.plist for iOS network session pinning.
 
 ### Tasks for jailbreak detection
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for jailbreak detection are checked and handled.
+- [ ] **Task 1**: Implement multi-layered jailbreak heuristics (file existence, directory permissions, symlinks).
+- [ ] **Task 2**: Add dynamic linker (dyld) inspection to detect injected hooks and runtime libraries.
 
 ### Tasks for SSL configuration
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for SSL configuration are checked and handled.
+- [ ] **Task 1**: Set usesCleartextTraffic='false' in AndroidManifest.xml and cleartextTrafficPermitted='false'.
+- [ ] **Task 2**: Verify App Transport Security (ATS) is enabled in Info.plist without arbitrary loads.
 
 ### Tasks for backup rules
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for backup rules are checked and handled.
+- [ ] **Task 1**: Configure dataExtractionRules (Android 12+) and fullBackupContent to exclude tokens and databases.
+- [ ] **Task 2**: Set isExcludedFromBackup resource property on sensitive iOS local files.
 
 ### Tasks for exported activities
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for exported activities are checked and handled.
+- [ ] **Task 1**: Enforce android:exported='false' on all non-launcher activities and internal components.
+- [ ] **Task 2**: Protect mandatory exported activities with signature-level custom permissions.
 
 ### Tasks for intent filters
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for intent filters are checked and handled.
+- [ ] **Task 1**: Replace implicit intents with explicit class intents for internal component transitions.
+- [ ] **Task 2**: Verify caller package names and signatures using getCallingPackage() in exposed receivers.
 
 ### Tasks for deep links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for deep links are checked and handled.
+- [ ] **Task 1**: Sanitize and strictly validate all incoming deep link path parameters as untrusted input.
+- [ ] **Task 2**: Eliminate transmission of auth tokens or sensitive session data via deep link URLs.
 
 ### Tasks for universal links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for universal links are checked and handled.
+- [ ] **Task 1**: Host a valid apple-app-site-association file at domain root with Content-Type application/json.
+- [ ] **Task 2**: Configure Associated Domains entitlement in iOS app entitlements.
 
 ### Tasks for app links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for app links are checked and handled.
+- [ ] **Task 1**: Publish assetlinks.json on host domain containing application signing certificate SHA-256 fingerprint.
+- [ ] **Task 2**: Add android:autoVerify='true' to HTTPS intent filters in AndroidManifest.xml.
 
 ### Tasks for authentication flows
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for authentication flows are checked and handled.
+- [ ] **Task 1**: Implement OAuth 2.1 authentication flow with PKCE challenge/verifier parameters.
+- [ ] **Task 2**: Transition authentication screens to system secure browsers (Custom Tabs / ASWebAuthenticationSession).
 
 ### Tasks for session handling
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for session handling are checked and handled.
+- [ ] **Task 1**: Implement server-side session invalidation on user logout.
+- [ ] **Task 2**: Add background multitasking blur window transitions to protect user data from snapshots.
 
 ### Tasks for token storage
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for token storage are checked and handled.
+- [ ] **Task 1**: Store access and refresh tokens strictly inside Keychain or EncryptedSharedPreferences.
+- [ ] **Task 2**: Enforce short lifetimes for access tokens and isolate long-lived refresh tokens with cryptographic constraints.
 
 <!-- SECURITY_POLICY_MONITOR_END -->
