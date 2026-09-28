@@ -42,7 +42,7 @@ echo "$OUT_SCAN" | grep -q "Sources/App.swift" && ok "repo scanner correctly ide
 # Clean up
 rm -rf "$T"
 
-# 5. The proposed pull request carries sections numbered 1 to 15, in order
+# 6. The proposed pull request carries sections numbered 1 to 15, in order
 echo "$JSON_OUT" | python3 -c "
 import sys, json, re
 body = json.load(sys.stdin)[0]['proposed_pull_request']['description']
@@ -50,9 +50,18 @@ nums = [int(n) for n in re.findall(r'^## (\d+)\. ', body, re.M)]
 assert nums == list(range(1, 16)), nums
 " 2>/dev/null && ok "proposed pull request has sections 1 to 15 in order" || bad "numbered PR sections"
 
-# 6. Mock announcements fallback or manual trigger
+# 7. Mock announcements fallback or manual trigger
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
+
+# 8. Verification of documentation report generation and PR draft output
+TD=$(mktemp -d)
+DOCS_FILE="$TD/docs/APPLE-POLICY-MIGRATION.md"
+PR_FILE="$TD/docs/APPLE_COMPLIANCE_PR_DRAFT.md"
+$MONITOR --mock --output-docs "$DOCS_FILE" --pr-output "$PR_FILE" >/dev/null 2>&1
+[ -f "$DOCS_FILE" ] && grep -q "# Apple Developer Requirements Policy Migration & Requirements Report" "$DOCS_FILE" && ok "documentation report file correctly generated" || bad "docs file generation"
+[ -f "$PR_FILE" ] && grep -q "## 1\. Summary" "$PR_FILE" && ok "PR draft file correctly generated" || bad "pr draft file generation"
+rm -rf "$TD"
 
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
