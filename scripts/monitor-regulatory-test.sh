@@ -111,6 +111,36 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output file generation
+echo "[TEST] Verifying --output-docs and --pr-output file creation..."
+TMP_DOCS="/tmp/test-reg-report.md"
+TMP_PR="/tmp/test-reg-pr.md"
+rm -f "$TMP_DOCS" "$TMP_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TMP_DOCS" --pr-output "$TMP_PR" > /dev/null
+
+if [ ! -f "$TMP_DOCS" ]; then
+  echo "[ERROR] --output-docs failed to create $TMP_DOCS"
+  exit 1
+fi
+
+if [ ! -f "$TMP_PR" ]; then
+  echo "[ERROR] --pr-output failed to create $TMP_PR"
+  exit 1
+fi
+
+if ! grep -q "Regulatory Intelligence Monitoring" "$TMP_DOCS"; then
+  echo "[ERROR] $TMP_DOCS does not contain expected header"
+  exit 1
+fi
+
+if ! grep -q "## 1\. Summary" "$TMP_PR"; then
+  echo "[ERROR] $TMP_PR does not contain expected 15-section PR header"
+  exit 1
+fi
+rm -f "$TMP_DOCS" "$TMP_PR"
+echo "[PASS] --output-docs and --pr-output generated files successfully"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0

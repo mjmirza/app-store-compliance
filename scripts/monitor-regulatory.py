@@ -3,6 +3,7 @@
 (EU/UK/US/CA/AU/SG/intl) against a source trust hierarchy. See README.md."""
 
 import os
+import sys
 import re
 import json
 import argparse
@@ -552,6 +553,20 @@ def scan_target_repo(repo_path, track_name, metadata):
     return affected_files, verdict
 
 
+def enforce_strict_source_trust_hierarchy(announcement, all_announcements=None):
+    """
+    Enforces strict source trust hierarchy, logging verification alerts to stderr
+    for unverified Priority 4 or 5 secondary sources.
+    Returns (priority_level, is_verified).
+    """
+    priority, is_verified = classify_source_and_verify(announcement, all_announcements)
+    if priority in (4, 5) and not is_verified:
+        sys.stderr.write(
+            f"[SOURCE TRUST ALERT] Unverified Priority {priority} source detected: '{announcement.get('title')}' ({announcement.get('link')}). Compliance PR generation blocked.\n"
+        )
+    return priority, is_verified
+
+
 def classify_source_and_verify(announcement, all_announcements=None):
     """Classifies announcement by TRUST_HIERARCHY priority (1-5) and
     verification status. Returns (priority_level, is_verified)."""
@@ -1020,12 +1035,14 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
             affected_files, scan_verdict = scan_target_repo(project_path, track, meta)
 
             # Evaluate source trust and apply restriction/blocking rules
-            priority, is_verified = classify_source_and_verify(item, announcements)
+            priority, is_verified = enforce_strict_source_trust_hierarchy(item, announcements)
             if priority in (4, 5) and not is_verified:
                 pr_details = None
                 scan_verdict = f"BLOCKED: Compliance Pull Request generation blocked. Announcement source is Priority {priority} (unverified secondary source)."
             else:
                 pr_details = generate_pull_request(track, affected_files, item)
+
+            source_trust_status = f"Priority {priority} (" + ("Verified" if is_verified else "Unverified") + ")"
 
             report_items.append(
                 {
@@ -1035,6 +1052,7 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
                     "track": track,
                     "jurisdiction": meta["jurisdiction"],
                     "compliance_impact": meta["compliance_impact"],
+                    "source_trust_status": source_trust_status,
                     "scan_verdict": scan_verdict,
                     "affected_files": affected_files,
                     "migration_tasks": meta["migration_steps"],
@@ -1043,6 +1061,56 @@ def run_monitor(project_path=".", simulate_track=None, verbose=False):
             )
 
     return report_items, processed_tracks
+
+
+def update_documentation_report(report_items, output_filepath):
+    """
+    Overwrites or updates the migration and compliance evaluation report in
+    output_filepath (e.g. docs/REGULATORY-MONITOR-REPORT-2026.md).
+    Guarantees strict emoji-free output.
+    """
+    lines = [
+        "<!-- REGULATORY_INTELLIGENCE_MONITOR_START -->",
+        "# Regulatory Intelligence Monitoring & Compliance Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory updates, source trust evaluations, affected repository files, and actionable compliance migration tasks.",
+        "",
+        "## Monitored Global Regulatory Updates",
+        "",
+    ]
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Compliance Impact**: {item['compliance_impact']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Source Trust Evaluation**: {item['source_trust_status']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+        lines.append("#### Affected Repository Files")
+        if item["affected_files"]:
+            for f in item["affected_files"]:
+                lines.append(f"- `{f}`")
+        else:
+            lines.append("- No code-level signature files matched. Audit configuration files manually.")
+        lines.append("")
+
+        lines.append("#### Required Migration Tasks")
+        for task in item["migration_tasks"]:
+            lines.append(f"- [ ] {task}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_INTELLIGENCE_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    try:
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"Regulatory report updated successfully at: {output_filepath}")
+    except Exception as e:
+        sys.stderr.write(f"Error writing documentation to {output_filepath}: {e}\n")
 
 
 def print_text_report(report_items, project_path):
@@ -1106,6 +1174,16 @@ def main():
         "--simulate", help="Simulate a regulatory change by track name or keyword"
     )
     parser.add_argument(
+        "--output-docs",
+        type=str,
+        help="Filepath to write/update documentation report (e.g. docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        help="Filepath to save drafted PR (e.g. docs/REGULATORY_COMPLIANCE_PR_DRAFT.md)",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
     )
     parser.add_argument(
@@ -1118,9 +1196,30 @@ def main():
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )
 
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+
+    if args.pr_output:
+        pr_drafts = [
+            item["proposed_pull_request"]["description"]
+            for item in report_items
+            if item.get("proposed_pull_request")
+        ]
+        if pr_drafts:
+            combined_pr = "\n\n---\n\n".join(pr_drafts)
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            try:
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write(combined_pr + "\n")
+                print(f"PR draft written successfully to: {args.pr_output}")
+            except Exception as e:
+                sys.stderr.write(f"Error writing PR draft to {args.pr_output}: {e}\n")
+        else:
+            print(f"No valid PR drafts to write to {args.pr_output} (all sources were blocked or invalid).")
+
     if args.json:
         print(json.dumps(report_items, indent=2))
-    else:
+    elif not args.output_docs and not args.pr_output:
         print_text_report(report_items, args.project)
 
 
