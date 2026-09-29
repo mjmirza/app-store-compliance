@@ -21,9 +21,10 @@ bad() {
 # Create mock folders
 COMPLIANT_DIR=$(mktemp -d "/tmp/access_compliant_XXXXXX")
 REGRESSION_DIR=$(mktemp -d "/tmp/access_regression_XXXXXX")
+REPORT_FILE=$(mktemp "/tmp/access_report_XXXXXX.md")
 
 cleanup() {
-  rm -rf "$COMPLIANT_DIR" "$REGRESSION_DIR" 2>/dev/null || true
+  rm -rf "$COMPLIANT_DIR" "$REGRESSION_DIR" "$REPORT_FILE" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -363,7 +364,7 @@ EOF
 echo "== Running Accessibility Compliance Test Suite =="
 
 # Test 1: Run on compliant folder. Should have NO findings.
-OUT_COMPLIANT=$($AUDIT "$COMPLIANT_DIR" 2>&1)
+OUT_COMPLIANT=$($AUDIT "$COMPLIANT_DIR" --report-out "$REPORT_FILE" 2>&1)
 if echo "$OUT_COMPLIANT" | grep -q "Clean. No accessibility compliance regressions found."; then
   ok "Compliant directory produced 0 findings"
 else
@@ -371,7 +372,31 @@ else
   echo "$OUT_COMPLIANT"
 fi
 
-# Test 2: Run on regression folder. Should detect regressions.
+# Test 2: Verify report output file generation
+if [ -f "$REPORT_FILE" ] && grep -q "Continuous Accessibility Compliance Audit Report" "$REPORT_FILE"; then
+  ok "Report generated successfully"
+else
+  bad "Report file generation failed"
+fi
+
+# Test 3: Verify report contains no emojis and includes all 10 rules
+if python3 -c "
+content = open('$REPORT_FILE').read()
+has_emoji = any(ord(c) > 0x1F600 and ord(c) < 0x1F650 or ord(c) > 0x1F300 and ord(c) < 0x1F5FF for c in content)
+rules = ['APPLE-ACCESSIBILITY-VOICEOVER', 'APPLE-ACCESSIBILITY-DYNAMICTYPE', 'APPLE-ACCESSIBILITY-REDUCEMOTION', 'APPLE-ACCESSIBILITY-COLORCONTRAST', 'APPLE-ACCESSIBILITY-HAPTICS', 'APPLE-ACCESSIBILITY-KEYBOARD', 'ANDROID-ACCESSIBILITY-TALKBACK', 'ANDROID-ACCESSIBILITY-FONTSCALING', 'ANDROID-ACCESSIBILITY-HIGHCONTRAST', 'ANDROID-ACCESSIBILITY-SCANNER']
+missing = [r for r in rules if r not in content]
+if not has_emoji and not missing:
+    exit(0)
+else:
+    print('Failed report verification. Emoji:', has_emoji, 'Missing rules:', missing)
+    exit(1)
+"; then
+  ok "Report verified for 0 emojis and complete 10-rule coverage"
+else
+  bad "Report verification failed"
+fi
+
+# Test 4: Run on regression folder. Should detect regressions.
 OUT_REGRESSION=$($AUDIT "$REGRESSION_DIR" 2>&1)
 
 # Check Rule 1: APPLE-ACCESSIBILITY-VOICEOVER

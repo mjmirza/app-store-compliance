@@ -93,8 +93,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
     findings = []
 
     if rule_id == "APPLE-ACCESSIBILITY-VOICEOVER":
-        # SwiftUI Image without accessibility modifiers, or UIKit views without accessibility attributes
-        # Scan SwiftUI Images: e.g. Image("name") or Image(systemName: "...")
         for f in ios_files:
             if not f.endswith(".swift"):
                 continue
@@ -103,13 +101,10 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            # Find SwiftUI Image usages
             for match in re.finditer(r"\bImage\s*\(([^)]+)\)", content):
                 expr = match.group(1)
-                # Ignore images explicitly defined as decorative or having system accessibility labels/hidden
                 if "decorative:" in expr or "systemName:" in expr:
                     continue
-                # Simple parsing check: does the immediate context (within 5 lines) have accessibility modifiers?
                 start_idx = match.start()
                 context = content[start_idx:start_idx + 300]
                 if not any(kw in context for kw in ["accessibilityLabel", "accessibilityIdentifier", "accessibilityHidden", "accessibilityElement"]):
@@ -123,7 +118,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier."
                     })
 
-            # Look for UIButton / UIImageView declarations in UIKit swift without accessibility properties
             if "UIButton" in content or "UIImageView" in content:
                 if not any(kw in content for kw in ["accessibilityLabel", "accessibilityIdentifier", "isAccessibilityElement"]):
                     findings.append({
@@ -136,8 +130,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "APPLE-ACCESSIBILITY-DYNAMICTYPE":
-        # Check SwiftUI hardcoded system fonts, e.g. .font(.system(size: ...))
-        # Or UIKit Font declarations like UIFont.systemFont(ofSize: ...)
         for f in ios_files:
             if not (f.endswith(".swift") or f.endswith(".m") or f.endswith(".h")):
                 continue
@@ -161,7 +153,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
             for match in re.finditer(r"UIFont\.systemFont\(ofSize:\s*\d+", content):
                 start_idx = match.start()
                 line_no = content.count("\n", 0, start_idx) + 1
-                # Check if adjustsFontForContentSizeCategory is present in the file
                 if "adjustsFontForContentSizeCategory" not in content:
                     findings.append({
                         "file": f,
@@ -173,7 +164,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "APPLE-ACCESSIBILITY-REDUCEMOTION":
-        # Find transition, withAnimation or UIView.animate without checking reduce motion
         for f in ios_files:
             if not (f.endswith(".swift") or f.endswith(".m")):
                 continue
@@ -194,7 +184,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "APPLE-ACCESSIBILITY-COLORCONTRAST":
-        # Find hardcoded UIColors or SwiftUI Colors without dynamic adaptivity or isDarkerSystemColorsEnabled
         for f in ios_files:
             if not (f.endswith(".swift") or f.endswith(".m")):
                 continue
@@ -203,7 +192,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            # Flag static CGColors or UIColors using hardcoded color specs without dynamic checking
             for match in re.finditer(r"UIColor\s*\(\s*red:\s*\d+", content):
                 if "isDarkerSystemColorsEnabled" not in content and "darkerSystemColors" not in content:
                     start_idx = match.start()
@@ -218,7 +206,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "APPLE-ACCESSIBILITY-HAPTICS":
-        # Scan for interactive actions/handlers without feedback generator references
         for f in ios_files:
             if not f.endswith(".swift"):
                 continue
@@ -239,7 +226,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "APPLE-ACCESSIBILITY-KEYBOARD":
-        # Scan for customized controls or keyboard handling missing proper focus or keyCommands
         for f in ios_files:
             if not f.endswith(".swift"):
                 continue
@@ -259,18 +245,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-TALKBACK":
-        # Look for XML layout elements or Compose Image without contentDescription
         for f in android_files:
             if f.endswith(".xml"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                # Find ImageView or ImageButton
                 for match in re.finditer(r"<ImageView\b|<ImageButton\b", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    # Check if this element block (up to next >) has contentDescription
                     elem_block = content[start_idx:content.find(">", start_idx) + 1]
                     if "contentDescription" not in elem_block:
                         findings.append({
@@ -286,7 +269,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                # Find Jetpack Compose Image usages
                 for match in re.finditer(r"\bImage\s*\(([^)]+)\)", content):
                     expr = match.group(1)
                     if "contentDescription" not in expr:
@@ -302,7 +284,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-FONTSCALING":
-        # Search for XML textSize with dp units, or Compose fontSize with dp units
         for f in android_files:
             if f.endswith(".xml"):
                 try:
@@ -338,7 +319,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-HIGHCONTRAST":
-        # Scan for hardcoded background or text colors using hex code values directly in XML or Compose
         for f in android_files:
             if f.endswith(".xml"):
                 try:
@@ -374,15 +354,12 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
-        # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
         for f in android_files:
             if f.endswith(".xml"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
-                # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
                 for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
                     if "layout_width=\"wrap_content\"" not in content and "layout_height=\"wrap_content\"" not in content:
                         start_idx = match.start()
@@ -400,7 +377,6 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                # Match clickable elements that may be too small
                 for match in re.finditer(r"\.size\s*\(\s*([1-3][0-9]|4[0-7]|[1-9])\.dp\s*\)", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
@@ -415,10 +391,122 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_markdown_report(directory, ios_files, android_files, all_findings, report_filepath):
+    lines = []
+    lines.append("# Continuous Accessibility Compliance Audit Report")
+    lines.append("")
+    lines.append(f"Target Directory: {os.path.abspath(directory)}")
+    lines.append(f"Scanned Files: iOS ({len(ios_files)} files), Android ({len(android_files)} files)")
+
+    crit = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "critical")
+    high = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "high")
+    med = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "medium")
+    low = sum(1 for f in all_findings if RULE_META[f["rule_id"]]["severity"] == "low")
+
+    overall_status = "BLOCKED" if crit > 0 or high > 0 else ("ADVISORY" if all_findings else "PASSED")
+    lines.append(f"Overall Compliance Status: {overall_status}")
+    lines.append("")
+
+    lines.append("## Executive Summary")
+    lines.append("This report documents the findings and recommendations from the static continuous accessibility audit across iOS (Apple) and Android platforms. The evaluation covers mandatory accessibility domains aligned with European Accessibility Act (EAA Directive 2019/882 / EN 301 549 Chapter 11), US ADA Title II (28 CFR Part 35), and mobile store platform design guidelines.")
+    lines.append("")
+    lines.append(f"Summary: critical={crit} high={high} medium={med} low={low}")
+    lines.append("")
+
+    lines.append("## Evaluated Accessibility Rules Summary")
+    lines.append("")
+    lines.append("| Platform | Rule ID | Title | Severity | Status |")
+    lines.append("| --- | --- | --- | --- | --- |")
+
+    for rule_id, meta in RULE_META.items():
+        rule_findings = [f for f in all_findings if f["rule_id"] == rule_id]
+        status = "REGRESSION" if rule_findings else "PASSED"
+        platform_name = "Apple (iOS)" if meta["platform"] == "apple" else "Android"
+        lines.append(f"| {platform_name} | {rule_id} | {meta['title']} | {meta['severity'].upper()} | {status} |")
+    lines.append("")
+
+    lines.append("## Detailed Platform Requirements and Audit Findings")
+    lines.append("")
+
+    lines.append("### Apple (iOS / iPadOS) Accessibility Requirements")
+    lines.append("")
+    apple_rules = [rid for rid, m in RULE_META.items() if m["platform"] == "apple"]
+    for rid in apple_rules:
+        meta = RULE_META[rid]
+        r_findings = [f for f in all_findings if f["rule_id"] == rid]
+        lines.append(f"#### {rid}: {meta['title']}")
+        lines.append(f"- Platform: Apple (iOS)")
+        lines.append(f"- Severity: {meta['severity'].upper()}")
+        lines.append(f"- Remediation: {meta['fix']}")
+        lines.append(f"- Status: {'REGRESSION DETECTED (' + str(len(r_findings)) + ' issue(s))' if r_findings else 'PASSED (0 issues)'}")
+        lines.append("")
+        if r_findings:
+            lines.append("| File | Line | Context | Issue Description | Fix Recommendation |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for f in r_findings:
+                rel = os.path.relpath(f["file"], directory)
+                ctx = f["match"].replace("|", "\\|").replace("\n", " ")
+                msg = f["message"].replace("|", "\\|")
+                fix = f["fix"].replace("|", "\\|")
+                lines.append(f"| {rel} | {f['line']} | `{ctx}` | {msg} | {fix} |")
+            lines.append("")
+
+    lines.append("### Android Accessibility Requirements")
+    lines.append("")
+    android_rules = [rid for rid, m in RULE_META.items() if m["platform"] == "google"]
+    for rid in android_rules:
+        meta = RULE_META[rid]
+        r_findings = [f for f in all_findings if f["rule_id"] == rid]
+        lines.append(f"#### {rid}: {meta['title']}")
+        lines.append(f"- Platform: Android")
+        lines.append(f"- Severity: {meta['severity'].upper()}")
+        lines.append(f"- Remediation: {meta['fix']}")
+        lines.append(f"- Status: {'REGRESSION DETECTED (' + str(len(r_findings)) + ' issue(s))' if r_findings else 'PASSED (0 issues)'}")
+        lines.append("")
+        if r_findings:
+            lines.append("| File | Line | Context | Issue Description | Fix Recommendation |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for f in r_findings:
+                rel = os.path.relpath(f["file"], directory)
+                ctx = f["match"].replace("|", "\\|").replace("\n", " ")
+                msg = f["message"].replace("|", "\\|")
+                fix = f["fix"].replace("|", "\\|")
+                lines.append(f"| {rel} | {f['line']} | `{ctx}` | {msg} | {fix} |")
+            lines.append("")
+
+    lines.append("## Platform Mechanics and Best Practices")
+    lines.append("")
+    lines.append("### Apple Accessibility Features")
+    lines.append("1. VoiceOver: Ensure all interactive views declare `accessibilityLabel`, `accessibilityHint`, and traits. Decorative graphics should use `Image(decorative: ...)` or `isAccessibilityElement = false`.")
+    lines.append("2. Dynamic Type: Use dynamic text styles like `.font(.body)` in SwiftUI and `UIFont.preferredFont(forTextStyle:)` with `adjustsFontForContentSizeCategory = true` in UIKit to allow font resizing.")
+    lines.append("3. Reduce Motion: Check `UIAccessibility.isReduceMotionEnabled` or SwiftUI `@Environment(\\.accessibilityReduceMotion)` to disable or simplify non-essential animations.")
+    lines.append("4. Color Contrast: Support system dark/light modes and dynamic colors. Observe `UIAccessibility.isDarkerSystemColorsEnabled` for high-contrast adjustments.")
+    lines.append("5. Haptics: Provide subtle tactile haptic feedback on interactive buttons and actions using `UIImpactFeedbackGenerator` or `UISelectionFeedbackGenerator`.")
+    lines.append("6. Keyboard Navigation: Support full hardware keyboard navigation by using `@FocusState` in SwiftUI or `keyCommands` in UIKit.")
+    lines.append("")
+
+    lines.append("### Android Accessibility Features")
+    lines.append("1. TalkBack: Provide meaningful `contentDescription` attributes on all XML `ImageView`/`ImageButton` elements and Compose `Image` components, or set `importantForAccessibility=\"no\"` on decorative elements.")
+    lines.append("2. Font Scaling: Always declare text sizes using scale-independent pixels (`sp`) rather than fixed density pixels (`dp`) so font scaling preferences are honored.")
+    lines.append("3. High Contrast: Reference theme attributes (e.g. `?attr/colorOnSurface` or `MaterialTheme.colorScheme.primary`) rather than hardcoded hex colors to adapt to contrast themes.")
+    lines.append("4. Accessibility Scanner: Ensure all touch targets meet or exceed the recommended minimum size of 48dp x 48dp using layout padding or `minWidth`/`minHeight` constraints.")
+    lines.append("")
+
+    lines.append("## Strategic Recommendations for Ongoing Compliance")
+    lines.append("1. Automated CI Integration: Incorporate `scripts/accessibility-audit.py` into continuous integration pipelines to catch accessibility regressions before PR merge.")
+    lines.append("2. Accessibility Testing Tools: Utilize Apple Accessibility Inspector (Xcode) and Android Accessibility Scanner on physical devices during release QA cycles.")
+    lines.append("3. Regulatory Deadlines Alignment: Ensure compliance with EAA (Directive EU 2019/882 / EN 301 549) mandatory requirements and US ADA Title II mobile application standards.")
+    lines.append("")
+
+    os.makedirs(os.path.dirname(os.path.abspath(report_filepath)), exist_ok=True)
+    with open(report_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", "--output-report", help="Path to write Markdown accessibility compliance report.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -438,6 +526,10 @@ def main():
 
     # Sort findings by rule ID and file path
     all_findings.sort(key=lambda x: (x["rule_id"], x["file"], x["line"]))
+
+    if args.report_out:
+        generate_markdown_report(args.directory, ios_files, android_files, all_findings, args.report_out)
+        print(f"Accessibility report written successfully to: {args.report_out}")
 
     print("== Accessibility Compliance Audit ==")
     print(f"Audited directory. {args.directory}")
@@ -477,7 +569,6 @@ def main():
     print(f"Summary. critical={crit} high={high} medium={med} low={low}")
     print("Reference. docs/EU-REGULATORY-2026.md and docs/PLATFORM-MECHANICS-2026.md")
 
-    # Exit with 0 on advisory findings since accessibility represents medium store risk
     return 0
 
 if __name__ == "__main__":
