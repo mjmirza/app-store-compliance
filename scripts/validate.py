@@ -4,6 +4,7 @@ pass, 1 on error; see README.md and AGENTS.md for the check list."""
 
 import json
 import os
+import re
 import sys
 import datetime
 
@@ -59,6 +60,18 @@ def parse_day(value):
         return datetime.datetime.strptime(value, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
+
+
+SECTION_PATH = re.compile(
+    r"(?:docs|references|data|scripts|agent-os|templates)/[A-Za-z0-9_./-]+\.(?:md|json|py|sh)"
+)
+
+
+def validate_section_paths(d, did):
+    """Every file named in affected_repository_sections must exist in the repo."""
+    for path in SECTION_PATH.findall(str(d.get("affected_repository_sections") or "")):
+        if not os.path.exists(os.path.join(ROOT, path)):
+            errors.append(f"deadline '{did}' points at {path}, which does not exist")
 
 
 def validate_deadline_dates(d, did, today):
@@ -163,6 +176,7 @@ def main():
                                 f"deadline '{did}' missing required field '{f}'"
                             )
 
+                    validate_section_paths(d, did)
                     if d.get("priority") not in SEVERITIES:
                         errors.append(
                             f"deadline '{did}' has invalid priority '{d.get('priority')}'"

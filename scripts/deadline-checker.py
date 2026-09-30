@@ -29,6 +29,29 @@ def load_deadlines():
         return []
 
 
+def print_brief(passed, upcoming, absorbed):
+    """One line per deadline, for the guard report. The full blocks stay the default."""
+    print("== Regulatory Compliance Deadline Status ==")
+    for item in passed:
+        print(
+            f"[{item['priority'].upper()}] OVERDUE {abs(item['remaining_days'])} days. "
+            f"{item['jurisdiction']}. {item['law']} (mandatory {item['mandatory_date']})"
+        )
+    for item in sorted(upcoming, key=lambda x: x["remaining_days"]):
+        days = item["remaining_days"]
+        when = "due today" if days == 0 else f"in {days} day" + ("" if days == 1 else "s")
+        print(
+            f"[{item['priority'].upper()}] {when}. "
+            f"{item['jurisdiction']}. {item['law']} (mandatory {item['mandatory_date']})"
+        )
+    if not passed and not upcoming:
+        print("No deadline is overdue or due within 90 days.")
+    if absorbed:
+        print(f"{len(absorbed)} passed deadline(s) already carried by the playbook, not listed.")
+    print(f"Full detail. python3 {os.path.abspath(__file__)}")
+    return 0
+
+
 def main():
     deadlines = load_deadlines()
     if not deadlines:
@@ -92,6 +115,9 @@ def main():
             passed_deadlines.append(item)
         elif remaining_days <= 90:
             upcoming_deadlines.append(item)
+
+    if "--brief" in sys.argv[1:]:
+        return print_brief(passed_deadlines, upcoming_deadlines, absorbed_deadlines)
 
     if passed_deadlines or upcoming_deadlines:
         print("== Regulatory Compliance Deadline Status ==\n")

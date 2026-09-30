@@ -121,6 +121,11 @@ class TestDateOrder(unittest.TestCase):
         )
         self.assertEqual(rc, 0, out)
 
+    def test_dead_section_path_fails(self):
+        rc, out = run(entry(affected_repository_sections="docs/NO-SUCH-FILE.md section 2"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("docs/NO-SUCH-FILE.md", out)
+
     def test_real_data_is_valid(self):
         cmd = [sys.executable, os.path.join(ROOT, "scripts", "validate.py")]
         env = {k: v for k, v in os.environ.items() if k != "DEADLINES_FILE"}

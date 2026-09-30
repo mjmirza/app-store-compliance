@@ -122,11 +122,11 @@ Apple.
 
 Android.
 
-- [ ] Developer identity verified before 30 September 2026 if the app is distributed to Brazil, Indonesia, Singapore, or Thailand.
+- [ ] Developer identity verified if the app is distributed to Brazil, Indonesia, Singapore, or Thailand (required since 30 September 2026), and every Play package name registered in Play Console.
 - [ ] Every foreground service declares `foregroundServiceType` in the manifest with the matching permission, and each type is declared in the Play Console with a demo video.
 - [ ] No SafetyNet Attestation. attestation uses the Play Integrity API, verified server-side.
-- [ ] Play Billing Library at version 8 or later before 31 August 2026, and digital goods route through Play Billing.
-- [ ] `targetSdkVersion` at least 35 today, planned for at least 36 by the 2026 deadline.
+- [ ] Play Billing Library at version 8 or later (required for new apps and updates since 31 August 2026, extension available to 1 November 2026), and digital goods route through Play Billing.
+- [ ] `targetSdkVersion` at least 36 for new apps and updates (required since 31 August 2026, extension available to 1 November 2026). Wear OS and Android Automotive OS at least 35, Android TV and Android XR at least 34.
 - [ ] No unexpected launch-time or mid-task full-screen interstitial, and every interstitial is closable by 15 seconds.
 - [ ] Health app has the Health Apps Declaration, a core-function justification per Health Connect permission, the migrated Organization Account, and the correct medical-device label or disclaimer.
 - [ ] Real-money game apps in supported countries have the required licenses or self-declarations, geo-restrictions, age-gating, and comply with any relevant Play Age Signals API terms.

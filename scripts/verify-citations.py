@@ -168,7 +168,16 @@ def main():
         with open(allow_path, encoding="utf-8") as fh:
             allow = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
 
-    urls = collect_urls(root, args.files)
+    files = []
+    for path in args.files or []:
+        # a relative path is tried from the working directory first, then under --dir
+        resolved = path if os.path.exists(path) else os.path.join(root, path)
+        if not os.path.exists(resolved):
+            print(f"verify-citations. '{path}' does not exist here or under {root}. Nothing was checked.")
+            return 2
+        files.append(resolved)
+
+    urls = collect_urls(root, files or None)
     if not urls:
         print("verify-citations. no URLs found.")
         return 0
