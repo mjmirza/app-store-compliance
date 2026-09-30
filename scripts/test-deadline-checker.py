@@ -125,5 +125,66 @@ class TestDeadlineChecker(unittest.TestCase):
                 os.rename(backup_db_path, real_db_path)
 
 
+class TestDeadlineDayBoundary(unittest.TestCase):
+    """A deadline is due on its own date, not one day overdue, and tomorrow is one day away."""
+
+    def _run(self, script, extra_env):
+        env = dict(os.environ, **extra_env)
+        cmd = [sys.executable, os.path.join(ROOT, "scripts", script)]
+        return subprocess.run(cmd, capture_output=True, text=True, env=env)
+
+    def _db(self, tmpdir):
+        today = datetime.now(timezone.utc).date()
+        rows = []
+        for name, delta in (("Due Today Act", 0), ("Due Tomorrow Act", 1), ("Due Yesterday Act", -1)):
+            day = (today + timedelta(days=delta)).strftime("%Y-%m-%d")
+            rows.append({
+                "id": name.upper().replace(" ", "-"),
+                "jurisdiction": "Test",
+                "law": name,
+                "requirement": "Boundary",
+                "effective_date": day,
+                "grace_period": "none",
+                "mandatory_date": day,
+                "enforcement_date": day,
+                "affected_repository_sections": "docs/APPLE.md",
+                "priority": "high",
+            })
+        path = os.path.join(tmpdir, "deadlines.json")
+        with open(path, "w") as f:
+            json.dump({"deadlines": rows}, f)
+        return path
+
+    def test_checker_counts_whole_days(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self._run("deadline-checker.py", {"DEADLINES_FILE": self._db(tmp)}).stdout
+        passed, _, upcoming = out.partition("UPCOMING COMPLIANCE DEADLINES")
+        self.assertIn("Due Yesterday Act", passed)
+        self.assertIn("(1 days overdue)", passed)
+        self.assertNotIn("Due Today Act", passed)
+        self.assertIn("Due Today Act", upcoming)
+        self.assertIn("(in 0 days)", upcoming)
+        self.assertIn("(in 1 days)", upcoming)
+
+    def test_timeline_counts_whole_days(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out_md = os.path.join(tmp, "timeline.md")
+            self._run("generate-timeline.py", {"DEADLINES_FILE": self._db(tmp), "TIMELINE_OUTPUT_FILE": out_md})
+            text = open(out_md).read()
+        row = {}
+        for line in text.splitlines():
+            for name in ("Due Today Act", "Due Tomorrow Act", "Due Yesterday Act"):
+                if line.startswith("|") and name in line:
+                    row.setdefault(name, line)
+        self.assertIn("| 0 days |", row["Due Today Act"])
+        self.assertIn("| 1 days |", row["Due Tomorrow Act"])
+        self.assertIn("| 1 days |", row["Due Yesterday Act"])
+        overdue_part = text.split("### Approaching Deadlines")[0]
+        self.assertIn("Due Yesterday Act", overdue_part)
+        self.assertNotIn("Due Today Act", overdue_part)
+
+
 if __name__ == "__main__":
     unittest.main()

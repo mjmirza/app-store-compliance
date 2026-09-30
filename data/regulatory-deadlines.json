@@ -473,7 +473,8 @@
       "mandatory_date": "2026-09-30",
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md"
     },
     {
       "id": "GOOGLE-PLAY-PHOTO-VIDEO-PERM",
@@ -563,7 +564,8 @@
       "mandatory_date": "2026-09-30",
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md"
     },
     {
       "id": "GOOGLE-PLAY-APP-PACKAGE-REGISTRATION",
@@ -575,7 +577,8 @@
       "mandatory_date": "2026-09-30",
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2"
     },
     {
       "id": "GOOGLE-US-ALT-BILLING-FEE-REPORTING",

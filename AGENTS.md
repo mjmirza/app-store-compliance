@@ -160,3 +160,4 @@ Priority 5, Social Media and AI Summaries:
 
 - Never trust secondary sources before official sources.
 - Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
+- A deadline that is postponed, withdrawn, or narrowed is updated in place in `data/regulatory-deadlines.json`, never deleted. Keep the old date and the reason in a `history` note on the entry. A deadline that has passed gets `absorbed_into` naming the doc section that now carries the rule, and `scripts/validate.py` fails a passed entry without one after 7 days.

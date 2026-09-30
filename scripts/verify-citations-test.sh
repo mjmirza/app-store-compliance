@@ -33,6 +33,13 @@ python3 "$VERIFY" --dir "$WORK/empty" --offline >/dev/null 2>&1 && ok "empty tre
 printf 'http://\nhttps://x\n%s\n' "$(head -c 20000 /dev/zero | tr '\0' 'x')" > "$WORK/empty/junk.md"
 python3 "$VERIFY" --dir "$WORK/empty" --offline >/dev/null 2>&1 && ok "malformed input survives" || bad "malformed input"
 
+# 3b. hidden tool-state directories are not cited sources, but .github is part of the repo
+mkdir -p "$WORK/hid/.gstack" "$WORK/hid/.github"
+echo "https://example.org/from-a-browser-log" > "$WORK/hid/.gstack/browse-network.log"
+echo "https://www.ftc.gov/legal-library" > "$WORK/hid/.github/CONTRIBUTING.md"
+out="$(python3 "$VERIFY" --dir "$WORK/hid" --offline 2>&1)"
+echo "$out" | grep -q "1 distinct URL" && echo "$out" | grep -q "ftc.gov" && ! echo "$out" | grep -q "browser-log" && ok "hidden tool-state directories are skipped, .github is scanned" || bad "hidden tool-state directories are skipped, .github is scanned"
+
 if ! net_up; then
   echo "SKIP  network tests (offline)"
 else
