@@ -56,6 +56,23 @@ assert nums == list(range(1, 16)), nums
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# A long live report is cut to a readable first screen. --full prints every item.
+T="$(mktemp -d)"
+python3 -c 'import json,sys; json.dump([{"title":"Privacy manifest update %d" % i,"description":"Changes to privacy manifests and required reason APIs.","pubDate":"Mon, 01 Sep 2026 10:00:00 PDT","link":"https://mock.invalid/n/%d" % i} for i in range(40)], open(sys.argv[1],"w"))' "$T/news.json"
+OUT="$($MONITOR --project "$T" --news-file "$T/news.json" 2>&1)"
+N="$(echo "$OUT" | grep -c 'TRACK UPDATE')"
+[ "$N" -eq 10 ] && echo "$OUT" | grep -q "Showing 10 of" && echo "$OUT" | grep -q "\-\-full" && ok "a long report shows 10 items and names --full" || bad "a long report shows 10 items and names --full (got $N)"
+echo "$OUT" | grep -q "By track" && ok "a long report opens with a count per track" || bad "a long report opens with a count per track"
+N="$($MONITOR --project "$T" --news-file "$T/news.json" --full 2>&1 | grep -c 'TRACK UPDATE')"
+[ "$N" -ge 40 ] && ok "--full prints every item" || bad "--full prints every item (got $N)"
+N="$($MONITOR --project "$T" --news-file "$T/news.json" --json 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')"
+[ "$N" -ge 40 ] && ok "--json is never cut" || bad "--json is never cut (got $N)"
+# A failed live fetch must say the items shown are samples, on stderr so --json stays parseable.
+ERR="$(APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>&1 >/dev/null)"
+echo "$ERR" | grep -q "sample announcements" && ok "a failed live fetch says the items are samples" || bad "a failed live fetch says the items are samples"
+APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>/dev/null | python3 -c 'import json,sys; json.load(sys.stdin)' && ok "--json stays valid when the fetch fails" || bad "--json stays valid when the fetch fails"
+rm -rf "$T"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

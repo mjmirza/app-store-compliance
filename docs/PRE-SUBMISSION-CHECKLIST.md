@@ -2,6 +2,15 @@
 
 Treat every unchecked box as a release blocker. Run this before any upload to App Store Connect or the Play Console. Each item is phrased as a verifiable check.
 
+## Start here. Two checks, about five minutes
+
+These two stop most rejections on both stores. Do them before anything else.
+
+- [ ] A working demo account with a live backend is in the review notes, and the login works today.
+- [ ] The privacy declaration (Apple privacy labels, Google Data Safety form) matches what the app really collects at runtime, every SDK included.
+
+Then work down the page. Do Shared first, then the store you ship to. Skip any section whose heading says "if" and does not match your app. The full list is about 100 boxes, so plan an hour for a first pass.
+
 ## Shared (both stores)
 
 ### Stability and completeness

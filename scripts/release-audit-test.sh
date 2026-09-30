@@ -37,5 +37,9 @@ IDS="$(grep -oE '\b[A-Z]+(-[A-Z0-9.]+)+\b' "$REPORT" 2>/dev/null | sort -u | wc 
 OUT="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing target path is rejected before any scan" || bad "a missing target path is rejected before any scan (rc=$RC)"
 
+# The audit runs the playbook's own tests first, which is slow. The reader is told how long before the wait.
+FIRST="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1; sed -n '/Starting Release Readiness/,/Scanning your app/p' scripts/release-audit.py)"
+echo "$FIRST" | grep -q "about two minutes" && ok "the slow self-check step says how long it takes" || bad "the slow self-check step says how long it takes"
+
 echo "release-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

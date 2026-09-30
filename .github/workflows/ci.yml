@@ -29,6 +29,11 @@ jobs:
       - name: Installer test suite
         run: bash scripts/install-test.sh
 
+      - name: Every link, path, script and flag named in the docs exists
+        run: |
+          bash scripts/check-docs-test.sh
+          python3 scripts/check-docs.py
+
       - name: Metadata audit test suite
         run: bash scripts/metadata-audit-test.sh
 
