@@ -15,7 +15,12 @@ PAYLOAD_DIRS="docs data references templates scripts"
 
 # shellcheck disable=SC2088
 if [ "$CONF" = "$HOME/.claude" ]; then SHOWN='~/.claude'; else SHOWN="$CONF"; fi
-HOOK_CMD="bash $SHOWN/hooks/$GUARD_NAME"
+# The hook command is run by a shell, so a custom folder is single-quoted. The default keeps an unquoted tilde.
+if [ "$CONF" = "$HOME/.claude" ]; then
+  HOOK_CMD="bash $SHOWN/hooks/$GUARD_NAME"
+else
+  HOOK_CMD="bash '$(printf '%s' "$GUARD" | sed "s/'/'\\\\''/g")'"
+fi
 
 MODE="install"; DRY=0
 for arg in "$@"; do
@@ -60,7 +65,7 @@ settings_edit() {
   local action="$1"
   if have python3 -c pass; then
     python3 - "$SETTINGS" "$HOOK_CMD" "$GUARD_NAME" "$action" <<'PY'
-import json, os, shutil, sys, tempfile, time
+import json, os, re, shutil, sys, tempfile, time
 
 path, cmd, name, action = sys.argv[1:5]
 real = os.path.realpath(path)
@@ -70,9 +75,17 @@ if exists:
     try:
         with open(real, encoding="utf-8") as f:
             text = f.read()
-        data = json.loads(text) if text.strip() else {}
+        def no_repeats(pairs):
+            keys = [k for k, _ in pairs]
+            if len(keys) != len(set(keys)):
+                raise ValueError("repeated key")
+            return dict(pairs)
+
+        data = json.loads(text, object_pairs_hook=no_repeats) if text.strip() else {}
     except Exception:
         sys.exit(4)
+    if not os.access(real, os.W_OK):
+        sys.exit(6)
 if not isinstance(data, dict):
     sys.exit(4)
 hooks = data.get("hooks", {})
@@ -90,8 +103,23 @@ def ours(h):
     return isinstance(h, dict) and name in str(h.get("command", ""))
 
 
+def fires(e, h):
+    # Only an entry Claude Code would run for a Bash call counts. Wrong matcher or a commented name does not.
+    m = e.get("matcher", "")
+    c = str(h.get("command", "")).strip()
+    try:
+        on_bash = m in ("", "*") or re.fullmatch(m, "Bash") is not None
+    except re.error:
+        on_bash = False
+    runs = c.startswith("bash ") and "#" not in c and c.rstrip("'\"").endswith(name)
+    return ours(h) and on_bash and runs and h.get("type", "command") == "command"
+
+
 changed = False
-found = [h for e in pre for h in e.get("hooks", []) if ours(h)]
+if action == "add":
+    found = [h for e in pre for h in e.get("hooks", []) if fires(e, h)]
+else:
+    found = [h for e in pre for h in e.get("hooks", []) if ours(h)]
 if action == "add":
     if found:
         for h in found:
@@ -125,7 +153,7 @@ if not changed:
 folder = os.path.dirname(real) or "."
 os.makedirs(folder, exist_ok=True)
 if exists:
-    shutil.copy2(real, path + ".bak-" + time.strftime("%Y%m%d-%H%M%S"))
+    shutil.copy2(real, path + ".bak-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(os.getpid()))
 fd, tmp = tempfile.mkstemp(dir=folder, prefix=".settings-")
 with os.fdopen(fd, "w", encoding="utf-8") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -140,10 +168,11 @@ PY
     local cur tmp
     if [ -s "$SETTINGS" ]; then cur="$SETTINGS"; else cur=""; fi
     if [ -n "$cur" ]; then
-      jq -e 'type == "object" and ((.hooks // {}) | type == "object") and ((.hooks.PreToolUse // []) | type == "array")' "$cur" >/dev/null 2>&1 || return 4
+      jq -e 'type == "object" and ((.hooks // {}) | type == "object") and ((.hooks.PreToolUse // []) | type == "array") and ((.hooks.PreToolUse // []) | all(type == "object" and ((.hooks // []) | type == "array")))' "$cur" >/dev/null 2>&1 || return 4
+      [ -w "$cur" ] || return 6
     fi
     local present=1
-    [ -n "$cur" ] && jq -e --arg n "$GUARD_NAME" '[.hooks.PreToolUse[]?.hooks[]?.command? // "" | tostring | contains($n)] | any' "$cur" >/dev/null 2>&1 && present=0
+    [ -n "$cur" ] && jq -e --arg n "$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and contains($n) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     if [ "$action" = "add" ]; then
       [ "$present" -eq 0 ] && return 3
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
@@ -161,17 +190,32 @@ PY
   return 5
 }
 
-hook_registered() {
-  [ -f "$SETTINGS" ] || return 1
+# Prints the registered command Claude Code would run for a Bash call, empty when there is none.
+registered_cmd() {
+  [ -f "$SETTINGS" ] || return 0
   if have python3 -c pass; then
-    python3 -c 'import json,sys
+    python3 -c 'import json,re,sys
 try: d=json.load(open(sys.argv[1]))
-except Exception: sys.exit(1)
-ok=any(sys.argv[2] in str(h.get("command","")) for e in d.get("hooks",{}).get("PreToolUse",[]) if isinstance(e,dict) for h in e.get("hooks",[]) if isinstance(h,dict))
-sys.exit(0 if ok else 1)' "$SETTINGS" "$GUARD_NAME" 2>/dev/null
-    return $?
+except Exception: sys.exit(0)
+n=sys.argv[2]
+for e in d.get("hooks",{}).get("PreToolUse",[]):
+    if not isinstance(e,dict): continue
+    m=e.get("matcher","")
+    try: ok=m in ("","*") or re.fullmatch(m,"Bash") is not None
+    except re.error: ok=False
+    if not ok: continue
+    for h in e.get("hooks",[]):
+        c=str(h.get("command","")) if isinstance(h,dict) else ""
+        if n in c and "#" not in c and c.strip().startswith("bash "):
+            print(c); sys.exit(0)' "$SETTINGS" "$GUARD_NAME" 2>/dev/null
+    return 0
   fi
-  grep -q "$GUARD_NAME" "$SETTINGS" 2>/dev/null
+  if have jq -n true; then
+    jq -r --arg n "$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and contains($n) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
+    return 0
+  fi
+  grep -q "$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"
+  return 0
 }
 
 # Proves the install. Every line is a real check, the guard is run against a built-in app that must be blocked.
@@ -187,7 +231,8 @@ verify() {
   done
   if [ -z "$missing" ]; then good "skill payload complete at $SHOWN/skills/app-store-compliance"; else fail "skill payload is missing.$missing"; fi
   if [ -f "$CMD_FILE" ]; then good "slash command /app-store-audit installed"; else fail "slash command missing at $SHOWN/commands/app-store-audit.md"; fi
-  if hook_registered; then good "hook registered in $SHOWN/settings.json"; else fail "hook is not registered in $SHOWN/settings.json"; fi
+  local reg; reg="$(registered_cmd)"
+  if [ -n "$reg" ]; then good "hook registered for Bash in $SHOWN/settings.json"; else fail "no working hook entry for Bash in $SHOWN/settings.json"; fi
 
   if [ -f "$GUARD" ]; then
     local fx rc out
@@ -196,10 +241,13 @@ verify() {
     printf 'import CoreLocation\nclass A { func signIn(){} func createAccount(){} }\nlet m=CLLocationManager()\nlet u="https://staging.example.com"\nimport Stripe\n' > "$fx/App/X.swift"
     bash "$GUARD" "$fx" >/dev/null 2>&1; rc=$?
     if [ "$rc" -eq 2 ]; then good "guard blocks a sample app with known rejection risks"; else fail "guard did not block the sample app when run directly (exit $rc, expected 2)"; fi
-    ( cd "$fx" && printf '{"tool_name":"Bash","tool_input":{"command":"fastlane deliver"}}' | env -u CLAUDE_PROJECT_DIR bash "$GUARD" >/dev/null 2>&1 ); rc=$?
-    if [ "$rc" -eq 2 ]; then good "guard blocks a submit command as a hook"; else fail "guard did not block a submit command as a hook (exit $rc, expected 2)"; fi
-    out="$( cd "$fx" && printf '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>&1 )"; rc=$?
-    if [ "$rc" -eq 0 ] && [ -z "$out" ]; then good "guard stays silent on an ordinary command"; else fail "guard reacted to an ordinary command (exit $rc)"; fi
+    # The registered command string is what Claude Code runs, so that exact string is what gets tested.
+    if [ -n "$reg" ]; then
+      ( cd "$fx" && printf '{"tool_name":"Bash","tool_input":{"command":"fastlane deliver"}}' | env -u CLAUDE_PROJECT_DIR bash -c "$reg" >/dev/null 2>&1 ); rc=$?
+      if [ "$rc" -eq 2 ]; then good "the registered hook command blocks a submit command"; else fail "the registered hook command did not block a submit command (exit $rc, expected 2). Command. $reg"; fi
+      out="$( cd "$fx" && printf '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' | env -u CLAUDE_PROJECT_DIR bash -c "$reg" 2>&1 )"; rc=$?
+      if [ "$rc" -eq 0 ] && [ -z "$out" ]; then good "the registered hook command stays silent on an ordinary command"; else fail "the registered hook command reacted to an ordinary command (exit $rc)"; fi
+    fi
     rm -rf "$fx"
   fi
   have python3 -c pass || warn "python3 not found. The guard still runs, the deadline list and the privacy manifest validator are skipped."
@@ -244,7 +292,8 @@ do_install() {
   case "$rc" in
     0) good "hook added to settings.json (a backup sits next to it when the file already existed)" ;;
     3) good "hook already registered, settings.json left as it is" ;;
-    4) fail "settings.json is not valid JSON or has an unexpected shape. It was not changed."; manual_block ;;
+    4) fail "settings.json is not valid JSON, repeats a key, or has an unexpected shape. It was not changed."; manual_block ;;
+    6) fail "settings.json is read-only. It was not changed."; manual_block ;;
     *) fail "neither python3 nor jq is installed, so settings.json was not edited."; manual_block ;;
   esac
   verify

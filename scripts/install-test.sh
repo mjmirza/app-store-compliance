@@ -92,6 +92,54 @@ fresh
 run frobnicate >/dev/null; RC=$?
 [ "$RC" -eq 2 ] && [ -z "$(ls -A "$C")" ] && ok "an unknown subcommand exits 2 and writes nothing" || bad "an unknown subcommand exits 2 and writes nothing (rc=$RC)"
 
+# 12 an entry that names the guard but cannot fire for Bash does not count as registered
+bash_entries() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(sum(1 for e in d["hooks"]["PreToolUse"] if e.get("matcher")=="Bash" for h in e["hooks"] if h.get("command","").startswith("bash ") and "#" not in h["command"] and h["command"].rstrip().rstrip(chr(39)).endswith("app-store-compliance-guard.sh")))' "$C/settings.json"; }
+fresh
+printf '{"hooks":{"PreToolUse":[{"matcher":"Read","hooks":[{"type":"command","command":"bash ~/.claude/hooks/app-store-compliance-guard.sh"}]},{"matcher":"Bash","hooks":[{"type":"command","command":"true # app-store-compliance-guard.sh"}]}]}}' > "$C/settings.json"
+run >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(bash_entries)" = "1" ] && ok "a guard entry on the wrong matcher or behind a comment is not trusted, a working one is added" || bad "a guard entry on the wrong matcher or behind a comment is not trusted (rc=$RC)"
+
+# 13 a config folder with a space still yields a hook command the shell can run, and it blocks
+C="$WORK/claude config $RANDOM"; mkdir -p "$C"
+OUT="$(run)"; RC=$?
+HOOKCMD="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print([h["command"] for e in d["hooks"]["PreToolUse"] for h in e["hooks"]][0])' "$C/settings.json")"
+FX="$(mktemp -d)"; mkdir -p "$FX/App"; printf '<plist><dict></dict></plist>' > "$FX/App/Info.plist"
+printf 'class A { func signIn(){} func createAccount(){} }\nlet u="https://staging.example.com"\n' > "$FX/App/X.swift"
+( cd "$FX" && printf '{"tool_name":"Bash","tool_input":{"command":"fastlane deliver"}}' | env -u CLAUDE_PROJECT_DIR bash -c "$HOOKCMD" >/dev/null 2>&1 ); HRC=$?
+[ "$RC" -eq 0 ] && [ "$HRC" -eq 2 ] && ok "a config path with a space gives a runnable hook command that blocks" || bad "a config path with a space gives a runnable hook command that blocks (install rc=$RC hook rc=$HRC)"
+rm -rf "$FX"
+
+# 14 doctor runs the registered command itself, so an entry that cannot fire fails the check
+fresh; run >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["PreToolUse"][0]["hooks"][0]["command"]="bash /no/such/app-store-compliance-guard.sh"; json.dump(d,open(p,"w"))' "$C/settings.json"
+run doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "doctor fails when the registered command cannot run" || bad "doctor fails when the registered command cannot run (rc=$RC)"
+
+# 15 a settings.json with a repeated key is ambiguous and is never rewritten
+fresh
+printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"x"}]}]},"hooks":{"PreToolUse":[]}}' > "$C/settings.json"; BEFORE="$(cat "$C/settings.json")"
+OUT="$(run)"; RC=$?
+[ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ "$RC" -eq 1 ] && echo "$OUT" | grep -q '"PreToolUse"' && ok "a repeated key leaves settings.json untouched" || bad "a repeated key leaves settings.json untouched (rc=$RC)"
+
+# 16 a read-only settings.json is respected
+fresh
+printf '{"model":"opus"}' > "$C/settings.json"; chmod 0444 "$C/settings.json"
+run >/dev/null; RC=$?
+[ "$(cat "$C/settings.json")" = '{"model":"opus"}' ] && [ "$RC" -eq 1 ] && ok "a read-only settings.json is left untouched" || bad "a read-only settings.json is left untouched (rc=$RC)"
+chmod 0644 "$C/settings.json"
+
+# 17 with jq and no python3 the hook is still merged, other keys kept, and a second run adds nothing
+if command -v jq >/dev/null 2>&1; then
+  fresh
+  SHIM="$(mktemp -d)"
+  for b in bash cp rm mkdir chmod cat grep sed awk find xargs tr head tail mktemp printf wc sort uniq cut dirname basename date cmp mv ls env plutil xmllint file od comm tee sleep expr touch jq; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$SHIM/$b"; done
+  printf '{"model":"opus","hooks":{"Stop":[]}}' > "$C/settings.json"
+  OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
+  PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" >/dev/null 2>&1
+  [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && [ "$(hooks)" = "1" ] && grep -q '"opus"' "$C/settings.json" && ok "with jq only the hook is merged once and verified" || bad "with jq only the hook is merged once and verified (rc=$RC entries=$(hooks))"
+  rm -rf "$SHIM"
+fi
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

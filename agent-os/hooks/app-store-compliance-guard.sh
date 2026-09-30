@@ -108,14 +108,19 @@ if [ -n "$STDIN_JSON" ]; then
       else { gsub(sq, "", l); gsub(dq, "", l) }
       print l }' 2>/dev/null | sed -E 's/\\([A-Za-z0-9])/\1/g')"
   # Only act on submission style commands. Otherwise stay silent.
-  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'
+  # Installing a package named like a submit tool (npm install bundletool) is not a submit.
+  CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/(npm|pnpm|yarn|bun|brew|pip3?|gem|cargo)[[:space:]]+(install|add|i|uninstall|remove)([[:space:]][^;&|]*)?//g')"
+  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'
   UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
-  # A custom fastlane lane submits when its name says so, or when its block in a Fastfile calls an upload action.
+  # A custom fastlane lane submits when a word in its name says so, when its Fastfile block calls an
+  # upload action, or when the lane is a variable the guard cannot read (scanned, never assumed safe).
   fastlane_lane_submits() {
     local lane ff
-    lane="$(printf '%s' "$1" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])fastlane[[:space:]]+((ios|android|mac)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*).*/\4/p' | head -1)"
+    lane="$(printf '%s' "$1" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])fastlane[[:space:]]+((ios|android|mac)[[:space:]]+)?([$`]|[A-Za-z_][A-Za-z0-9_]*).*/\4/p' | head -1)"
     [ -z "$lane" ] && return 1
-    printf '%s' "$lane" | grep -qiE 'release|beta|deploy|prod|publish|submit|upload|store|testflight|distribut|ship' && return 0
+    case "$lane" in '$'*|'`'*) return 0 ;; esac
+    case "$lane" in *[!A-Za-z0-9_]*) return 1 ;; esac
+    printf '%s' "$lane" | tr '_' '\n' | grep -qixE 'release|beta|deploy|production|prod|publish|submit|upload|appstore|playstore|testflight|distribute' && return 0
     while IFS= read -r ff; do
       [ -f "$ff" ] || continue
       awk -v n="$lane" '$0 ~ "lane[[:space:]]+:" n "([^A-Za-z0-9_]|$)" { on=1; next } on && /^[[:space:]]*(private_)?lane[[:space:]]+:/ { on=0 } on' "$ff" 2>/dev/null \
@@ -125,25 +130,42 @@ $(find "$DIR" -maxdepth 3 -name Fastfile -not -path '*/node_modules/*' 2>/dev/nu
 FASTFILES
     return 1
   }
-  submits() { printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || fastlane_lane_submits "$1"; }
+  submits() { printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || printf '%s' "$1" | grep -qE 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
   # What a package script or a make target runs, one level deep, so a wrapped submit is still seen.
   wrapper_body() {
-    local name mf
-    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])(npm|pnpm|bun)[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\4/p' | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])yarn[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p' | head -1)"
-    if [ -n "$name" ] && [ -f "$DIR/package.json" ]; then
-      grep -E "^[[:space:]]*\"$name\"[[:space:]]*:" "$DIR/package.json" 2>/dev/null | head -1
-    fi
-    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([A-Za-z0-9_.-]+).*/\2/p' | head -1)"
+    local name esc sub pj seg w prev mf targets mfiles
+    local opts='([[:space:]]+--?[A-Za-z][A-Za-z-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*'
+    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])(npm|pnpm|bun)'"$opts"'[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p' | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])yarn'"$opts"'[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p' | head -1)"
     if [ -n "$name" ]; then
-      for mf in "$DIR/Makefile" "$DIR/makefile" "$DIR/GNUmakefile"; do
-        [ -f "$mf" ] && awk -v t="$name" 'index($0, t ":") == 1 { on=1; next } on && /^[^\t#]/ { on=0 } on' "$mf" 2>/dev/null
+      esc="$(printf '%s' "$name" | sed 's/\./\\./g')"
+      sub="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
+      case "$sub" in /*|*..*) sub="" ;; esac
+      for pj in "$DIR/package.json" ${sub:+"$DIR/$sub/package.json"}; do
+        [ -f "$pj" ] && grep -E "^[[:space:]]*\"$esc\"[[:space:]]*:" "$pj" 2>/dev/null | head -1
       done
+    fi
+    seg="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([^;&|]*).*/\2/p' | head -1)"
+    if [ -n "$seg" ]; then
+      targets=""; mfiles="Makefile makefile GNUmakefile"; prev=""
+      set -f
+      for w in $seg; do
+        if [ "$prev" = "-f" ]; then case "$w" in /*|*..*) ;; *) mfiles="$mfiles $w" ;; esac
+        else case "$w" in -*|*=*) ;; *[!A-Za-z0-9_.-]*) ;; *) targets="$targets $w" ;; esac
+        fi
+        prev="$w"
+      done
+      for w in $targets; do
+        for mf in $mfiles; do
+          [ -f "$DIR/$mf" ] && awk -v t="$w" 'index($0, t ":") == 1 { on=1; next } on && /^[^\t#]/ { on=0 } on' "$DIR/$mf" 2>/dev/null
+        done
+      done
+      set +f
     fi
   }
   # Cheap exit for the everyday command. Nothing below runs unless a submit tool or a wrapper is named.
   if ! printf '%s' "$CMD_MATCH" | grep -qiE "$SUBMIT_RE" \
-    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make)[[:space:]]'; then
+    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make)[[:space:]]|gradlew?[[:space:]]+\$'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
@@ -161,7 +183,7 @@ FASTFILES
     fi
   fi
   if ! submits "$CMD_MATCH"; then
-    WRAPPED="$(wrapper_body)"
+    WRAPPED="$(wrapper_body | tr -d "\"'\\\\")"
     { [ -n "$WRAPPED" ] && submits "$WRAPPED"; } || exit 0
   fi
 fi

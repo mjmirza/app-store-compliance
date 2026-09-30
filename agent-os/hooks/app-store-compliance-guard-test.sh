@@ -1572,6 +1572,24 @@ RC="$(hook_rc "fastlane deliver" "$D" PowerShell)"
 [ "$RC" = "2" ] && ok "836-ps a PowerShell tool payload is scanned" || bad "836-ps a PowerShell tool payload is scanned (rc=$RC)"
 rm -rf "$D"
 
+# Second round (#836). Options before the subcommand, a makefile named with -f, a lane held in a variable.
+D="$(mk_ios_bad)"; mkdir -p "$D/ios" "$D/apps/mobile"
+printf '{\n  "scripts": {\n    "submit:ios": "fastlane ios \\"release\\""\n  }\n}\n' > "$D/ios/package.json"
+printf '{\n  "scripts": {\n    "submit": "eas submit -p ios"\n  }\n}\n' > "$D/apps/mobile/package.json"
+printf '{\n  "scripts": {\n    "q": "fastlane ios \\"release\\"",\n    "buildX": "eas submit",\n    "build.x": "tsc"\n  }\n}\n' > "$D/package.json"
+printf 'ios-release:\n\txcodebuild -scheme A archive\n' > "$D/Release.mk"
+printf 'ios-release:\n\txcodebuild -scheme A archive\n' > "$D/Makefile"
+n=0
+for c in 'pnpm --dir apps/mobile run submit' 'npm --prefix ios run submit:ios' 'npm run q' 'make -f Release.mk ios-release' "make 'ios-release'" 'make -j4 ios-release' 'npx expo upload:ios' 'fastlane ios "$LANE"' 'fastlane ios $(printf deliver)' './gradlew "$TASK"'; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "2" ] && ok "836b-$n blocked. $c" || bad "836b-$n blocked. $c (rc=$RC)"
+done
+for c in 'fastlane ios restore_state' 'fastlane ios shipshape' 'npm install bundletool' 'yarn add transporter' 'npm run build.x' './gradlew test -Pv=$V'; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "0" ] && ok "836b-$n silent. $c" || bad "836b-$n silent. $c (rc=$RC)"
+done
+rm -rf "$D"
+
 # An explicit path that is not a directory is an error the person must see, never a silent pass.
 ERR="$(bash "$GUARD" /no/such/dir/here 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$ERR" | grep -q "not a directory" && ok "836-path a missing project path exits 1 with a reason" || bad "836-path a missing project path exits 1 with a reason (rc=$RC)"
