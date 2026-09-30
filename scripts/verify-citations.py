@@ -118,7 +118,11 @@ def collect_urls(root, only=None):
         walk = [target] if os.path.isfile(target) else []
         if not walk:
             for dirpath, dirnames, filenames in os.walk(target):
-                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+                # hidden directories hold local tool state (browser logs, editor caches), never cited sources
+                dirnames[:] = [
+                    d for d in dirnames
+                    if d not in SKIP_DIRS and (not d.startswith(".") or d == ".github")
+                ]
                 for fn in filenames:
                     if os.path.splitext(fn)[1].lower() in SKIP_EXT or fn in SELF:
                         continue

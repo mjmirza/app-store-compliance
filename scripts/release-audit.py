@@ -291,7 +291,10 @@ def find_affected_files(target_dir, patterns_dict):
 
 def main():
     target_dir = ROOT
-    if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]):
+    if len(sys.argv) > 1:
+        if not os.path.isdir(sys.argv[1]):
+            print(f"release-audit. '{sys.argv[1]}' is not a directory.", file=sys.stderr)
+            return 1
         target_dir = os.path.abspath(sys.argv[1])
 
     print("== Starting Release Readiness Compliance Audit ==")

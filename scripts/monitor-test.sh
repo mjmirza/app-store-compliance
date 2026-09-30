@@ -23,6 +23,8 @@ echo "$OUT" | grep -q "TRACK UPDATE: \[In-App Purchase policies\]" && \
 echo "$OUT" | grep -q "TRACK UPDATE: \[DMA compliance changes\]" && \
 echo "$OUT" | grep -q "TRACK UPDATE: \[Swift requirements\]" && \
 ok "simulating all 25 tracks runs successfully with no crashes and outputs matches" || bad "simulate all tracks"
+N_TRACKS="$($MONITOR --simulate "all" 2>&1 | grep -o 'TRACK UPDATE: \[[^]]*\]' | sort -u | wc -l | tr -d ' ')"
+[ "$N_TRACKS" = "25" ] && ok "simulating all reaches every one of the 25 tracks" || bad "simulating all reaches every one of the 25 tracks (got $N_TRACKS)"
 
 # 4. JSON output format verification
 JSON_OUT="$($MONITOR --simulate "Required Reason APIs" --json 2>&1)"

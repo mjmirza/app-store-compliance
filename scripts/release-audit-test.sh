@@ -33,5 +33,9 @@ TOTAL="$(echo "$SUMMARY" | grep -oE '[0-9]+' | awk '{t+=$1} END {print t+0}')"
 IDS="$(grep -oE '\b[A-Z]+(-[A-Z0-9.]+)+\b' "$REPORT" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
 [ "${TOTAL:-x}" = "$IDS" ] && ok "every counted finding has a real hyphenated id ($TOTAL)" || bad "finding count $TOTAL does not match $IDS real ids"
 
+# A target path that does not exist is an error, never a silent audit of this playbook.
+OUT="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing target path is rejected before any scan" || bad "a missing target path is rejected before any scan (rc=$RC)"
+
 echo "release-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

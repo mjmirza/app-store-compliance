@@ -70,7 +70,7 @@ These put duties on both the store and the developer, separate from broader soci
 |---|---|---|---|
 | Utah | SB 142 | 26 March 2025 | store and developer duties from 6 May 2026, some operational parts delayed to 6 May 2027, private right of action from 31 December 2026 |
 | Texas | SB 2420 | 2025 | statutory 1 January 2026, enjoined 23 December 2025, injunction stayed 28 May 2026 so now in effect while litigation continues |
-| Louisiana | HB 570 | 30 June 2025 | delayed one year to 1 July 2027 |
+| Louisiana | HB 977 (Act 185 of 2026), replacing HB 570 | 2026 | 1 July 2027. HB 570 (Act 481 of 2025) never takes effect |
 | Alabama | HB 161 | 9 March 2026 | 2027, exact date unverified |
 
 Common developer duties. request and receive an age category from the store. confirm whether verifiable parental consent exists for a minor account before use. assign an accurate age and suitability rating. re-request consent on a major change. limit use of age and consent data to compliance and delete it after verification (Texas is explicit on deletion). For Android apps, Google Play supports this via the Play Age Signals API, which began returning signals for eligible Texas accounts created after May 28, 2026. Sources. [Utah SB 142](https://le.utah.gov/~2025/bills/static/SB0142.html), [FPF comparison of the ASAAs](https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/), [Wiley ASAA developments](https://www.wiley.law/alert-Key-Developments-With-State-App-Store-Accountability-Acts-as-Texas-Act-Takes-Effect).
@@ -177,7 +177,7 @@ Neither rule is a general developer duty. Both bind the entity that provides the
 
 ### 3.4 Canada
 
-- PIPEDA is the federal baseline. informed consent, purpose limitation, and breach reporting. Quebec Law 25 is stricter. explicit opt-in consent for tracking and profiling, a named privacy officer, privacy impact assessments, and breach notification. Penalty up to the greater of 25 million Canadian dollars or 4 percent of global turnover. Sources. [Quebec Law 25](https://www.cookieyes.com/blog/quebec-law-25/).
+- PIPEDA is the federal baseline. informed consent, purpose limitation, and breach reporting. Quebec Law 25 is stricter. explicit opt-in consent for tracking and profiling, a named privacy officer, privacy impact assessments, and breach notification. Administrative monetary penalties reach 10 million Canadian dollars or 2 percent of worldwide turnover, read on the regulator page on 30 September 2026. The penal fine maximum of 25 million Canadian dollars or 4 percent comes from a vendor summary, because LégisQuébec refuses automated fetches and the statute text was not read. Sources. [Commission d'accès à l'information, main changes under Law 25](https://www.cai.gouv.qc.ca/protection-renseignements-personnels/sujets-et-domaines-dinteret/principaux-changements-loi-25), [CookieYes summary](https://www.cookieyes.com/blog/quebec-law-25/).
 
 - Checked 5 September 2026. No AI statute exists (no government AI bill in the 45th Parliament), Bill C-36 (privacy) is at first reading, Bill S-209 (age verification) passed the Senate on 15 April 2026 and is at House first reading, and the Online Harms bill was reintroduced as C-34 at second reading. Bill C-8 (cyber security, Royal Assent 15 June 2026) binds vital-services operators, not consumer apps. No new dated app obligation. Source. [LEGISinfo](https://www.parl.ca/legisinfo/).
 
