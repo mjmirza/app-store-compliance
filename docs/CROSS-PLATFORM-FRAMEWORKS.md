@@ -37,7 +37,8 @@ file-tree detection.
 `xcrun notarytool`, `transporter`, `gradlew bundleRelease/assembleRelease`,
 `bundletool`, `xcodebuild archive`, `flutter build ipa/appbundle/apk`,
 `cap sync/build/run` (with or without `npx`), `ionic capacitor build/run`,
-`cordova build` (with or without `--release`).
+`cordova build` (with or without `--release`), `Unity ... -buildTarget iOS/Android`,
+`dotnet publish -f net8.0-ios/android`, `tauri ios/android build`.
 
 ## Flutter checks
 
@@ -87,6 +88,38 @@ before submitting.
   support is less standardized than Flutter's. Verify each plugin wrapping a
   native SDK ships its own `PrivacyInfo.xcprivacy`.
 
+## Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform
+
+Added for issue 837. Each one is detected, named on the `Frameworks.` line, and has a bad and a clean project in the test suite.
+
+| Framework | Detected by | Source now read | Submit command that runs the scan |
+|---|---|---|---|
+| Unity | `ProjectSettings/ProjectVersion.txt` | `.cs` | `Unity -batchmode ... -buildTarget iOS` or `Android` |
+| .NET MAUI | a `.csproj` with `UseMaui` or a `net8.0-ios` style target | `.cs`, `.xaml`, `.csproj` | `dotnet publish -f net8.0-ios` or `net8.0-android` |
+| Tauri mobile | `tauri.conf.json`, `tauri.conf.json5` or `Tauri.toml` | `.rs`, `.toml` | `tauri ios build`, `tauri android build`, with or without `cargo` or `npx` |
+| Kotlin Multiplatform | the multiplatform plugin in a Gradle file | `commonMain` Kotlin, as before | the Gradle and `xcodebuild archive` commands already covered |
+
+Three behaviours to know.
+
+- A Unity project is scanned for both stores when it is run by hand. As a hook the `-buildTarget` value picks the store.
+- A Unity project holds no Xcode or Gradle project until it is exported, so the export compliance check and the R8 check stay silent and the report says so. Scan the exported project too.
+- A Kotlin Multiplatform project is scanned as one app, so shared code in `commonMain` counts for both the iOS and the Android checks.
+
+## What stays out of reach
+
+These are limits, not bugs waiting for a fix. Plan around them.
+
+- **Anything that runs on a CI server.** `gh workflow run`, a release started from a CI dashboard, and a fastlane lane run by a runner are never seen by a hook on your machine.
+- **Uploads from an app window.** Xcode Organizer, the Transporter app, the Unity Editor build window and Android Studio's Generate Signed Bundle do not run a shell command.
+- **A Unity build whose target is chosen in code.** `-executeMethod` with no `-buildTarget iOS` or `Android` on the command line is not treated as a submit.
+- **Unity and .NET MAUI build settings.** Info.plist keys and Gradle settings that the tool generates at build time are not read. For .NET MAUI the linker and target API settings in the `.csproj` are not checked, and `dotnet build -t:Publish` is not matched. A Mac Catalyst publish is not treated as a submit.
+- **Tauri before init.** With no `src-tauri/gen/apple` or `src-tauri/gen/android` folder there is nothing native to scan. The report names the command to run.
+- **A Tauri app beside a native app.** In a monorepo a Tauri folder with no `gen/apple` or `gen/android` is treated as a desktop app, so it does not stop a `CLEAR` for the native app next to it.
+- **Rust naming.** The sign-in and account-deletion patterns look for camelCase names such as `signIn`. A Rust function named `sign_in` does not trigger them.
+- **Frameworks not detected.** NativeScript and legacy Xamarin.Forms projects.
+- **More than one Xcode target.** Targets are read as one body of source, so an app extension can satisfy, or trigger, a finding for the main app. A watchOS-only or visionOS-only workspace is treated as iOS.
+- **Store console state.** The guard cannot see App Store Connect or Play Console, so the age rating, social media declaration, and closed testing items are reminders, not proof of a problem.
+
 ## Known gaps (found by Codex and Qwen adversarial review, not yet fixed)
 
 - **Newline-containing file paths.** The `package.json`/`config.xml` scan loops
@@ -111,9 +144,9 @@ before submitting.
 - **Expo Continuous Native Generation (CNG) is not modeled.** A managed Expo
   project legitimately has no committed `ios/`/`android/` folder; treating that
   as "no iOS target" is not always correct.
-- **Other cross-platform frameworks have no coverage.** NativeScript,
-  Xamarin/.NET MAUI, Kotlin Multiplatform, Unity (mobile export), and Tauri
-  Mobile are not detected at all.
+- **Two frameworks have no coverage.** NativeScript and legacy Xamarin.Forms
+  are not detected. Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform
+  are, see the section above for what each one still cannot see.
 - **The submission regex still misses a few real commands**
   (`eas build` with no platform flag, ambiguous local `cap run` without a
   release intent) and can overfire on non-release local dev commands.
@@ -124,7 +157,7 @@ improvement over native-only, not a finished answer.
 
 ## The honest limit
 
-The guard reads Swift, Kotlin, XML, Gradle, Plist, Dart, JS, and TS source text.
+The guard reads Swift, Kotlin, XML, Gradle, Plist, Dart, JS, TS, C#, and Rust source text.
 It does not execute the app, does not parse the Dart or JS AST, and cannot see
 runtime behavior (whether an OTA update actually changes the UI, for example).
 Treat every finding as a lead to verify, not a guaranteed defect, and treat a

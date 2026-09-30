@@ -14,12 +14,10 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2ea44f)](.github/CONTRIBUTING.md)
 
 [![Stars](https://img.shields.io/github/stars/mjmirza/app-store-compliance?style=social)](https://github.com/mjmirza/app-store-compliance/stargazers)
-[![Forks](https://img.shields.io/github/forks/mjmirza/app-store-compliance?style=social)](https://github.com/mjmirza/app-store-compliance/fork)
-[![Follow mjmirza](https://img.shields.io/github/followers/mjmirza?label=Follow&style=social)](https://github.com/mjmirza)
 
-**If this saves you even one rejection, leave a star, fork it, and follow along. That is the whole ask.**
+**If this saves you even one rejection, leave a star. That is the whole ask.**
 
-[Star this repo](https://github.com/mjmirza/app-store-compliance) &nbsp;|&nbsp; [Fork it](https://github.com/mjmirza/app-store-compliance/fork) &nbsp;|&nbsp; [Follow on GitHub](https://github.com/mjmirza) &nbsp;|&nbsp; [Follow on X](https://twitter.com/MirzaJhanzaib) &nbsp;|&nbsp; [next8n.com](https://next8n.com)
+[Star this repo](https://github.com/mjmirza/app-store-compliance)
 
 </div>
 
@@ -41,7 +39,7 @@ git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-sto
 bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 ```
 
-Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. The last lines tell you where you stand.
+Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. Findings print first, critical ones on top, each with the file and line that triggered it when there is one. The last lines tell you where you stand.
 
 | Last line starts with | It means | Do next |
 |---|---|---|
@@ -289,13 +287,14 @@ What to expect, measured on 30 September 2026.
 | Command | Output and time | Writes a file |
 |---|---|---|
 | `monitor.py` | A count per track and the first 10 items. `--full` prints every item | No |
-| `monitor-android.py`, `monitor-ai-policy.py` | About 200 and 95 lines | Each rewrites its migration doc under `docs/` in the folder you run it from |
-| `monitor-privacy.py`, `monitor-security.py` | About 27 lines each | A PR draft under `docs/` in the folder you run them from |
+| `monitor-regulatory.py` | About 95 lines | No |
+| `monitor-android.py`, `monitor-ai-policy.py` | About 205 and 95 lines | Only with `--output-docs <path>` or `--pr-output <path>` |
+| `monitor-privacy.py`, `monitor-security.py` | About 27 lines each | Only with `--output-docs <path>` or `--pr-output <path>` |
 | `release-audit.py` | About two minutes. It checks the playbook itself first, then your app | `RELEASE-READINESS-REPORT.md` in your app folder |
 | `generate-timeline.py` | The open deadlines, then one completion line | Rewrites `docs/REGULATORY-TIMELINE.md` in the playbook folder |
 | `deadline-checker.py` | About 175 lines of detail. Add `--brief` for one line per open deadline | No |
 
-The monitors other than `monitor.py` read built-in sample announcements by default. Treat their output as a worked example of the migration tasks, not as news.
+Every monitor prints one `Data.` line that says whether its items are live or sample. The monitors other than `monitor.py` read built-in sample announcements unless you pass `--live`, so treat that output as a worked example of the migration tasks, not as news. `monitor-regulatory.py` and `monitor-security.py` have no live feed.
 
 ### Citation integrity
 
@@ -349,7 +348,7 @@ python3 scripts/deadline-checker.py
 | `docs/EU-REGULATORY-2026.md` | The EU legal hard rules with dated sources. the EU AI Act (Article 50 transparency by 2 August 2026, Article 4 literacy, Article 5 prohibitions, penalties), the Digital Markets Act and the Core Technology Fee, DSA trader status, the European Accessibility Act and EN 301 549, and the Apple 2025 and 2026 platform changes |
 | `docs/GLOBAL-REGULATORY-2026.md` | The USA and other-global legal hard rules with dated sources. US COPPA and the state app-store age laws, the external-link rules, plus the UK, Australia, Brazil, and other jurisdictions, and what Apple tells developers to do per region |
 | `docs/PLATFORM-MECHANICS-2026.md` | The platform-mechanics and newer-policy hard rules with dated sources. macOS notarization, Guideline 4.2 and 4.3 with the June 2026 saturation tightening, reader-app entitlement, France ANSSI encryption, visionOS and watchOS and tvOS specifics, plus Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, sanctions, and PCI items |
-| `docs/CROSS-PLATFORM-FRAMEWORKS.md` | What the guard covers for Flutter, React Native, Expo, Capacitor, Ionic, and Cordova apps, and why it scans the built artifact surface rather than framework source |
+| `docs/CROSS-PLATFORM-FRAMEWORKS.md` | What the guard covers for Flutter, React Native, Expo, Capacitor, Ionic, Cordova, Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform apps, and why it scans the built artifact surface rather than framework source |
 | `docs/BY-APP-TYPE.md` | The rejection map routed by app type. Universal, subscriptions, social, kids, health, games, macOS, AI, crypto and finance, VPN |
 | `docs/COMPETITIVE-GAP-ANALYSIS.md` | A survey of the other open source compliance repositories, what each publishes and why, the gaps they surfaced, and what was folded in here |
 | `docs/REGULATORY-GAP-REPORT-2026.md` | Global and regional regulatory compliance gap analysis prepared by the Senior Compliance Officer, evaluating modern and upcoming frameworks |

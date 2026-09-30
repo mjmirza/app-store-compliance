@@ -871,13 +871,13 @@ def main():
     parser.add_argument(
         "--output-docs",
         type=str,
-        default="docs/PRIVACY-POLICY-MIGRATION.md",
+        default=None,
         help="Filepath to write migration tasks and logs",
     )
     parser.add_argument(
         "--pr-output",
         type=str,
-        default="docs/PRIVACY_COMPLIANCE_PR_DRAFT.md",
+        default=None,
         help="Filepath to save the drafted PR",
     )
     parser.add_argument(
@@ -899,6 +899,7 @@ def main():
     used_mock = False
     if args.mock or (not args.live and not args.mock) or not announcements:
         used_mock = True
+        print("Data. sample announcements built into this script, not live news.")
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
             try:
                 with open(args.mock, "r") as f:
@@ -911,6 +912,8 @@ def main():
                 announcements.extend(MOCK_ANNOUNCEMENTS)
         else:
             announcements.extend(MOCK_ANNOUNCEMENTS)
+    else:
+        print("Data. live feeds, fetched just now.")
 
     # 2. Classify updates into the 16 required categories
     keywords_filter = (
@@ -949,22 +952,28 @@ def main():
     print(f"Found {total_matches} signal matches in code.")
 
     # 4. Write/Update documentation
-    os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    if args.output_docs:
+        os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
+        update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    else:
+        print("No file written. Pass --output-docs <path> to save this report.")
 
     # 5. Generate Pull Request draft using verified updates
     pr_draft = generate_pull_request_draft(verified_updates, scan_results)
     if used_mock:
         pr_draft = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_draft
 
-    # Save drafted PR
-    os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
-    try:
-        with open(args.pr_output, "w", encoding="utf-8") as f:
-            f.write(pr_draft)
-        print(f"PR draft written successfully to: {args.pr_output}")
-    except Exception as e:
-        print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
+    # Save the drafted PR only when a path was passed
+    if args.pr_output:
+        try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(pr_draft)
+            print(f"PR draft written successfully to: {args.pr_output}")
+        except Exception as e:
+            print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
+    else:
+        print("No PR draft written. Pass --pr-output <path> to save it.")
 
     # 6. JSON output format verification if requested
     if args.json:

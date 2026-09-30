@@ -1210,7 +1210,7 @@ NCRIT="$(echo "$OUT" | grep -c '^  \[CRITICAL\] ')"
 echo "$OUT" | grep -q "^Project\. $D$" && [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && ok "612-2 monorepo report keeps the root Project line and adds one App section per root" || bad "612-2 monorepo report keeps the root Project line and adds one App section per root"
 # the findings sit under the app they belong to, never under the clean sibling
 APP_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/app$/{p=1;next} /^App\. /{p=0} p')"
-KIOSK_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/kiosk$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+KIOSK_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/kiosk$/{p=1;next} /^App\. |^Summary\.|^== Regulatory/{p=0} p')"
 echo "$APP_SECTION" | grep -q '\[CRITICAL\]' && ! echo "$KIOSK_SECTION" | grep -q '\[CRITICAL\]' && ok "612-3 findings sit under their own app section" || bad "612-3 findings sit under their own app section"
 rm -rf "$D"
 
@@ -1242,7 +1242,7 @@ rm -rf "$D"
 D="$(mk_two_native)"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q 'GOOGLE-PERM-BACKGROUND-LOCATION' && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "612-8 side by side native projects are scanned separately" || bad "612-8 side by side native projects are scanned separately (rc=$RC)"
-IOS_SECTION="$(echo "$OUT" | awk '/^App\. .*\/ios-app$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+IOS_SECTION="$(echo "$OUT" | awk '/^App\. .*\/ios-app$/{p=1;next} /^App\. |^Summary\.|^== Regulatory/{p=0} p')"
 echo "$IOS_SECTION" | grep -q 'Platforms\. iOS=1 Android=0' && ok "612-9 each section reports its own platforms" || bad "612-9 each section reports its own platforms"
 rm -rf "$D"
 
@@ -1331,7 +1331,7 @@ mk_bare_ios_android() {
 D="$(mk_root_app_plus_child)"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ROOT_SECTION="$(echo "$OUT" | awk -v r="App. $D" '$0==r{p=1;next} /^App\. /{p=0} p')"
-CHILD_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/child$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+CHILD_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/child$/{p=1;next} /^App\. |^Summary\.|^== Regulatory/{p=0} p')"
 [ "$RC" -eq 2 ] && [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$ROOT_SECTION" | grep -q 'MISSING-USAGE-DESCRIPTION' && ! echo "$CHILD_SECTION" | grep -q '\[CRITICAL\]' && ok "612-13 root app plus nested app are scanned apart" || bad "612-13 root app plus nested app are scanned apart (rc=$RC)"
 rm -rf "$D"
 
@@ -1493,7 +1493,7 @@ printf "plugins { id 'com.android.application' }\nandroid { buildTypes { release
 printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/a/app/src/main/AndroidManifest.xml"
 printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/apps/b/app/src/main/AndroidManifest.xml"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-A_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/a\/app$/{p=1;next} /^App\. |^Summary\./{p=0} p')"
+A_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/a\/app$/{p=1;next} /^App\. |^Summary\.|^== Regulatory/{p=0} p')"
 [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$A_SECTION" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "612-33 Android app modules without a settings file are two apps" || bad "612-33 Android app modules without a settings file are two apps (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
 rm -rf "$D"
 
@@ -1616,6 +1616,172 @@ ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}
 rm -rf "$D"
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
+rm -rf "$D"
+
+# ===== Third review round. Each case failed before its fix. =====
+r3_hook() { python3 -c 'import json,sys; print(json.dumps({"tool_input":{"command":sys.argv[1]}}))' "$1" | CLAUDE_PROJECT_DIR="$2" bash "$GUARD" >/dev/null 2>"${3:-/dev/null}"; }
+D="$(mk_ios_bad)"
+r3_hook 'npm install "$(fastlane deliver)"' "$D"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-1 a submit inside a command substitution in an install line still blocks" || bad "r3-1 a submit inside a command substitution in an install line still blocks (rc=$RC)"
+r3_hook 'npm install `fastlane deliver`' "$D"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-2 a submit inside backticks in an install line still blocks" || bad "r3-2 a submit inside backticks in an install line still blocks (rc=$RC)"
+r3_hook 'npm install bundletool fastlane' "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "r3-3 a plain install of a package named like a submit tool stays silent" || bad "r3-3 a plain install of a package named like a submit tool stays silent (rc=$RC)"
+OUT="$(env -u HOME bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ! echo "$OUT" | grep -q "unbound variable" && ok "r3-4 an unset HOME does not crash the guard" || bad "r3-4 an unset HOME does not crash the guard (rc=$RC)"
+rm -rf "$D"
+# A monorepo with one scannable app and one Expo app with no native folders is never CLEAR.
+D="$(mktemp -d)"; mkdir -p "$D/apps/native/App.xcodeproj" "$D/apps/expo"
+N="$(mk_ios_clean)"; cp -R "$N/App" "$D/apps/native/"; rm -rf "$N"
+printf '{"expo":{"name":"x","slug":"x"}}' > "$D/apps/expo/app.json"; printf '{"dependencies":{"expo":"~52.0.0","react-native":"0.76.0"}}' > "$D/apps/expo/package.json"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Apps. 2 app roots" && ! echo "$OUT" | grep -q '^CLEAR' && echo "$OUT" | grep '^NOT CHECKED' | grep -q 'apps/expo' && [ "$RC" -eq 1 ] && ok "r3-5 an unscanned sibling app stops CLEAR and is named" || bad "r3-5 an unscanned sibling app stops CLEAR and is named (rc=$RC)"
+r3_hook 'fastlane deliver' "$D" "$D/err.txt"; RC=$?
+[ "$RC" -eq 0 ] && grep -q 'NOT CHECKED' "$D/err.txt" && ok "r3-6 as a hook the unscanned sibling is reported and never blocks" || bad "r3-6 as a hook the unscanned sibling is reported and never blocks (rc=$RC)"
+rm -rf "$D"
+
+# ===== Issue 842. Findings lead the report, critical first, each with the file that triggered it. =====
+D="$(mk_ios_bad)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | awk '/^  \[CRITICAL\]/{ if (lower) bad=1; c++ } /^  \[(HIGH|MEDIUM)\]/{ lower=1 } END { exit (bad || c == 0) }' && ok "842-1 every critical finding prints above the first high or medium one" || bad "842-1 every critical finding prints above the first high or medium one"
+FIRST_F="$(echo "$OUT" | grep -n '^  \[' | head -1 | cut -d: -f1)"; DL="$(echo "$OUT" | grep -n 'Regulatory Compliance Deadline Status' | head -1 | cut -d: -f1)"
+[ -n "$FIRST_F" ] && [ -n "$DL" ] && [ "$FIRST_F" -lt "$DL" ] && ok "842-2 findings print above the deadline list" || bad "842-2 findings print above the deadline list (finding=$FIRST_F deadlines=$DL)"
+echo "$OUT" | grep -A1 'APPLE-2.1-STAGING-BACKEND' | grep -q '^      file\. App/X\.swift:4$' && ok "842-3 a finding names the file and line that triggered it" || bad "842-3 a finding names the file and line that triggered it"
+echo "$OUT" | grep -A2 'APPLE-2.1-STAGING-BACKEND' | grep -q '^      fix\. ' && ok "842-4 the fix line still follows the finding" || bad "842-4 the fix line still follows the finding"
+rm -rf "$D"
+# Deadlines follow the stores the project ships to. Laws that bind every app stay.
+DLF="$(mktemp)"
+python3 - "$DLF" <<'PYT'
+import datetime, json, sys
+day = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+rows = [("A", "Apple App Store (Global)", "Apple rule"), ("G", "Google Play (Global)", "Play rule"), ("R", "Android (Brazil)", "Android rule"), ("E", "European Union", "EU law")]
+out = [{"id": i, "jurisdiction": j, "law": law, "requirement": "r", "effective_date": "2026-01-01", "grace_period": "none", "mandatory_date": day, "enforcement_date": day, "affected_repository_sections": "docs/X.md", "priority": "high"} for i, j, law in rows]
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    json.dump({"deadlines": out}, f)
+PYT
+D="$(mk_android_bad)"; OUT="$(DEADLINES_FILE="$DLF" bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'Play rule' && echo "$OUT" | grep -q 'Android rule' && echo "$OUT" | grep -q 'EU law' && ! echo "$OUT" | grep -q 'Apple rule' && echo "$OUT" | grep -q '^1 deadline(s) for a store this project does not ship to' && ok "842-5 an Android-only project sees no Apple store deadline and is told one was left out" || bad "842-5 an Android-only project sees no Apple store deadline and is told one was left out"
+rm -rf "$D"
+D="$(mk_ios_bad)"; OUT="$(DEADLINES_FILE="$DLF" bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'Apple rule' && echo "$OUT" | grep -q 'EU law' && ! echo "$OUT" | grep -q 'Play rule' && ! echo "$OUT" | grep -q 'Android rule' && ok "842-6 an iOS-only project sees no Google Play or Android deadline" || bad "842-6 an iOS-only project sees no Google Play or Android deadline"
+rm -rf "$D" "$DLF"
+
+# ===== Issue 837. Unity, .NET MAUI, Tauri mobile and Kotlin Multiplatform. One bad and one clean project each. =====
+BAD_SRC='"https://staging.example.com/api"'
+GOOD_SRC='"https://api.realbackend.io" "https://realbackend.io/privacy-policy"'
+mk_unity() {  # $1 is the string the source file carries
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ProjectSettings" "$d/Assets/Scripts"
+  printf 'm_EditorVersion: 6000.0.30f1\n' > "$d/ProjectSettings/ProjectVersion.txt"
+  printf 'public class Api { string[] u = { %s }; }\n' "$1" > "$d/Assets/Scripts/Api.cs"
+  echo "$d"
+}
+mk_maui() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/Platforms/iOS" "$d/Platforms/Android" "$d/Services"
+  printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFrameworks>net8.0-ios;net8.0-android</TargetFrameworks><UseMaui>true</UseMaui></PropertyGroup></Project>\n' > "$d/App.csproj"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/Platforms/iOS/Info.plist"
+  printf '<manifest></manifest>' > "$d/Platforms/Android/AndroidManifest.xml"
+  printf 'public class Api { string[] u = { %s }; }\n' "$1" > "$d/Services/Api.cs"
+  echo "$d"
+}
+mk_tauri() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/src-tauri/src" "$d/src-tauri/gen/apple/app.xcodeproj" "$d/src-tauri/gen/apple/app_iOS"
+  printf '{"productName":"x","identifier":"io.realbackend.x"}' > "$d/src-tauri/tauri.conf.json"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/src-tauri/gen/apple/app_iOS/Info.plist"
+  printf 'pub fn urls() -> Vec<&'"'"'static str> { vec![%s] }\n' "$(printf '%s' "$1" | sed 's/" "/", "/')" > "$d/src-tauri/src/lib.rs"
+  echo "$d"
+}
+mk_kmp() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/shared/src/commonMain/kotlin" "$d/iosApp/iosApp.xcodeproj" "$d/iosApp/iosApp"
+  printf 'include(":shared")\n' > "$d/settings.gradle.kts"
+  printf 'plugins { kotlin("multiplatform") }\n' > "$d/shared/build.gradle.kts"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/iosApp/iosApp/Info.plist"
+  printf 'val urls = listOf(%s)\n' "$(printf '%s' "$1" | sed 's/" "/", "/')" > "$d/shared/src/commonMain/kotlin/Api.kt"
+  echo "$d"
+}
+f837() {  # name, builder, framework label, source path, submit command
+  local D OUT RC
+  D="$("$2" "$BAD_SRC")"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+  [ "$RC" -eq 2 ] && echo "$OUT" | grep -q "^Frameworks\. .*$3=1" && echo "$OUT" | grep -A1 'APPLE-2.1-STAGING-BACKEND' | grep -q "file\. $4:1" \
+    && ok "837 $1 bad project is recognised, blocked, and the finding names $4" || bad "837 $1 bad project is recognised, blocked, and the finding names $4 (rc=$RC)"
+  r3_hook "$5" "$D"; RC=$?
+  [ "$RC" -eq 2 ] && ok "837 $1 submit command runs the scan" || bad "837 $1 submit command runs the scan (rc=$RC)"
+  rm -rf "$D"
+  D="$("$2" "$GOOD_SRC")"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+  [ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR\. ' && ! echo "$OUT" | grep -q '^Apps\. ' \
+    && ok "837 $1 clean project is CLEAR and scanned as one app" || bad "837 $1 clean project is CLEAR and scanned as one app (rc=$RC)"
+  r3_hook "$5" "$D"; RC=$?
+  [ "$RC" -eq 0 ] && ok "837 $1 submit command passes on the clean project" || bad "837 $1 submit command passes on the clean project (rc=$RC)"
+  rm -rf "$D"
+}
+f837 "Unity" mk_unity "Unity" "Assets/Scripts/Api.cs" "/Applications/Unity/Unity -batchmode -quit -buildTarget iOS -executeMethod Build.Run"
+f837 "MAUI" mk_maui "MAUI" "Services/Api.cs" "dotnet publish -f net8.0-ios -c Release"
+f837 "Tauri" mk_tauri "Tauri" "src-tauri/src/lib.rs" "cargo tauri ios build"
+f837 "KMP" mk_kmp "KotlinMultiplatform" "shared/src/commonMain/kotlin/Api.kt" "xcodebuild -scheme iosApp archive"
+# A Unity project has no Info.plist or Gradle file until it is exported, so the two checks that read them stay silent.
+D="$(mk_unity "$GOOD_SRC")"; OUT="$(bash "$GUARD" "$D" 2>&1)"
+! echo "$OUT" | grep -qE 'APPLE-EXPORT-COMPLIANCE-MISSING|ANDROID-R8-OPTIMIZATION-MISSING' && echo "$OUT" | grep -q '^Unity\. ' && ok "837 Unity is not blamed for files that exist only after export, and is told so" || bad "837 Unity is not blamed for files that exist only after export, and is told so"
+r3_hook "Unity -batchmode -buildTarget StandaloneOSX -executeMethod Build.Run" "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "837 a Unity desktop build is not a store submit" || bad "837 a Unity desktop build is not a store submit (rc=$RC)"
+rm -rf "$D"
+D="$(mk_maui "$BAD_SRC")"
+r3_hook "dotnet build" "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "837 a plain dotnet build is not a store submit" || bad "837 a plain dotnet build is not a store submit (rc=$RC)"
+r3_hook "cargo tauri dev" "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "837 tauri dev is not a store submit" || bad "837 tauri dev is not a store submit (rc=$RC)"
+rm -rf "$D"
+
+# ===== Second attack pass on this change. Each case failed before its fix. =====
+# A finding with two conditions names the file that holds the more specific one.
+D="$(mk_ios_clean)"
+printf 'let plan = "monthly subscription"\n' > "$D/App/Aaa.swift"
+printf 'let help = "call support to cancel"\n' > "$D/App/Zzz.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -A1 'BOTH-SUBSCRIPTION-HARD-CANCEL' | grep -q 'file\. App/Zzz\.swift:1' && ok "c2-1 a two-condition finding names the file of the specific condition" || bad "c2-1 a two-condition finding names the file of the specific condition"
+# A broken privacy manifest is still reported now that findings are buffered.
+printf '<plist><dict><key>NSPrivacyTracking</key><true/></dict></plist>' > "$D/App/PrivacyInfo.xcprivacy"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -qE '^  \[(CRITICAL|HIGH|MEDIUM)\] APPLE-[A-Z0-9.-]*(MANIFEST|TRACKING)' && ok "c2-2 privacy manifest validator findings survive the buffering" || bad "c2-2 privacy manifest validator findings survive the buffering"
+rm -rf "$D"
+D="$(mk_maui "$BAD_SRC")"
+r3_hook "dotnet publish --framework net8.0-maccatalyst --configuration Debug" "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "c2-3 a Mac Catalyst publish is not an iOS or Android submit" || bad "c2-3 a Mac Catalyst publish is not an iOS or Android submit (rc=$RC)"
+rm -rf "$D"
+
+# ===== Third attack pass. Each case failed before its fix. =====
+D="$(mk_maui "$BAD_SRC")"
+r3_hook "dotnet publish --framework net8.0-ios --configuration Debug" "$D"; RC=$?
+[ "$RC" -eq 0 ] && ok "c3-1 a Debug dotnet publish is not a store submit" || bad "c3-1 a Debug dotnet publish is not a store submit (rc=$RC)"
+r3_hook "dotnet publish -c Debug -f net8.0-android && dotnet publish -f net8.0-ios -c Release" "$D"; RC=$?
+[ "$RC" -eq 2 ] && ok "c3-2 a Release publish after a Debug one still runs the scan" || bad "c3-2 a Release publish after a Debug one still runs the scan (rc=$RC)"
+rm -rf "$D"
+# A cross-platform app with no native folder has had no store check, so it is never CLEAR.
+D="$(mktemp -d)"
+printf '{"dependencies":{"@capacitor/core":"^6.0.0"}}' > "$D/package.json"; printf 'export default {};' > "$D/capacitor.config.ts"; printf '<html></html>' > "$D/index.html"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q '^NOT CHECKED' && echo "$OUT" | grep -q 'npx cap add' && ! echo "$OUT" | grep -q '^CLEAR' && ok "c3-3 a Capacitor app with no native folders is NOT CHECKED and told to add one" || bad "c3-3 a Capacitor app with no native folders is NOT CHECKED and told to add one (rc=$RC)"
+r3_hook "npx cap build ios" "$D" "$D/err.txt"; RC=$?
+[ "$RC" -eq 0 ] && grep -q 'NOT CHECKED' "$D/err.txt" && ok "c3-4 as a hook the Capacitor app is reported and not blocked" || bad "c3-4 as a hook the Capacitor app is reported and not blocked (rc=$RC)"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/lib"
+printf 'name: x\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$D/pubspec.yaml"; printf 'void main() {}\n' > "$D/lib/main.dart"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q '^NOT CHECKED' && echo "$OUT" | grep -q 'flutter create' && ok "c3-5 a Flutter app with no platform folders is NOT CHECKED and told to create them" || bad "c3-5 a Flutter app with no platform folders is NOT CHECKED and told to create them (rc=$RC)"
+rm -rf "$D"
+D="$(mk_web_clean)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR' && ok "c3-6 a plain web project still ends CLEAR" || bad "c3-6 a plain web project still ends CLEAR (rc=$RC)"
+rm -rf "$D"
+
+# ===== Fourth attack pass. Each case failed before its fix. =====
+# A Flutter app with no platform folders next to a native app is its own root, so it cannot hide behind the sibling.
+D="$(mktemp -d)"; mkdir -p "$D/apps/native/App.xcodeproj" "$D/apps/fl/lib" "$D/packages/util/lib"
+N="$(mk_ios_clean)"; cp -R "$N/App" "$D/apps/native/"; rm -rf "$N"
+printf 'name: fl\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$D/apps/fl/pubspec.yaml"; printf 'void main() {}\n' > "$D/apps/fl/lib/main.dart"
+printf 'name: util\n' > "$D/packages/util/pubspec.yaml"; printf 'int one() => 1;\n' > "$D/packages/util/lib/util.dart"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep '^NOT CHECKED' | grep -q 'apps/fl' && ! echo "$OUT" | grep '^NOT CHECKED' | grep -q 'packages/util' && ! echo "$OUT" | grep -q '^CLEAR' && ok "c4-1 a Flutter app with no platform folders beside a native app stops CLEAR" || bad "c4-1 a Flutter app with no platform folders beside a native app stops CLEAR (rc=$RC)"
+rm -rf "$D/apps/fl"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR' && ok "c4-2 a plain Dart package beside a native app does not stop CLEAR" || bad "c4-2 a plain Dart package beside a native app does not stop CLEAR (rc=$RC)"
 rm -rf "$D"
 
 echo ""

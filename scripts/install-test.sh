@@ -140,6 +140,59 @@ if command -v jq >/dev/null 2>&1; then
   rm -rf "$SHIM"
 fi
 
+# 18 a hook for a guard of the same file name in another folder is somebody else's. It is not trusted and not removed.
+fresh
+python3 -c 'import json,sys; json.dump({"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash /opt/other/app-store-compliance-guard.sh"}]}]}}, sys.stdout)' > "$C/settings.json"
+run >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(hooks "$C/settings.json")" = "2" ] && ok "a same-named guard in another folder does not count as installed" || bad "a same-named guard in another folder does not count as installed (rc=$RC entries=$(hooks "$C/settings.json"))"
+run uninstall >/dev/null
+[ "$(hooks "$C/settings.json")" = "1" ] && grep -q "/opt/other/app-store-compliance-guard.sh" "$C/settings.json" && ok "uninstall leaves the other folder's hook in place" || bad "uninstall leaves the other folder's hook in place (entries=$(hooks "$C/settings.json"))"
+
+# 19 no HOME and no CLAUDE_CONFIG_DIR is a clear message, never a crash. HOME alone missing still works.
+OUT="$(env -u HOME -u CLAUDE_CONFIG_DIR bash "$INSTALL" --dry-run 2>&1)"; RC=$?
+[ "$RC" -ne 0 ] && echo "$OUT" | grep -q 'HOME is not set' && ! echo "$OUT" | grep -q 'unbound variable' && ok "an unset HOME is reported, not a crash" || bad "an unset HOME is reported, not a crash (rc=$RC)"
+fresh
+OUT="$(env -u HOME CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" --dry-run 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q 'unbound variable' && ok "a custom folder works with HOME unset" || bad "a custom folder works with HOME unset (rc=$RC)"
+# 20 the default folder written with a braced HOME is still this folder's hook, so no second entry is added.
+H="$WORK/home$RANDOM"; mkdir -p "$H/.claude"
+C="$H/.claude"
+python3 -c 'import json,sys; json.dump({"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"bash \"${HOME}/.claude/hooks/app-store-compliance-guard.sh\"","timeout":120}]}]}}, sys.stdout)' > "$H/.claude/settings.json"
+env -u CLAUDE_CONFIG_DIR HOME="$H" bash "$INSTALL" >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] && [ "$(hooks)" = "1" ] && ok "a hook written with a braced HOME counts as installed" || bad "a hook written with a braced HOME counts as installed (rc=$RC entries=$(hooks))"
+
+# 21 a hook that runs some other script and only passes this guard's path as an argument is not ours.
+fresh
+python3 - "$C" > "$C/settings.json" <<'PYT'
+import json, sys
+cmd = "bash %s/hooks/audit-wrapper.sh --guard %s/hooks/app-store-compliance-guard.sh" % (sys.argv[1], sys.argv[1])
+json.dump({"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": cmd}]}]}}, sys.stdout)
+PYT
+run >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(hooks)" = "2" ] && ok "a wrapper that only names the guard as an argument does not count as installed" || bad "a wrapper that only names the guard as an argument does not count as installed (rc=$RC entries=$(hooks))"
+run uninstall >/dev/null
+[ "$(hooks)" = "1" ] && grep -q "audit-wrapper.sh" "$C/settings.json" && ok "uninstall leaves the wrapper hook in place" || bad "uninstall leaves the wrapper hook in place (entries=$(hooks))"
+
+# 22 only the exact command counts. A longer file name, or the path run without bash, is somebody else's hook.
+for OTHER in "bash $WORK/x/hooks/app-store-compliance-guard.sh.backdoor" "$WORK/x/hooks/app-store-compliance-guard.sh"; do
+  C="$WORK/x"; rm -rf "$C"; mkdir -p "$C"
+  python3 -c 'import json,sys; json.dump({"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":sys.argv[1]}]}]}}, sys.stdout)' "$OTHER" > "$C/settings.json"
+  run >/dev/null; RC=$?
+  [ "$RC" -eq 0 ] && [ "$(hooks)" = "2" ] && ok "a look-alike command is not taken for this guard (${OTHER##*/})" || bad "a look-alike command is not taken for this guard (${OTHER##*/}) (rc=$RC entries=$(hooks))"
+  run uninstall >/dev/null
+  [ "$(hooks)" = "1" ] && grep -qF "$OTHER" "$C/settings.json" && ok "uninstall leaves the look-alike in place (${OTHER##*/})" || bad "uninstall leaves the look-alike in place (${OTHER##*/}) (entries=$(hooks))"
+done
+
+# 23 a config folder with an apostrophe in its name installs once, verifies, and uninstalls.
+C="$WORK/O'Reilly cfg"; mkdir -p "$C"
+OUT="$(run)"; RC=$?
+run >/dev/null
+[ "$RC" -eq 0 ] && [ "$(hooks)" = "1" ] && ok "a folder with an apostrophe installs once and verifies" || bad "a folder with an apostrophe installs once and verifies (rc=$RC entries=$(hooks))"
+run doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "doctor passes for a folder with an apostrophe" || bad "doctor passes for a folder with an apostrophe (rc=$RC)"
+run uninstall >/dev/null
+[ "$(hooks)" = "0" ] && ok "uninstall removes the hook for a folder with an apostrophe" || bad "uninstall removes the hook for a folder with an apostrophe (entries=$(hooks))"
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

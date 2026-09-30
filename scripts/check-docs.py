@@ -26,6 +26,7 @@ PATH_RE = re.compile(
     % "|".join(re.escape(t) for t in TOP)
 )
 LINK_RE = re.compile(r"(!?)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
+REF_RE = re.compile(r"\s{0,3}\[([^\]^][^\]]*)\]:\s*(\S+)")
 HTML_SRC_RE = re.compile(r"<img[^>]+src=\"([^\"]+)\"")
 CMD_RE = re.compile(
     r"(?:python3|bash)\s+((?:~/[\w./-]*/)?(scripts/[\w.-]+\.(?:py|sh)))((?:\s+[^\s|;&<>`]+)*)"
@@ -86,6 +87,10 @@ def check_file(path):
         targets = [m.group(2) for m in LINK_RE.finditer(line)] + HTML_SRC_RE.findall(
             line
         )
+        ref = REF_RE.match(line)
+        if ref:
+            targets.append(ref.group(2))
+        targets = [t.strip("<>") for t in targets]
         for target in targets:
             if re.match(r"[a-z][a-z0-9+.-]*:", target) or target.startswith("//"):
                 continue

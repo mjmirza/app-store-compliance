@@ -5,12 +5,12 @@
 # @matcher: Bash
 set -uo pipefail
 
-HOOK_LOG="$HOME/.claude/hooks/hook-log.sh"
+HOOK_LOG="${HOME:-}/.claude/hooks/hook-log.sh"
 # shellcheck disable=SC1090
 [ -f "$HOOK_LOG" ] && source "$HOOK_LOG" 2>/dev/null || true
 log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compliance-guard" "$@"; else echo "app-store-compliance-guard: $*" >&2; fi; }
 
-CRIT=0; HIGH=0; MED=0; DEADLINE_DONE=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0
+CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
 cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
@@ -109,8 +109,10 @@ if [ -n "$STDIN_JSON" ]; then
       print l }' 2>/dev/null | sed -E 's/\\([A-Za-z0-9])/\1/g')"
   # Only act on submission style commands. Otherwise stay silent.
   # Installing a package named like a submit tool (npm install bundletool) is not a submit.
-  CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/(npm|pnpm|yarn|bun|brew|pip3?|gem|cargo)[[:space:]]+(install|add|i|uninstall|remove)([[:space:]][^;&|]*)?//g')"
-  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'
+  CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/(npm|pnpm|yarn|bun|brew|pip3?|gem|cargo)[[:space:]]+(install|add|i|uninstall|remove)([[:space:]][^;&|$`]*)?//g')"
+  # A Debug publish is a local build, never a store upload.
+  CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/dotnet[[:space:]]+publish[^;&|]*(-c|--configuration)[[:space:]=]+[Dd]ebug[^;&|]*//g')"
+  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build'
   UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
   # A custom fastlane lane submits when a word in its name says so, when its Fastfile block calls an
   # upload action, or when the lane is a variable the guard cannot read (scanned, never assumed safe).
@@ -176,7 +178,7 @@ FASTFILES
   if [ "$CD_COUNT" -eq 1 ] && printf '%s' "$FIRST" | grep -qE '^[[:space:]]*cd[[:space:]]+[^&|;]+(&&|;)'; then
     TARGET="$(printf '%s' "$FIRST" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*(&&|;).*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/')"
     TARGET="${TARGET//\$\{CLAUDE_PROJECT_DIR\}/$DIR}"; TARGET="${TARGET//\$CLAUDE_PROJECT_DIR/$DIR}"
-    case "$TARGET" in /*) ;; '~'*) TARGET="$HOME${TARGET#\~}" ;; *) TARGET="$DIR/$TARGET" ;; esac
+    case "$TARGET" in /*) ;; '~'*) TARGET="${HOME:-}${TARGET#\~}" ;; *) TARGET="$DIR/$TARGET" ;; esac
     if [ -d "$TARGET" ]; then
       REAL_T="$(cd "$TARGET" 2>/dev/null && pwd -P)"; REAL_R="$(cd "$DIR" 2>/dev/null && pwd -P)"
       case "$REAL_T/" in "$REAL_R"/*) DIR="$REAL_T" ;; esac
@@ -192,7 +194,7 @@ fi
 # folder for the Apple-only checks below (standalone mode has no CMD, unaffected).
 CMD_TARGET_ANDROID_ONLY=0
 if [ -n "$CMD" ] \
-  && printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b' \
+  && printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b' \
   && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; then
   CMD_TARGET_ANDROID_ONLY=1
 fi
@@ -256,18 +258,43 @@ release_string_has() {
   # machine. Draining all input with plain grep and returning its status is deterministic.
 }
 
-finding() {  # severity id title fix
+# Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
+hit_file() {
+  [ -s "$FILELIST" ] || return 0
+  local f n
+  if [ "$1" = "manifest" ]; then
+    f="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  else
+    f="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  fi
+  [ -n "$f" ] || return 0
+  n="$(grep -En -m1 -e "$2" "$f" 2>/dev/null | cut -d: -f1)"
+  printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"
+}
+
+# Findings are held and printed by flush_findings, critical first (issue #842).
+F_CRIT=(); F_HIGH=(); F_MED=()
+finding() {  # severity id title fix [src|manifest regex]. The optional pair names the file that triggered it.
+  local t w=""
+  [ -n "${5:-}" ] && w="$(hit_file "$5" "${6:-}")"
   case "$1" in
-    critical) CRIT=$((CRIT+1)); printf '  [CRITICAL] %s  %s\n' "$2" "$3" ;;
-    high)     HIGH=$((HIGH+1)); printf '  [HIGH]     %s  %s\n' "$2" "$3" ;;
-    *)        MED=$((MED+1));   printf '  [MEDIUM]   %s  %s\n' "$2" "$3" ;;
+    critical) CRIT=$((CRIT+1)); t="  [CRITICAL] $2  $3" ;;
+    high)     HIGH=$((HIGH+1)); t="  [HIGH]     $2  $3" ;;
+    *)        MED=$((MED+1));   t="  [MEDIUM]   $2  $3" ;;
   esac
-  printf '      fix. %s\n' "$4"
+  [ -n "$w" ] && t="$t"$'\n'"      file. $w"
+  t="$t"$'\n'"      fix. $4"
+  case "$1" in critical) F_CRIT+=("$t") ;; high) F_HIGH+=("$t") ;; *) F_MED+=("$t") ;; esac
+}
+flush_findings() {
+  local t
+  for t in ${F_CRIT[@]+"${F_CRIT[@]}"} ${F_HIGH[@]+"${F_HIGH[@]}"} ${F_MED[@]+"${F_MED[@]}"}; do printf '%s\n' "$t"; done
+  F_CRIT=(); F_HIGH=(); F_MED=()
 }
 
 # Cross-platform apps reach StoreKit and Play Billing through a plugin, so the native symbols never
 # appear in their source. These are the plugins' own package names.
-XPLAT_IAP='in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor'
+XPLAT_IAP='in_app_purchase|purchases_flutter|flutter_inapp_purchase|react-native-iap|react-native-purchases|expo-iap|cordova-plugin-purchase|@revenuecat/purchases-capacitor|UnityEngine\.Purchasing|com\.unity\.purchasing|Plugin\.InAppBilling|tauri-plugin-iap'
 
 # Vendored trees never decide the platform, and the prune applies only below the project root, so a project
 # that itself sits under a folder named build or test is still detected. Same SIGPIPE-safe grep as the source scan.
@@ -307,6 +334,7 @@ find "$DIR" -mindepth 1 \
   -o -name '*.json' -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
   -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
   -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
+  -o -name '*.cs' -o -name '*.rs' -o -name '*.csproj' -o -name '*.xaml' -o -name '*.toml' \
   \) -print 2>/dev/null \
   > "$FILELIST"
 build_blob
@@ -337,6 +365,26 @@ while IFS= read -r cfg; do
   grep -qE '<widget|xmlns:cdv' "$cfg" 2>/dev/null && IS_IONIC=1
 done < <(find_app 12 -name 'config.xml')
 
+# ----- Unity, .NET MAUI, Tauri mobile, Kotlin Multiplatform (issue #837) -----
+IS_UNITY=0; IS_MAUI=0; IS_TAURI=0; IS_KMP=0
+find_app 6 -name 'ProjectVersion.txt' -path '*/ProjectSettings/*' | grep . >/dev/null && IS_UNITY=1
+while IFS= read -r cs; do
+  grep -qE '<UseMaui>[[:space:]]*true|net[0-9.]+-(ios|android|maccatalyst)' "$cs" 2>/dev/null || continue
+  IS_MAUI=1
+  grep -qE 'net[0-9.]+-ios' "$cs" 2>/dev/null && IS_IOS=1
+  grep -qE 'net[0-9.]+-android' "$cs" 2>/dev/null && IS_AND=1
+done < <(find_app 6 -name '*.csproj')
+find_app 6 -name 'tauri.conf.json' -o -name 'tauri.conf.json5' -o -name 'Tauri.toml' | grep . >/dev/null && IS_TAURI=1
+while IFS= read -r g; do
+  grep -qE 'kotlin\("multiplatform"\)|org\.jetbrains\.kotlin\.multiplatform|kotlinMultiplatform' "$g" 2>/dev/null && { IS_KMP=1; break; }
+done < <(find_app 6 -name 'build.gradle.kts' -o -name 'build.gradle' -o -name 'libs.versions.toml')
+# Unity holds no Xcode or Gradle project until export. The build target names the store, with none named both are scanned.
+if [ "$IS_UNITY" -eq 1 ]; then
+  case "$(printf '%s' "${CMD:-}" | grep -oiE -e '-buildtarget[[:space:]]+(ios|android)' | head -1 | tr '[:upper:]' '[:lower:]')" in
+    *ios) IS_IOS=1 ;; *android) IS_AND=1 ;; *) IS_IOS=1; IS_AND=1 ;;
+  esac
+fi
+
 # The actual gate the framework checks below use: a committed ios/ folder AND the
 # invoking command (when known) does not explicitly target Android-only.
 IOS_TARGET_ACTIVE=0
@@ -344,56 +392,51 @@ IOS_TARGET_ACTIVE=0
 
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
 { [ "$IS_IOS" -eq 1 ] || [ "$IS_AND" -eq 1 ]; } && ANY_NATIVE=1
+[ "$IS_IOS" -eq 1 ] && ANY_IOS=1
+[ "$IS_AND" -eq 1 ] && ANY_AND=1
 [ "$IS_RN" -eq 1 ] && ANY_RN=1
+# A framework app builds its native project later. Until that exists the store checks have nothing to read.
+NEEDS_NATIVE=0
+if [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ]; then
+  [ "$IS_RN" -eq 1 ] && { NEEDS_NATIVE=1; NATIVE_HINT="npx expo prebuild"; }
+  [ "$IS_IONIC" -eq 1 ] && { NEEDS_NATIVE=1; NATIVE_HINT="npx cap add ios or npx cap add android"; }
+  [ "$IS_FLUTTER" -eq 1 ] && { NEEDS_NATIVE=1; NATIVE_HINT="flutter create --platforms ios,android ."; }
+  [ "$IS_TAURI" -eq 1 ] && { NEEDS_NATIVE=1; NATIVE_HINT="cargo tauri ios init or cargo tauri android init"; }
+fi
+[ "$NEEDS_NATIVE" -eq 1 ] && ANY_NEEDS_NATIVE=1
 [ "$IS_WEB" -eq 1 ] && ANY_WEB=1
-echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC"
+echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC Unity=$IS_UNITY MAUI=$IS_MAUI Tauri=$IS_TAURI KotlinMultiplatform=$IS_KMP"
+[ "$IS_UNITY" -eq 1 ] && echo "Unity. No Xcode or Gradle project exists before export, so Info.plist and the Gradle settings were not read. Scan the exported project too."
+[ "$IS_TAURI" -eq 1 ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && echo "Tauri. No src-tauri/gen/apple or gen/android folder. Run cargo tauri ios init or cargo tauri android init before a mobile submit, then scan again."
 [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only framework checks suppressed for this run."
 echo ""
-
-# ----- run regulatory deadlines check -----
-# Tries both ship shapes. nested repo (agent-os/hooks/) and flat ~/.claude.
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEADLINE_PY=""
-for candidate in \
-  "$HOOK_DIR/../../scripts/deadline-checker.py" \
-  "$HOOK_DIR/../skills/app-store-compliance/scripts/deadline-checker.py"; do
-  if [ -f "$candidate" ]; then DEADLINE_PY="$candidate"; break; fi
-done
-if [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ] && ! tool_ok python3 -c pass; then
-  echo "Regulatory deadline list skipped. python3 not found."
-  echo ""
-elif [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ]; then
-  python3 "$DEADLINE_PY" --brief
-  echo ""
-fi
-DEADLINE_DONE=1
 
 # ===== shared checks =====
 # App Store Connect API 4.3 and 4.4 removed the old age-rating declaration endpoints. a pipeline that still calls them stops the release.
 if grep_has 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'; then
-  finding critical "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED" "Pipeline calls a removed App Store Connect API age-rating endpoint" "Switch to the current age-rating declaration read and update endpoints (ASC API 4.4 release notes)."
+  finding critical "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED" "Pipeline calls a removed App Store Connect API age-rating endpoint" "Switch to the current age-rating declaration read and update endpoints (ASC API 4.4 release notes)." src 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'
 fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
 if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
-  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content."
+  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." src 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
 # "call" and "write" match as whole words only, or "renews automatically until cancelled" and
 # "overwrite ... cancel" read as an instruction to call or write in.
 if grep_has 'subscri(be|ption)|auto.renew|membership' && grep_has '(^|[^A-Za-z])[Cc]all[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,25}[^A-Za-z][Cc]all([^A-Za-z]|$)|[Mm]ail.{0,25}[Cc]ancel|(^|[^A-Za-z])[Ww]rite[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'; then
-  finding high "BOTH-SUBSCRIPTION-HARD-CANCEL" "Subscription cancellation appears to require a phone call, mail, or an in-person visit" "Provide a self-service cancellation path at least as easy as sign-up (FTC Section 5, ROSCA, and CA/NY/MA negative-option laws)."
+  finding high "BOTH-SUBSCRIPTION-HARD-CANCEL" "Subscription cancellation appears to require a phone call, mail, or an in-person visit" "Provide a self-service cancellation path at least as easy as sign-up (FTC Section 5, ROSCA, and CA/NY/MA negative-option laws)." src '(^|[^A-Za-z])[Cc]all[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,25}[^A-Za-z][Cc]all([^A-Za-z]|$)|[Mm]ail.{0,25}[Cc]ancel|(^|[^A-Za-z])[Ww]rite[^A-Za-z].{0,24}[Cc]ancel|[Cc]ancel.{0,15}(in.person|by.phone|by.mail)'
 fi
 # fastlane precheck derived metadata checks
 if grep_has 'coming soon|coming-soon|will be available|in a future update|stay tuned'; then
-  finding medium "APPLE-2.3-FUTURE-FUNCTIONALITY" "Future functionality language found (coming soon, beta)" "Describe only what the build does today (fastlane precheck future_functionality, Apple 2.3.1)."
+  finding medium "APPLE-2.3-FUTURE-FUNCTIONALITY" "Future functionality language found (coming soon, beta)" "Describe only what the build does today (fastlane precheck future_functionality, Apple 2.3.1)." src 'coming soon|coming-soon|will be available|in a future update|stay tuned'
 fi
 if grep_has 'iOS bug|apple bug|broken on iOS'; then
-  finding medium "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT" "Negative Apple or iOS bug reference in copy" "Remove negative references to Apple and iOS bugs (fastlane precheck negative_apple_sentiment)."
+  finding medium "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT" "Negative Apple or iOS bug reference in copy" "Remove negative references to Apple and iOS bugs (fastlane precheck negative_apple_sentiment)." src 'iOS bug|apple bug|broken on iOS'
 fi
 if grep_has 'loot ?box|gacha|mystery box|random reward'; then
-  finding high "BOTH-LOOTBOX-ODDS" "Random reward mechanic present" "Disclose the odds for every random reward before purchase (Apple 3.1.1, Google gambling)."
+  finding high "BOTH-LOOTBOX-ODDS" "Random reward mechanic present" "Disclose the odds for every random reward before purchase (Apple 3.1.1, Google gambling)." src 'loot ?box|gacha|mystery box|random reward'
 fi
 
 # ===== Flutter checks =====
@@ -414,12 +457,12 @@ fi
 if [ "$IS_RN" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if grep_has 'react-native-code-push|CodePush\.|expo-updates|Updates\.checkForUpdate|react-native-ota-hot-update|@stallion-js|Stallion\.'; then
     if ! grep_has 'reviewNotes|App Review|bug.fix.only|bugfix.only'; then
-      finding high "RN-OTA-UNDECLARED" "An over-the-air JS bundle updater (CodePush, Expo Updates, or similar) is present" "Disclose the OTA mechanism by name in App Review notes, restrict its use to bug fixes that do not change the app's purpose, UI, or add features beyond what was reviewed (Apple 3.3.2, 2.5.2)."
+      finding high "RN-OTA-UNDECLARED" "An over-the-air JS bundle updater (CodePush, Expo Updates, or similar) is present" "Disclose the OTA mechanism by name in App Review notes, restrict its use to bug fixes that do not change the app's purpose, UI, or add features beyond what was reviewed (Apple 3.3.2, 2.5.2)." src 'react-native-code-push|CodePush\.|expo-updates|Updates\.checkForUpdate|react-native-ota-hot-update|@stallion-js|Stallion\.'
     fi
   fi
   if grep_has 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'; then
     if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
-      finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side."
+      finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side." src 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'
     fi
   fi
 fi
@@ -433,11 +476,11 @@ if [ "$IS_IONIC" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding high "IONIC-4.2-THIN-WRAPPER" "WebView/Capacitor/Cordova present with fewer than 2 recognized native-feel plugins (status bar, splash screen, push, haptics)" "This is a heuristic proxy, not the actual Apple 4.2 test (features/content/UI beyond a repackaged website); review manually before treating it as a hard blocker. Add native Capacitor/Cordova plugins for status bar, splash transition, push, and haptics, or ship as an installable PWA to skip App Review entirely."
   fi
   if grep_has 'UIWebView'; then
-    finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it."
+    finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it." src 'UIWebView'
   fi
   if grep_has '@capacitor/|Capacitor\.'; then
     if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
-      finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one."
+      finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one." src '@capacitor/|Capacitor\.'
     fi
   fi
 fi
@@ -445,77 +488,77 @@ fi
 # ===== iOS checks =====
 if [ "$IS_IOS" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
-    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles."
+    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." src 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
     if ! grep_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
-      finding critical "APPLE-5.1.1-NO-ACCOUNT-DELETION" "Account creation found but no in app account deletion" "Add an in app account deletion flow (Apple 5.1.1(v))."
+      finding critical "APPLE-5.1.1-NO-ACCOUNT-DELETION" "Account creation found but no in app account deletion" "Add an in app account deletion flow (Apple 5.1.1(v))." src 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'
     fi
   fi
   if grep_has 'AVCaptureDevice|UIImagePickerController'; then
-    grep_has 'NSCameraUsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera used without NSCameraUsageDescription" "Add NSCameraUsageDescription with a specific reason."
+    grep_has 'NSCameraUsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera used without NSCameraUsageDescription" "Add NSCameraUsageDescription with a specific reason." src 'AVCaptureDevice|UIImagePickerController'
   fi
   if grep_has 'CLLocationManager'; then
-    grep_has 'NSLocation.*UsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location used without a location usage description" "Add the matching NSLocation usage description with a specific reason."
+    grep_has 'NSLocation.*UsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location used without a location usage description" "Add the matching NSLocation usage description with a specific reason." src 'CLLocationManager'
   fi
   if grep_has 'PHPhotoLibrary|PHPicker'; then
-    grep_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason."
+    grep_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason." src 'PHPhotoLibrary|PHPicker'
   fi
   if grep_has 'CNContactStore'; then
-    grep_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason."
+    grep_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)."
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then
-    finding critical "APPLE-4.0-SIWA-RELAY-DOMAIN" "Sign in with Apple relay allowlist accepts only privaterelay.appleid.com" "Accept private.icloud.com as well, everywhere relay addresses are validated or allowlisted."
+    finding critical "APPLE-4.0-SIWA-RELAY-DOMAIN" "Sign in with Apple relay allowlist accepts only privaterelay.appleid.com" "Accept private.icloud.com as well, everywhere relay addresses are validated or allowlisted." src 'privaterelay\.appleid\.com'
   fi
   # Age assurance. a parent can withdraw consent, Apple then blocks launch. the app must handle RESCIND_CONSENT.
   if grep_has 'DeclaredAgeRange|AgeRangeService' && ! grep_has 'RESCIND_CONSENT|rescindConsent'; then
-    finding high "APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED" "Declared Age Range used without RESCIND_CONSENT handling" "Handle the RESCIND_CONSENT server notification, revoke the minor session and consent-scoped data, and build with the iOS 26.2 SDK or later."
+    finding high "APPLE-5.1.1-RESCIND-CONSENT-UNHANDLED" "Declared Age Range used without RESCIND_CONSENT handling" "Handle the RESCIND_CONSENT server notification, revoke the minor session and consent-scoped data, and build with the iOS 26.2 SDK or later." src 'DeclaredAgeRange|AgeRangeService'
   fi
   # The no-entitlement external purchase link is a US-storefront carve-out only. everywhere else it is still 3.1.1.
   if grep_has 'ExternalPurchaseLink|external-purchase-link|openExternalPurchaseLink' && ! grep_has 'Storefront|storefront|countryCode'; then
-    finding high "APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING" "External purchase link is not gated on the storefront" "Show the link only on the US storefront (or where you hold the entitlement). gate on Storefront.current or countryCode."
+    finding high "APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING" "External purchase link is not gated on the storefront" "Show the link only on the US storefront (or where you hold the entitlement). gate on Storefront.current or countryCode." src 'ExternalPurchaseLink|external-purchase-link|openExternalPurchaseLink'
   fi
   # On-Demand Resources are deprecated from the 27 OS family (WWDC26).
   if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
-    finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework."
+    finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
   # Since September 2026 the social media capability question gates every submission (Apple news 0d2gpmml).
   if grep_has 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'; then
-    finding medium "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION" "Social features detected, confirm the social media capability declaration in App Store Connect" "Answer the social media question before submitting. it sets a 13+ minimum and requires Declared Age Range for under-13 users."
+    finding medium "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION" "Social features detected, confirm the social media capability declaration in App Store Connect" "Answer the social media question before submitting. it sets a 13+ minimum and requires Declared Age Range for under-13 users." src 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'
   fi
   # Match the tracking SDKs by their own type names / imports, never the bare words "Adjust" or
   # "Branch", which collide with ordinary English ("Adjust times", a git branch) and false-flag a
   # tracking SDK that is not present.
   if grep_has 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'; then
-    grep_has 'ATTrackingManager|NSUserTrackingUsageDescription' || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency" "Call the ATT prompt and add NSUserTrackingUsageDescription (Apple 5.1.2)."
+    grep_has 'ATTrackingManager|NSUserTrackingUsageDescription' || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency" "Call the ATT prompt and add NSUserTrackingUsageDescription (Apple 5.1.2)." src 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'
   fi
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
-    grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)."
+    grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
-    finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)."
+    finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'
   fi
   if ! grep_has 'privacyPolicy|privacy-policy|PrivacyPolicy'; then
     finding high "APPLE-5.1.1-MISSING-PRIVACY-POLICY" "No privacy policy reference found in sources" "Publish a privacy policy, link it in App Store Connect, and reach it from inside the app."
   fi
   if grep_has 'UserDefaults\.standard'; then
     if grep_has 'token|password|credential|secret|jwt' && ! grep_has 'Keychain|SecItemAdd|SecItemUpdate'; then
-      finding high "BOTH-SECURE-STORAGE" "Plain UserDefaults storage is used for sensitive credentials" "Store access tokens and sensitive credentials in iOS Keychain instead."
+      finding high "BOTH-SECURE-STORAGE" "Plain UserDefaults storage is used for sensitive credentials" "Store access tokens and sensitive credentials in iOS Keychain instead." src 'token|password|credential|secret|jwt'
     fi
   fi
   if grep_has 'CFBundleURLSchemes'; then
     if ! grep_has 'apple-app-site-association'; then
-      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking."
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking." src 'CFBundleURLSchemes'
     fi
   fi
   # Privacy manifest, the top modern Apple upload rejection since 2024
   if grep_has 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'; then
     if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
-      finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest."
+      finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest." src 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'
     fi
   fi
 
@@ -525,7 +568,7 @@ if [ "$IS_IOS" -eq 1 ]; then
   MANIFEST_VALIDATOR=""
   for candidate in \
     "$(dirname "$0")/../../scripts/validate-privacy-manifest.py" \
-    "$HOME/.claude/skills/app-store-compliance/scripts/validate-privacy-manifest.py"; do
+    "${HOME:-}/.claude/skills/app-store-compliance/scripts/validate-privacy-manifest.py"; do
     [ -f "$candidate" ] && { MANIFEST_VALIDATOR="$candidate"; break; }
   done
   if [ -n "$MANIFEST_VALIDATOR" ] && command -v python3 >/dev/null 2>&1; then
@@ -550,48 +593,48 @@ if [ "$IS_IOS" -eq 1 ]; then
   elif find_app 12 -name 'PrivacyInfo.xcprivacy' | grep . >/dev/null; then
     finding medium "APPLE-MANIFEST-VALIDATOR-UNAVAILABLE" "Privacy manifests present but python3 or scripts/validate-privacy-manifest.py is missing, so their internals were not validated" "Install python3 and keep scripts/validate-privacy-manifest.py next to the guard, or run plutil -lint on each manifest by hand."
   fi
-  grep_has 'ITSAppUsesNonExemptEncryption' || finding high "APPLE-EXPORT-COMPLIANCE-MISSING" "ITSAppUsesNonExemptEncryption not set" "Set it in Info.plist or the build stalls in Missing Compliance and never reaches review."
+  [ "$IS_UNITY" -eq 1 ] || grep_has 'ITSAppUsesNonExemptEncryption' || finding high "APPLE-EXPORT-COMPLIANCE-MISSING" "ITSAppUsesNonExemptEncryption not set" "Set it in Info.plist or the build stalls in Missing Compliance and never reaches review."
   if grep_has 'SKProduct|Product\.purchase|StoreKit'; then
-    grep_has 'restorePurchases|restoreCompletedTransactions|AppStore\.sync|Restore Purchases' || finding high "APPLE-RESTORE-PURCHASES-MISSING" "StoreKit purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables."
+    grep_has 'restorePurchases|restoreCompletedTransactions|AppStore\.sync|Restore Purchases' || finding high "APPLE-RESTORE-PURCHASES-MISSING" "StoreKit purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src 'SKProduct|Product\.purchase|StoreKit'
   fi
   if grep_has 'deleteAccount|delete account'; then
-    grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form."
+    grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form." src 'mailto:|deactivate'
   fi
   if grep_has 'fixed-odds|betting'; then
-    finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)."
+    finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)." src 'fixed-odds|betting'
   fi
   if grep_has 'Image\('; then
     if ! grep_has 'accessibilityLabel|accessibilityIdentifier|accessibilityHidden|accessibilityElement'; then
-      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)."
+      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)." src 'Image\('
     fi
   fi
   if grep_has '\.system\(size:'; then
-    finding medium "APPLE-ACCESSIBILITY-DYNAMICTYPE" "Hardcoded system font size detected" "Use relative SwiftUI font styles or preferredFont APIs to support Dynamic Type (Apple Design - Accessibility)."
+    finding medium "APPLE-ACCESSIBILITY-DYNAMICTYPE" "Hardcoded system font size detected" "Use relative SwiftUI font styles or preferredFont APIs to support Dynamic Type (Apple Design - Accessibility)." src '\.system\(size:'
   fi
   if grep_has 'withAnimation|UIView\.animate'; then
     if ! grep_has 'isReduceMotionEnabled|accessibilityReduceMotion'; then
-      finding medium "APPLE-ACCESSIBILITY-REDUCEMOTION" "Animations implemented without checking Reduce Motion" "Respect the Reduce Motion accessibility setting before executing complex custom animations (Apple Design - Accessibility)."
+      finding medium "APPLE-ACCESSIBILITY-REDUCEMOTION" "Animations implemented without checking Reduce Motion" "Respect the Reduce Motion accessibility setting before executing complex custom animations (Apple Design - Accessibility)." src 'withAnimation|UIView\.animate'
     fi
   fi
   if grep_has 'UIColor\(\s*red:'; then
     if ! grep_has 'isDarkerSystemColorsEnabled|darkerSystemColors'; then
-      finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)."
+      finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)." src 'UIColor\(\s*red:'
     fi
   fi
   if grep_has 'onTapGesture|Button'; then
     if ! grep_has 'FeedbackGenerator|CoreHaptics'; then
-      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)."
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)." src 'onTapGesture|Button'
     fi
   fi
   if grep_has 'focusable'; then
     if ! grep_has 'FocusState|focused'; then
-      finding medium "APPLE-ACCESSIBILITY-KEYBOARD" "Focusable controls declared without focus state tracking" "Support physical keyboards with FocusState tracking (Apple Design - Accessibility)."
+      finding medium "APPLE-ACCESSIBILITY-KEYBOARD" "Focusable controls declared without focus state tracking" "Support physical keyboards with FocusState tracking (Apple Design - Accessibility)." src 'focusable'
     fi
   fi
   finding medium "APPLE-2.3-AGE-RATING-2026" "Verify the 2026 age rating questionnaire" "Answer the updated age rating questions (13 plus, 16 plus, 18 plus) in App Store Connect."
   if grep_has 'email|phoneNumber|userName|location|coordinates'; then
     if ! grep_has 'NSPrivacyCollectedDataTypes|privacyNutritionLabels|privacy-nutrition-labels'; then
-      finding high "APPLE-PRIVACY-NUTRITION-LABELS" "Missing Privacy Nutrition Labels data type declarations" "Update the app privacy manifest (PrivacyInfo.xcprivacy) with NSPrivacyCollectedDataTypes and complete corresponding Nutrition Labels in App Store Connect."
+      finding high "APPLE-PRIVACY-NUTRITION-LABELS" "Missing Privacy Nutrition Labels data type declarations" "Update the app privacy manifest (PrivacyInfo.xcprivacy) with NSPrivacyCollectedDataTypes and complete corresponding Nutrition Labels in App Store Connect." src 'email|phoneNumber|userName|location|coordinates'
     fi
   fi
 fi
@@ -599,65 +642,65 @@ fi
 # ===== Android checks =====
 if [ "$IS_AND" -eq 1 ]; then
   if grep_has 'ACCESS_BACKGROUND_LOCATION'; then
-    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location."
+    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location." src 'ACCESS_BACKGROUND_LOCATION'
   fi
   if grep_has 'MANAGE_EXTERNAL_STORAGE'; then
-    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case."
+    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case." src 'MANAGE_EXTERNAL_STORAGE'
   fi
   if grep_has 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'; then
-    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it."
+    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it." src 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'
   fi
   if grep_has 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'; then
-    finding critical "GOOGLE-PERM-ACCESSIBILITY-MISUSE" "AccessibilityService present" "Use it only for genuine accessibility and declare the use, or remove it."
+    finding critical "GOOGLE-PERM-ACCESSIBILITY-MISUSE" "AccessibilityService present" "Use it only for genuine accessibility and declare the use, or remove it." src 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'
   fi
   if grep_has 'Stripe|PayPal|braintree|razorpay'; then
-    grep_has "BillingClient|com\.android\.billingclient|$XPLAT_IAP" || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods."
+    grep_has "BillingClient|com\.android\.billingclient|$XPLAT_IAP" || finding critical "GOOGLE-PLAY-BILLING" "External payment without Play Billing" "Use Play Billing for in app digital goods." src 'Stripe|PayPal|braintree|razorpay'
   fi
   # Payments policy exception is literal. only a tax-exempt charity may take donations outside Play
   # billing (AnkiDroid, August 2026). A donate link to a funding platform is a Payments violation.
   if grep_has 'opencollective\.com|ko-fi\.com|patreon\.com|buymeacoffee\.com|github\.com/sponsors|liberapay\.com|paypal\.com/donate'; then
-    finding high "GOOGLE-PAYMENTS-DONATION-LINK" "In-app donation link to a payment page outside Play billing" "Remove the donation entry point from the Play build or sell it through Play billing. Only a tax-exempt charity (501(c)(3)-class) may bypass Play billing, Google rejects 501(c)(6) and unincorporated projects (Payments policy)."
+    finding high "GOOGLE-PAYMENTS-DONATION-LINK" "In-app donation link to a payment page outside Play billing" "Remove the donation entry point from the Play build or sell it through Play billing. Only a tax-exempt charity (501(c)(3)-class) may bypass Play billing, Google rejects 501(c)(6) and unincorporated projects (Payments policy)." src 'opencollective\.com|ko-fi\.com|patreon\.com|buymeacoffee\.com|github\.com/sponsors|liberapay\.com|paypal\.com/donate'
   fi
   # Since 3 August 2026 the developer bears chargeback costs. An app on Play billing that never
   # handles the refund-review notification loses every fraudulent dispute by default.
   # New apps and updates need Play Billing Library 8 or later since 31 August 2026 (deprecation ladder, extension to 1 November 2026).
   BILLING_MAJOR="$(grep -E '/build\.gradle(\.kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'com\.android\.billingclient:billing(-ktx)?:[0-9]+' 2>/dev/null | grep -oE '[0-9]+$' | sort -n | tail -1)"
   if [ -n "$BILLING_MAJOR" ] && [ "$BILLING_MAJOR" -lt 8 ]; then
-    finding critical "GOOGLE-PLAY-BILLING-V8-REQUIRED" "Play Billing Library $BILLING_MAJOR.x, new apps and updates need version 8 or later since 31 August 2026" "Upgrade com.android.billingclient:billing to 8.x, or request the Play Console extension available until 1 November 2026."
+    finding critical "GOOGLE-PLAY-BILLING-V8-REQUIRED" "Play Billing Library $BILLING_MAJOR.x, new apps and updates need version 8 or later since 31 August 2026" "Upgrade com.android.billingclient:billing to 8.x, or request the Play Console extension available until 1 November 2026." src 'billingclient'
   fi
   if grep_has 'BillingClient|com\.android\.billingclient'; then
-    grep_has 'PendingRefundReviewNotification|[Rr]eview[Rr]efund' || finding medium "GOOGLE-PLAY-CHARGEBACK-LIABILITY" "Play billing without chargeback dispute handling" "Handle PendingRefundReviewNotification and call the Review Refund API within 24 hours with the refund preference and usage evidence (Play Console Help answer 17068375)."
+    grep_has 'PendingRefundReviewNotification|[Rr]eview[Rr]efund' || finding medium "GOOGLE-PLAY-CHARGEBACK-LIABILITY" "Play billing without chargeback dispute handling" "Handle PendingRefundReviewNotification and call the Review Refund API within 24 hours with the refund preference and usage evidence (Play Console Help answer 17068375)." src 'BillingClient|com\.android\.billingclient'
   fi
   # From 30 September 2026 regulated categories must publish from an organization account with a D-U-N-S number.
   if grep_has 'VpnService|HealthConnect|health\.connect|BankAccount|cryptocurrency'; then
-    finding high "GOOGLE-ORG-REGISTRATION-REQUIRED" "Regulated-category signals (VPN, health, finance), organization account required from 30 Sep 2026" "Publish from an organization account with a D-U-N-S number matching the Dun and Bradstreet profile (Play Console Help 10788890)."
+    finding high "GOOGLE-ORG-REGISTRATION-REQUIRED" "Regulated-category signals (VPN, health, finance), organization account required from 30 Sep 2026" "Publish from an organization account with a D-U-N-S number matching the Dun and Bradstreet profile (Play Console Help 10788890)." src 'VpnService|HealthConnect|health\.connect|BankAccount|cryptocurrency'
   fi
   # Geofencing is no longer an approved foreground-service use case for API 37 targets (Play Console Help 16965181).
   if grep_has 'FOREGROUND_SERVICE_LOCATION' && grep_has '[Gg]eofenc'; then
-    finding high "GOOGLE-FGS-GEOFENCE-REMOVED" "Foreground service used for geofencing" "Move to the Geofence API (GeofencingClient) and drop FOREGROUND_SERVICE_LOCATION if geofencing was its only use."
+    finding high "GOOGLE-FGS-GEOFENCE-REMOVED" "Foreground service used for geofencing" "Move to the Geofence API (GeofencingClient) and drop FOREGROUND_SERVICE_LOCATION if geofencing was its only use." src '[Gg]eofenc'
   fi
   # Random or anonymous chat is now in scope of Age-Restricted, Families, and Child Safety Standards (26 Aug 2026).
   if grep_has '[Rr]andom chat|[Aa]nonymous chat|chat with strangers|Omegle' && ! grep_has 'ageGate|minorBlock|csae'; then
-    finding critical "GOOGLE-ANON-CHAT-MINOR-BLOCK" "Random or anonymous chat without minor blocking and child-safety standards" "Enable Play Console minor blocking, exclude children from the target audience, publish CSAE standards, add in-app reporting and a child-safety contact."
+    finding critical "GOOGLE-ANON-CHAT-MINOR-BLOCK" "Random or anonymous chat without minor blocking and child-safety standards" "Enable Play Console minor blocking, exclude children from the target audience, publish CSAE standards, add in-app reporting and a child-safety contact." src '[Rr]andom chat|[Aa]nonymous chat|chat with strangers|Omegle'
   fi
   # Generative image or video apps need NCII controls and a full-access test account (Android Developers Blog, 25 Aug 2026).
   if grep_has 'generateImage|imageGeneration|text-to-image|faceSwap|stable-diffusion' && ! grep_has '[Mm]oderation|safetyClassifier|contentFilter'; then
-    finding high "GOOGLE-GENAI-NCII-CONTROLS" "Generative image or video feature without moderation controls" "Add input and output moderation for intimate and deepfake content, document tested safety prompts, and give the reviewer a full-access test account."
+    finding high "GOOGLE-GENAI-NCII-CONTROLS" "Generative image or video feature without moderation controls" "Add input and output moderation for intimate and deepfake content, document tested safety prompts, and give the reviewer a full-access test account." src 'generateImage|imageGeneration|text-to-image|faceSwap|stable-diffusion'
   fi
   # From February 2027 release builds must be R8-optimized (25 percent minimum coverage, Play Console Help 17492799).
   R8_ON=0
   while IFS= read -r g; do
     grep -qE '(isMinifyEnabled|minifyEnabled)[[:space:]=]+true' "$g" 2>/dev/null && { R8_ON=1; break; }
   done < <(find_tree -type f \( -name '*.gradle' -o -name '*.kts' \) -print)
-  if [ "$R8_ON" -eq 0 ]; then
+  if [ "$R8_ON" -eq 0 ] && [ "$IS_UNITY" -eq 0 ] && [ "$IS_MAUI" -eq 0 ]; then
     finding high "ANDROID-R8-OPTIMIZATION-MISSING" "No release build type with minifyEnabled true" "Enable R8 (isMinifyEnabled = true, isShrinkResources = true) in the release build type before February 2027."
   fi
   # From April 2027 sign-in apps must restore sign-in state on a new device (Restore Credentials API).
   if grep_has 'signInWith|CredentialManager|FirebaseAuth|LoginActivity' && ! grep_has 'RestoreCredential'; then
-    finding medium "ANDROID-RESTORE-CREDENTIALS-REQUIRED" "Sign-in present without Restore Credentials integration" "Create a restore credential on sign-in and restore it after device transfer (Play technical quality requirement, April 2027)."
+    finding medium "ANDROID-RESTORE-CREDENTIALS-REQUIRED" "Sign-in present without Restore Credentials integration" "Create a restore credential on sign-in and restore it after device transfer (Play technical quality requirement, April 2027)." src 'signInWith|CredentialManager|FirebaseAuth|LoginActivity'
   fi
   if grep_has 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'; then
-    finding high "GOOGLE-DATASAFETY-MISMATCH" "Analytics or ad SDK present. Verify the Data Safety form" "Declare every collection and sharing accurately. Data Safety mismatch is the top Google rejection."
+    finding high "GOOGLE-DATASAFETY-MISMATCH" "Analytics or ad SDK present. Verify the Data Safety form" "Declare every collection and sharing accurately. Data Safety mismatch is the top Google rejection." src 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'
   fi
   if ! grep_has 'privacyPolicy|privacy-policy'; then
     finding high "GOOGLE-MISSING-PRIVACY-POLICY" "No privacy policy reference found" "Publish a privacy policy and set its URL in the Play Console store listing."
@@ -666,61 +709,61 @@ if [ "$IS_AND" -eq 1 ]; then
   # android/app/build.gradle was never read. Play rejects new apps and updates below API 36 since 31 August 2026.
   TSDK="$(grep -E '/build\.gradle(\.kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
   if [ -n "$TSDK" ] && [ "$TSDK" -lt 36 ]; then
-    finding critical "GOOGLE-TARGET-API" "targetSdk is $TSDK, below the API 36 floor Play enforces for new apps and updates since 31 August 2026" "Target API 36 or higher (Wear OS and Automotive 35, TV and XR 34), or request the Play Console extension available until 1 November 2026."
+    finding critical "GOOGLE-TARGET-API" "targetSdk is $TSDK, below the API 36 floor Play enforces for new apps and updates since 31 August 2026" "Target API 36 or higher (Wear OS and Automotive 35, TV and XR 34), or request the Play Console extension available until 1 November 2026." src 'targetSdk'
   fi
   # Android 17 (API 37) targets. contacts picker, location button scope, and local network permission (27 Jan 2027).
   if [ -n "$TSDK" ] && [ "$TSDK" -ge 37 ] 2>/dev/null; then
     if grep_has 'READ_CONTACTS' && ! grep_has 'ACTION_PICK|ContactPicker'; then
-      finding high "GOOGLE-CONTACTS-PICKER-REQUIRED" "READ_CONTACTS on an API 37 target where the Contact Picker may suffice" "Use the Android Contact Picker for one-off selection and keep READ_CONTACTS only for a declared core use (Play Console Help 16909972)."
+      finding high "GOOGLE-CONTACTS-PICKER-REQUIRED" "READ_CONTACTS on an API 37 target where the Contact Picker may suffice" "Use the Android Contact Picker for one-off selection and keep READ_CONTACTS only for a declared core use (Play Console Help 16909972)." src 'READ_CONTACTS'
     fi
     if grep_has 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION' && ! grep_has 'onlyForLocationButton'; then
-      finding high "GOOGLE-LOCATION-BUTTON-SCOPE" "Location requested on an API 37 target without the location button scope" "Scope one-shot location to the Android location button with the onlyForLocationButton manifest flag (Play Console Help 16909972)."
+      finding high "GOOGLE-LOCATION-BUTTON-SCOPE" "Location requested on an API 37 target without the location button scope" "Scope one-shot location to the Android location button with the onlyForLocationButton manifest flag (Play Console Help 16909972)." src 'ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION'
     fi
     if grep_has 'NsdManager|MulticastSocket|_tcp\.local|mDNS' && ! grep_has 'ACCESS_LOCAL_NETWORK'; then
-      finding high "ANDROID-LOCAL-NETWORK-PERMISSION" "Local network discovery on an API 37 target without ACCESS_LOCAL_NETWORK" "Declare and request android.permission.ACCESS_LOCAL_NETWORK before any LAN discovery or connection (Android 17 behavior changes)."
+      finding high "ANDROID-LOCAL-NETWORK-PERMISSION" "Local network discovery on an API 37 target without ACCESS_LOCAL_NETWORK" "Declare and request android.permission.ACCESS_LOCAL_NETWORK before any LAN discovery or connection (Android 17 behavior changes)." src 'NsdManager|MulticastSocket|_tcp\.local|mDNS'
     fi
   fi
   if grep_has 'DexClassLoader|PathClassLoader|loadDex'; then
-    finding high "ANDROID-DYNAMIC-CODE-LOADING" "Dynamic code loading at runtime" "Ship all code in the package. Server changes are data, not executable code."
+    finding high "ANDROID-DYNAMIC-CODE-LOADING" "Dynamic code loading at runtime" "Ship all code in the package. Server changes are data, not executable code." src 'DexClassLoader|PathClassLoader|loadDex'
   fi
   if grep_has 'getSharedPreferences'; then
     if grep_has 'token|password|credential|secret|jwt' && ! grep_has 'EncryptedSharedPreferences|KeyStore|SQLCipher'; then
-      finding high "BOTH-SECURE-STORAGE" "Plain SharedPreferences storage is used for sensitive credentials" "Store access tokens and sensitive credentials in Android EncryptedSharedPreferences / Keystore instead."
+      finding high "BOTH-SECURE-STORAGE" "Plain SharedPreferences storage is used for sensitive credentials" "Store access tokens and sensitive credentials in Android EncryptedSharedPreferences / Keystore instead." src 'token|password|credential|secret|jwt'
     fi
   fi
   if grep_has 'allowBackup="true"'; then
     if ! grep_has 'dataExtractionRules|fullBackupContent|allowBackup="false"'; then
-      finding high "ANDROID-INSECURE-BACKUP" "Android allowBackup is enabled without strict filters" "Disable backups using android:allowBackup=\"false\", or restrict backup folders using dataExtractionRules."
+      finding high "ANDROID-INSECURE-BACKUP" "Android allowBackup is enabled without strict filters" "Disable backups using android:allowBackup=\"false\", or restrict backup folders using dataExtractionRules." src 'allowBackup="true"'
     fi
   fi
   if grep_has 'android:scheme'; then
     if ! grep_has 'assetlinks.json'; then
-      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking."
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." src 'android:scheme'
     fi
   fi
   if grep_has 'QUERY_ALL_PACKAGES'; then
-    finding high "ANDROID-QUERY-ALL-PACKAGES" "QUERY_ALL_PACKAGES without a permitted use case" "Declare specific packages with a queries element, or qualify for a permitted use case."
+    finding high "ANDROID-QUERY-ALL-PACKAGES" "QUERY_ALL_PACKAGES without a permitted use case" "Declare specific packages with a queries element, or qualify for a permitted use case." src 'QUERY_ALL_PACKAGES'
   fi
   if grep_has 'SYSTEM_ALERT_WINDOW|TYPE_APPLICATION_OVERLAY'; then
-    finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal."
+    finding high "ANDROID-OVERLAY-TAPJACKING" "System overlay permission present" "Remove overlay abuse. The overlay plus accessibility combination is a strong malware signal." src 'SYSTEM_ALERT_WINDOW|TYPE_APPLICATION_OVERLAY'
   fi
   if grep_has 'com\.google\.android\.play:age-signals|AgeSignalsManager|AgeSignalsRequest'; then
-    finding critical "GOOGLE-PLAY-AGE-SIGNALS-MISUSE" "Play Age Signals API dependency found" "Ensure age signals are ONLY used to provide age-appropriate experiences. Using them for advertising, marketing, user profiling, or analytics is a direct ToS violation that can result in immediate app suspension or takedown."
+    finding critical "GOOGLE-PLAY-AGE-SIGNALS-MISUSE" "Play Age Signals API dependency found" "Ensure age signals are ONLY used to provide age-appropriate experiences. Using them for advertising, marketing, user profiling, or analytics is a direct ToS violation that can result in immediate app suspension or takedown." src 'com\.google\.android\.play:age-signals|AgeSignalsManager|AgeSignalsRequest'
   fi
   if grep_has '<ImageView|<ImageButton'; then
     if ! grep_has 'contentDescription'; then
-      finding medium "ANDROID-ACCESSIBILITY-TALKBACK" "XML ImageView or ImageButton missing contentDescription" "Add an android:contentDescription attribute (Google User Experience - Accessibility)."
+      finding medium "ANDROID-ACCESSIBILITY-TALKBACK" "XML ImageView or ImageButton missing contentDescription" "Add an android:contentDescription attribute (Google User Experience - Accessibility)." src '<ImageView|<ImageButton'
     fi
   fi
   if grep_has 'android:textSize=.*dp'; then
-    finding medium "ANDROID-ACCESSIBILITY-FONTSCALING" "Text size defined in dp instead of sp" "Always define text size in sp to allow system font scaling to work correctly (Google User Experience - Accessibility)."
+    finding medium "ANDROID-ACCESSIBILITY-FONTSCALING" "Text size defined in dp instead of sp" "Always define text size in sp to allow system font scaling to work correctly (Google User Experience - Accessibility)." src 'android:textSize=.*dp'
   fi
   if grep_has 'android:(textColor|background)=.*#'; then
-    finding medium "ANDROID-ACCESSIBILITY-HIGHCONTRAST" "Hardcoded hex colors ignoring high contrast settings" "Use semantic theme references or color resources instead of hardcoded hex values (Google User Experience - Accessibility)."
+    finding medium "ANDROID-ACCESSIBILITY-HIGHCONTRAST" "Hardcoded hex colors ignoring high contrast settings" "Use semantic theme references or color resources instead of hardcoded hex values (Google User Experience - Accessibility)." src 'android:(textColor|background)=.*#'
   fi
   if grep_has 'android:(layout_width|layout_height|minWidth|minHeight)=.*dp'; then
     if grep_has 'clickable|onClick'; then
-      finding medium "ANDROID-ACCESSIBILITY-SCANNER" "Interactive controls with hardcoded dimensions" "Verify touch target sizes are at least 48dp (Google User Experience - Accessibility)."
+      finding medium "ANDROID-ACCESSIBILITY-SCANNER" "Interactive controls with hardcoded dimensions" "Verify touch target sizes are at least 48dp (Google User Experience - Accessibility)." src 'clickable|onClick'
     fi
   fi
   finding medium "GOOGLE-12-TESTER-RULE" "Verify the closed testing requirement" "A new personal account needs 12 testers over 14 consecutive days before production."
@@ -728,29 +771,29 @@ if [ "$IS_AND" -eq 1 ]; then
   # feature, and a Play Console declaration is required either way (Photo and Video Permissions policy).
   if manifest_has 'android\.permission\.READ_MEDIA_(IMAGES|VIDEO)'; then
     if ! grep_has 'PickVisualMedia|ACTION_PICK_IMAGES|PhotoPicker|photo_picker'; then
-      finding high "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION" "READ_MEDIA_IMAGES or READ_MEDIA_VIDEO declared without the Android photo picker" "Use the Android photo picker for one-off selection. Keep broad access only for a core gallery-style feature and complete the Photo and Video Permissions declaration in Play Console."
+      finding high "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION" "READ_MEDIA_IMAGES or READ_MEDIA_VIDEO declared without the Android photo picker" "Use the Android photo picker for one-off selection. Keep broad access only for a core gallery-style feature and complete the Photo and Video Permissions declaration in Play Console." manifest 'android\.permission\.READ_MEDIA_(IMAGES|VIDEO)'
     fi
   fi
   # Declared permissions in AndroidManifest.xml, the surface Play enforces on (#542). English words matched prose,
   # and bare API symbols match imports, comments and vendored SDKs. READ_MEDIA_* has its own check below.
   if manifest_has 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'; then
     if ! grep_has 'prominent disclosure|user consent|privacy consent|accept policy|[Pp]rominentDisclosure|[Dd]isclosureDialog|[Cc]onsentDialog|showDisclosure|requestConsent'; then
-      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent."
+      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." manifest 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'
     fi
   fi
   if grep_has 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'; then
     if ! grep_has 'opt-out|reset AD_ID|advertisingIdConsent|delete AD_ID'; then
-      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy."
+      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy." src 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'
     fi
   fi
   if grep_has 'requestPermissions|checkSelfPermission|shouldShowRequestPermissionRationale'; then
     if ! grep_has 'permission explanation|showPermissionRationale|explainPermission'; then
-      finding high "ANDROID-RUNTIME-PERMISSIONS" "Sensitive runtime permissions requested without validation" "Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully."
+      finding high "ANDROID-RUNTIME-PERMISSIONS" "Sensitive runtime permissions requested without validation" "Check permissions dynamically at runtime, show a clear rationale if denied, and handle denials gracefully." src 'requestPermissions|checkSelfPermission|shouldShowRequestPermissionRationale'
     fi
   fi
   if grep_has 'HealthConnectClient|com\.google\.android\.gms\.permission\.HealthConnect|READ_STEPS|READ_HEART_RATE'; then
     if ! grep_has 'healthConnectConsent|healthPrivacyPolicy|Health Connect'; then
-      finding critical "ANDROID-HEALTH-PERMISSIONS" "Health or fitness data access without Health Connect declaration" "Declare Health Connect permissions, complete the console Health Connect form, and maintain a dedicated health privacy policy."
+      finding critical "ANDROID-HEALTH-PERMISSIONS" "Health or fitness data access without Health Connect declaration" "Declare Health Connect permissions, complete the console Health Connect form, and maintain a dedicated health privacy policy." src 'HealthConnectClient|com\.google\.android\.gms\.permission\.HealthConnect|READ_STEPS|READ_HEART_RATE'
     fi
   fi
 fi
@@ -759,32 +802,32 @@ fi
 if [ "$IS_WEB" -eq 1 ]; then
   if grep_has 'processData|personalData|submitForm|registerWeb|webForm'; then
     if ! grep_has 'GDPR|opt-in|privacyConsent|deletePersonalData|exportData'; then
-      finding critical "WEB-GDPR-COMPLIANCE" "Processing web personal data without GDPR compliance controls" "Integrate standard GDPR compliance gates including explicit opt-in for data processing and a mechanism for data deletion."
+      finding critical "WEB-GDPR-COMPLIANCE" "Processing web personal data without GDPR compliance controls" "Integrate standard GDPR compliance gates including explicit opt-in for data processing and a mechanism for data deletion." src 'processData|personalData|submitForm|registerWeb|webForm'
     fi
   fi
   if grep_has 'document\.cookie|setCookie|cookieStore|js-cookie|cookieConsent'; then
     if ! grep_has 'cookieBanner|cookieConsentBanner|acceptCookies|cookiePreferences'; then
-      finding critical "WEB-COOKIE-CONSENT" "Setting non-essential cookies without prior cookie consent" "Implement a compliant Cookie Consent banner that blocks non-essential cookies until the user gives explicit consent."
+      finding critical "WEB-COOKIE-CONSENT" "Setting non-essential cookies without prior cookie consent" "Implement a compliant Cookie Consent banner that blocks non-essential cookies until the user gives explicit consent." src 'document\.cookie|setCookie|cookieStore|js-cookie|cookieConsent'
     fi
   fi
   if grep_has 'localStorage\.setItem|localStorage'; then
     if ! grep_has 'encryptedStorage|encryptToken|consentLocalStorage|clearLocalStorage'; then
-      finding high "WEB-LOCAL-STORAGE" "Unencrypted sensitive personal data stored in localStorage" "Avoid storing plain sensitive personal info in localStorage, encrypt any stored tokens, and respect storage preferences."
+      finding high "WEB-LOCAL-STORAGE" "Unencrypted sensitive personal data stored in localStorage" "Avoid storing plain sensitive personal info in localStorage, encrypt any stored tokens, and respect storage preferences." src 'localStorage\.setItem|localStorage'
     fi
   fi
   if grep_has 'sessionStorage\.setItem|sessionStorage'; then
     if ! grep_has 'encryptedSession|clearSessionStorage'; then
-      finding high "WEB-SESSION-STORAGE" "Sensitive session details stored in sessionStorage without protection" "Limit and secure the data written to sessionStorage, apply encryption, and ensure data is deleted at session end."
+      finding high "WEB-SESSION-STORAGE" "Sensitive session details stored in sessionStorage without protection" "Limit and secure the data written to sessionStorage, apply encryption, and ensure data is deleted at session end." src 'sessionStorage\.setItem|sessionStorage'
     fi
   fi
   if grep_has 'indexedDB\.open|indexedDB|createObjectStore'; then
     if ! grep_has 'encryptDatabase|deleteDatabase|consentIndexedDB'; then
-      finding high "WEB-INDEXEDDB" "Structured personal data stored in IndexedDB without security controls" "Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout."
+      finding high "WEB-INDEXEDDB" "Structured personal data stored in IndexedDB without security controls" "Use encrypted IndexedDB wrappers for structured sensitive records, check user consent, and clear databases upon logout." src 'indexedDB\.open|indexedDB|createObjectStore'
     fi
   fi
   if grep_has 'gtag|fbq|google-analytics|trackingPixel|analytics\.js|hotjar'; then
     if ! grep_has 'consentTracking|disableTracking|optOutTracking|trackingPreferences'; then
-      finding high "WEB-TRACKING-TECHNOLOGIES" "Third-party tracking technologies loaded without consent" "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent."
+      finding high "WEB-TRACKING-TECHNOLOGIES" "Third-party tracking technologies loaded without consent" "Load third-party tracking scripts and pixels conditionally only after receiving explicit user cookie consent." src 'gtag|fbq|google-analytics|trackingPixel|analytics\.js|hotjar'
     fi
   fi
 fi
@@ -825,7 +868,7 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
         d="$(dirname "$m")"
         case "$m" in
           */app.json) grep -qE '"(expo|displayName)"' "$m" 2>/dev/null || continue ;;
-          */pubspec.yaml) { [ -d "$d/ios" ] || [ -d "$d/android" ]; } && ! is_library "$d" || continue ;;
+          */pubspec.yaml) { [ -d "$d/ios" ] || [ -d "$d/android" ] || [ -f "$d/lib/main.dart" ]; } && ! is_library "$d" || continue ;;
           */build.gradle|*/build.gradle.kts) grep -qE 'com\.android\.application|android\.application' "$m" 2>/dev/null || continue ;;
         esac
         printf '%s\n' "$d"
@@ -869,6 +912,21 @@ if [ -n "$STDIN_JSON" ]; then
   if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
 fi
 
+# The deadline list prints after the findings, and only for the stores this project ships to (issue #842).
+print_deadlines() {
+  local hd py="" c plats=""
+  hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  for c in "$hd/../../scripts/deadline-checker.py" "$hd/../skills/app-store-compliance/scripts/deadline-checker.py"; do
+    if [ -f "$c" ]; then py="$c"; break; fi
+  done
+  [ -n "$py" ] || return 0
+  echo ""
+  if ! tool_ok python3 -c pass; then echo "Regulatory deadline list skipped. python3 not found."; return 0; fi
+  [ "$ANY_IOS" -eq 1 ] && plats="ios"
+  [ "$ANY_AND" -eq 1 ] && plats="${plats:+$plats,}android"
+  if [ -n "$plats" ]; then python3 "$py" --brief --platforms "$plats"; else python3 "$py" --brief; fi
+}
+
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
 ROOTS="$(app_roots)"
@@ -886,12 +944,19 @@ EOF2
     DIR="$ROOT"
     echo "App. $ROOT"
     scan_tree
+    flush_findings
+    # One scannable sibling must not speak for a root the store checks never ran on.
+    if [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
+      UNCHECKED="${UNCHECKED:+$UNCHECKED, }${ROOT#"$PROJECT_ROOT"/}"
+    fi
   done <<EOF
 $ROOTS
 EOF
 else
   scan_tree
+  flush_findings
 fi
+print_deadlines
 
 # ===== summary and exit =====
 echo ""
@@ -916,9 +981,13 @@ if [ "$CRIT" -gt 0 ]; then
   emit_report 2; exit 2
 fi
 # A verdict line every time. Exit 0 with nothing scanned reads as a pass, so it is named and, run by hand, exits 1.
-if [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] || [ "$ANY_RN" -eq 1 ]; }; then
+if [ -n "$UNCHECKED" ] || { [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] || [ "$ANY_NEEDS_NATIVE" -eq 1 ]; }; }; then
   NOTE="NOT CHECKED. No iOS or Android project was found in $DIR, so the store checks did not run."
-  if [ "$ANY_RN" -eq 1 ]; then NEXT="Next. This looks like an Expo or React Native app with no ios or android folder. Run npx expo prebuild, then run the guard again."
+  if [ -n "$UNCHECKED" ]; then
+    NOTE="NOT CHECKED. No ios or android folder in $UNCHECKED, so the store checks did not run there. The other app roots had 0 critical risks."
+    NEXT="Next. Create the native project in each folder named above (npx expo prebuild, npx cap add, flutter create, or cargo tauri ios init), then run the guard again."
+  elif [ "$ANY_RN" -eq 1 ]; then NEXT="Next. This looks like an Expo or React Native app with no ios or android folder. Run npx expo prebuild, then run the guard again."
+  elif [ "$ANY_NEEDS_NATIVE" -eq 1 ]; then NEXT="Next. This app has no ios or android folder yet. Run $NATIVE_HINT, then run the guard again."
   else NEXT="Next. Point the guard at the folder that holds your Xcode project or your Android app folder."; fi
   echo ""; echo "$NOTE"; echo "$NEXT"
   if [ -n "$STDIN_JSON" ]; then emit_report 0; echo "$NOTE $NEXT" >&2; exit 0; fi

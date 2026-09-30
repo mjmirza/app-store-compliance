@@ -51,5 +51,23 @@ check "brief counts what it left out" "1 passed deadline" "$T/brief.txt"
 ncheck "brief has no multi-line blocks" "Affected repository sections" "$T/brief.txt"
 [ "$(wc -l < "$T/brief.txt")" -le 8 ] && echo "PASS brief output stays short" || { echo "FAIL brief output stays short ($(wc -l < "$T/brief.txt") lines)"; fails=$((fails+1)); }
 
+cat > "$T/stores.json" <<'JSON'
+{"deadlines":[
+ {"id":"A","jurisdiction":"Apple App Store (Global)","law":"Apple rule","requirement":"r","effective_date":"2024-01-01","grace_period":"none","mandatory_date":"2025-06-01","enforcement_date":"2025-06-01","affected_repository_sections":"docs/Y.md","priority":"high"},
+ {"id":"G","jurisdiction":"Google Play (Global)","law":"Play rule","requirement":"r","effective_date":"2024-01-01","grace_period":"none","mandatory_date":"2025-06-01","enforcement_date":"2025-06-01","affected_repository_sections":"docs/Y.md","priority":"high"},
+ {"id":"E","jurisdiction":"European Union","law":"EU law","requirement":"r","effective_date":"2024-01-01","grace_period":"none","mandatory_date":"2025-06-01","enforcement_date":"2025-06-01","affected_repository_sections":"docs/Y.md","priority":"high"}
+]}
+JSON
+DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief --platforms android > "$T/and.txt" 2>&1
+check "platforms android keeps the Play deadline" "Play rule" "$T/and.txt"
+check "platforms android keeps a law that binds every app" "EU law" "$T/and.txt"
+ncheck "platforms android drops the Apple store deadline" "Apple rule" "$T/and.txt"
+check "the dropped deadline is counted" "^1 deadline\(s\) for a store this project does not ship to" "$T/and.txt"
+DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief --platforms ios,android > "$T/both.txt" 2>&1
+check "both platforms keep the Apple deadline" "Apple rule" "$T/both.txt"
+ncheck "both platforms leave nothing out" "does not ship to" "$T/both.txt"
+DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief > "$T/none.txt" 2>&1
+check "no platforms flag lists every store" "Apple rule" "$T/none.txt"
+
 echo "----"
 if [ "$fails" -eq 0 ]; then echo "deadline-checker-test: ALL PASS"; else echo "deadline-checker-test: $fails FAIL"; exit 1; fi
