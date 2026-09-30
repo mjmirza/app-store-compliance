@@ -590,7 +590,8 @@
       "mandatory_date": "2026-10-01",
       "enforcement_date": "2026-10-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.3, docs/GOOGLE-PLAY.md",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.3, docs/GOOGLE-PLAY.md"
     },
     {
       "id": "GOOGLE-PLAY-CATALOG-ACCESS-DEFAULT",
@@ -677,7 +678,8 @@
       "mandatory_date": "2026-10-01",
       "enforcement_date": "2026-10-01",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 2.3",
-      "priority": "critical"
+      "priority": "critical",
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 2.3, docs/APPLE.md 2026 changes you must act on"
     },
     {
       "id": "APPLE-ADPLA-ATTACHMENT-12-BRAZIL",
@@ -837,7 +839,7 @@
       "grace_period": "none",
       "mandatory_date": "2027-03-01",
       "enforcement_date": "2027-03-01",
-      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/guidelines/by-app-type/social-networking-and-dating.md",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/guidelines/by-app-type/social-and-user-generated-content.md",
       "priority": "critical"
     },
     {
@@ -1059,7 +1061,7 @@
       "grace_period": "none",
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
-      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-networking-and-dating.md",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-and-user-generated-content.md",
       "priority": "high"
     },
     {
@@ -1071,7 +1073,7 @@
       "grace_period": "none",
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
-      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-networking-and-dating.md",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-and-user-generated-content.md",
       "priority": "high"
     },
     {
@@ -1107,7 +1109,7 @@
       "grace_period": "none",
       "mandatory_date": "2027-01-25",
       "enforcement_date": "2027-01-25",
-      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/social-networking-and-dating.md",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/social-and-user-generated-content.md",
       "priority": "critical"
     },
     {
@@ -1169,6 +1171,18 @@
       "enforcement_date": "2026-10-23",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific, docs/GAP-ANALYSIS-2026-09.md open items",
       "priority": "high"
+    },
+    {
+      "id": "APPLE-MULTISEAT-VOLUME-PURCHASING",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple multiseat subscription purchases (Apple Developer news likeohx4)",
+      "requirement": "Since 16 September 2026 multiseat purchases are enabled by default for subscriptions in App Store Connect. Volume Purchasing through Apple Business and Apple School Manager launches on 22 October 2026, and Group Purchases launch this winter. Before 22 October decide for each auto-renewable subscription whether organizations and groups may buy seats, and disable multiseat purchases, or limit them across the App Store, Apple Business, and Apple School Manager, where they do not fit your pricing or entitlement logic. Source https://developer.apple.com/news/?id=likeohx4",
+      "effective_date": "2026-09-16",
+      "grace_period": "about 5 weeks",
+      "mandatory_date": "2026-10-22",
+      "enforcement_date": "2026-10-22",
+      "affected_repository_sections": "docs/APPLE.md 2026 changes you must act on",
+      "priority": "medium"
     }
   ]
 }

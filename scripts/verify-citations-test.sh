@@ -40,6 +40,12 @@ echo "https://www.ftc.gov/legal-library" > "$WORK/hid/.github/CONTRIBUTING.md"
 out="$(python3 "$VERIFY" --dir "$WORK/hid" --offline 2>&1)"
 echo "$out" | grep -q "1 distinct URL" && echo "$out" | grep -q "ftc.gov" && ! echo "$out" | grep -q "browser-log" && ok "hidden tool-state directories are skipped, .github is scanned" || bad "hidden tool-state directories are skipped, .github is scanned"
 
+# 3c. a --files path that does not exist is an error, and a relative one is tried under --dir
+out="$(cd / && python3 "$VERIFY" --dir "$WORK" --files no-such-folder/ --offline 2>&1)"; rc=$?
+[ "$rc" -eq 2 ] && echo "$out" | grep -q "does not exist" && ok "a missing --files path fails loudly" || bad "a missing --files path fails loudly (rc=$rc)"
+out="$(cd / && python3 "$VERIFY" --dir "$WORK" --files a.md --offline 2>&1)"
+echo "$out" | grep -q "2 distinct URL" && ok "a relative --files path resolves under --dir from any directory" || bad "a relative --files path resolves under --dir from any directory"
+
 if ! net_up; then
   echo "SKIP  network tests (offline)"
 else

@@ -357,7 +357,7 @@ def main():
     while i < len(lines):
         line = lines[i]
         # deadline-checker lines ("[HIGH] EU AI Act ... (mandatory ...) absorbed into ...") are not findings
-        if "absorbed into" in line and "(mandatory " in line:
+        if "(mandatory " in line:
             i += 1
             continue
         match = re.match(

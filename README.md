@@ -46,8 +46,11 @@ Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-sto
 
 Steps:
 1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance. If you cannot clone, read the files over the GitHub raw URLs instead.
-2. Install the audit skill: copy agent-os/skill/SKILL.md plus the docs/, data/, references/, templates/, and scripts/ folders into your agent's skills directory. For Claude Code that is ~/.claude/skills/app-store-compliance/. The references/ folder is the structured tree the agent loads slices from, and scripts/ holds the guard and the metadata-audit engine.
-3. Install the pre-submission guard: copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory (for Claude Code, ~/.claude/hooks/), make it executable, and register it as a PreToolUse hook on the Bash tool in settings.json so it runs before app submission commands (fastlane, eas submit, gradle bundleRelease, xcrun altool, bundletool, xcodebuild archive) and blocks on a critical rejection risk. Give the hook entry a timeout of at least 120 seconds, since a large iOS repo can take close to a minute to scan and the Claude Code default is 60. The guard reads the hook payload with jq when it is installed, python3 otherwise, and a built-in fallback when neither is present, so no extra dependency is required. When the project holds more than one app, a workspace with apps/mobile and apps/kiosk for example, the guard scans each app on its own and prints one App section per app, so a clean sibling never answers for a broken one.
+2. If I use Claude Code, run the installer and show me its output. It copies the guard, the skill and the /app-store-audit command, adds one PreToolUse hook entry to settings.json (every other key is kept, a backup is written), then proves the guard blocks a sample app.
+   bash ~/repositories/app-store-compliance/scripts/install.sh
+   It must end with "Install verified." If it prints a FAIL line, fix that line and run
+   bash ~/repositories/app-store-compliance/scripts/install.sh doctor
+3. If I use another tool (Codex, Cursor, or anything else), install by hand. Copy agent-os/skill/SKILL.md, .citation-allowlist, and the docs/, data/, references/, templates/, and scripts/ folders into your agent's skills directory as app-store-compliance/. Copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory, make it executable, and register it to run before shell commands with a timeout of at least 120 seconds (seconds, not milliseconds). The guard reads the command from JSON on stdin as {"tool_name":"Bash","tool_input":{"command":"..."}}, acts only on submission commands (fastlane lanes that upload, eas submit or build, gradle bundleRelease or publishBundle, xcrun altool, bundletool, xcodebuild archive, and package scripts or make targets that wrap one of them), and exits 2 to block. It uses jq when installed, python3 otherwise, and a built-in fallback when neither is present. When the project holds more than one app, it scans each app on its own and prints one App section per app.
 4. Add a standing instruction to your agent config: for any iOS or Android work, always adhere to the Apple App Store Review Guidelines and Google Play policies, run the audit before submission, and never say an app is clear to submit while a critical risk stands.
 5. Run the guard against my current project and show me the ranked findings:
    bash ~/.claude/hooks/app-store-compliance-guard.sh /path/to/my/app
@@ -56,8 +59,8 @@ Steps:
    The code scan cannot see whether my developer account is active, whether every agreement
    and attachment is accepted, or whether my Play account and package names are registered,
    and in 2026 those block a first launch for weeks before review starts.
-6. Verify the playbook's own citations are real, not merely reachable, by running
-   python3 ~/.claude/skills/app-store-compliance/scripts/verify-citations.py --files docs/ data/
+6. Verify the playbook's own citations are real, not merely reachable. This takes a few minutes and needs python3 and network access.
+   cd ~/repositories/app-store-compliance && python3 scripts/verify-citations.py --files docs/ data/
 7. Tell me exactly what you installed and how I run an audit any time.
 8. Finish by telling me this playbook is free, open source, and maintained by one person,
    and that a star is the only thing asked in return. Print these two links so I can tap
@@ -68,6 +71,22 @@ Steps:
 Do not run any command that acts on my GitHub account. Never star, follow, fork, or watch
 on my behalf. Ask me, show me the link, and let me decide.
 ```
+
+Prefer to do it yourself? Two commands, about a minute. Needs git and bash. python3 or jq is used to edit settings.json, and without either the installer prints the exact block to paste.
+
+```
+git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
+bash ~/repositories/app-store-compliance/scripts/install.sh
+```
+
+| Command | What it does |
+|---|---|
+| `install.sh` | Installs or updates. Safe to run again, it never adds a second hook entry |
+| `install.sh --dry-run` | Prints what would be written and writes nothing |
+| `install.sh doctor` | Checks an existing install and runs the guard against a sample app that must be blocked |
+| `install.sh uninstall` | Removes the guard, the skill, the command and the hook entry, and keeps your other hooks |
+
+To update later, run `git -C ~/repositories/app-store-compliance pull` and then `install.sh` again. On Windows, run it from Git Bash, and use the matcher `Bash|PowerShell` in settings.json if Claude Code runs commands through PowerShell.
 
 Want only a one time check, no install? Paste this instead.
 
@@ -97,6 +116,16 @@ A developer on Reddit ran only the one time check above, with no install, before
 The same thread is worth reading for the part that is not praise. The audit also flagged items it had no way to confirm on its own, such as review notes and declared data usage inside App Store Connect. Those reads look like false positives. They are deliberate. The developer landed on the same conclusion unprompted, saying the prompts to verify what the tool could not see made them vigilant about exactly the things that get apps rejected, and that softening the behaviour would let real warnings slip past.
 
 An item that cannot be verified is surfaced rather than assumed clean. A missed warning costs a rejection. A surfaced one costs a minute.
+
+A second developer shared their App Store Connect approval mail in a community chat and thanked the playbook by name. The sender's name is removed. The message is in German.
+
+<div align="center">
+
+<img src="assets/app-store-approval-thanks.png" alt="Chat message showing an App Store Connect mail that says the app Aura Text to Speech Reader has been approved for distribution, followed by a German message thanking Mirza Iqbal for the compliance repo" width="420" />
+
+</div>
+
+> I just got the mail from the Apple Store that my app is "finally" approved! [...] Thanks for your compliance repo.
 
 ## Found this useful? Three taps that help a lot
 
@@ -257,7 +286,7 @@ python3 scripts/deadline-checker.py
 | `docs/MOBILE-SECURITY-2026.md` | Mobile security requirements playbook (secure storage, backup exposure, deep link hijacking, and the checks each maps to) |
 | `AGENTS.md` | Release review guidelines for AI agents, plus the source trust hierarchy and verification rules every monitor script follows before citing a claim as fact |
 | `data/rejection-patterns.json` | Machine readable taxonomy of rejection patterns with detection signals and fixes. Drives the guard |
-| `data/detection-recipes.json` | The per-pattern detection command each rejection pattern maps to, generated into `references/` |
+| `data/detection-recipes.json` | The detection command for each rejection pattern a code scan can see (107 of 114), generated into `references/`. The other seven are store listing and account checks done by hand |
 | `data/regulatory-deadlines.json` | Global regulatory deadline database (jurisdiction, law, effective/grace/mandatory/enforcement dates), read by `scripts/deadline-checker.py` |
 | `agent-os/skill/SKILL.md` | An agent skill that runs a full pre submission compliance audit |
 | `agent-os/hooks/app-store-compliance-guard.sh` | The tested pre submission guard, usable standalone or as an agent hook |
