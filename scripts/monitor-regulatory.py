@@ -3,6 +3,7 @@
 (EU/UK/US/CA/AU/SG/intl) against a source trust hierarchy. See README.md."""
 
 import os
+import sys
 import re
 import json
 import argparse
@@ -1114,6 +1115,11 @@ def main():
 
     args = parser.parse_args()
 
+    # The line goes to stderr with --json so the JSON on stdout stays parseable.
+    print(
+        "Data. sample developments built into this script, not live news.",
+        file=sys.stderr if args.json else sys.stdout,
+    )
     report_items, processed = run_monitor(
         project_path=args.project, simulate_track=args.simulate, verbose=args.verbose
     )

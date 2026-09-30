@@ -114,6 +114,18 @@ def run_command(args, cwd=ROOT):
         return -1, "", str(e)
 
 
+DEADLINE_LINE_RE = re.compile(r"\(mandatory \d{4}-\d{2}-\d{2}\)")
+
+FINDING_SHAPE_RE = re.compile(r"^\s*\[\w+\]\s+[A-Z0-9]+(-[A-Z0-9.]+)+\s")
+
+
+def is_deadline_line(line):
+    """A deadline-checker line carries a date after the word mandatory. A finding does not."""
+    if FINDING_SHAPE_RE.match(line):
+        return False
+    return bool(DEADLINE_LINE_RE.search(line))
+
+
 def load_patterns():
     path = os.path.join(ROOT, "data", "rejection-patterns.json")
     if os.path.exists(path):
@@ -356,8 +368,7 @@ def main():
     i = 0
     while i < len(lines):
         line = lines[i]
-        # deadline-checker lines ("[HIGH] EU AI Act ... (mandatory ...) absorbed into ...") are not findings
-        if "(mandatory " in line:
+        if is_deadline_line(line):
             i += 1
             continue
         match = re.match(
@@ -376,6 +387,8 @@ def main():
             title = re.sub(r"\s*\([^)]+\)$", "", title)
 
             fix = ""
+            if i + 1 < len(lines) and re.match(r"^\s*file\.\s", lines[i + 1]):
+                i += 1
             if i + 1 < len(lines):
                 next_line = lines[i + 1]
                 fix_match = re.match(r"^\s*fix\.\s+(.+)$", next_line, re.IGNORECASE)

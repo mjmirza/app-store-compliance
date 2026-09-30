@@ -501,7 +501,7 @@ def main():
     parser.add_argument(
         "--output-docs",
         type=str,
-        default="docs/AI-POLICY-MIGRATION.md",
+        default=None,
         help="Filepath to write migration tasks / docs updates",
     )
     parser.add_argument(
@@ -525,6 +525,7 @@ def main():
     used_mock = False
     if args.mock or (not args.live and not args.mock):
         used_mock = True
+        print("Data. sample announcements built into this script, not live news.")
         # Default or explicit inline mock mode
         print("Using mock policy update data for analysis...")
         if args.mock and args.mock != "inline" and os.path.exists(args.mock):
@@ -539,6 +540,8 @@ def main():
                 announcements.extend(MOCK_ANNOUNCEMENTS)
         else:
             announcements.extend(MOCK_ANNOUNCEMENTS)
+    else:
+        print("Data. live feeds, fetched just now.")
 
     # 2. Analyze policy announcements against keywords
     matched_policies = analyze_announcements(announcements, keywords_list)
@@ -558,8 +561,11 @@ def main():
     print(f"Found {len(affected_features)} matching source lines.")
 
     # 4. Generate documentation updates and migration tasks
-    os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation(matched_policies, args.output_docs, is_simulated=used_mock)
+    if args.output_docs:
+        os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
+        update_documentation(matched_policies, args.output_docs, is_simulated=used_mock)
+    else:
+        print("No file written. Pass --output-docs <path> to save this report.")
 
     # 5. Draft the Pull Request with exactly 15 sections
     pr_draft = generate_pull_request_draft(matched_policies, affected_features)

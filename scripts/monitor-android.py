@@ -1187,7 +1187,7 @@ def main():
     parser.add_argument(
         "--output-docs",
         type=str,
-        default="docs/ANDROID-POLICY-MIGRATION.md",
+        default=None,
         help="Filepath to write migration tasks and logs",
     )
     parser.add_argument(
@@ -1216,6 +1216,7 @@ def main():
     used_mock = False
     if args.mock or (not args.live and not args.mock) or not announcements:
         used_mock = True
+        print("Data. sample announcements built into this script, not live news.")
         print(
             "Using comprehensive mock Android policy updates for compliance scanning..."
         )
@@ -1231,6 +1232,8 @@ def main():
                 announcements.extend(MOCK_ANNOUNCEMENTS)
         else:
             announcements.extend(MOCK_ANNOUNCEMENTS)
+    else:
+        print("Data. live feeds, fetched just now.")
 
     # 2. Classify updates into the 19 required categories
     keywords_filter = (
@@ -1256,8 +1259,11 @@ def main():
     print(f"Found {total_matches} signal matches in code.")
 
     # 4. Write/Update documentation
-    os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    if args.output_docs:
+        os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
+        update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    else:
+        print("No file written. Pass --output-docs <path> to save this report.")
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
