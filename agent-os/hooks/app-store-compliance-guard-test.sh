@@ -197,9 +197,9 @@ OUT="$(bash "$GUARD" /no/such/dir/here 2>&1)"; RC=$?
 OUT="$(printf '%s' '{not valid json [[[ command : oops }}}' | bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "Malformed JSON stdin fail-open" || bad "Malformed JSON stdin (got $RC)"
 
-# 9 stress. Empty stdin does not hang or crash
+# 9 stress. Empty stdin does not hang or crash. /tmp may hold no app at all, which is exit 1 (not checked).
 OUT="$(printf '' | bash "$GUARD" /tmp 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
+[ "$RC" -eq 0 ] || [ "$RC" -eq 1 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
 
 # 9b fail-open. Hook mode with an empty payload must not fall back to scanning the working directory
 D="$(mk_ios_bad)"; OUT="$(cd "$D" && printf '' | bash "$GUARD" 2>&1)"; RC=$?
@@ -1601,6 +1601,22 @@ OUT="$(PATH="$SHIM" bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "python3: command not found" && bad "836-nopy no raw python3 error without python3" || ok "836-nopy no raw python3 error without python3"
 echo "$OUT" | grep -q "python3 not found" && [ "$RC" -eq 2 ] && ok "836-nopy2 the skipped deadline list is named and the scan still blocks" || bad "836-nopy2 the skipped deadline list is named and the scan still blocks (rc=$RC)"
 rm -rf "$D" "$SHIM"
+
+# ===== The run always ends with a verdict a person can read. A silent exit 0 is not a verdict. =====
+D="$(mk_ios_clean)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR\. 0 critical' && ok "verdict-1 a clean app ends with a CLEAR line" || bad "verdict-1 a clean app ends with a CLEAR line (rc=$RC)"
+rm -rf "$D"
+D="$(mktemp -d)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q '^NOT CHECKED\.' && ! echo "$OUT" | grep -q '^CLEAR' && ok "verdict-2 an empty folder is NOT CHECKED with exit 1, never a pass" || bad "verdict-2 an empty folder is NOT CHECKED with exit 1 (rc=$RC)"
+printf '{"expo":{"name":"x","slug":"x"}}' > "$D/app.json"; printf '{"dependencies":{"expo":"~52.0.0","react-native":"0.76.0"}}' > "$D/package.json"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q 'expo prebuild' && ok "verdict-3 an Expo app with no native folders is told to prebuild" || bad "verdict-3 an Expo app with no native folders is told to prebuild (rc=$RC)"
+ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$ERR" | grep -q 'NOT CHECKED' && ok "verdict-4 as a hook an unscannable project is reported and never blocked" || bad "verdict-4 as a hook an unscannable project is reported and never blocked (rc=$RC)"
+rm -rf "$D"
+D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
+rm -rf "$D"
 
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

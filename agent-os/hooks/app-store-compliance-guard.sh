@@ -10,7 +10,7 @@ HOOK_LOG="$HOME/.claude/hooks/hook-log.sh"
 [ -f "$HOOK_LOG" ] && source "$HOOK_LOG" 2>/dev/null || true
 log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compliance-guard" "$@"; else echo "app-store-compliance-guard: $*" >&2; fi; }
 
-CRIT=0; HIGH=0; MED=0; DEADLINE_DONE=0
+CRIT=0; HIGH=0; MED=0; DEADLINE_DONE=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
 cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
@@ -343,6 +343,9 @@ IOS_TARGET_ACTIVE=0
 [ "$IS_IOS" -eq 1 ] && [ "$CMD_TARGET_ANDROID_ONLY" -eq 0 ] && IOS_TARGET_ACTIVE=1
 
 echo "Platforms. iOS=$IS_IOS Android=$IS_AND Web=$IS_WEB"
+{ [ "$IS_IOS" -eq 1 ] || [ "$IS_AND" -eq 1 ]; } && ANY_NATIVE=1
+[ "$IS_RN" -eq 1 ] && ANY_RN=1
+[ "$IS_WEB" -eq 1 ] && ANY_WEB=1
 echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC"
 [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only framework checks suppressed for this run."
 echo ""
@@ -908,7 +911,20 @@ if [ "$CRIT" -gt 0 ]; then
   fi
   echo ""
   echo "BLOCKED. $CRIT critical rejection risk(s) above. Fix them, or set APP_STORE_GUARD_OK=1 to override."
+  echo "Next. Fix each [CRITICAL] line using its fix. line, then run the same command again."
   [ "${REPORT_DEGRADED:-0}" = "1" ] && echo "BLOCKED. $CRIT critical rejection risk(s). Full report on stdout (no temp file available for buffering)." >&2
   emit_report 2; exit 2
 fi
+# A verdict line every time. Exit 0 with nothing scanned reads as a pass, so it is named and, run by hand, exits 1.
+if [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] || [ "$ANY_RN" -eq 1 ]; }; then
+  NOTE="NOT CHECKED. No iOS or Android project was found in $DIR, so the store checks did not run."
+  if [ "$ANY_RN" -eq 1 ]; then NEXT="Next. This looks like an Expo or React Native app with no ios or android folder. Run npx expo prebuild, then run the guard again."
+  else NEXT="Next. Point the guard at the folder that holds your Xcode project or your Android app folder."; fi
+  echo ""; echo "$NOTE"; echo "$NEXT"
+  if [ -n "$STDIN_JSON" ]; then emit_report 0; echo "$NOTE $NEXT" >&2; exit 0; fi
+  exit 1
+fi
+echo ""
+[ "$ANY_NATIVE" -eq 0 ] && echo "Web project only. No iOS or Android project was found here, so only the web checks ran."
+echo "CLEAR. 0 critical risks in the code scan. Read any [HIGH] and [MEDIUM] lines above, then walk docs/PRE-SUBMISSION-CHECKLIST.md for the account and listing checks a scan cannot see."
 emit_report 0; exit 0

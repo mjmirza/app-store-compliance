@@ -61,6 +61,17 @@ Priority 5: Social Media and AI Summaries
 - Never trust secondary sources before official sources.
 - Never create compliance pull requests using Priority 4 or Priority 5 sources unless verified by a Priority 1 source. Any citation or claim sourced from Priority 4 or 5 must be traceably corroborated by an official publication from Priority 1.
 
+## How to fix a wrong citation
+
+1. Find the official page that states the rule (Apple, Google, or the regulator). Read it and copy the exact wording.
+2. Replace the link and the claim in the doc or data file. If a deadline date changes, say what the old date was in `CHANGELOG.md`, never change it silently.
+3. Run the two checks below. Both must pass.
+
+```
+python3 scripts/verify-citations.py --files <the file you changed>
+python3 scripts/check-docs.py
+```
+
 ## How to add a rejection pattern
 
 1. Add the human facing entry to the matching doc in `docs/`.
