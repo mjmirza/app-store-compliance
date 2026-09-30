@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test gauntlet for deadline-checker.py absorbed-state behavior.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 fails=0
 check() { # name, expected, haystack-file
