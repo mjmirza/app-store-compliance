@@ -197,9 +197,9 @@ OUT="$(bash "$GUARD" /no/such/dir/here 2>&1)"; RC=$?
 OUT="$(printf '%s' '{not valid json [[[ command : oops }}}' | bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "Malformed JSON stdin fail-open" || bad "Malformed JSON stdin (got $RC)"
 
-# 9 stress. Empty stdin does not hang or crash
+# 9 stress. Empty stdin does not hang or crash. /tmp may hold no app at all, which is exit 1 (not checked).
 OUT="$(printf '' | bash "$GUARD" /tmp 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
+[ "$RC" -eq 0 ] || [ "$RC" -eq 1 ] || [ "$RC" -eq 2 ] && ok "Empty stdin handled" || bad "Empty stdin handled (got $RC)"
 
 # 9b fail-open. Hook mode with an empty payload must not fall back to scanning the working directory
 D="$(mk_ios_bad)"; OUT="$(cd "$D" && printf '' | bash "$GUARD" 2>&1)"; RC=$?
