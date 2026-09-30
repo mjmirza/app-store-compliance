@@ -12,8 +12,12 @@ import json
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEADLINES_FILE = os.path.join(ROOT, "data", "regulatory-deadlines.json")
-OUTPUT_FILE = os.path.join(ROOT, "docs", "REGULATORY-TIMELINE.md")
+DEADLINES_FILE = os.environ.get(
+    "DEADLINES_FILE", os.path.join(ROOT, "data", "regulatory-deadlines.json")
+)
+OUTPUT_FILE = os.environ.get(
+    "TIMELINE_OUTPUT_FILE", os.path.join(ROOT, "docs", "REGULATORY-TIMELINE.md")
+)
 
 
 def load_deadlines():
@@ -53,7 +57,7 @@ def main():
             print(f"Error parsing date for {d.get('id', 'Unknown')}: {e}", file=sys.stderr)
             continue
 
-        remaining_days = (mand_dt - now).days
+        remaining_days = (mand_dt.date() - now.date()).days
         parsed_items.append({
             "id": d.get("id"),
             "jurisdiction": d.get("jurisdiction", "Unknown"),

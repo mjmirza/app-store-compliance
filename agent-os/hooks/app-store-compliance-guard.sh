@@ -829,6 +829,11 @@ fi
 # ===== summary and exit =====
 echo ""
 echo "Summary. critical=$CRIT high=$HIGH medium=$MED"
+# Issue #658. A run killed by the hook timeout looks like a silent pass, so say how long this one took.
+SLOW_SECS="${APP_STORE_GUARD_SLOW_SECS:-45}"
+case "$SLOW_SECS" in ''|*[!0-9]*) SLOW_SECS=45 ;; esac
+echo "Scan time. ${SECONDS}s"
+[ "$SECONDS" -ge "$SLOW_SECS" ] && echo "Slow scan. This run is close to the Claude Code hook timeout of 60 seconds. Raise \"timeout\" on the hook entry in settings.json to at least 120."
 echo "Reference. docs/ in the app-store-compliance repo, and data/rejection-patterns.json"
 
 if [ "$CRIT" -gt 0 ]; then

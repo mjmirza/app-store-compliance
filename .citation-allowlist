@@ -39,6 +39,8 @@ https://example.com/x
 https://kiosk.example.io/privacy-policy
 https://realbackend.io/privacy-policy
 https://staging.example.com
+https://app.com/privacy-policy
+https://prod.app.com
 
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers

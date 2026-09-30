@@ -29,6 +29,9 @@ jobs:
       - name: Metadata audit test suite
         run: bash scripts/metadata-audit-test.sh
 
+      - name: Accessibility audit test suite
+        run: bash scripts/accessibility-audit-test.sh
+
       - name: Policy monitor test suites
         run: bash scripts/run-monitor-tests.sh
 
@@ -39,6 +42,7 @@ jobs:
         run: |
           python3 scripts/test-generate-timeline.py
           python3 scripts/test-deadline-checker.py
+          python3 scripts/test-validate.py
           bash scripts/deadline-checker-test.sh
 
       - name: References are in sync with the taxonomy

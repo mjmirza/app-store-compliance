@@ -135,6 +135,24 @@ else
   bad "PR Draft file was not created"
 fi
 
+# Topic labels are assigned from word stems, so "disclose", "policies" and "harmful" are not missed.
+STEM_JSON="$(mktemp)"; STEM_DOCS="$(mktemp)"; STEM_PR="$(mktemp)"
+cat << 'STEMS' > "$STEM_JSON"
+[
+  {"id": "A", "platform": "Apple", "title": "Generative AI apps must disclose third-party AI use",
+   "description": "Apps using generative AI must disclose data sharing and block harmful output.",
+   "link": "https://mock.invalid/a", "pubDate": "Mon, 10 Mar 2026 09:00:00 PDT"},
+  {"id": "G", "platform": "Google", "title": "Generative AI apps and Play policies",
+   "description": "Updated Play policies for generative AI apps. Apps must disclose AI content and keep users safe.",
+   "link": "https://mock.invalid/g", "pubDate": "Mon, 10 Mar 2026 09:00:00 PDT"}
+]
+STEMS
+python3 scripts/monitor-ai-policy.py --mock "$STEM_JSON" --dir . --output-docs "$STEM_DOCS" --pr-output "$STEM_PR" >/dev/null 2>&1
+TOPICS="$(grep 'Key Topics' "$STEM_DOCS")"
+echo "$TOPICS" | grep -q "User disclosure requirements" && echo "$TOPICS" | grep -q "Safety expectations" && ok "Apple topics are matched from the stems disclose and harmful" || bad "Apple topics are matched from the stems disclose and harmful"
+echo "$TOPICS" | grep -q "Google Play AI policies" && echo "$TOPICS" | grep -q "AI-generated content disclosures" && echo "$TOPICS" | grep -q "User safety requirements" && ok "Google topics are matched from the stems policies, disclose and safe" || bad "Google topics are matched from the stems policies, disclose and safe"
+rm -f "$STEM_JSON" "$STEM_DOCS" "$STEM_PR"
+
 echo ""
 echo "AI Policy Monitor test suite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

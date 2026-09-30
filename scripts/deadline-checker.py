@@ -63,7 +63,8 @@ def main():
 
         # Check against the mandatory date or enforcement date (whichever is earlier/relevant, let's use mandatory_date)
         # We calculate remaining days based on the mandatory date
-        remaining_days = (mand_dt - now).days
+        # whole calendar days in UTC, so a deadline is due on its own date and not a day early
+        remaining_days = (mand_dt.date() - now.date()).days
 
         raw_sections = d.get("affected_repository_sections", "")
         if isinstance(raw_sections, list):

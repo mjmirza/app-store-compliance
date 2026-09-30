@@ -54,10 +54,11 @@ case "$target" in
     if [ -z "$EDIT" ]; then echo "Failed to create edit. Check token and package access."; exit 1; fi
     echo "Edit $EDIT. Fetching listings."
     LISTINGS="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/edits/$EDIT/listings")"
-    echo "$LISTINGS" | python3 - "$DIR" <<'PYIN'
+    # the heredoc is python's stdin, so the listings travel in the environment, not on a pipe
+    LISTINGS="$LISTINGS" python3 - "$DIR" <<'PYIN'
 import json, os, sys
 dir = sys.argv[1]
-data = json.load(sys.stdin)
+data = json.loads(os.environ["LISTINGS"])
 for l in data.get("listings", []):
     lang = l.get("language", "default")
     d = os.path.join(dir, lang); os.makedirs(d, exist_ok=True)

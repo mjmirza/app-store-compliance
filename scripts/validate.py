@@ -10,7 +10,11 @@ import datetime
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")
 RECIPES = os.path.join(ROOT, "data", "detection-recipes.json")
-DEADLINES = os.path.join(ROOT, "data", "regulatory-deadlines.json")
+DEADLINES = os.environ.get(
+    "DEADLINES_FILE", os.path.join(ROOT, "data", "regulatory-deadlines.json")
+)
+# a passed deadline with no absorbed_into is a warning for this many days, then an error
+PASSED_GRACE_DAYS = 7
 
 REQUIRED_PATTERN = [
     "id",
@@ -48,6 +52,38 @@ def validate_date(date_str, field_name, item_id):
         errors.append(
             f"deadline '{item_id}' has invalid {field_name} '{date_str}', must be YYYY-MM-DD format"
         )
+
+
+def parse_day(value):
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def validate_deadline_dates(d, did, today):
+    """Date order, and an owner for a deadline that has passed (#660)."""
+    eff, mand, enf = (
+        parse_day(d.get(k)) for k in ("effective_date", "mandatory_date", "enforcement_date")
+    )
+    if eff and mand and eff > mand:
+        errors.append(
+            f"deadline '{did}' has effective_date {eff} after mandatory_date {mand}"
+        )
+    if mand and enf and mand > enf:
+        errors.append(
+            f"deadline '{did}' has mandatory_date {mand} after enforcement_date {enf}"
+        )
+    if mand and mand < today and not str(d.get("absorbed_into") or "").strip():
+        days = (today - mand).days
+        msg = (
+            f"deadline '{did}' passed {days} day(s) ago on {mand} with no absorbed_into. "
+            "Name the doc section that now carries the rule."
+        )
+        if days > PASSED_GRACE_DAYS:
+            errors.append(msg)
+        else:
+            warnings.append(msg)
 
 
 def main():
@@ -141,6 +177,9 @@ def main():
                         val = d.get(date_field)
                         if val and val != "none":
                             validate_date(val, date_field, did)
+                    validate_deadline_dates(
+                        d, did, datetime.datetime.now(datetime.timezone.utc).date()
+                    )
         except Exception as e:
             errors.append(f"Failed to parse regulatory-deadlines.json: {e}")
 
