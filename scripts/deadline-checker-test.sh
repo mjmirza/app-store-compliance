@@ -42,5 +42,14 @@ echo "{bad" > "$T/bad.json"
 DEADLINES_FILE="$T/bad.json" python3 scripts/deadline-checker.py > "$T/out2.txt" 2>&1
 check "malformed data fails open" "No deadlines loaded|Error loading" "$T/out2.txt"
 
+# --brief is what the guard prints. one line per deadline, nothing for an absorbed one.
+DEADLINES_FILE="$T/deadlines.json" python3 scripts/deadline-checker.py --brief > "$T/brief.txt" 2>&1
+check "brief keeps the section header" "Regulatory Compliance Deadline Status" "$T/brief.txt"
+check "brief shows the overdue entry on one line" "^\[CRITICAL\] OVERDUE [0-9]+ days\. EU\. Law B" "$T/brief.txt"
+ncheck "brief does not list absorbed entries" "Law A" "$T/brief.txt"
+check "brief counts what it left out" "1 passed deadline" "$T/brief.txt"
+ncheck "brief has no multi-line blocks" "Affected repository sections" "$T/brief.txt"
+[ "$(wc -l < "$T/brief.txt")" -le 8 ] && echo "PASS brief output stays short" || { echo "FAIL brief output stays short ($(wc -l < "$T/brief.txt") lines)"; fails=$((fails+1)); }
+
 echo "----"
 if [ "$fails" -eq 0 ]; then echo "deadline-checker-test: ALL PASS"; else echo "deadline-checker-test: $fails FAIL"; exit 1; fi

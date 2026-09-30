@@ -189,9 +189,9 @@ D="$(mk_ios_bad)"; OUT="$(printf '{"tool_input":{"command":"fastlane deliver --s
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "Hook mode runs scan on submission command" || bad "Hook mode runs scan (rc=$RC)"
 rm -rf "$D"
 
-# 7 fail-open. Non-existent dir does not crash
+# 7 a non-existent dir does not crash and never reads as a clean pass
 OUT="$(bash "$GUARD" /no/such/dir/here 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && ok "Fail-open on missing dir (exit 0)" || bad "Fail-open on missing dir (got $RC)"
+[ "$RC" -eq 1 ] && ok "Missing dir is reported (exit 1)" || bad "Missing dir is reported (got $RC)"
 
 # 8 stress. Malformed JSON stdin does not crash
 OUT="$(printf '%s' '{not valid json [[[ command : oops }}}' | bash "$GUARD" 2>&1)"; RC=$?
@@ -1550,6 +1550,39 @@ echo "$ERR" | grep -qE '^Scan time\. [0-9]+s$' && echo "$ERR" | grep -q 'hook ti
 OUT="$(APP_STORE_GUARD_SLOW_SECS=abc bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -qE '^Scan time\. [0-9]+s$' && ! echo "$OUT" | grep -q 'hook timeout' && [ "$RC" -eq 2 ] && ok "658-5 a non-numeric threshold falls back to the default" || bad "658-5 a non-numeric threshold falls back to the default (rc=$RC)"
 rm -rf "$D"
+
+# ===== Submit commands that reach the store through a wrapper or a custom lane (#836) =====
+hook_rc() { python3 -c 'import json,sys; print(json.dumps({"tool_name":sys.argv[2],"tool_input":{"command":sys.argv[1]}}))' "$1" "${3:-Bash}" | CLAUDE_PROJECT_DIR="$2" bash "$GUARD" >/dev/null 2>&1; echo $?; }
+D="$(mk_ios_bad)"
+mkdir -p "$D/fastlane"
+printf 'default_platform(:ios)\nplatform :ios do\n  lane :tests do\n    scan\n  end\n  lane :nightly do\n    build_app\n    upload_to_testflight\n  end\n  lane :screens do\n    snapshot\n  end\nend\n' > "$D/fastlane/Fastfile"
+printf '{\n  "name": "x",\n  "scripts": {\n    "submit:ios": "cd ios && fastlane ios release",\n    "ship": "eas submit -p ios",\n    "lint": "eslint ."\n  }\n}\n' > "$D/package.json"
+printf 'ios-release:\n\txcodebuild -workspace A.xcworkspace -scheme A archive\n\nfmt:\n\tswiftformat .\n' > "$D/Makefile"
+n=0
+for c in "bundle exec fastlane release" "fastlane ios beta" "fastlane android deploy" "fastlane run upload_to_testflight" "fastlane upload_to_app_store" "fastlane nightly" "gradle publishBundle" "./gradlew publishReleaseBundle" "./gradlew :app:promoteReleaseArtifact" "npx eas --non-interactive submit -p ios" "eas --profile production build" "npm run submit:ios" "pnpm run ship" "yarn ship" "make ios-release"; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "2" ] && ok "836-$n blocked. $c" || bad "836-$n blocked. $c (rc=$RC)"
+done
+for c in "fastlane tests" "fastlane ios screens" "fastlane match development" "fastlane --version" "bundle exec fastlane lanes" "npm run lint" "yarn install" "npm install" "make fmt" "make" "gradle publishToMavenLocal" "./gradlew test" 'echo "fastlane release"' "grep -r 'fastlane beta' docs"; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "0" ] && ok "836-$n silent. $c" || bad "836-$n silent. $c (rc=$RC)"
+done
+# A PowerShell tool call carries a shell command too (Claude Code on Windows).
+RC="$(hook_rc "fastlane deliver" "$D" PowerShell)"
+[ "$RC" = "2" ] && ok "836-ps a PowerShell tool payload is scanned" || bad "836-ps a PowerShell tool payload is scanned (rc=$RC)"
+rm -rf "$D"
+
+# An explicit path that is not a directory is an error the person must see, never a silent pass.
+ERR="$(bash "$GUARD" /no/such/dir/here 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$ERR" | grep -q "not a directory" && ok "836-path a missing project path exits 1 with a reason" || bad "836-path a missing project path exits 1 with a reason (rc=$RC)"
+
+# Without python3 the deadline list is skipped with a note, never a command-not-found error.
+D="$(mk_ios_bad)"; SHIM="$(mktemp -d)"
+for b in bash cat grep sed awk find xargs tr head tail mktemp wc sort uniq cut dirname basename date rm ls env printf cmp mkdir plutil xmllint file od comm tee sleep expr touch; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$SHIM/$b"; done
+OUT="$(PATH="$SHIM" bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "python3: command not found" && bad "836-nopy no raw python3 error without python3" || ok "836-nopy no raw python3 error without python3"
+echo "$OUT" | grep -q "python3 not found" && [ "$RC" -eq 2 ] && ok "836-nopy2 the skipped deadline list is named and the scan still blocks" || bad "836-nopy2 the skipped deadline list is named and the scan still blocks (rc=$RC)"
+rm -rf "$D" "$SHIM"
 
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

@@ -23,8 +23,8 @@ CMD=""
 if [ "$#" -ge 1 ] && [ -d "$1" ]; then
   DIR="$1"                                   # standalone with explicit path
 elif [ "$#" -ge 1 ] && [ ! -d "$1" ]; then
-  # An explicit path that does not exist must fail open, never fall back to scanning the working directory.
-  log_err "project dir not found. $1"; exit 0
+  # An explicit path that is not a directory is a typo. Say so and exit 1, a path that was not read is never a pass.
+  echo "app-store-compliance-guard: $1 is not a directory. Nothing was scanned." >&2; exit 1
 elif [ ! -t 0 ]; then
   STDIN_JSON="$(cat 2>/dev/null || true)"    # hook mode, payload on stdin
   # An empty hook payload has no command to judge; falling back to scanning the working directory can take minutes.
@@ -37,7 +37,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if ((.tool_name? // "Bash") != "Bash") then empty else ((.tool_input.command? | strings) // (.command? | strings) // empty) end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if (((.tool_name? // "Bash") == "Bash" or .tool_name == "PowerShell") | not) then empty else ((.tool_input.command? | strings) // (.command? | strings) // empty) end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -47,7 +47,7 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-if isinstance(d, dict) and d.get("tool_name", "Bash") == "Bash":
+if isinstance(d, dict) and d.get("tool_name", "Bash") in ("Bash", "PowerShell"):
     ti = d.get("tool_input")
     if isinstance(ti, dict) and isinstance(ti.get("command"), str):
         c = ti["command"]
@@ -80,7 +80,7 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
 }
 
 if [ -n "$STDIN_JSON" ]; then
-  # Only a Bash tool call carries a shell command. The jq and python3 tiers check the top-level tool_name.
+  # Only a Bash or PowerShell tool call carries a shell command. The jq and python3 tiers check the top-level tool_name.
   # The no-tools tier cannot tell a top-level key from a nested one, so it scans rather than skips.
   CMD="$(payload_command 2>/dev/null | tr -d '\000')"
   # Fold a backslash-newline continuation (odd trailing backslashes) into one space. Bare newlines stay,
@@ -108,7 +108,42 @@ if [ -n "$STDIN_JSON" ]; then
       else { gsub(sq, "", l); gsub(dq, "", l) }
       print l }' 2>/dev/null | sed -E 's/\\([A-Za-z0-9])/\1/g')"
   # Only act on submission style commands. Otherwise stay silent.
-  if ! printf '%s' "$CMD_MATCH" | grep -qiE 'fastlane[[:space:]]+(deliver|pilot|supply|submit)|eas[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'; then
+  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android)|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?'
+  UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
+  # A custom fastlane lane submits when its name says so, or when its block in a Fastfile calls an upload action.
+  fastlane_lane_submits() {
+    local lane ff
+    lane="$(printf '%s' "$1" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])fastlane[[:space:]]+((ios|android|mac)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*).*/\4/p' | head -1)"
+    [ -z "$lane" ] && return 1
+    printf '%s' "$lane" | grep -qiE 'release|beta|deploy|prod|publish|submit|upload|store|testflight|distribut|ship' && return 0
+    while IFS= read -r ff; do
+      [ -f "$ff" ] || continue
+      awk -v n="$lane" '$0 ~ "lane[[:space:]]+:" n "([^A-Za-z0-9_]|$)" { on=1; next } on && /^[[:space:]]*(private_)?lane[[:space:]]+:/ { on=0 } on' "$ff" 2>/dev/null \
+        | grep -qE "$UPLOAD_ACTION_RE" && return 0
+    done <<FASTFILES
+$(find "$DIR" -maxdepth 3 -name Fastfile -not -path '*/node_modules/*' 2>/dev/null | head -5)
+FASTFILES
+    return 1
+  }
+  submits() { printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || fastlane_lane_submits "$1"; }
+  # What a package script or a make target runs, one level deep, so a wrapped submit is still seen.
+  wrapper_body() {
+    local name mf
+    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])(npm|pnpm|bun)[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\4/p' | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])yarn[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p' | head -1)"
+    if [ -n "$name" ] && [ -f "$DIR/package.json" ]; then
+      grep -E "^[[:space:]]*\"$name\"[[:space:]]*:" "$DIR/package.json" 2>/dev/null | head -1
+    fi
+    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([A-Za-z0-9_.-]+).*/\2/p' | head -1)"
+    if [ -n "$name" ]; then
+      for mf in "$DIR/Makefile" "$DIR/makefile" "$DIR/GNUmakefile"; do
+        [ -f "$mf" ] && awk -v t="$name" 'index($0, t ":") == 1 { on=1; next } on && /^[^\t#]/ { on=0 } on' "$mf" 2>/dev/null
+      done
+    fi
+  }
+  # Cheap exit for the everyday command. Nothing below runs unless a submit tool or a wrapper is named.
+  if ! printf '%s' "$CMD_MATCH" | grep -qiE "$SUBMIT_RE" \
+    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make)[[:space:]]'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
@@ -124,6 +159,10 @@ if [ -n "$STDIN_JSON" ]; then
       REAL_T="$(cd "$TARGET" 2>/dev/null && pwd -P)"; REAL_R="$(cd "$DIR" 2>/dev/null && pwd -P)"
       case "$REAL_T/" in "$REAL_R"/*) DIR="$REAL_T" ;; esac
     fi
+  fi
+  if ! submits "$CMD_MATCH"; then
+    WRAPPED="$(wrapper_body)"
+    { [ -n "$WRAPPED" ] && submits "$WRAPPED"; } || exit 0
   fi
 fi
 
@@ -295,8 +334,11 @@ for candidate in \
   "$HOOK_DIR/../skills/app-store-compliance/scripts/deadline-checker.py"; do
   if [ -f "$candidate" ]; then DEADLINE_PY="$candidate"; break; fi
 done
-if [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ]; then
-  python3 "$DEADLINE_PY"
+if [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ] && ! tool_ok python3 -c pass; then
+  echo "Regulatory deadline list skipped. python3 not found."
+  echo ""
+elif [ -n "$DEADLINE_PY" ] && [ "${DEADLINE_DONE:-0}" -eq 0 ]; then
+  python3 "$DEADLINE_PY" --brief
   echo ""
 fi
 DEADLINE_DONE=1

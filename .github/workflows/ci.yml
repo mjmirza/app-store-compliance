@@ -26,6 +26,9 @@ jobs:
       - name: Guard test suite
         run: bash agent-os/hooks/app-store-compliance-guard-test.sh
 
+      - name: Installer test suite
+        run: bash scripts/install-test.sh
+
       - name: Metadata audit test suite
         run: bash scripts/metadata-audit-test.sh
 
