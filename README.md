@@ -23,13 +23,39 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 
 </div>
 
+## Start here
+
+Pick one row. The time shown is for that first step.
+
+| You are | Do this first | Time |
+|---|---|---|
+| About to submit, and you can open a terminal | Run the two commands below | 2 minutes |
+| Already rejected | Open [the appeal playbook](docs/MISTAKE-PATTERNS.md#the-appeal-playbook) | 10 minutes |
+| Not a developer | Open [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) and do its first two checks | 5 minutes |
+| Using Claude Code and want this on every submit | Go to [the install](#paste-this-into-claude-code-codex-or-any-ai-coding-tool) | 1 minute |
+
+The two commands. Needs git and bash. The first downloads this playbook. The second scans your app. Nothing is installed and nothing in your app is changed.
+
+```
+git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
+bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
+```
+
+Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. The last lines tell you where you stand.
+
+| Last line starts with | It means | Do next |
+|---|---|---|
+| `BLOCKED.` | A critical rejection risk was found | Fix each `[CRITICAL]` line using the `fix.` line under it, then run the same command again |
+| `CLEAR.` | No critical risk in your code | Do the account and listing checks in [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) |
+| `NOT CHECKED.` | No iOS or Android project was found in that folder. Run by hand this exits 1. As a hook it lets the command through | Point it at the right folder. Expo apps run `npx expo prebuild` first |
+
 ## What you get
 
 A rejection costs a week. You submit, you wait days in review, you get a one line rejection, you guess at the fix, you resubmit, you wait again. This playbook turns that loop into a check you run before you ever submit.
 
 - **You catch the rejection before Apple or Google does.** The guard runs against your project and names the risk while you can still fix it cheaply, not after a reviewer has already said no.
 - **You stop guessing at the cause.** Every rejection pattern maps to the exact guideline and the exact fix, so a one line rejection email becomes a known problem with a known answer.
-- **The two checks that sink most submissions are covered first.** A working demo account with a live backend, and a privacy declaration that matches what your app actually does at runtime, including every SDK. These are the top modern rejection causes and the playbook holds them above everything else.
+- **The two checks that cause most rejections are covered first.** A working demo account with a live backend, and a privacy declaration that matches what your app actually does at runtime, including every SDK. These are the top modern rejection causes and the playbook holds them above everything else.
 - **It works whether or not you write code.** A developer wires the guard into the build. A non developer reads the plain English checklist and walks the submission safely.
 - **Every claim is real.** Guideline numbers and statistics trace to a live Apple or Google source, never invented, so you are acting on the actual rules, not a guess.
 
@@ -37,9 +63,17 @@ If it saves you one rejection, it has paid for the ten minutes it takes to read.
 
 ## Paste this into Claude Code, Codex, or any AI coding tool
 
-No setup effort. Copy the block below, paste it into your AI coding tool, and it installs the whole playbook and wires the guard into your flow.
+This is for an always-on check in Claude Code. For a one-time scan, skip this section and use Start here. Copy the block below, paste it into your AI coding tool, and it installs the whole playbook and wires the guard into your flow.
 
-Read it before you paste it. It only clones this repo and copies files into your agent's skills and hooks directories. It never touches your GitHub account, your credentials, or anything outside those paths. It ends by asking you to consider a star and showing you the link. Tapping it is always your call, never your agent's.
+Read it before you paste it. This is everything it does.
+
+- Clones this repo to `~/repositories/app-store-compliance`.
+- Copies the guard, the skill, and one command into `~/.claude`.
+- Adds one entry to `~/.claude/settings.json` and keeps every other key. When the file already existed, a dated backup is written next to it.
+- Asks your agent to add one standing instruction to its own config.
+- Step 6 makes network requests to check the playbook's sources.
+
+It never touches your GitHub account or your credentials. Undo it with `bash ~/repositories/app-store-compliance/scripts/install.sh uninstall`. If `settings.json` cannot be edited, the uninstall says so and you remove the one hook entry by hand. It ends by asking you to consider a star and showing you the link. Tapping it is always your call, never your agent's.
 
 ```
 Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-store-compliance so that from now on any iOS or Android app I build is automatically checked against Apple App Store and Google Play rejection rules before I submit it.
@@ -50,7 +84,12 @@ Steps:
    bash ~/repositories/app-store-compliance/scripts/install.sh
    It must end with "Install verified." If it prints a FAIL line, fix that line and run
    bash ~/repositories/app-store-compliance/scripts/install.sh doctor
-3. If I use another tool (Codex, Cursor, or anything else), install by hand. Copy agent-os/skill/SKILL.md, .citation-allowlist, and the docs/, data/, references/, templates/, and scripts/ folders into your agent's skills directory as app-store-compliance/. Copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory, make it executable, and register it to run before shell commands with a timeout of at least 120 seconds (seconds, not milliseconds). The guard reads the command from JSON on stdin as {"tool_name":"Bash","tool_input":{"command":"..."}}, acts only on submission commands (fastlane lanes that upload, eas submit or build, gradle bundleRelease or publishBundle, xcrun altool, bundletool, xcodebuild archive, and package scripts or make targets that wrap one of them), and exits 2 to block. It uses jq when installed, python3 otherwise, and a built-in fallback when neither is present. When the project holds more than one app, it scans each app on its own and prints one App section per app.
+3. If I use another tool (Codex, Cursor, or anything else), install by hand.
+   a. Copy agent-os/skill/SKILL.md, .citation-allowlist, and the docs/, data/, references/, templates/, and scripts/ folders into your agent's skills directory as app-store-compliance/.
+   b. Copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory and make it executable.
+   c. Register it to run before shell commands, with a timeout of at least 120 seconds (seconds, not milliseconds).
+   d. The guard reads the command from JSON on stdin as {"tool_name":"Bash","tool_input":{"command":"..."}}. It acts only on submission commands and exits 2 to block.
+   e. Tell me which file you registered it in, so I can check it.
 4. Add a standing instruction to your agent config: for any iOS or Android work, always adhere to the Apple App Store Review Guidelines and Google Play policies, run the audit before submission, and never say an app is clear to submit while a critical risk stands.
 5. Run the guard against my current project and show me the ranked findings:
    bash ~/.claude/hooks/app-store-compliance-guard.sh /path/to/my/app
@@ -79,9 +118,13 @@ git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-sto
 bash ~/repositories/app-store-compliance/scripts/install.sh
 ```
 
+### Check, update, or remove it
+
+Each command ends with one line that tells you whether it worked.
+
 | Command | What it does |
 |---|---|
-| `install.sh` | Installs or updates. Safe to run again, it never adds a second hook entry |
+| `install.sh` | Installs or updates. Safe to run again, a working hook entry is never added twice |
 | `install.sh --dry-run` | Prints what would be written and writes nothing |
 | `install.sh doctor` | Checks an existing install and runs the guard against a sample app that must be blocked |
 | `install.sh uninstall` | Removes the guard, the skill, the command and the hook entry, and keeps your other hooks |
@@ -157,12 +200,12 @@ This works whether you write code or not.
 
 ### If you are not a developer
 
-You are about to submit an app, maybe one an agency or an AI tool built for you, and you do not want it bounced.
+You are about to submit an app, maybe one an agency or an AI tool built for you, and you do not want it rejected.
 
-1. Open `docs/PRE-SUBMISSION-CHECKLIST.md`.
+1. Open [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md). Start with its first section, two checks, about five minutes.
 2. Treat every unchecked box as a reason you will be rejected. Answer each one honestly.
 3. The two that catch most people. A working demo account with a live backend, and a privacy form that matches what the app really does.
-4. Read `docs/MISTAKE-PATTERNS.md` for the appeal playbook if a rejection already landed.
+4. Already rejected? Go to [the appeal playbook](docs/MISTAKE-PATTERNS.md#the-appeal-playbook) before you resubmit.
 
 ### If you use Claude Code or another AI coding tool
 
@@ -183,24 +226,29 @@ Your iOS or Android project
         |
         +-- critical rejection risk found -->  BLOCKED, with the exact guideline and fix
         |
-        +-- clean -------------------------->  clear to submit
+        +-- clean -------------------------->  CLEAR, then the checklist for what a scan cannot see
 ```
+
+The same flow in words. Your AI tool reads the rule while you build. When you are about to ship, the guard scans your project. A critical risk stops the upload and names the fix. A clean scan ends with `CLEAR.` and lets the upload through.
 
 The guard fires automatically before submission commands such as fastlane, eas submit, gradle bundleRelease, and xcrun altool. If it finds a critical risk, it stops the upload and tells you the exact fix. Your AI tool now refuses to help you ship a rejection.
 
-Run a manual audit any time.
+### No AI tool. Run it by hand
+
+No agent is needed. Nothing is installed and nothing is hooked. Skip the install section above if this one-time scan is all you want.
 
 ```
-bash agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
+bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
 ```
 
 ### Apple Developer Requirements Monitor
 
 Keep your projects in sync with Apple's continuously evolving requirements. The monitor tracks changes to 25 critical areas including App Store guidelines, privacy manifests, alternative payments, and child safety.
 
-Run a requirements check on your repository against the live Apple Developer RSS news feed:
+Run a requirements check on your repository against the live Apple Developer RSS news feed. A long result opens with a count per track and shows the first 10 items. Add `--full` for every item. If the feed cannot be reached, the monitor says its items are samples.
 
 ```
+cd ~/repositories/app-store-compliance
 python3 scripts/monitor.py --project /path/to/your/app
 ```
 
@@ -222,9 +270,10 @@ python3 scripts/monitor.py --project /path/to/your/app --simulate "In-App Purcha
 
 ### Other continuous monitors
 
-Four sibling monitors watch other tracks the same way, each with its own doc and test suite.
+Eight more commands watch other tracks the same way. Run them from the playbook folder. Start with the one that matches your platform.
 
 ```
+cd ~/repositories/app-store-compliance
 python3 scripts/monitor-regulatory.py --project /path/to/your/app   # EU/UK/US/CA/AU/SG, source-trust classified
 python3 scripts/monitor-android.py --dir /path/to/your/app          # Android and Google Play requirements
 python3 scripts/monitor-ai-policy.py --dir /path/to/your/app        # generative AI policy (Apple and Google)
@@ -234,6 +283,19 @@ python3 scripts/monitor-privacy.py --dir /path/to/your/app          # mobile and
 python3 scripts/monitor-security.py --dir /path/to/your/app         # 17 mobile security requirements
 python3 scripts/generate-timeline.py                                # chronological regulatory timeline
 ```
+
+What to expect, measured on 30 September 2026.
+
+| Command | Output and time | Writes a file |
+|---|---|---|
+| `monitor.py` | A count per track and the first 10 items. `--full` prints every item | No |
+| `monitor-android.py`, `monitor-ai-policy.py` | About 200 and 95 lines | Each rewrites its migration doc under `docs/` in the folder you run it from |
+| `monitor-privacy.py`, `monitor-security.py` | About 27 lines each | A PR draft under `docs/` in the folder you run them from |
+| `release-audit.py` | About two minutes. It checks the playbook itself first, then your app | `RELEASE-READINESS-REPORT.md` in your app folder |
+| `generate-timeline.py` | The open deadlines, then one completion line | Rewrites `docs/REGULATORY-TIMELINE.md` in the playbook folder |
+| `deadline-checker.py` | About 175 lines of detail. Add `--brief` for one line per open deadline | No |
+
+The monitors other than `monitor.py` read built-in sample announcements by default. Treat their output as a worked example of the migration tasks, not as news.
 
 ### Citation integrity
 
@@ -256,6 +318,26 @@ The regulatory deadline check runs on every guard invocation automatically, and 
 ```
 python3 scripts/deadline-checker.py
 ```
+
+## If something goes wrong
+
+| You see | Do this |
+|---|---|
+| `NOT CHECKED.` | Point the guard at the folder with your Xcode project or Android app. Expo apps run `npx expo prebuild` first |
+| The install ends with a `FAIL` line | The line names the problem. Fix it, then run `install.sh doctor` |
+| `settings.json` was not changed | It was read-only, not valid JSON, or neither python3 nor jq is installed. The installer printed the block to paste by hand |
+| The guard does not fire in Claude Code | Restart Claude Code once, then run `install.sh doctor` |
+| `verify-citations.py` seems stuck | It checks about 300 links over the network and prints at the end. Give it a few minutes |
+
+## Words used here
+
+| Word | Meaning |
+|---|---|
+| Guard | The script that scans your app and blocks a submit when it finds a critical risk |
+| Hook | A setting that makes your AI tool run the guard before a shell command |
+| Skill | The folder of rules and data your AI tool reads when it audits an app |
+| Privacy manifest | The `PrivacyInfo.xcprivacy` file Apple requires. It declares the data types collected and the required-reason APIs used |
+| Data Safety form | The Google Play Console form where you declare what data your app collects and shares |
 
 ## What is inside
 

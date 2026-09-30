@@ -535,7 +535,10 @@ def clean_xml_tag(tag):
     return tag
 
 
-def fetch_apple_rss(url="https://developer.apple.com/news/rss/news.rss", verbose=False):
+def fetch_apple_rss(url=None, verbose=False):
+    url = url or os.environ.get(
+        "APPLE_NEWS_RSS_URL", "https://developer.apple.com/news/rss/news.rss"
+    )
     if verbose:
         print(f"[*] Fetching Apple Developer News from {url}...")
     try:
@@ -1031,10 +1034,11 @@ def run_monitor(
         if rss_content:
             announcements = parse_rss_items(rss_content)
         else:
-            if verbose:
-                print(
-                    "[*] Falling back to mock announcements due to missing or failed RSS fetch."
-                )
+            print(
+                "monitor. Apple's news feed could not be reached. The items below are sample "
+                "announcements, not real ones. Check your network and run again.",
+                file=sys.stderr,
+            )
             announcements = MOCK_ANNOUNCEMENTS
 
     if verbose:
@@ -1072,7 +1076,10 @@ def run_monitor(
     return report_items, processed_tracks
 
 
-def print_text_report(report_items, project_path):
+REPORT_LIMIT = 10
+
+
+def print_text_report(report_items, project_path, full=True):
     print("=" * 80)
     print("                  APPLE DEVELOPER REQUIREMENTS MONITOR REPORT")
     print(f" Target Project: {os.path.abspath(project_path)}")
@@ -1086,6 +1093,20 @@ def print_text_report(report_items, project_path):
         return
 
     print(f"\nFound {len(report_items)} matched compliance requirement update(s):\n")
+
+    total = len(report_items)
+    if not full and total > 25:
+        counts = {}
+        for item in report_items:
+            counts[item["track"]] = counts.get(item["track"], 0) + 1
+        print("By track.")
+        for track, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+            print(f"  {n:>3}  {track}")
+        print(
+            f"\nShowing {REPORT_LIMIT} of {total}. Run again with --full for every item, "
+            "or --json for machine output.\n"
+        )
+        report_items = report_items[:REPORT_LIMIT]
 
     for i, item in enumerate(report_items, 1):
         print(f"{i}. TRACK UPDATE: [{item['track']}]")
@@ -1145,6 +1166,11 @@ def main():
         action="store_true",
         help="Print verbose execution and scanning logs",
     )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Print every matched item. Without it a report over 25 items shows a count per track and the first 10",
+    )
 
     args = parser.parse_args()
 
@@ -1159,7 +1185,7 @@ def main():
     if args.json:
         print(json.dumps(report_items, indent=2))
     else:
-        print_text_report(report_items, args.project)
+        print_text_report(report_items, args.project, full=args.full)
 
 
 if __name__ == "__main__":

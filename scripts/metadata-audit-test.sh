@@ -45,5 +45,13 @@ OUT="$($AUDIT --description "Subscribe for premium, auto-renew monthly" 2>&1)"
 echo "$OUT" | grep -q 'MISLEADING-PRICING\|Terms' && ok "flags subscription without terms" || bad "subscription terms"
 
 echo ""
+# A folder with no listing files was not audited. That is exit 1 with the file names to add, never a pass.
+E="$(mktemp -d)"
+OUT="$($AUDIT "$E" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "name.txt" && echo "$OUT" | grep -q "Nothing was audited" && ok "an empty metadata folder exits 1 and names the files to add" || bad "an empty metadata folder exits 1 and names the files to add (rc=$RC)"
+OUT="$($AUDIT "$E/missing" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ok "a missing metadata folder exits 1" || bad "a missing metadata folder exits 1 (rc=$RC)"
+rm -rf "$E"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

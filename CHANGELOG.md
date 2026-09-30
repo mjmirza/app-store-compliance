@@ -10,6 +10,12 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Added
 
+- README first-run path. A Start here table routes four kinds of reader to one action each, with the time it takes. The two-command check comes first, followed by what each last line of the guard means. The install section lists everything it writes and the undo command before the paste block. New short sections cover troubleshooting and the five words a newcomer has to know. Driven by 40 persona walks (a second model as 24 readers, and two reviewers who ran every README command in a throwaway home folder).
+- `scripts/check-docs.py`. Fails CI when a Markdown file names a link, heading anchor, image, repo path, script or flag that does not exist. 9 tests prove it fails on each kind.
+- The guard ends every run with a verdict. `CLEAR.` when no critical risk was found, `NOT CHECKED.` with exit 1 when the folder holds no iOS or Android project (an empty folder and an Expo app with no native folders used to look like a clean pass), and a `Next.` line after `BLOCKED.`. As a hook it still never blocks a project it could not scan.
+- `monitor.py --full`. A live report over 25 items now opens with a count per track and shows the first 10 (3,503 lines became 194). `--json` is never cut.
+- The checklist opens with the two checks that stop most rejections and says how long a full pass takes. CONTRIBUTING explains how to fix a wrong citation.
+
 - README. A second approval proof, a developer's App Store Connect approval mail shared with thanks for the playbook, stored as assets/app-store-approval-thanks.png with the sender's name removed.
 - One command install for Claude Code. `scripts/install.sh` copies the guard, the skill (now with `.citation-allowlist`) and the `/app-store-audit` command, adds one PreToolUse hook entry to settings.json while keeping every other key and writing a backup, then runs the guard against a sample app that must be blocked. `doctor` checks an existing install, `uninstall` removes it, `--dry-run` writes nothing. The check runs the registered command string itself, so an entry on the wrong matcher, behind a comment, or with an unquoted path fails it. A settings.json that is read-only, not valid JSON, or repeats a key is never rewritten. Before this the install was a prose prompt with no settings example and no way to tell whether it worked. 27 tests, in CI.
 - Apple, September 2026. The EU App Tracking Transparency alternative prompt from iOS 27.2 (the only version in Germany, France, Italy, Poland, and Romania), multiseat subscription purchases enabled by default with Volume Purchasing on 22 October 2026 as deadline APPLE-MULTISEAT-VOLUME-PURCHASING, Bundles and Suites, the 27 August tax and price updates, and the 27.2 betas. Each read from Apple's own post on 30 September 2026.
@@ -26,6 +32,11 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 - Licence. The whole repository moved from a dual MIT and CC BY 4.0 grant to the OpenRoots Agent License 2.3 (via ORA 1.0 on 24 August 2026, then 2.3 on 27 August 2026). One licence now covers code, docs, data, the skill, and the guard. Releases before 24 August 2026 keep MIT and CC BY 4.0 irrevocably. LICENSE is a pointer to the canonical text at openroots.org.
 
 ### Fixed
+
+- `monitor.py` fell back to built-in sample announcements without a word when Apple's feed could not be reached. It now says so on stderr.
+- `metadata-audit.py` on a folder with no listing files, or on a path that does not exist, exited 0. It exits 1 and names the files to add.
+- `release-audit.py` ran silently for about two minutes. It now labels its two steps and says how long the first takes.
+- README said four sibling monitors and listed eight commands, showed the manual audit as a relative path, and promised a "clear to submit" line the guard never printed.
 
 - Guard submit detection (#836). In hook mode a custom fastlane lane (`fastlane ios beta`, `bundle exec fastlane release`), a Gradle Play Publisher task (`publishBundle`, `publishReleaseBundle`), `eas` with a flag before the subcommand, and a submit wrapped in a package script or a make target all passed with no scan. They are now matched, a lane by its name or by an upload action in its Fastfile block, a wrapper one level deep. A second attack pass added package manager options before `run` (`pnpm --dir`, `npm --prefix`), `make -f`, legacy `expo upload`, and a lane or Gradle task held in a shell variable, which is scanned because it cannot be read. Lane names are matched on whole words, so `restore_state` stays silent, and `npm install bundletool` no longer triggers a scan. 45 new tests pin what blocks and what stays silent. `gh workflow run` and deeper nesting remain out of reach (#837).
 - The guard ignored PowerShell tool payloads, so Claude Code on Windows never triggered it. It reads them now.

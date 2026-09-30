@@ -20,7 +20,7 @@ Usage:
     metadata-audit.py <dir> --propose           write <dir>/.metadata-fixes.md with suggested fixes
     metadata-audit.py <dir> --check-urls        also HEAD-check URLs (needs network)
 
-Exit codes: 0 clean or advisory, 2 a critical finding.
+Exit codes: 0 clean or advisory, 1 the directory held nothing to audit, 2 a critical finding.
 """
 import os
 import sys
@@ -220,17 +220,25 @@ def main():
             canon = ALIASES.get(key, key)
             fields[canon] = val
             i += 2
-        elif os.path.isdir(a):
+        elif os.path.isdir(a) or d is None:
             d = a
             i += 1
         else:
             i += 1
 
+    if d and not os.path.isdir(d):
+        print(f"metadata-audit. {d} is not a directory. Nothing was audited.", file=sys.stderr)
+        return 1
     if d:
         fields.update({k: v for k, v in load_dir(d).items() if k not in fields})
 
+    if not fields and d:
+        print(f"metadata-audit. no listing files found in {d}. Nothing was audited.")
+        print("Add name.txt, subtitle.txt, keywords.txt and description.txt (the fastlane metadata layout),")
+        print("or pull them with scripts/pull-metadata.sh, or pass --name, --keywords and --description.")
+        return 1
     if not fields:
-        print("metadata-audit. no metadata found. pass a directory or fields. see --help in the header.")
+        print("metadata-audit. nothing to audit. Pass a metadata directory, or --name, --keywords and --description.")
         return 0
 
     findings = audit_fields(fields, check_urls=check_urls)

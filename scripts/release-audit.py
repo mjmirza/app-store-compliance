@@ -302,7 +302,7 @@ def main():
     print("")
 
     # --- Step 1. Run Internal Validation and Test Engines ---
-    print("Running internal validation and test engines...")
+    print("Step 1 of 2. Checking the playbook itself first. This takes about two minutes.", flush=True)
 
     val_code, val_out, val_err = run_command(["python3", "scripts/validate.py"])
     if val_code != 0:
@@ -333,7 +333,7 @@ def main():
     print("")
 
     # --- Step 2. Execute Compliance Scanners ---
-    print("Executing compliance scanners on target...")
+    print("Step 2 of 2. Scanning your app...", flush=True)
 
     # Run the compliance guard
     guard_code, guard_out, guard_err = run_command(
