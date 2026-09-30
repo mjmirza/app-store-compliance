@@ -14,10 +14,12 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2ea44f)](.github/CONTRIBUTING.md)
 
 [![Stars](https://img.shields.io/github/stars/mjmirza/app-store-compliance?style=social)](https://github.com/mjmirza/app-store-compliance/stargazers)
+[![Forks](https://img.shields.io/github/forks/mjmirza/app-store-compliance?style=social)](https://github.com/mjmirza/app-store-compliance/fork)
+[![Follow mjmirza](https://img.shields.io/github/followers/mjmirza?label=Follow&style=social)](https://github.com/mjmirza)
 
-**If this saves you even one rejection, leave a star. That is the whole ask.**
+**If this saves you even one rejection, leave a star, fork it, and follow along. That is the whole ask.**
 
-[Star this repo](https://github.com/mjmirza/app-store-compliance)
+[Star this repo](https://github.com/mjmirza/app-store-compliance) &nbsp;|&nbsp; [Fork it](https://github.com/mjmirza/app-store-compliance/fork) &nbsp;|&nbsp; [Follow on GitHub](https://github.com/mjmirza) &nbsp;|&nbsp; [Follow on X](https://twitter.com/MirzaJhanzaib) &nbsp;|&nbsp; [next8n.com](https://next8n.com)
 
 </div>
 
