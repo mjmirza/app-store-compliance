@@ -41,5 +41,22 @@ OUT="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1)"; RC=$?
 FIRST="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1; sed -n '/Starting Release Readiness/,/Scanning your app/p' scripts/release-audit.py)"
 echo "$FIRST" | grep -q "about two minutes" && ok "the slow self-check step says how long it takes" || bad "the slow self-check step says how long it takes"
 
+# A finding whose title contains "(mandatory " is a finding. Only deadline lines, which carry a date there, are skipped.
+python3 - <<'PYT' && ok "only deadline lines are dropped from the finding list" || bad "only deadline lines are dropped from the finding list"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+keep = "  [HIGH]     BOTH-PLACEHOLDER  Placeholder text (mandatory disclosure) found"
+keep2 = "  [HIGH]     BOTH-SOME-RULE  A title that quotes a date (mandatory 2026-10-15)"
+drop = [
+    "[CRITICAL] OVERDUE 12 days. EU. Some Act (mandatory 2026-09-18)",
+    "[HIGH] in 3 days. Apple. Thing (mandatory 2026-10-03)",
+    "[HIGH] EU AI Act (mandatory 2025-02-02) absorbed into docs/EU.md",
+]
+fn = getattr(ra, "is_deadline_line", None)
+sys.exit(0 if fn and not fn(keep) and not fn(keep2) and all(fn(d) for d in drop) else 1)
+PYT
+
 echo "release-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

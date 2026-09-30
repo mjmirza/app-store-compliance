@@ -34,6 +34,11 @@ printf '# T\n\nSee https://example.org/docs/NOPE.md and `~/other/docs/x.md`.\n' 
 OUT="$(run)"; RC=$?
 [ "$RC" -eq 0 ] && ok "a web URL and a path outside the repo are left alone" || bad "a web URL and a path outside the repo are left alone (rc=$RC)"
 
+printf '# T\n\n[x](<docs/GUIDE.md#first-step>) and [y][g].\n\n[g]: docs/GUIDE.md\n' > "$T/README.md"
+OUT="$(run)"; RC=$?
+[ "$RC" -eq 0 ] && ok "an angle-bracket link and a reference link to real files pass" || bad "an angle-bracket link and a reference link to real files pass (rc=$RC)"
+expect_fail "a reference link to a missing file fails" "$(printf '[y][g]\n\n[g]: other/NOPE.md\n')" "other/NOPE.md"
+
 OUT="$(python3 "$CHECK" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && ok "the real repository passes" || bad "the real repository passes (rc=$RC)"
 

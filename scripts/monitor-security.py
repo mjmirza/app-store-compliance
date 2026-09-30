@@ -940,13 +940,13 @@ def main():
     parser.add_argument(
         "--output-docs",
         type=str,
-        default="docs/SECURITY-POLICY-MIGRATION.md",
+        default=None,
         help="Filepath to write migration tasks and logs",
     )
     parser.add_argument(
         "--pr-output",
         type=str,
-        default="docs/SECURITY_COMPLIANCE_PR_DRAFT.md",
+        default=None,
         help="Filepath to save the drafted PR",
     )
 
@@ -964,6 +964,7 @@ def main():
     used_mock = False
     if args.mock or (not args.live and not args.mock) or not announcements:
         used_mock = True
+        print("Data. sample announcements built into this script, not live news.")
         print(
             "Using comprehensive mock Security policy updates for compliance scanning..."
         )
@@ -979,6 +980,8 @@ def main():
                 announcements.extend(MOCK_ANNOUNCEMENTS)
         else:
             announcements.extend(MOCK_ANNOUNCEMENTS)
+    else:
+        print("Data. live feeds, fetched just now.")
 
     # 2. Classify updates into the 17 required categories
     keywords_filter = (
@@ -1004,8 +1007,11 @@ def main():
     print(f"Found {total_matches} signal matches in code.")
 
     # 4. Write/Update documentation
-    os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
-    update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    if args.output_docs:
+        os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
+        update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    else:
+        print("No file written. Pass --output-docs <path> to save this report.")
 
     # 5. Generate Pull Request draft
     pr_draft = generate_pull_request_draft(classified_updates, scan_results)
@@ -1021,9 +1027,7 @@ def main():
         except Exception as e:
             print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
     else:
-        print("\n=== GENERATED 15-SECTION COMPLIANCE PULL REQUEST DRAFT ===")
-        print(pr_draft)
-        print("==========================================================")
+        print("No PR draft written. Pass --pr-output <path> to save it.")
 
 
 if __name__ == "__main__":

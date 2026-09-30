@@ -29,7 +29,18 @@ def load_deadlines():
         return []
 
 
-def print_brief(passed, upcoming, absorbed):
+STORE_OF = (("Apple", "ios"), ("App Store", "ios"), ("Google Play", "android"), ("Android", "android"))
+
+
+def other_store(item, platforms):
+    """True when the deadline binds one store only and the project does not ship there."""
+    for prefix, platform in STORE_OF:
+        if item["jurisdiction"].startswith(prefix):
+            return platform not in platforms
+    return False
+
+
+def print_brief(passed, upcoming, absorbed, skipped=0):
     """One line per deadline, for the guard report. The full blocks stay the default."""
     print("== Regulatory Compliance Deadline Status ==")
     for item in passed:
@@ -48,6 +59,8 @@ def print_brief(passed, upcoming, absorbed):
         print("No deadline is overdue or due within 90 days.")
     if absorbed:
         print(f"{len(absorbed)} passed deadline(s) already carried by the playbook, not listed.")
+    if skipped:
+        print(f"{skipped} deadline(s) for a store this project does not ship to, not listed.")
     print(f"Full detail. python3 {os.path.abspath(__file__)}")
     return 0
 
@@ -116,8 +129,16 @@ def main():
         elif remaining_days <= 90:
             upcoming_deadlines.append(item)
 
+    skipped = 0
+    if "--platforms" in sys.argv[1:-1]:
+        platforms = set(sys.argv[sys.argv.index("--platforms") + 1].lower().split(","))
+        before = len(passed_deadlines) + len(upcoming_deadlines)
+        passed_deadlines = [d for d in passed_deadlines if not other_store(d, platforms)]
+        upcoming_deadlines = [d for d in upcoming_deadlines if not other_store(d, platforms)]
+        skipped = before - len(passed_deadlines) - len(upcoming_deadlines)
+
     if "--brief" in sys.argv[1:]:
-        return print_brief(passed_deadlines, upcoming_deadlines, absorbed_deadlines)
+        return print_brief(passed_deadlines, upcoming_deadlines, absorbed_deadlines, skipped)
 
     if passed_deadlines or upcoming_deadlines:
         print("== Regulatory Compliance Deadline Status ==\n")

@@ -4,7 +4,11 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONF="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+if [ -z "${CLAUDE_CONFIG_DIR:-}" ] && [ -z "${HOME:-}" ]; then
+  echo "HOME is not set, so there is no folder to install into. Set HOME or CLAUDE_CONFIG_DIR, then run this again." >&2
+  exit 1
+fi
+CONF="${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"
 GUARD_NAME="app-store-compliance-guard.sh"
 GUARD_SRC="$REPO/agent-os/hooks/$GUARD_NAME"
 GUARD="$CONF/hooks/$GUARD_NAME"
@@ -14,9 +18,9 @@ SETTINGS="$CONF/settings.json"
 PAYLOAD_DIRS="docs data references templates scripts"
 
 # shellcheck disable=SC2088
-if [ "$CONF" = "$HOME/.claude" ]; then SHOWN='~/.claude'; else SHOWN="$CONF"; fi
+if [ "$CONF" = "${HOME:-}/.claude" ]; then SHOWN='~/.claude'; else SHOWN="$CONF"; fi
 # The hook command is run by a shell, so a custom folder is single-quoted. The default keeps an unquoted tilde.
-if [ "$CONF" = "$HOME/.claude" ]; then
+if [ "$CONF" = "${HOME:-}/.claude" ]; then
   HOOK_CMD="bash $SHOWN/hooks/$GUARD_NAME"
 else
   HOOK_CMD="bash '$(printf '%s' "$GUARD" | sed "s/'/'\\\\''/g")'"
@@ -64,10 +68,12 @@ BLOCK
 settings_edit() {
   local action="$1"
   if have python3 -c pass; then
-    python3 - "$SETTINGS" "$HOOK_CMD" "$GUARD_NAME" "$action" <<'PY'
+    python3 - "$SETTINGS" "$HOOK_CMD" "$GUARD_NAME" "$action" "$GUARD" "$SHOWN/hooks/$GUARD_NAME" <<'PY'
 import json, os, re, shutil, sys, tempfile, time
 
 path, cmd, name, action = sys.argv[1:5]
+spots = list(sys.argv[5:7])
+spots += [h + s[2:] for s in list(spots) if s.startswith("~/") for h in ("$HOME/", "${HOME}/")]
 real = os.path.realpath(path)
 exists = os.path.exists(real)
 data = {}
@@ -100,7 +106,10 @@ for e in pre:
 
 
 def ours(h):
-    return isinstance(h, dict) and name in str(h.get("command", ""))
+    # Ours means this folder's guard. A guard of the same file name somewhere else belongs to someone else.
+    c = str(h.get("command", "")) if isinstance(h, dict) else ""
+    c = c.strip()
+    return c == cmd or any(c in ("bash " + s, "bash '" + s + "'", 'bash "' + s + '"') for s in spots)
 
 
 def fires(e, h):
@@ -172,7 +181,7 @@ PY
       [ -w "$cur" ] || return 6
     fi
     local present=1
-    [ -n "$cur" ] && jq -e --arg n "$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and contains($n) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
+    [ -n "$cur" ] && jq -e --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     if [ "$action" = "add" ]; then
       [ "$present" -eq 0 ] && return 3
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
@@ -184,7 +193,7 @@ PY
     [ "$present" -ne 0 ] && return 3
     tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
     cp -p "$cur" "$SETTINGS.bak-$(date +%Y%m%d-%H%M%S)"
-    jq --arg n "$GUARD_NAME" '.hooks.PreToolUse |= (map(.hooks |= map(select((.command? // "" | tostring | contains($n)) | not))) | map(select((.hooks | length) > 0)))' "$cur" > "$tmp" || { rm -f "$tmp"; return 4; }
+    jq --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '.hooks.PreToolUse |= (map(.hooks |= map(select((.command? // "" | tostring | (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\"")))) | not))) | map(select((.hooks | length) > 0)))' "$cur" > "$tmp" || { rm -f "$tmp"; return 4; }
     mv "$tmp" "$SETTINGS"; return 0
   fi
   return 5
@@ -197,7 +206,9 @@ registered_cmd() {
     python3 -c 'import json,re,sys
 try: d=json.load(open(sys.argv[1]))
 except Exception: sys.exit(0)
-n=sys.argv[2]
+hc=sys.argv[2]
+n=sys.argv[3:]
+n+=[h+s[2:] for s in list(n) if s.startswith("~/") for h in ("$HOME/","${HOME}/")]
 for e in d.get("hooks",{}).get("PreToolUse",[]):
     if not isinstance(e,dict): continue
     m=e.get("matcher","")
@@ -206,15 +217,15 @@ for e in d.get("hooks",{}).get("PreToolUse",[]):
     if not ok: continue
     for h in e.get("hooks",[]):
         c=str(h.get("command","")) if isinstance(h,dict) else ""
-        if n in c and "#" not in c and c.strip().startswith("bash "):
-            print(c); sys.exit(0)' "$SETTINGS" "$GUARD_NAME" 2>/dev/null
+        if (c.strip()==hc or any(c.strip() in ("bash " + s, "bash \"" + s + "\"", "bash \u0027" + s + "\u0027") for s in n)) and "#" not in c and c.strip().startswith("bash "):
+            print(c); sys.exit(0)' "$SETTINGS" "$HOOK_CMD" "$GUARD" "$SHOWN/hooks/$GUARD_NAME" 2>/dev/null
     return 0
   fi
   if have jq -n true; then
-    jq -r --arg n "$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and contains($n) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
+    jq -r --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
     return 0
   fi
-  grep -q "$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"
+  grep -qF "$SHOWN/hooks/$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"
   return 0
 }
 
