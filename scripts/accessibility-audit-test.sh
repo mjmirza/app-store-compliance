@@ -444,6 +444,26 @@ else
   bad "Failed to flag ANDROID-ACCESSIBILITY-SCANNER"
 fi
 
+# Test 3: Verify --report-out flag generates Markdown report
+REPORT_FILE_CLEAN=$(mktemp "/tmp/access_report_clean_XXXXXX.md")
+REPORT_FILE_REG=$(mktemp "/tmp/access_report_reg_XXXXXX.md")
+
+$AUDIT "$COMPLIANT_DIR" --report-out "$REPORT_FILE_CLEAN" >/dev/null 2>&1
+if [ -f "$REPORT_FILE_CLEAN" ] && grep -q "No accessibility regressions found" "$REPORT_FILE_CLEAN"; then
+  ok "--report-out generated clean report correctly"
+else
+  bad "--report-out failed to generate clean report"
+fi
+
+$AUDIT "$REGRESSION_DIR" --report-out "$REPORT_FILE_REG" >/dev/null 2>&1
+if [ -f "$REPORT_FILE_REG" ] && grep -q "APPLE-ACCESSIBILITY-VOICEOVER" "$REPORT_FILE_REG"; then
+  ok "--report-out generated regression report correctly"
+else
+  bad "--report-out failed to generate regression report"
+fi
+
+rm -f "$REPORT_FILE_CLEAN" "$REPORT_FILE_REG" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
