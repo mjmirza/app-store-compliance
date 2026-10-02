@@ -371,6 +371,15 @@ else
   echo "$OUT_COMPLIANT"
 fi
 
+# Test 1b: Verify --report-out flag generates Markdown report
+REPORT_PATH="$COMPLIANT_DIR/test-report.md"
+OUT_REPORT=$($AUDIT --report-out "$REPORT_PATH" "$COMPLIANT_DIR" 2>&1)
+if [ -f "$REPORT_PATH" ] && grep -q "# Mobile Accessibility Compliance Report" "$REPORT_PATH"; then
+  ok "--report-out generated valid Markdown report"
+else
+  bad "Failed to generate valid Markdown report with --report-out. Output: $OUT_REPORT"
+fi
+
 # Test 2: Run on regression folder. Should detect regressions.
 OUT_REGRESSION=$($AUDIT "$REGRESSION_DIR" 2>&1)
 
