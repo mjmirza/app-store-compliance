@@ -237,6 +237,7 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
 | EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |
 | EU Contract Withdrawal | Prominent, Frictionless contract withdrawal button on user interface | 19 Jun 2026 |
+| EU GPSR Compliance | Prominent manufacturer contact details (address, email) and product safety warnings displayed | live since 13 Dec 2024 |
 
 ## 8. Sources
 

@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-29 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+33 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -160,6 +160,57 @@ How to detect.
 
 ```bash
 grep -rniE 'e-evidence|european production order|european preservation order|emergency data production' . 2>/dev/null
+```
+
+## EU-AI-ACT-ART-50-TRANSPARENCY-MISSING
+
+- Title. Missing AI interaction disclosure or synthetic content watermarking
+- Platform. both
+- Guideline or policy. Regulation (EU) 2024/1689 Article 50 (EU AI Act Transparency)
+- Severity. high
+- What triggers it. Interactive AI features or synthetic output generation missing explicit user disclosures or machine-readable synthetic content watermarking.
+- How to fix it. Provide clear in-app AI interaction notices at first exposure and embed machine-readable metadata in synthetic outputs.
+- Detection signals. chat/completions, text-to-image, generateImage, syntheticMedia
+- Present means handled. aiInteractionNotice, C2PA, watermark, syntheticContentLabel
+
+How to detect.
+
+```bash
+grep -rniE 'chat/completions|text-to-image|generateimage|syntheticmedia' . 2>/dev/null && ! grep -rniE 'aiinteractionnotice|c2pa|watermark' . 2>/dev/null
+```
+
+## US-COPPA-AMENDED-RULE-MISSING
+
+- Title. Child personal data collection without separate opt-in or retention limits
+- Platform. both
+- Guideline or policy. 16 CFR Part 312 (Amended COPPA Rule)
+- Severity. high
+- What triggers it. Child-directed or mixed-audience apps collecting biometric/government IDs or sharing child data for ads without separate opt-in consent and retention policies.
+- How to fix it. Implement separate parental consent for ad sharing, enforce data retention limits, and maintain an information security program.
+- Detection signals. childUser, biometricData, under13
+- Present means handled. separateAdConsent, coppaRetentionPolicy, verifiableParentalConsent
+
+How to detect.
+
+```bash
+grep -rniE 'childuser|biometricdata|under13' . 2>/dev/null && ! grep -rniE 'separateadconsent|copparetentionpolicy' . 2>/dev/null
+```
+
+## EU-EAA-ACCESSIBILITY-MISSING
+
+- Title. EU-facing app missing EN 301 549 / WCAG 2.1 AA mobile accessibility or accessibility statement
+- Platform. both
+- Guideline or policy. Directive (EU) 2019/882 (European Accessibility Act / EN 301 549)
+- Severity. high
+- What triggers it. Mobile apps distributed in the EU lacking VoiceOver/TalkBack labels, Dynamic Type font scaling, contrast, or a published accessibility statement.
+- How to fix it. Comply with EN 301 549 Chapter 11 / WCAG 2.1 AA requirements and publish a reachable in-app Accessibility Statement.
+- Detection signals. e-commerce, banking, digitalServices, EUStorefront
+- Present means handled. accessibilityStatement, EN301549, WCAG21AA, VoiceOver
+
+How to detect.
+
+```bash
+grep -rniE 'e-commerce|banking|digitalservices' . 2>/dev/null && ! grep -rniE 'accessibilitystatement|en301549' . 2>/dev/null
 ```
 
 ## BOTH-SDK-SUPPLY-CHAIN
@@ -465,4 +516,21 @@ How to detect.
 
 ```bash
 python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+```
+
+## EU-AI-ACT-ART-4-LITERACY-MISSING
+
+- Title. Missing staff AI literacy training policy and record
+- Platform. both
+- Guideline or policy. Regulation (EU) 2024/1689 Article 4 (EU AI Act AI Literacy)
+- Severity. medium
+- What triggers it. App deployer/provider utilizing AI models without establishing a staff AI literacy policy, training induction log, or annual review record.
+- How to fix it. Maintain a written AI Literacy Policy and document staff training in an AI Literacy Log.
+- Detection signals. OpenAI, Anthropic, Gemini, AIModel, LLM
+- Present means handled. AI_LITERACY_LOG, aiLiteracyPolicy, aiTrainingRecord
+
+How to detect.
+
+```bash
+grep -rniE 'openai|anthropic|gemini|llm|aimodel' . 2>/dev/null && ! grep -rniE 'ai_literacy_log|ailiteracy' . 2>/dev/null
 ```

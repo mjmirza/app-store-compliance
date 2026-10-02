@@ -1,6 +1,6 @@
 # Global and Regional Regulatory Compliance Gap Report (2026)
 
-This report audits the playbook itself. It takes six regulations that bind app developers shipping into the EU and the US, and checks honestly how far this repository already carries each one, what it only mentions in passing, and what it does not cover at all.
+This report audits the playbook itself. It takes eight key regulations that bind app developers shipping into the EU and the US, and checks honestly how far this repository already carries each one, what it only mentions in passing, and what it does not cover at all.
 
 Read it as a work list for the playbook, not as legal advice for your company. Where it says something is missing, it means missing from this repository. Each framework is checked across eight angles, which are policy, documentation, code, disclosure, logging, testing, evidence, and audit trail.
 
@@ -235,7 +235,75 @@ Official Citation: Regulation (EU) 2024/1689, Article 50.
 
 ---
 
-## 7. Consolidated Gap Classification Matrix
+## 7. Amended US COPPA Rule (16 CFR Part 312)
+
+### 7.1 Regulatory Overview and Background
+The Federal Trade Commission (FTC) finalized amendments to the Children's Online Privacy Protection Rule (16 CFR Part 312) with a general compliance enforcement date of 22 April 2026 (90 FR 16918).
+
+The amended rule expands personal information definitions to include biometric identifiers and government identifiers, restricts data retention, mandates separate opt-in consent for third-party disclosures or targeted advertising, requires a written information security program, and introduces new verifiable parental consent mechanisms (such as knowledge-based authentication and face-matching).
+
+Official Citation: FTC Children's Online Privacy Protection Rule, 16 CFR Part 312, 90 FR 16918.
+
+### 7.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:**
+  The repository lacks a dedicated written COPPA Data Retention and Information Security Policy template for developers operating child-directed or mixed-audience apps.
+- **Missing Documentation:**
+  Checklists lack step-by-step guidance on implementing separate consent paths for third-party disclosures vs. core functionality access.
+- **Missing Code:**
+  Mock backends lack code implementations for face-match or knowledge-based verifiable parental consent flows.
+- **Missing Disclosure:**
+  In-app onboarding templates do not provide explicit disclosures separating core app feature consent from third-party advertising consent.
+- **Missing Logging:**
+  There are no logging schemas or database models for capturing granular parental opt-in choices for advertising separate from feature access.
+- **Missing Testing:**
+  No automated unit or integration tests exist to verify that personal data (such as biometric templates or location) is automatically purged upon expiry of the retention period.
+- **Missing Evidence:**
+  The repository contains no sample annual risk assessment templates or Information Security Program coordinator appointment documentation.
+- **Missing Audit Trail:**
+  An unalterable log tracking parental consent receipts, consent revocations, and data deletion events under 16 CFR 312.10 is missing.
+
+### 7.3 Remediation and Action Plan
+1. Publish a COPPA Compliance Policy and Data Retention Schedule in the references directory.
+2. Add rejection patterns and detection recipes for unseparated parental consent and missing biometric/data retention policies.
+3. Build backend data retention purge scripts to enforce automatic deletion of child data.
+
+---
+
+## 8. European Accessibility Act (EAA - Directive (EU) 2019/882 / EN 301 549)
+
+### 8.1 Regulatory Overview and Background
+The European Accessibility Act (Directive (EU) 2019/882) became enforceable on 28 June 2025 across EU Member States. It mandates accessibility for e-commerce, banking, e-books, travel, and audiovisual media apps using the EN 301 549 standard (including Chapter 11 for mobile apps, based on WCAG 2.1 AA).
+
+Official Citation: Directive (EU) 2019/882 of the European Parliament and of the Council on the accessibility requirements for products and services.
+
+### 8.2 Comprehensive Gap Analysis Across the Eight Compliance Categories
+
+- **Missing Policy:**
+  The repository carries no template Corporate Accessibility Statement or EAA Compliance Roadmap.
+- **Missing Documentation:**
+  While accessibility rules exist in `docs/PRE-SUBMISSION-CHECKLIST.md`, developer guidelines lack explicit mapping between WCAG 2.1 AA / EN 301 549 Chapter 11 mobile requirements and app store submission gates.
+- **Missing Code:**
+  Automated accessibility scanning scripts (`scripts/accessibility-audit.py`) cover basic VoiceOver and font scaling, but lack checks for non-text contrast ratios and focus order in complex custom UI components.
+- **Missing Disclosure:**
+  No template Accessibility Statement component exists in the mock UI libraries.
+- **Missing Logging:**
+  There are no schemas or logging patterns to track accessibility feedback or issue reports submitted by users.
+- **Missing Testing:**
+  Automated CI test suites do not run automated contrast or screen-reader layout audits on generated UI builds.
+- **Missing Evidence:**
+  No template Accessibility Conformance Report (ACR) or Voluntary Product Accessibility Template (VPAT) is provided.
+- **Missing Audit Trail:**
+  There is no historical audit log tracking accessibility regression reviews or remediation across app updates.
+
+### 8.3 Remediation and Action Plan
+1. Add an EAA / EN 301 549 Chapter 11 compliance guide and Accessibility Statement template to `docs/`.
+2. Expand `scripts/accessibility-audit.py` to cover focus order and touch target size checks.
+3. Provide VPAT / ACR templates in the templates directory.
+
+---
+
+## 9. Consolidated Gap Classification Matrix
 
 Where the playbook already covers a framework, the cell says Covered. Partial means the rule is named with a dated source but a developer still has no step by step way to satisfy it. Missing means the playbook does not carry it at all.
 
@@ -247,24 +315,26 @@ Where the playbook already covers a framework, the cell says Covered. Partial me
 | **US state ASAA** | Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
 | **EU AI Act Art 4**| Partial | Covered | N/A | Partial | Missing | Missing | Missing | Missing |
 | **EU AI Act Art 50**| Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **US COPPA Amended**| Partial | Covered | Missing | Partial | Missing | Missing | Missing | Missing |
+| **EU EAA (EN 301 549)**| Partial | Covered | Partial | Partial | Missing | Partial | Missing | Missing |
 
-The honest read. Five of the six are already named in `docs/EU-REGULATORY-2026.md`, `docs/GLOBAL-REGULATORY-2026.md`, `data/regulatory-deadlines.json`, and `data/rejection-patterns.json`, with dated sources and a deadline entry. What they lack is the implementation layer, meaning detection rules in the guard, code templates, and tests. GPSR is the only one absent end to end, so it is the first thing to add.
+The honest read. Seven of the eight are already named in `docs/EU-REGULATORY-2026.md`, `docs/GLOBAL-REGULATORY-2026.md`, `data/regulatory-deadlines.json`, and `data/rejection-patterns.json`, with dated sources and a deadline entry. What they lack is the implementation layer, meaning detection rules in the guard, code templates, and tests. GPSR is the only one absent end to end, so it is the first thing to add.
 
 ---
 
-## 8. Conclusion and Future Monitoring
+## 10. Conclusion and Future Monitoring
 
-The playbook is strong on what gets an app rejected by a store reviewer, and thinner on the laws that bind the app once it is live. Five of the six frameworks here are already named with dated sources. What is missing is the layer a developer can act on, meaning detection rules the guard can fire on, code templates they can paste, and tests that prove the obligation is met.
+The playbook is strong on what gets an app rejected by a store reviewer, and thinner on the laws that bind the app once it is live. Seven of the eight frameworks here are already named with dated sources. What is missing is the layer a developer can act on, meaning detection rules the guard can fire on, code templates they can paste, and tests that prove the obligation is met.
 
 In priority order.
 
 1. Add GPSR, the only framework absent end to end.
-2. Give the five Partial frameworks detection rules in `data/rejection-patterns.json` and checklist items a developer can tick.
+2. Give the seven Partial frameworks detection rules in `data/rejection-patterns.json` and checklist items a developer can tick.
 3. Add the code templates, starting with the AI Act Article 50 disclosure line and the withdrawal path, since both carry 2026 deadlines.
 
 This report is a snapshot. It goes stale the moment a deadline moves, so re-run it against EUR-Lex and the other primary sources rather than trusting the dates here on their own.
 
-## 9. Sources
+## 11. Sources
 
 Every regulation named above, at its primary source.
 
@@ -273,5 +343,7 @@ Every regulation named above, at its primary source.
 - e-Evidence Directive, [Directive (EU) 2023/1544](https://eur-lex.europa.eu/eli/dir/2023/1544/oj)
 - Distance Marketing of Financial Services, [Directive (EU) 2023/2673](https://eur-lex.europa.eu/eli/dir/2023/2673/oj)
 - EU AI Act, [Regulation (EU) 2024/1689](https://eur-lex.europa.eu/eli/reg/2024/1689/oj)
+- European Accessibility Act, [Directive (EU) 2019/882](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32019L0882)
+- Amended COPPA Rule, [16 CFR Part 312, 90 FR 16918](https://www.govinfo.gov/content/pkg/FR-2025-04-22/html/2025-05904.htm)
 
 The US state App Store Accountability Acts are cited to their bill texts in [docs/GLOBAL-REGULATORY-2026.md](GLOBAL-REGULATORY-2026.md), which is the source of record for that section rather than this report.
