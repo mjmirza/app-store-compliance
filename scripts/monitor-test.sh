@@ -41,6 +41,11 @@ printf "import SwiftUI\nlet swiftVersion = 6.0\nTask { @MainActor in print(\"asy
 OUT_SCAN="$($MONITOR --project "$T" --simulate "Swift requirements" 2>&1)"
 echo "$OUT_SCAN" | grep -q "Sources/App.swift" && ok "repo scanner correctly identifies affected source file" || bad "repo scanner affected file"
 
+# Test --output-docs and --pr-output file generation
+$MONITOR --project "$T" --simulate "Privacy Manifests" --output-docs "$T/docs.md" --pr-output "$T/pr.md" >/dev/null 2>&1
+[ -s "$T/docs.md" ] && grep -q "Apple Developer Requirements Policy Migration" "$T/docs.md" && ok "--output-docs writes migration report" || bad "--output-docs"
+[ -s "$T/pr.md" ] && grep -q "## 1\. Summary" "$T/pr.md" && ok "--pr-output writes PR draft" || bad "--pr-output"
+
 # Clean up
 rm -rf "$T"
 
