@@ -942,6 +942,88 @@
       "fix": "Provide prominent manufacturer contact details (email and postal address) and any applicable product safety warnings directly on the product listing or online interface for any consumer goods distributed in the EU."
     },
     {
+      "id": "EU-AI-ACT-ART-4-LITERACY-MISSING",
+      "platform": "both",
+      "guideline": "Regulation (EU) 2024/1689 Article 4 (EU AI Act AI Literacy)",
+      "title": "Missing staff AI literacy training policy and record",
+      "severity": "medium",
+      "detection": "App deployer/provider utilizing AI models without establishing a staff AI literacy policy, training induction log, or annual review record.",
+      "signals": [
+        "OpenAI",
+        "Anthropic",
+        "Gemini",
+        "AIModel",
+        "LLM"
+      ],
+      "counterSignals": [
+        "AI_LITERACY_LOG",
+        "aiLiteracyPolicy",
+        "aiTrainingRecord"
+      ],
+      "fix": "Maintain a written AI Literacy Policy and document staff training in an AI Literacy Log."
+    },
+    {
+      "id": "EU-AI-ACT-ART-50-TRANSPARENCY-MISSING",
+      "platform": "both",
+      "guideline": "Regulation (EU) 2024/1689 Article 50 (EU AI Act Transparency)",
+      "title": "Missing AI interaction disclosure or synthetic content watermarking",
+      "severity": "high",
+      "detection": "Interactive AI features or synthetic output generation missing explicit user disclosures or machine-readable synthetic content watermarking.",
+      "signals": [
+        "chat/completions",
+        "text-to-image",
+        "generateImage",
+        "syntheticMedia"
+      ],
+      "counterSignals": [
+        "aiInteractionNotice",
+        "C2PA",
+        "watermark",
+        "syntheticContentLabel"
+      ],
+      "fix": "Provide clear in-app AI interaction notices at first exposure and embed machine-readable metadata in synthetic outputs."
+    },
+    {
+      "id": "US-COPPA-AMENDED-RULE-MISSING",
+      "platform": "both",
+      "guideline": "16 CFR Part 312 (Amended COPPA Rule)",
+      "title": "Child personal data collection without separate opt-in or retention limits",
+      "severity": "high",
+      "detection": "Child-directed or mixed-audience apps collecting biometric/government IDs or sharing child data for ads without separate opt-in consent and retention policies.",
+      "signals": [
+        "childUser",
+        "biometricData",
+        "under13"
+      ],
+      "counterSignals": [
+        "separateAdConsent",
+        "coppaRetentionPolicy",
+        "verifiableParentalConsent"
+      ],
+      "fix": "Implement separate parental consent for ad sharing, enforce data retention limits, and maintain an information security program."
+    },
+    {
+      "id": "EU-EAA-ACCESSIBILITY-MISSING",
+      "platform": "both",
+      "guideline": "Directive (EU) 2019/882 (European Accessibility Act / EN 301 549)",
+      "title": "EU-facing app missing EN 301 549 / WCAG 2.1 AA mobile accessibility or accessibility statement",
+      "severity": "high",
+      "detection": "Mobile apps distributed in the EU lacking VoiceOver/TalkBack labels, Dynamic Type font scaling, contrast, or a published accessibility statement.",
+      "signals": [
+        "e-commerce",
+        "banking",
+        "digitalServices",
+        "EUStorefront"
+      ],
+      "counterSignals": [
+        "accessibilityStatement",
+        "EN301549",
+        "WCAG21AA",
+        "VoiceOver"
+      ],
+      "fix": "Comply with EN 301 549 Chapter 11 / WCAG 2.1 AA requirements and publish a reachable in-app Accessibility Statement."
+    },
+    {
       "id": "BOTH-LOOTBOX-ODDS",
       "platform": "both",
       "guideline": "Apple 3.1.1, Google gambling",

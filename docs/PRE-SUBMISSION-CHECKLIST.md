@@ -93,16 +93,19 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] Any AI feature reaching EU users shows an in-app notice that the user is interacting with AI, at or before first interaction (EU AI Act Article 50(1), in force 2 August 2026).
 - [ ] AI-generated audio, image, video, or text carries a machine-readable and visible AI-generated marking (Article 50(2) and 50(4)).
 - [ ] A short AI-literacy record exists for the team building or operating the AI feature (Article 4, live since 2 February 2025).
+- [ ] AI transparency obligations under Article 50 are logged and verified prior to submission.
 - [ ] No prohibited AI practice ships (manipulation, banned emotion inference, biometric categorisation) (Article 5, live since 2 February 2025).
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
 - [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes an accessibility statement (European Accessibility Act, in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
 - [ ] If the app promotes external offers in the EU, the external-purchase entitlement is declared, every external link calls the disclosure sheet, IAP and external offers are not mixed on one storefront, and reporting is wired (DMA).
+- [ ] General Product Safety Regulation (GPSR) details (manufacturer electronic address, postal address, and product safety warnings) are clearly displayed on EU product listings (Regulation (EU) 2023/988, in force 13 December 2024).
 
 ## Global specific (USA and other markets, if the app reaches those users)
 
 The full hard rules and sources are in docs/GLOBAL-REGULATORY-2026.md. This is legal, on top of App Review. Several dates are under active litigation, so re-verify each against the cited source.
 
 - [ ] Child-directed or under-13 data. COPPA verifiable parental consent, a separate opt-in for ad or third-party disclosure, a written retention policy and a written security program (general compliance date 22 April 2026).
+- [ ] Biometric identifiers and government IDs collected from children under amended COPPA are strictly covered under the written retention policy and security program.
 - [ ] US state App Store Accountability Acts (Utah, Texas, Louisiana, Alabama). the app requests an age category from the store, confirms parental consent for a minor, and re-requests on a major change, wired through the Declared Age Range API (iOS) or the Play Age Signals API (Android, ensuring strict ToS compliance prohibiting ads, marketing, user profiling, or analytics use of age data).
 - [ ] Age rating set to 4-plus, 9-plus, 13-plus, 16-plus, or 18-plus, never Unrated, questionnaire re-answered by 31 January 2026.
 - [ ] US storefront external links are allowed with no entitlement and no disclosure sheet, no in-app alternative payment, and the commission question is treated as unsettled.
