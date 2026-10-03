@@ -701,6 +701,87 @@ def match_announcement_to_tracks(announcement):
     return matched
 
 
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(
+    report_items, output_filepath, is_simulated=False, verbose=False, quiet=False
+):
+    """Generates / updates the migration report in docs/APPLE-POLICY-MIGRATION.md."""
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Apple Developer Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track 25 Apple requirement categories.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ])
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {item['repository_impact']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    processed_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        if track in processed_tracks:
+            continue
+        processed_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        for t in item["migration_tasks"]:
+            lines.append(f"- [ ] {t}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    if not quiet and verbose:
+        print(f"[*] Apple policy documentation updated at: {output_filepath}")
+
+
+def save_pr_draft(report_items, output_filepath, is_simulated=False, quiet=False):
+    """Saves the generated 15-section PR draft to the specified filepath."""
+    if not report_items:
+        return
+
+    # Use the proposed pull request description from the first report item
+    pr_body = report_items[0]["proposed_pull_request"]["description"]
+    if is_simulated:
+        pr_body = "\n".join(SIMULATED_NOTICE[1:]) + "\n\n" + pr_body
+
+    os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+    with open(output_filepath, "w", encoding="utf-8") as f:
+        f.write(pr_body)
+    if not quiet:
+        print(f"PR draft written successfully to: {output_filepath}")
+
+
 def generate_pull_request(track_name, affected_files, item_title):
     """
     Generates draft Pull Request information for the compliance update.
@@ -967,8 +1048,10 @@ def run_monitor(
     Main runner for the requirements monitor.
     """
     announcements = []
+    used_mock = False
 
     if simulate_track:
+        used_mock = True
         if verbose:
             print(f"[*] Simulating update for track: {simulate_track}")
         # Build simulated announcements
@@ -1024,6 +1107,7 @@ def run_monitor(
             sys.exit(1)
 
     elif use_mock:
+        used_mock = True
         if verbose:
             print("[*] Using pre-defined mock Apple Developer announcements...")
         announcements = MOCK_ANNOUNCEMENTS
@@ -1033,6 +1117,7 @@ def run_monitor(
         rss_content = fetch_apple_rss(verbose=verbose)
         if rss_content:
             announcements = parse_rss_items(rss_content)
+            used_mock = False
         else:
             print(
                 "monitor. Apple's news feed could not be reached. The items below are sample "
@@ -1040,6 +1125,7 @@ def run_monitor(
                 file=sys.stderr,
             )
             announcements = MOCK_ANNOUNCEMENTS
+            used_mock = True
 
     if verbose:
         print(f"[*] Loaded {len(announcements)} developer announcements.")
@@ -1073,7 +1159,7 @@ def run_monitor(
                 }
             )
 
-    return report_items, processed_tracks
+    return report_items, processed_tracks, used_mock
 
 
 REPORT_LIMIT = 10
@@ -1171,16 +1257,47 @@ def main():
         action="store_true",
         help="Print every matched item. Without it a report over 25 items shows a count per track and the first 10",
     )
+    parser.add_argument(
+        "--output-docs",
+        nargs="?",
+        const="docs/APPLE-POLICY-MIGRATION.md",
+        default=None,
+        help="Filepath to write migration tasks and documentation (defaults to docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        nargs="?",
+        const="docs/APPLE_COMPLIANCE_PR_DRAFT.md",
+        default=None,
+        help="Filepath to save the drafted PR (defaults to docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
+    )
 
     args = parser.parse_args()
 
-    report_items, processed = run_monitor(
+    report_items, processed, used_mock = run_monitor(
         project_path=args.project,
         simulate_track=args.simulate,
         use_mock=args.mock,
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    if args.output_docs:
+        update_documentation_report(
+            report_items,
+            args.output_docs,
+            is_simulated=used_mock,
+            verbose=args.verbose,
+            quiet=args.json,
+        )
+
+    if args.pr_output:
+        save_pr_draft(
+            report_items,
+            args.pr_output,
+            is_simulated=used_mock,
+            quiet=args.json,
+        )
 
     if args.json:
         print(json.dumps(report_items, indent=2))
