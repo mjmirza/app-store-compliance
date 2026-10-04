@@ -20,6 +20,23 @@ https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restric
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
 
+# Test fixtures used in script test suites.
+http://127.0.0.1:9/none.rss
+https://example.org/docs/NOPE.md
+https://staging.example.com/api
+
+# Utah, California, and Australian legislature URLs that block or geo-filter automated checks.
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1043
+https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202320240SB976
+https://www.legislation.gov.au/F2026L00370/asmade/text
+
+# Apple developer news and industry report links that return transient errors or soft-404.
+https://developer.apple.com/news/?id=gmws0jgp
+https://developer.apple.com/news/upcoming-requirements/?id=02172025a
+https://www.biometricupdate.com/202604/app-stores-reveal-age-verification-estimation-methods-to-meet-singapore-requirements
+
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
 
