@@ -499,6 +499,183 @@ TRACK_METADATA = {
     },
 }
 
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(report_items, output_filepath, is_simulated=False):
+    """Overwrites or updates the migration report in docs/APPLE-POLICY-MIGRATION.md."""
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Apple Developer Policy Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track Apple developer requirements.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ])
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {item['repository_impact']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        if item["affected_files"]:
+            lines.append("- **Affected Files**:")
+            for f in item["affected_files"]:
+                lines.append(f"  - `{f}`")
+        else:
+            lines.append("- **Affected Files**: None found.")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    processed_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        if track in processed_tracks:
+            continue
+        processed_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        for step in item["migration_tasks"]:
+            lines.append(f"- [ ] {step}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        print(f"Apple documentation updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def generate_combined_pr_draft(report_items, is_simulated=False):
+    """Generates a combined 15-section Pull Request draft for all matched items or simulated tracks."""
+    if not report_items:
+        return "# PULL REQUEST DRAFT: Apple Developer Requirements Compliance Update\n\nNo updates matched."
+
+    citations = []
+    seen_citations = set()
+    affected_files_set = set()
+    migration_steps = []
+    impl_checklist = []
+    test_checklist = []
+    doc_checklist = []
+    risk_assessment = []
+    processed_tracks = set()
+
+    for item in report_items:
+        track = item["track"]
+        cite_entry = f"- **{track}**: [{item['announcement_title']}]({item['announcement_link']}) (Published: {item['announcement_pubDate']})"
+        if cite_entry not in seen_citations:
+            seen_citations.add(cite_entry)
+            citations.append(cite_entry)
+
+        for f in item["affected_files"]:
+            affected_files_set.add(f)
+
+        if track in processed_tracks:
+            continue
+        processed_tracks.add(track)
+
+        meta = TRACK_METADATA.get(track, {})
+        risk_assessment.append(f"- *{track}* ({item['severity_impact'].upper()} RISK): {item['repository_impact']}")
+        for step in item["migration_tasks"]:
+            migration_steps.append(f"- **{track}**: {step}")
+            impl_checklist.append(f"- [ ] {step}")
+
+    citations_str = "\n".join(citations) if citations else "- *No announcements matched.*"
+    if affected_files_set:
+        affected_files_str = "\n".join(f"- `{f}`" for f in sorted(list(affected_files_set)))
+    else:
+        affected_files_str = "- *No specific files containing matching category patterns were automatically detected. (Perform manual review of configuration variables).* "
+
+    migration_steps_str = "\n".join(migration_steps) if migration_steps else "- *No migration steps required.*"
+    impl_checklist_str = "\n".join(impl_checklist) if impl_checklist else "- [ ] Verify codebase compliance."
+    risk_assessment_str = "\n".join(risk_assessment) if risk_assessment else "- *Low identified risk.*"
+
+    pr_template = f"""# PULL REQUEST DRAFT: Apple Developer Requirements Compliance Update
+
+## 1. Summary
+This pull request brings the application into complete compliance with all monitored Apple Developer requirements and App Store Review Guidelines. It addresses privacy manifests, required reason APIs, Sign in with Apple, StoreKit, HIG guidelines, and platform SDK target thresholds to clear App Store submission gates.
+
+## 2. Background
+Apple continuously updates the App Store Review Guidelines, Apple Developer Program License Agreement, and technical requirements. Non-compliance leads to upload-time build rejection or submission suspension in App Store Connect. Proactively maintaining compliance ensures uninterrupted release delivery.
+
+## 3. Regulatory change
+- **App Store Guidelines & Developer Policies**: Enforces mandatory Privacy Manifests (PrivacyInfo.xcprivacy), Required Reason API declarations, Sign in with Apple parity, StoreKit 2 IAP flows, and minimum SDK deployment targets.
+- **Privacy & Security**: Mandatory user consent for App Tracking Transparency (ATT), clear purpose strings in Info.plist, and encryption declarations.
+
+## 4. Official citations
+{citations_str}
+
+## 5. Affected files
+{affected_files_str}
+
+## 6. Risk assessment
+{risk_assessment_str}
+- **Overall Standing**: High risk of submission rejection or build processing failure if platform compliance requirements are not satisfied.
+
+## 7. Migration steps
+{migration_steps_str}
+
+## 8. Backward compatibility
+All changes are fully backward-compatible. Deployment targets and fallback handling preserve compatibility for legacy iOS versions while satisfying new store submission minimums.
+
+## 9. Implementation checklist
+{impl_checklist_str}
+- [ ] Run automated compliance guard checks locally (`bash agent-os/hooks/app-store-compliance-guard.sh .`).
+
+## 10. Testing checklist
+- [ ] Execute clean build on physical device and iOS simulator.
+- [ ] Verify PrivacyInfo.xcprivacy is bundled correctly in the built archive.
+- [ ] Validate Sign in with Apple and StoreKit restore purchases in sandbox environment.
+- [ ] Execute pre-submission audit script (`python3 scripts/release-audit.py .`).
+
+## 11. Documentation checklist
+- [ ] Update App Store Connect Review Notes with test account details and compliance explanations.
+- [ ] Update `docs/APPLE-POLICY-MIGRATION.md` with completed tasks.
+- [ ] Verify support URL and privacy policy URL links in store metadata.
+
+## 12. Compliance impact
+- **Submission Security**: Prevents automated binary upload rejections and manual review holds in App Store Connect.
+- **Account Standing**: Protects developer account health and preserves good standing under the Apple Developer Program License Agreement.
+
+## 13. Breaking changes
+- No breaking API changes introduced. Configuration and metadata updates ensure backward compatibility.
+
+## 14. Review checklist
+- [ ] All required Info.plist purpose strings and privacy manifest keys are present.
+- [ ] Code is free of deprecated private APIs or unauthorized third-party tracking SDKs.
+- [ ] Verify that the diff is completely emoji-free.
+
+## 15. Approver recommendations
+Ensure that the Account Holder has accepted all updated Developer Program License Agreements in App Store Connect prior to submitting the binary for review.
+"""
+    if is_simulated:
+        return "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_template
+    return pr_template
+
+
 # Mock announcements for simulation and self-testing. Links use the RFC 2606
 # .invalid TLD so a fixture can never be mistaken for a real Apple citation.
 MOCK_ANNOUNCEMENTS = [
@@ -1171,8 +1348,25 @@ def main():
         action="store_true",
         help="Print every matched item. Without it a report over 25 items shows a count per track and the first 10",
     )
+    parser.add_argument(
+        "--output-docs",
+        type=str,
+        default=None,
+        help="Filepath to write migration tasks and logs report (e.g. docs/APPLE-POLICY-MIGRATION.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        default=None,
+        help="Filepath to save the drafted PR (e.g. docs/APPLE_COMPLIANCE_PR_DRAFT.md)",
+    )
 
     args = parser.parse_args()
+
+    is_simulated = bool(args.simulate or args.mock or (not args.news_file and not os.environ.get("APPLE_NEWS_RSS_URL")))
+
+    if is_simulated and not args.json:
+        print("Data. sample announcements built into this script, not live news.")
 
     report_items, processed = run_monitor(
         project_path=args.project,
@@ -1181,6 +1375,22 @@ def main():
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    if args.output_docs:
+        os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
+        update_documentation_report(report_items, args.output_docs, is_simulated=is_simulated)
+    elif not args.json:
+        print("No file written. Pass --output-docs <path> to save this report.")
+
+    if args.pr_output:
+        try:
+            os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+            draft = generate_combined_pr_draft(report_items, is_simulated=is_simulated)
+            with open(args.pr_output, "w", encoding="utf-8") as f:
+                f.write(draft)
+            print(f"PR draft written successfully to: {args.pr_output}")
+        except Exception as e:
+            print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
 
     if args.json:
         print(json.dumps(report_items, indent=2))
