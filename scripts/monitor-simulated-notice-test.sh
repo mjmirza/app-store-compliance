@@ -14,6 +14,7 @@ MONITORS = {
     "monitor-android": (True, "Google Play target API level and Play Billing Library update"),
     "monitor-security": (True, None),  # Android security bulletins publish no RSS feed
     "monitor-privacy": (True, "Privacy manifest and App Tracking Transparency requirement"),
+    "monitor-standards": (True, None),  # Standards publications use mock baseline dataset
 }
 LIVE_ITEM = lambda text: {
     "id": "LIVE-TEST-ITEM", "title": text, "description": text,
