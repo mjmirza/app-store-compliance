@@ -16,12 +16,19 @@ https://developer.apple.com/news/?id=required-reason-apis
 
 # Real government site that refuses all automated clients (geo/bot filtered).
 https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+
+# Test script fixtures.
+http://127.0.0.1:9/none.rss
+https://example.org/docs/NOPE.md
 
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+https://developer.apple.com/news/upcoming-requirements/?id=07242025a
 
 # Mock RSS fixtures in scripts/monitor-ai-policy-test.sh. Never cited as fact.
 https://developer.apple.com/news/?id=ai_test_2026
