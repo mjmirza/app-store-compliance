@@ -111,6 +111,33 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify file generation using --output-docs and --pr-output
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TMP_DIR/docs.md" --pr-output "$TMP_DIR/pr.md" > /dev/null
+
+if [ ! -s "$TMP_DIR/docs.md" ]; then
+  echo "[ERROR] --output-docs failed to create documentation file or file is empty"
+  exit 1
+fi
+
+if [ ! -s "$TMP_DIR/pr.md" ]; then
+  echo "[ERROR] --pr-output failed to create PR draft file or file is empty"
+  exit 1
+fi
+
+for idx in "${!SECTIONS[@]}"; do
+  sec_num=$((idx + 1))
+  sec_name="${SECTIONS[$idx]}"
+  if ! grep -q "## ${sec_num}\. ${sec_name}" "$TMP_DIR/pr.md"; then
+    echo "[ERROR] Missing expected section in generated PR draft: ## ${sec_num}. ${sec_name}"
+    exit 1
+  fi
+done
+echo "[PASS] Successfully generated documentation and 15-section PR draft files"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
