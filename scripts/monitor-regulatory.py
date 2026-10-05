@@ -1094,6 +1094,75 @@ def print_text_report(report_items, project_path):
         print("-" * 80)
 
 
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> developments built into this script. The titles, publish dates, and descriptions below",
+    "> show the shape of a regulatory monitor report, not real live publications.",
+    "",
+]
+
+
+def update_documentation_report(report_items, output_filepath):
+    """Overwrites or updates the regulatory report at output_filepath."""
+    lines = [
+        "<!-- REGULATORY_MONITOR_START -->",
+    ]
+    lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Regulatory Intelligence Monitoring & Compliance Report (2026)",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor-regulatory.py` to track global regulatory developments and codebase compliance.",
+        "",
+        "## Monitored Regulatory Updates Log",
+        "",
+    ])
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Impact Level**: {item['compliance_impact']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        lines.append("")
+
+    lines.append("## Codebase Analysis & Migration Tasks")
+    lines.append("")
+
+    processed_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        if track in processed_tracks:
+            continue
+        processed_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Jurisdiction**: {item['jurisdiction']}")
+        lines.append(f"- **Compliance Impact**: {item['compliance_impact']}")
+        if item["affected_files"]:
+            lines.append("- **Identified Affected Files**:")
+            for f in item["affected_files"]:
+                lines.append(f"  - `{f}`")
+        else:
+            lines.append("- **Identified Affected Files**: None found.")
+
+        lines.append("- **Migration Tasks**:")
+        for step in item["migration_tasks"]:
+            lines.append(f"  - [ ] {step}")
+        lines.append("")
+
+    lines.append("<!-- REGULATORY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"Regulatory documentation report updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regulatory Intelligence Agent Monitor."
@@ -1105,6 +1174,18 @@ def main():
     )
     parser.add_argument(
         "--simulate", help="Simulate a regulatory change by track name or keyword"
+    )
+    parser.add_argument(
+        "--output-docs",
+        type=str,
+        default=None,
+        help="Filepath to write migration tasks and logs (e.g., docs/REGULATORY-MONITOR-REPORT-2026.md)",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        default=None,
+        help="Filepath to save the drafted PR proposal",
     )
     parser.add_argument(
         "--json", action="store_true", help="Output report in JSON format"
@@ -1128,6 +1209,32 @@ def main():
         print(json.dumps(report_items, indent=2))
     else:
         print_text_report(report_items, args.project)
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs)
+    elif not args.json:
+        print("No file written. Pass --output-docs <path> to save this report.")
+
+    if args.pr_output:
+        pr_descriptions = []
+        for item in report_items:
+            pr = item.get("proposed_pull_request")
+            if pr and pr.get("description"):
+                pr_descriptions.append(pr["description"])
+
+        if pr_descriptions:
+            pr_content = "\n".join(SIMULATED_NOTICE[1:]) + "\n\n" + "\n\n---\n\n".join(pr_descriptions)
+            try:
+                os.makedirs(os.path.dirname(args.pr_output) or ".", exist_ok=True)
+                with open(args.pr_output, "w", encoding="utf-8") as f:
+                    f.write(pr_content + "\n")
+                print(f"PR draft written successfully to: {args.pr_output}")
+            except Exception as e:
+                print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
+        else:
+            print(f"No verified PR draft generated to write to {args.pr_output}.", file=sys.stderr)
+    elif not args.json:
+        print("No PR draft written. Pass --pr-output <path> to save it.")
 
 
 if __name__ == "__main__":
