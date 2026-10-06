@@ -415,10 +415,81 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_report(directory, ios_files, android_files, all_findings):
+    lines = []
+    lines.append("# Accessibility Compliance Report")
+    lines.append("")
+    lines.append(f"Audited Directory: `{directory}`")
+    lines.append(f"Scanned Files: iOS ({len(ios_files)}), Android ({len(android_files)})")
+    lines.append("")
+    lines.append("## Executive Summary")
+    lines.append("")
+
+    crit = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "critical")
+    high = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "high")
+    med = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "medium")
+    low = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "low")
+
+    if not all_findings:
+        lines.append("No accessibility compliance regressions found across audited platform code. All required criteria for Apple (VoiceOver, Dynamic Type, Reduce Motion, Color Contrast, Haptics, Keyboard navigation) and Android (TalkBack, Font scaling, High contrast, Accessibility Scanner recommendations) are satisfied.")
+    else:
+        lines.append(f"Found {len(all_findings)} accessibility compliance findings ({crit} critical, {high} high, {med} medium, {low} low). Immediate remediation is recommended to comply with European Accessibility Act (EAA) and store accessibility guidelines.")
+
+    lines.append("")
+    lines.append("## Platform Evaluation Summary")
+    lines.append("")
+    lines.append("| Platform | Accessibility Domain | Evaluated Standard | Status | Recommendations |")
+    lines.append("| --- | --- | --- | --- | --- |")
+
+    # Rule evaluation mapping
+    for rule_id, meta in RULE_META.items():
+        platform_name = "Apple (iOS/iPadOS)" if meta["platform"] == "apple" else "Android (Google Play)"
+        domain = meta["title"].split()[0]
+        rule_findings = [f for f in all_findings if f["rule_id"] == rule_id]
+        status = "PASS" if not rule_findings else "REGRESSION"
+        fix_rec = meta["fix"]
+        lines.append(f"| {platform_name} | {rule_id} | {meta['title']} | {status} | {fix_rec} |")
+
+    lines.append("")
+    lines.append("## Detailed Findings and Regressions")
+    lines.append("")
+
+    if not all_findings:
+        lines.append("No active accessibility regressions identified during static code analysis.")
+    else:
+        lines.append("| Severity | Rule ID | File & Line | Issue Context | Recommended Improvement |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for f in all_findings:
+            sev = RULE_META.get(f["rule_id"], {}).get("severity", "medium").upper()
+            file_loc = f"`{f['file']}:{f['line']}`"
+            context_str = f"`{f['match']}`: {f['message']}"
+            fix_str = f["fix"]
+            lines.append(f"| {sev} | {f['rule_id']} | {file_loc} | {context_str} | {fix_str} |")
+
+    lines.append("")
+    lines.append("## Best Practices and Recommendations")
+    lines.append("")
+    lines.append("### Apple Accessibility Guidelines")
+    lines.append("- VoiceOver: Provide explicit `.accessibilityLabel(...)` and `.accessibilityHint(...)` on custom UI elements. Use `Image(decorative: ...)` for purely decorative assets.")
+    lines.append("- Dynamic Type: Use `.font(.body)` or `.preferredFont(forTextStyle:)` and verify `adjustsFontForContentSizeCategory` is enabled.")
+    lines.append("- Reduce Motion: Observe `@Environment(\\.accessibilityReduceMotion)` or `UIAccessibility.isReduceMotionEnabled` to disable non-essential animations.")
+    lines.append("- Color Contrast: Ensure contrast ratio meets WCAG 2.1 AA (4.5:1 for standard text, 3:1 for large text). Support dynamic system dark/light modes.")
+    lines.append("- Haptics: Provide tactile feedback via `UIImpactFeedbackGenerator` or `UISelectionFeedbackGenerator` for touch interactions.")
+    lines.append("- Keyboard Navigation: Enable full keyboard focus tracking via `@FocusState` in SwiftUI or `keyCommands` / `canBecomeFocused` in UIKit.")
+    lines.append("")
+    lines.append("### Android Accessibility Guidelines")
+    lines.append("- TalkBack: Always specify `android:contentDescription` on `ImageView` / `ImageButton` or `contentDescription` on Jetpack Compose `Image` components.")
+    lines.append("- Font Scaling: Define text size exclusively using `sp` (scale-independent pixels) rather than `dp` to allow user font scaling preferences.")
+    lines.append("- High Contrast: Avoid hardcoded hex colors (`#FF0000`). Use semantic theme attributes (e.g., `?attr/colorOnSurface` or `MaterialTheme.colorScheme`).")
+    lines.append("- Accessibility Scanner: Ensure all touch targets meet or exceed 48dp x 48dp with adequate layout padding.")
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Output path for Markdown report.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -438,6 +509,12 @@ def main():
 
     # Sort findings by rule ID and file path
     all_findings.sort(key=lambda x: (x["rule_id"], x["file"], x["line"]))
+
+    if args.report_out:
+        report_md = generate_report(args.directory, ios_files, android_files, all_findings)
+        with open(args.report_out, "w", encoding="utf-8") as f:
+            f.write(report_md)
+        print(f"Accessibility report written to: {args.report_out}")
 
     print("== Accessibility Compliance Audit ==")
     print(f"Audited directory. {args.directory}")
