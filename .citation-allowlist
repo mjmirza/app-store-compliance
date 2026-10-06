@@ -39,8 +39,17 @@ https://example.com/x
 https://kiosk.example.io/privacy-policy
 https://realbackend.io/privacy-policy
 https://staging.example.com
+https://staging.example.com/api
 https://app.com/privacy-policy
 https://prod.app.com
+
+# Utah legislative links that are bot-blocked or moved.
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+
+# Test script fixtures.
+http://127.0.0.1:9/none.rss
+https://example.org/docs/NOPE.md
 
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
