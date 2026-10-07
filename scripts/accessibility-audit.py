@@ -415,10 +415,100 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_markdown_report(directory, ios_files, android_files, findings):
+    crit = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "critical")
+    high = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "high")
+    med = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "medium")
+    low = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "low")
+    status = "Regressions Detected" if findings else "Clean"
+
+    report = []
+    report.append("# Accessibility Compliance Report")
+    report.append("")
+    report.append("This document details the continuous accessibility compliance audit results, evaluated platform rules, verified criteria, detected regressions, and recommended implementation practices for iOS (Apple) and Android (Google Play) applications.")
+    report.append("")
+    report.append("## Executive Summary")
+    report.append("")
+    report.append(f"- Audited Directory: `{directory}`")
+    report.append(f"- Total Scanned Files: iOS={len(ios_files)}, Android={len(android_files)}")
+    report.append(f"- Audit Status: {status}")
+    report.append(f"- Findings Summary: Critical={crit}, High={high}, Medium={med}, Low={low}")
+    report.append("")
+    report.append("## Evaluated Accessibility Rules")
+    report.append("")
+    report.append("### Apple iOS Accessibility Rules")
+    report.append("")
+    report.append("1. **VoiceOver Support (`APPLE-ACCESSIBILITY-VOICEOVER`)**")
+    report.append("   - **Verification**: Verifies that all interactive controls and informative images have descriptive `accessibilityLabel`, `accessibilityHint`, and traits assigned, and decorative images use `Image(decorative: ...)` or `accessibilityHidden(true)`.")
+    report.append("   - **Recommendation**: Provide concise, localized labels for all interactive elements and explicitly mark decorative graphics as hidden.")
+    report.append("")
+    report.append("2. **Dynamic Type Support (`APPLE-ACCESSIBILITY-DYNAMICTYPE`)**")
+    report.append("   - **Verification**: Checks for hardcoded font sizes (`.system(size:)` or `UIFont.systemFont(ofSize:)`) that bypass user dynamic font size preferences.")
+    report.append("   - **Recommendation**: Use SwiftUI relative text styles (e.g., `.font(.body)`) or `UIFont.preferredFont(forTextStyle:)` with `adjustsFontForContentSizeCategory = true`.")
+    report.append("")
+    report.append("3. **Reduce Motion Support (`APPLE-ACCESSIBILITY-REDUCEMOTION`)**")
+    report.append("   - **Verification**: Scans for animations or transitions (`withAnimation`, `UIView.animate`) executed without inspecting `UIAccessibility.isReduceMotionEnabled` or `@Environment(\\.accessibilityReduceMotion)`.")
+    report.append("   - **Recommendation**: Respect user system settings by disabling or replacing motion-heavy transitions with instant cross-fades when Reduce Motion is active.")
+    report.append("")
+    report.append("4. **Color Contrast & System Settings (`APPLE-ACCESSIBILITY-COLORCONTRAST`)**")
+    report.append("   - **Verification**: Identifies static hardcoded RGB/hex color declarations that ignore system high-contrast modes or dark mode dynamic palettes.")
+    report.append("   - **Recommendation**: Use asset-catalog dynamic colors, semantic system colors, or adapt programmatically based on `UIAccessibility.isDarkerSystemColorsEnabled`.")
+    report.append("")
+    report.append("5. **Haptics Feedback (`APPLE-ACCESSIBILITY-HAPTICS`)**")
+    report.append("   - **Verification**: Ensures interactive controls, button taps, and gestures provide appropriate tactile haptic feedback.")
+    report.append("   - **Recommendation**: Integrate `UIImpactFeedbackGenerator` or `UISelectionFeedbackGenerator` to assist users with visual or motor impairments during interaction.")
+    report.append("")
+    report.append("6. **Keyboard Navigation (`APPLE-ACCESSIBILITY-KEYBOARD`)**")
+    report.append("   - **Verification**: Checks that custom focusable UI components maintain focus state tracking and key command handlers.")
+    report.append("   - **Recommendation**: Use `@FocusState` in SwiftUI or `keyCommands` / `canBecomeFirstResponder` in UIKit to ensure full accessibility keyboard navigation.")
+    report.append("")
+    report.append("### Android Accessibility Rules")
+    report.append("")
+    report.append("7. **TalkBack Support (`ANDROID-ACCESSIBILITY-TALKBACK`)**")
+    report.append("   - **Verification**: Verifies that XML layout images (`ImageView`, `ImageButton`) and Jetpack Compose `Image` composables provide non-empty `contentDescription` attributes or explicit `null` decorative designations.")
+    report.append("   - **Recommendation**: Assign descriptive `contentDescription` resources to informative views and set `android:importantForAccessibility=\"no\"` on purely decorative elements.")
+    report.append("")
+    report.append("8. **Font Scaling (`ANDROID-ACCESSIBILITY-FONTSCALING`)**")
+    report.append("   - **Verification**: Scans XML layouts and Compose text definitions for text size dimensions declared in `dp` rather than scale-independent pixels (`sp`).")
+    report.append("   - **Recommendation**: Declare all text dimensions in `sp` (e.g., `16.sp` in Compose or `16sp` in XML) to respect user font size scaling preferences in Android Settings.")
+    report.append("")
+    report.append("9. **High Contrast (`ANDROID-ACCESSIBILITY-HIGHCONTRAST`)**")
+    report.append("   - **Verification**: Identifies hardcoded hex color codes in layouts (`#FF0000`) or Compose code (`Color(0xFF...)`) that bypass theme contrast variations.")
+    report.append("   - **Recommendation**: Utilize Material Theme semantic color tokens (e.g., `MaterialTheme.colorScheme.primary` or `?attr/colorOnSurface`) to guarantee visibility under High Contrast themes.")
+    report.append("")
+    report.append("10. **Accessibility Scanner Recommendations (`ANDROID-ACCESSIBILITY-SCANNER`)**")
+    report.append("    - **Verification**: Checks for interactive elements with touch target dimensions below the mandatory 48dp x 48dp minimum threshold.")
+    report.append("    - **Recommendation**: Ensure touch target sizes meet or exceed 48dp x 48dp using layout padding, `minWidth`/`minHeight`, or Compose `Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)`.")
+    report.append("")
+    report.append("## Audit Findings & Regressions")
+    report.append("")
+    if not findings:
+        report.append("No accessibility compliance regressions found in the audited codebase.")
+        report.append("")
+    else:
+        for f in findings:
+            meta = RULE_META[f["rule_id"]]
+            sev = meta["severity"].upper()
+            report.append(f"### [{sev}] {f['rule_id']}")
+            report.append(f"- **Location**: `{f['file']}:{f['line']}`")
+            report.append(f"- **Context**: `{f['match']}`")
+            report.append(f"- **Issue**: {f['message']}")
+            report.append(f"- **Recommended Fix**: {f['fix']}")
+            report.append("")
+
+    report.append("## Compliance & Remediation Guidelines")
+    report.append("")
+    report.append("1. **Continuous Audit Execution**: Integrate `python3 scripts/accessibility-audit.py` into automated CI/CD workflows to prevent accessibility regressions during active development.")
+    report.append("2. **European Accessibility Act (EAA) Compliance**: Ensure all mobile and web UI components adhere to EN 301 549 (WCAG 2.1 AA standards) before mandatory legal enforcement dates.")
+    report.append("3. **Store Publishing Gates**: Verify minimum touch target sizes (48dp x 48dp) and correct screen reader labels to prevent Google Play and Apple App Store review rejections.")
+    report.append("")
+    return "\n".join(report)
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to write the markdown report output.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -443,6 +533,16 @@ def main():
     print(f"Audited directory. {args.directory}")
     print(f"Scanned files. iOS={len(ios_files)} Android={len(android_files)}")
     print("")
+
+    if args.report_out:
+        report_content = generate_markdown_report(args.directory, ios_files, android_files, all_findings)
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(args.report_out)), exist_ok=True)
+            with open(args.report_out, "w", encoding="utf-8") as rf:
+                rf.write(report_content)
+            print(f"Report written to {args.report_out}")
+        except Exception as e:
+            print(f"Failed to write report to {args.report_out}: {e}")
 
     if not all_findings:
         print("Clean. No accessibility compliance regressions found.")
