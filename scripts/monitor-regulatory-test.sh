@@ -111,6 +111,35 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Verify --output-docs and --pr-output options write non-empty output files
+echo "[TEST] Verifying --output-docs and --pr-output flags..."
+TMP_DOCS="/tmp/test_regulatory_report.md"
+TMP_PR="/tmp/test_regulatory_pr.md"
+rm -f "$TMP_DOCS" "$TMP_PR"
+
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "EU AI Act" --output-docs "$TMP_DOCS" --pr-output "$TMP_PR" > /dev/null
+
+if [ ! -s "$TMP_DOCS" ]; then
+  echo "[ERROR] --output-docs failed to write report to $TMP_DOCS"
+  exit 1
+fi
+if [ ! -s "$TMP_PR" ]; then
+  echo "[ERROR] --pr-output failed to write PR draft to $TMP_PR"
+  exit 1
+fi
+rm -f "$TMP_DOCS" "$TMP_PR"
+echo "[PASS] --output-docs and --pr-output generate valid output files"
+
+# Test 9: Verify simulation of 'all' tracks
+echo "[TEST] Verifying simulation of 'all' tracks..."
+ALL_JSON=$(python3 "$MON_SCRIPT" --project "$REPO_ROOT" --simulate "all" --json)
+TRACK_COUNT=$(echo "$ALL_JSON" | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
+if [ "$TRACK_COUNT" -lt 20 ]; then
+  echo "[ERROR] Expected at least 20 tracks when simulating 'all', got $TRACK_COUNT"
+  exit 1
+fi
+echo "[PASS] Simulated 'all' tracks successfully (matched $TRACK_COUNT tracks)"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0
