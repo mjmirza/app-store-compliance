@@ -172,7 +172,8 @@ class TestDeadlineDayBoundary(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out_md = os.path.join(tmp, "timeline.md")
             self._run("generate-timeline.py", {"DEADLINES_FILE": self._db(tmp), "TIMELINE_OUTPUT_FILE": out_md})
-            text = open(out_md).read()
+            with open(out_md, "r") as f:
+                text = f.read()
         row = {}
         for line in text.splitlines():
             for name in ("Due Today Act", "Due Tomorrow Act", "Due Yesterday Act"):
