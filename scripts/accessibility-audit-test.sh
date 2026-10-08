@@ -444,6 +444,16 @@ else
   bad "Failed to flag ANDROID-ACCESSIBILITY-SCANNER"
 fi
 
+# Test 3: Verify --report-out flag generates valid Markdown report
+REPORT_PATH=$(mktemp "/tmp/access_report_XXXXXX.md")
+$AUDIT "$REGRESSION_DIR" --report-out "$REPORT_PATH" > /dev/null 2>&1
+if [ -f "$REPORT_PATH" ] && grep -q "# Continuous Accessibility Compliance Report" "$REPORT_PATH"; then
+  ok "Generated Markdown report via --report-out"
+else
+  bad "Failed to generate Markdown report via --report-out"
+fi
+rm -f "$REPORT_PATH" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

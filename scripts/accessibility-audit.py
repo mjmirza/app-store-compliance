@@ -415,10 +415,110 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def write_markdown_report(report_path, directory, ios_files, android_files, all_findings):
+    lines = []
+    lines.append("# Continuous Accessibility Compliance Report")
+    lines.append("")
+    lines.append(f"Target Directory: `{directory}`")
+    lines.append(f"Files Scanned: iOS={len(ios_files)}, Android={len(android_files)}")
+    lines.append("")
+
+    crit = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "critical")
+    high = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "high")
+    med = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "medium")
+    low = sum(1 for f in all_findings if RULE_META.get(f["rule_id"], {}).get("severity") == "low")
+
+    status = "PASSED" if not all_findings else ("BLOCKED" if crit > 0 else "ADVISORY")
+    lines.append(f"Overall Accessibility Compliance Status: {status}")
+    lines.append("")
+
+    lines.append("## Executive Summary")
+    if not all_findings:
+        lines.append("The codebase successfully passed all continuous accessibility checks across Apple and Android platforms with zero detected regressions.")
+    elif crit > 0:
+        lines.append("Critical accessibility regressions were detected. Immediate remediation is required before app submission.")
+    else:
+        lines.append("Accessibility regressions or improvement opportunities were detected. Review the findings and recommendations below.")
+    lines.append("")
+
+    lines.append("## Evaluated Accessibility Rules Summary")
+    lines.append("")
+    lines.append("| Platform | Rule ID | Title | Status | Regressions |")
+    lines.append("| --- | --- | --- | --- | --- |")
+
+    for rule_id, meta in RULE_META.items():
+        plat = "Apple (iOS/macOS)" if meta["platform"] == "apple" else "Android (Google Play)"
+        rule_findings = [f for f in all_findings if f["rule_id"] == rule_id]
+        rule_status = "PASSED" if not rule_findings else "REGRESSION DETECTED"
+        lines.append(f"| {plat} | `{rule_id}` | {meta['title']} | {rule_status} | {len(rule_findings)} |")
+
+    lines.append("")
+
+    lines.append("## Detailed Platform Audits and Recommendations")
+    lines.append("")
+
+    # Apple Section
+    lines.append("### Apple Accessibility Requirements")
+    lines.append("")
+    apple_rules = {k: v for k, v in RULE_META.items() if v["platform"] == "apple"}
+    for rule_id, meta in apple_rules.items():
+        rule_findings = [f for f in all_findings if f["rule_id"] == rule_id]
+        lines.append(f"#### {rule_id}: {meta['title']}")
+        lines.append(f"- Recommended Fix: {meta['fix']}")
+        lines.append(f"- Regressions Detected: {len(rule_findings)}")
+        lines.append("")
+        if rule_findings:
+            lines.append("| File | Line | Context | Message |")
+            lines.append("| --- | --- | --- | --- |")
+            for rf in rule_findings:
+                clean_match = rf["match"].replace("\n", " ").replace("|", "\\|")
+                lines.append(f"| `{rf['file']}` | {rf['line']} | `{clean_match}` | {rf['message']} |")
+            lines.append("")
+        else:
+            lines.append("No regressions detected for this rule.")
+            lines.append("")
+
+    # Android Section
+    lines.append("### Android Accessibility Requirements")
+    lines.append("")
+    android_rules = {k: v for k, v in RULE_META.items() if v["platform"] == "google"}
+    for rule_id, meta in android_rules.items():
+        rule_findings = [f for f in all_findings if f["rule_id"] == rule_id]
+        lines.append(f"#### {rule_id}: {meta['title']}")
+        lines.append(f"- Recommended Fix: {meta['fix']}")
+        lines.append(f"- Regressions Detected: {len(rule_findings)}")
+        lines.append("")
+        if rule_findings:
+            lines.append("| File | Line | Context | Message |")
+            lines.append("| --- | --- | --- | --- |")
+            for rf in rule_findings:
+                clean_match = rf["match"].replace("\n", " ").replace("|", "\\|")
+                lines.append(f"| `{rf['file']}` | {rf['line']} | `{clean_match}` | {rf['message']} |")
+            lines.append("")
+        else:
+            lines.append("No regressions detected for this rule.")
+            lines.append("")
+
+    lines.append("## References and Regulatory Alignment")
+    lines.append("")
+    lines.append("- European Accessibility Act (EAA) Directives: `docs/EU-REGULATORY-2026.md`")
+    lines.append("- Apple and Google Play Accessibility Guidelines: `docs/PLATFORM-MECHANICS-2026.md`")
+    lines.append("- Pre-Submission Verification Checklist: `docs/PRE-SUBMISSION-CHECKLIST.md`")
+
+    report_dir = os.path.dirname(os.path.abspath(report_path))
+    if report_dir and not os.path.exists(report_dir):
+        os.makedirs(report_dir, exist_ok=True)
+
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    print(f"Accessibility compliance report generated successfully at: {report_path}")
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to write Markdown accessibility compliance report.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -448,6 +548,8 @@ def main():
         print("Clean. No accessibility compliance regressions found.")
         print("")
         print("Summary. critical=0 high=0 medium=0 low=0")
+        if args.report_out:
+            write_markdown_report(args.report_out, args.directory, ios_files, android_files, all_findings)
         return 0
 
     # Print detailed findings
@@ -476,6 +578,9 @@ def main():
 
     print(f"Summary. critical={crit} high={high} medium={med} low={low}")
     print("Reference. docs/EU-REGULATORY-2026.md and docs/PLATFORM-MECHANICS-2026.md")
+
+    if args.report_out:
+        write_markdown_report(args.report_out, args.directory, ios_files, android_files, all_findings)
 
     # Exit with 0 on advisory findings since accessibility represents medium store risk
     return 0
