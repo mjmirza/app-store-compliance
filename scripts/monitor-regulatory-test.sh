@@ -9,11 +9,19 @@ set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MON_SCRIPT="$REPO_ROOT/scripts/monitor-regulatory.py"
+TEST_DOC_OUTPUT="$REPO_ROOT/docs/TEST-REGULATORY-REPORT.md"
+TEST_PR_OUTPUT="$REPO_ROOT/docs/TEST_REGULATORY_PR_DRAFT.md"
 
 echo "[TEST] Starting Regulatory Intelligence Agent Monitor Test Suite"
 echo "Project Path: $REPO_ROOT"
 echo "Script Path:  $MON_SCRIPT"
 echo ""
+
+# Clean up any test artifacts on exit
+cleanup() {
+  rm -f "$TEST_DOC_OUTPUT" "$TEST_PR_OUTPUT"
+}
+trap cleanup EXIT
 
 # Test 1: Verify monitor-regulatory.py exists and is executable
 if [ ! -x "$MON_SCRIPT" ]; then
@@ -110,6 +118,31 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
   exit 1
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
+
+# Test 8: Verify --output-docs and --pr-output flags generate output files
+echo "[TEST] Verifying --output-docs and --pr-output file generation..."
+python3 "$MON_SCRIPT" --project "$REPO_ROOT" --output-docs "$TEST_DOC_OUTPUT" --pr-output "$TEST_PR_OUTPUT" > /dev/null
+
+if [ ! -f "$TEST_DOC_OUTPUT" ]; then
+  echo "[ERROR] --output-docs failed to generate $TEST_DOC_OUTPUT"
+  exit 1
+fi
+
+if [ ! -f "$TEST_PR_OUTPUT" ]; then
+  echo "[ERROR] --pr-output failed to generate $TEST_PR_OUTPUT"
+  exit 1
+fi
+
+# Verify generated doc and PR files are emoji-free
+python3 -c "
+for path in ['$TEST_DOC_OUTPUT', '$TEST_PR_OUTPUT']:
+    with open(path) as f:
+        text = f.read()
+    emojis = [c for c in text if 0x1F300 <= ord(c) <= 0x1F9FF or 0x2600 <= ord(c) <= 0x27BF]
+    if emojis:
+        raise ValueError(f'Emojis found in {path}: {emojis}')
+"
+echo "[PASS] --output-docs and --pr-output generated valid, emoji-free compliance files"
 
 echo ""
 echo "[SUCCESS] All tests passed successfully."
