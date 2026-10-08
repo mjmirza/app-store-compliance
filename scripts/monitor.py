@@ -956,6 +956,108 @@ def generate_pull_request(track_name, affected_files, item_title):
     }
 
 
+SIMULATED_NOTICE = [
+    "",
+    "> **Simulated output, not live announcements.** This file was generated from sample",
+    "> announcements (the built-in set, the default, or a file passed with `--mock`). The titles,",
+    "> publish dates, and descriptions below are examples that show the shape of a migration",
+    "> report, not real publications. Only the linked official documentation URLs are real.",
+    "> Re-run the monitor with `--live` against the real feeds before treating anything here",
+    "> as an actual requirement.",
+    "",
+]
+
+
+def update_documentation_report(report_items, output_filepath, is_simulated=False):
+    """
+    Overwrites or updates the migration report in docs/APPLE-POLICY-MIGRATION.md.
+    """
+    lines = [
+        "<!-- APPLE_POLICY_MONITOR_START -->",
+    ]
+    if is_simulated:
+        lines.extend(SIMULATED_NOTICE)
+    lines.extend([
+        "# Apple Developer Requirements Migration & Requirements Report",
+        "",
+        "This report is continuously generated and updated by `scripts/monitor.py` to track 25 Apple requirement categories.",
+        "",
+        "## Monitored Requirements Update Log",
+        "",
+    ])
+
+    for idx, item in enumerate(report_items, 1):
+        lines.append(f"### {idx}. [{item['track']}] {item['announcement_title']}")
+        lines.append(f"- **Published Date**: {item['announcement_pubDate']}")
+        lines.append(f"- **Official Resource**: [{item['announcement_link']}]({item['announcement_link']})")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        lines.append(f"- **Repository Impact**: {item['repository_impact']}")
+        lines.append(f"- **Scan Verdict**: {item['scan_verdict']}")
+        if item["affected_files"]:
+            lines.append("- **Identified Affected Files**:")
+            for f in item["affected_files"]:
+                lines.append(f"  * `{f}`")
+        else:
+            lines.append("- **Identified Affected Files**: None found.")
+        lines.append("")
+
+    lines.append("## Automated Migration Recommendations & Implementation Tasks")
+    lines.append("")
+
+    processed_doc_tracks = set()
+    for item in report_items:
+        track = item["track"]
+        if track in processed_doc_tracks:
+            continue
+        processed_doc_tracks.add(track)
+
+        lines.append(f"### Tasks for {track}")
+        lines.append(f"- **Release Impact**: {item['severity_impact']}")
+        for step in item["migration_tasks"]:
+            lines.append(f"- [ ] **Task**: {step}")
+        lines.append("")
+
+    lines.append("<!-- APPLE_POLICY_MONITOR_END -->")
+
+    try:
+        os.makedirs(os.path.dirname(output_filepath) or ".", exist_ok=True)
+        with open(output_filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        print(f"Apple documentation report updated successfully at: {output_filepath}")
+    except Exception as e:
+        print(f"Error writing documentation to {output_filepath}: {e}", file=sys.stderr)
+
+
+def save_pr_draft(report_items, pr_filepath, is_simulated=False):
+    """
+    Saves a consolidated 15-section Pull Request draft for all matched items to file.
+    """
+    if not report_items:
+        pr_text = "# PULL REQUEST DRAFT: Apple Developer Requirements Update\n\nNo compliance updates matched.\n"
+    else:
+        pr_blocks = []
+        seen_tracks = set()
+        for item in report_items:
+            track = item["track"]
+            if track in seen_tracks:
+                continue
+            seen_tracks.add(track)
+            pr_desc = item["proposed_pull_request"]["description"]
+            pr_blocks.append(pr_desc)
+        pr_text = "\n\n---\n\n".join(pr_blocks)
+
+    if is_simulated:
+        pr_text = "\n".join(SIMULATED_NOTICE[1:]) + "\n" + pr_text
+
+    try:
+        os.makedirs(os.path.dirname(pr_filepath) or ".", exist_ok=True)
+        with open(pr_filepath, "w", encoding="utf-8") as f:
+            f.write(pr_text)
+        print(f"Apple PR draft written successfully to: {pr_filepath}")
+    except Exception as e:
+        print(f"Error writing PR draft to {pr_filepath}: {e}", file=sys.stderr)
+
+
 def run_monitor(
     project_path=".",
     simulate_track=None,
@@ -967,8 +1069,10 @@ def run_monitor(
     Main runner for the requirements monitor.
     """
     announcements = []
+    used_mock = False
 
     if simulate_track:
+        used_mock = True
         if verbose:
             print(f"[*] Simulating update for track: {simulate_track}")
         # Build simulated announcements
@@ -1011,6 +1115,7 @@ def run_monitor(
                 )
 
     elif custom_news_file:
+        used_mock = True
         if verbose:
             print(f"[*] Loading announcements from custom file: {custom_news_file}")
         try:
@@ -1024,6 +1129,7 @@ def run_monitor(
             sys.exit(1)
 
     elif use_mock:
+        used_mock = True
         if verbose:
             print("[*] Using pre-defined mock Apple Developer announcements...")
         announcements = MOCK_ANNOUNCEMENTS
@@ -1034,6 +1140,7 @@ def run_monitor(
         if rss_content:
             announcements = parse_rss_items(rss_content)
         else:
+            used_mock = True
             print(
                 "monitor. Apple's news feed could not be reached. The items below are sample "
                 "announcements, not real ones. Check your network and run again.",
@@ -1070,6 +1177,7 @@ def run_monitor(
                     "affected_files": affected_files,
                     "migration_tasks": meta["migration_steps"],
                     "proposed_pull_request": pr_details,
+                    "is_simulated": used_mock,
                 }
             )
 
@@ -1171,6 +1279,18 @@ def main():
         action="store_true",
         help="Print every matched item. Without it a report over 25 items shows a count per track and the first 10",
     )
+    parser.add_argument(
+        "--output-docs",
+        type=str,
+        default=None,
+        help="Filepath to write migration tasks / docs updates",
+    )
+    parser.add_argument(
+        "--pr-output",
+        type=str,
+        default=None,
+        help="Filepath to save the drafted PR",
+    )
 
     args = parser.parse_args()
 
@@ -1181,6 +1301,25 @@ def main():
         custom_news_file=args.news_file,
         verbose=args.verbose,
     )
+
+    is_simulated = any(item.get("is_simulated", False) for item in report_items) if report_items else False
+    if args.simulate or args.mock or args.news_file:
+        is_simulated = True
+
+    if is_simulated and not args.json:
+        print("Data. sample announcements built into this script, not live news.")
+    elif not is_simulated and not args.json:
+        print("Data. live feeds, fetched just now.")
+
+    if args.output_docs:
+        update_documentation_report(report_items, args.output_docs, is_simulated=is_simulated)
+    elif not args.json:
+        print("No file written. Pass --output-docs <path> to save this report.")
+
+    if args.pr_output:
+        save_pr_draft(report_items, args.pr_output, is_simulated=is_simulated)
+    elif not args.json:
+        print("No PR draft written. Pass --pr-output <path> to save it.")
 
     if args.json:
         print(json.dumps(report_items, indent=2))

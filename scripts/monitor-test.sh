@@ -44,7 +44,16 @@ echo "$OUT_SCAN" | grep -q "Sources/App.swift" && ok "repo scanner correctly ide
 # Clean up
 rm -rf "$T"
 
-# 5. The proposed pull request carries sections numbered 1 to 15, in order
+# 5. Output docs and PR draft file generation verification
+T_OUT=$(mktemp -d)
+DOCS_FILE="$T_OUT/APPLE-POLICY-MIGRATION.md"
+PR_FILE="$T_OUT/APPLE_COMPLIANCE_PR_DRAFT.md"
+$MONITOR --simulate "Privacy Manifests" --output-docs "$DOCS_FILE" --pr-output "$PR_FILE" >/dev/null 2>&1
+[ -s "$DOCS_FILE" ] && grep -q "APPLE_POLICY_MONITOR_START" "$DOCS_FILE" && ok "--output-docs creates valid documentation report" || bad "--output-docs output"
+[ -s "$PR_FILE" ] && grep -q "## 1. Summary" "$PR_FILE" && grep -q "## 15. Approver recommendations" "$PR_FILE" && ok "--pr-output creates valid 15-section PR draft" || bad "--pr-output output"
+rm -rf "$T_OUT"
+
+# 6. The proposed pull request carries sections numbered 1 to 15, in order
 echo "$JSON_OUT" | python3 -c "
 import sys, json, re
 body = json.load(sys.stdin)[0]['proposed_pull_request']['description']
