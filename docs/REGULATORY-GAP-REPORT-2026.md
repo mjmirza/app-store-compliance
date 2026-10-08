@@ -135,14 +135,14 @@ Official Citation: Regulation (EU) 2024/1689 of the European Parliament and of t
 - **Missing Documentation:** Developer guidelines do not detail operational workflows for fulfilling Article 4 literacy obligations across engineering teams.
 - **Missing Code:** Not directly applicable to product runtime code, but missing a repository linter to verify the existence of an updated AI literacy log.
 - **Missing Disclosure:** External recruitment materials, partner agreements, and vendor contracts lack explicit AI literacy compliance declarations.
-- **Missing Logging:** The repository lacks a centralized training log or registry (`docs/AI_LITERACY_LOG.md`) tracking induction and refresher dates.
+- **Missing Logging:** The repository lacks a centralized training log or registry (`AI_LITERACY_LOG.md`) tracking induction and refresher dates.
 - **Missing Testing:** No automated CI scripts exist to verify that team members committing AI feature code have recorded active literacy training.
 - **Missing Evidence:** Lacks sample training record templates or completed competency assessment logs for regulatory inspection.
 - **Missing Audit Trail:** Lacks historical audit records showing annual literacy policy reviews and curriculum updates.
 
 ### 5.3 Remediation and Action Plan
 1. Create an AI Literacy Policy template defining required training modules and annual refresher cadences.
-2. Establish a template `docs/AI_LITERACY_LOG.md` file within the repository to track training completions.
+2. Establish a template `AI_LITERACY_LOG.md` file within the repository to track training completions.
 3. Add a CI check that warns if the AI literacy log has not been reviewed within the preceding 12 months.
 
 ---
