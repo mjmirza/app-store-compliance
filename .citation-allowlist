@@ -51,3 +51,20 @@ https://cppa.ca.gov/regulations/ccpa_updates.html
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
 https://www.ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2946
 https://www.miit.gov.cn/
+
+# Test fixtures and government / blog sources that block automated citation checks or return 5xx/404
+http://127.0.0.1:9/none.rss
+https://example.org/docs/NOPE.md
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+https://staging.example.com/api
+https://www.ftc.gov/business-guidance/blog/2026/05/take-it-down-act-enforcement-starts-now-what-know-about-ftc-tida
+https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions
+https://www.ftc.gov/news-events/news/press-releases/2024/04/ftc-finalizes-changes-health-breach-notification-rule
+https://www.ftc.gov/news-events/news/press-releases/2025/01/ftc-finalizes-changes-childrens-privacy-rule-limiting-companies-ability-monetize-kids-data
+https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children
+https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-seeks-public-comment-response-advance-notice-proposed-rulemaking-regarding-negative-option
+https://www.legislation.gov.au/F2026L00370/asmade/text
+https://android-developers.googleblog.com/2026/06/android-developer-verification.html
+https://android-developers.googleblog.com/2026/06/play-expanded-billing.html
+https://android-developers.googleblog.com/2026/08/app-broader-memory-limits.html
