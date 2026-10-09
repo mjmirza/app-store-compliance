@@ -444,6 +444,35 @@ else
   bad "Failed to flag ANDROID-ACCESSIBILITY-SCANNER"
 fi
 
+# Test 3: Test --report-out option and emoji-free verification
+REPORT_FILE=$(mktemp "/tmp/access_report_XXXXXX.md")
+$AUDIT --report-out "$REPORT_FILE" "$REGRESSION_DIR" >/dev/null 2>&1
+if [ -f "$REPORT_FILE" ] && grep -q "# Continuous Accessibility Compliance Report" "$REPORT_FILE"; then
+  ok "Generated accessibility Markdown report via --report-out"
+else
+  bad "Failed to generate accessibility report via --report-out"
+fi
+
+if python3 -c "
+import sys
+content = open('$REPORT_FILE', encoding='utf-8').read()
+# Check for common emoji unicode ranges
+for char in content:
+    if ord(char) > 0x1F600 and ord(char) < 0x1F64F:
+        sys.exit(1)
+    if ord(char) > 0x1F300 and ord(char) < 0x1F5FF:
+        sys.exit(1)
+    if ord(char) > 0x1F680 and ord(char) < 0x1F6FF:
+        sys.exit(1)
+    if ord(char) > 0x2600 and ord(char) < 0x26FF:
+        sys.exit(1)
+" ; then
+  ok "Accessibility Markdown report is 100% emoji-free"
+else
+  bad "Accessibility Markdown report contains emoji characters"
+fi
+rm -f "$REPORT_FILE" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
