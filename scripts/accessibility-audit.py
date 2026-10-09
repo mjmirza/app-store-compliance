@@ -415,10 +415,108 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_markdown_report(directory, ios_files, android_files, findings, report_path):
+    crit = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "critical")
+    high = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "high")
+    med = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "medium")
+    low = sum(1 for f in findings if RULE_META[f["rule_id"]]["severity"] == "low")
+
+    lines = []
+    lines.append("# Continuous Accessibility Compliance Report")
+    lines.append("")
+    lines.append("## Executive Summary")
+    lines.append("")
+    lines.append("This document provides a continuous accessibility compliance evaluation across Apple (iOS/iPadOS/macOS) and Google (Android) mobile applications. The report evaluates strict compliance against harmonised accessibility standards including EN 301 549, WCAG 2.1 Level AA, European Accessibility Act (EAA Directive 2019/882), US ADA Title II/III, Section 504, Apple App Store Guidelines, and Google Play Accessibility Policies.")
+    lines.append("")
+    lines.append("### Audit Overview")
+    lines.append(f"- **Target Directory**: `{directory}`")
+    lines.append(f"- **Scanned Files**: {len(ios_files)} iOS/Apple source files, {len(android_files)} Android source files")
+    lines.append(f"- **Total Findings**: {len(findings)} (Critical: {crit}, High: {high}, Medium: {med}, Low: {low})")
+    lines.append(f"- **Audit Status**: {'PASS (No Regressions Found)' if len(findings) == 0 else 'ACTION REQUIRED (Regressions Identified)'}")
+    lines.append("")
+
+    lines.append("## Evaluated Accessibility Rules & Requirements")
+    lines.append("")
+    lines.append("### Apple Platform Requirements")
+    lines.append("1. **VoiceOver (`APPLE-ACCESSIBILITY-VOICEOVER`)**")
+    lines.append("   - All informative images and interactive elements must provide meaningful accessibility labels, hints, and traits.")
+    lines.append("   - Decorative elements must be explicitly marked as decorative or hidden from VoiceOver accessibility tree.")
+    lines.append("2. **Dynamic Type (`APPLE-ACCESSIBILITY-DYNAMICTYPE`)**")
+    lines.append("   - Hardcoded font sizes are prohibited. Apps must utilize `UIFont.preferredFont(forTextStyle:)` with `adjustsFontForContentSizeCategory = true` in UIKit or relative font styles (e.g., `.font(.body)`) in SwiftUI.")
+    lines.append("3. **Reduce Motion (`APPLE-ACCESSIBILITY-REDUCEMOTION`)**")
+    lines.append("   - Non-essential UI transitions and custom animations must check `UIAccessibility.isReduceMotionEnabled` or SwiftUI `@Environment(\\.accessibilityReduceMotion)` to simplify or disable motion.")
+    lines.append("4. **Color Contrast (`APPLE-ACCESSIBILITY-COLORCONTRAST`)**")
+    lines.append("   - Static hex or RGB colors that fail contrast minimums are prohibited. Layouts must use adaptive system/asset colors and respect `UIAccessibility.isDarkerSystemColorsEnabled`.")
+    lines.append("5. **Haptics (`APPLE-ACCESSIBILITY-HAPTICS`)**")
+    lines.append("   - Custom interactive controls, buttons, and gesture triggers must incorporate tactile feedback using `UIImpactFeedbackGenerator` or `UISelectionFeedbackGenerator`.")
+    lines.append("6. **Keyboard Navigation (`APPLE-ACCESSIBILITY-KEYBOARD`)**")
+    lines.append("   - Physical keyboard navigation must be supported with focus tracking (`@FocusState` in SwiftUI, `keyCommands` in UIKit) and visible focus indicators.")
+    lines.append("")
+
+    lines.append("### Android Platform Requirements")
+    lines.append("1. **TalkBack (`ANDROID-ACCESSIBILITY-TALKBACK`)**")
+    lines.append("   - Informative `ImageView` elements in XML and Jetpack Compose `Image` composables must specify descriptive `contentDescription` attributes or set `importantForAccessibility=\"no\"` for decorative images.")
+    lines.append("2. **Font Scaling (`ANDROID-ACCESSIBILITY-FONTSCALING`)**")
+    lines.append("   - Text dimensions must be specified in scale-independent pixels (`sp`) rather than density-independent pixels (`dp`) or hardcoded pixel values.")
+    lines.append("3. **High Contrast (`ANDROID-ACCESSIBILITY-HIGHCONTRAST`)**")
+    lines.append("   - Hardcoded hex color codes on text and backgrounds must be avoided in favor of dynamic theme attributes (`?attr/colorOnSurface`, `MaterialTheme.colorScheme`).")
+    lines.append("4. **Accessibility Scanner Recommendations (`ANDROID-ACCESSIBILITY-SCANNER`)**")
+    lines.append("   - Interactive touch targets must meet or exceed the minimum 48dp x 48dp touch target size requirement.")
+    lines.append("")
+
+    lines.append("## Audit Findings & Regressions")
+    lines.append("")
+    if not findings:
+        lines.append("No accessibility compliance regressions or violations were detected in the target directory.")
+        lines.append("")
+    else:
+        lines.append("| Severity | Rule ID | Location | Details | Recommended Fix |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for f in findings:
+            meta = RULE_META[f["rule_id"]]
+            sev = meta["severity"].upper()
+            loc = f"{f['file']}:{f['line']}"
+            msg = f['message'].replace("|", "\\|")
+            fix = f['fix'].replace("|", "\\|")
+            lines.append(f"| {sev} | `{f['rule_id']}` | `{loc}` | {msg} | {fix} |")
+        lines.append("")
+
+    lines.append("## Recommended Accessibility Improvements")
+    lines.append("")
+    lines.append("### Apple iOS / iPadOS Guidance")
+    lines.append("- Ensure all custom view components set `isAccessibilityElement = true` and define `accessibilityLabel` and `accessibilityHint`.")
+    lines.append("- Test layouts with Maximum Dynamic Type sizes under Settings > Accessibility > Display & Text Size > Larger Text.")
+    lines.append("- Audit UI transitions with Reduce Motion enabled under Settings > Accessibility > Motion.")
+    lines.append("- Maintain a minimum color contrast ratio of 4.5:1 for standard text and 3:1 for large text across light and dark modes.")
+    lines.append("- Verify keyboard navigation flow using hardware keyboard or iOS Simulator Key Commands.")
+    lines.append("")
+    lines.append("### Android Guidance")
+    lines.append("- Run Google Accessibility Scanner on release build candidates to catch touch target or contrast regressions.")
+    lines.append("- Verify TalkBack screen reader navigation across all key screen flows.")
+    lines.append("- Test layouts under Android Display & Text Size settings with maximum font scale (up to 200%).")
+    lines.append("- Utilize Material 3 dynamic color schemes and semantic color tokens (`colorOnSurface`, `colorPrimary`).")
+    lines.append("- Enforce minWidth and minHeight of 48dp on all clickable views or compose Modifier parameters.")
+    lines.append("")
+
+    lines.append("## Regulatory Standards Alignment")
+    lines.append("- **European Accessibility Act (EAA)**: Directive (EU) 2019/882 and harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA.")
+    lines.append("- **US ADA Title II & Title III**: 28 CFR Part 35 Subpart H (WCAG 2.1 AA conformance for web and mobile apps).")
+    lines.append("- **HHS Section 504**: 45 CFR 84.84(b) mobile app accessibility requirements for healthcare and financial assistance recipients.")
+    lines.append("- **Apple App Store Policy**: Guideline 2.3 metadata requirements and Accessibility Nutrition Labels.")
+    lines.append("- **Google Play Policy**: BIND_ACCESSIBILITY_SERVICE policy restrictions and Accessibility target sizing enforcement.")
+    lines.append("")
+
+    report_dir = os.path.dirname(os.path.abspath(report_path))
+    if report_dir:
+        os.makedirs(report_dir, exist_ok=True)
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to write the Markdown accessibility report.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -438,6 +536,10 @@ def main():
 
     # Sort findings by rule ID and file path
     all_findings.sort(key=lambda x: (x["rule_id"], x["file"], x["line"]))
+
+    if args.report_out:
+        generate_markdown_report(args.directory, ios_files, android_files, all_findings, args.report_out)
+        print(f"Report generated at {args.report_out}")
 
     print("== Accessibility Compliance Audit ==")
     print(f"Audited directory. {args.directory}")
