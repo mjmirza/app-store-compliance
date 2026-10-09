@@ -11,17 +11,33 @@ https://yourdomain.com/.well-known/assetlinks.json
 https://randomblogsite.com/gdpr-rumor
 
 # Gauntlet fixtures for verify-citations.py itself. Must stay broken to test the gate.
+http://127.0.0.1:9/none.rss
+https://example.org/docs/NOPE.md
 https://support.google.com/googleplay/android-developer/answer/datasafety
 https://developer.apple.com/news/?id=required-reason-apis
 
 # Real government site that refuses all automated clients (geo/bot filtered).
 https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions
+https://egazette.gov.in
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+https://www.ftc.gov/business-guidance/blog/2026/05/take-it-down-act-enforcement-starts-now-what-know-about-ftc-tida
+https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions
+https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa
+https://www.ftc.gov/legal-library/browse/rules/negative-option-rule
+https://www.ftc.gov/news-events/news/press-releases/2024/04/ftc-finalizes-changes-health-breach-notification-rule
+https://www.ftc.gov/news-events/news/press-releases/2025/01/ftc-finalizes-changes-childrens-privacy-rule-limiting-companies-ability-monetize-kids-data
+https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children
+https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-seeks-public-comment-response-advance-notice-proposed-rulemaking-regarding-negative-option
 
 # Fixture app domain used by metadata-audit-test.sh.
 https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+https://developer.apple.com/support/privacy-manifest-files
+https://developer.apple.com/app-store/review/guidelines/
+https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
 
 # Mock RSS fixtures in scripts/monitor-ai-policy-test.sh. Never cited as fact.
 https://developer.apple.com/news/?id=ai_test_2026
@@ -39,13 +55,14 @@ https://example.com/x
 https://kiosk.example.io/privacy-policy
 https://realbackend.io/privacy-policy
 https://staging.example.com
+https://staging.example.com/api
 https://app.com/privacy-policy
 https://prod.app.com
 
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
 
-# Official government sources that block automated citation checks (recovered from closed PR 440, junk entries excluded)
+# Official government sources that block automated citation checks
 https://cppa.ca.gov/
 https://cppa.ca.gov/regulations/ccpa_updates.html
 https://digital-strategy.ec.europa.eu/en/policies/eu-age-verification
