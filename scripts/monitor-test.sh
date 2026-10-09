@@ -41,10 +41,17 @@ printf "import SwiftUI\nlet swiftVersion = 6.0\nTask { @MainActor in print(\"asy
 OUT_SCAN="$($MONITOR --project "$T" --simulate "Swift requirements" 2>&1)"
 echo "$OUT_SCAN" | grep -q "Sources/App.swift" && ok "repo scanner correctly identifies affected source file" || bad "repo scanner affected file"
 
+# 5. Output docs and PR output verification
+DOCS_FILE="$T/apple_docs.md"
+PR_FILE="$T/apple_pr.md"
+$MONITOR --project "$T" --simulate "Privacy Manifests" --output-docs "$DOCS_FILE" --pr-output "$PR_FILE" >/dev/null 2>&1
+[ -f "$DOCS_FILE" ] && grep -q "Apple Developer Requirements Migration & Policy Report" "$DOCS_FILE" && ok "documentation report output generated successfully" || bad "documentation report output"
+[ -f "$PR_FILE" ] && grep -q "## 1\. Summary" "$PR_FILE" && grep -q "## 15\. Approver recommendations" "$PR_FILE" && ok "PR draft output generated successfully with 15 sections" || bad "PR draft output"
+
 # Clean up
 rm -rf "$T"
 
-# 5. The proposed pull request carries sections numbered 1 to 15, in order
+# 6. The proposed pull request carries sections numbered 1 to 15, in order
 echo "$JSON_OUT" | python3 -c "
 import sys, json, re
 body = json.load(sys.stdin)[0]['proposed_pull_request']['description']
@@ -52,7 +59,7 @@ nums = [int(n) for n in re.findall(r'^## (\d+)\. ', body, re.M)]
 assert nums == list(range(1, 16)), nums
 " 2>/dev/null && ok "proposed pull request has sections 1 to 15 in order" || bad "numbered PR sections"
 
-# 6. Mock announcements fallback or manual trigger
+# 7. Mock announcements fallback or manual trigger
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
