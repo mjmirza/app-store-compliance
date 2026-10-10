@@ -444,6 +444,24 @@ else
   bad "Failed to flag ANDROID-ACCESSIBILITY-SCANNER"
 fi
 
+# Test 3: Report generation with --report-out
+COMPLIANT_REPORT="$COMPLIANT_DIR/report.md"
+REGRESSION_REPORT="$REGRESSION_DIR/report.md"
+
+$AUDIT "$COMPLIANT_DIR" --report-out "$COMPLIANT_REPORT" >/dev/null 2>&1
+if [ -f "$COMPLIANT_REPORT" ] && grep -q "# Continuous Accessibility Compliance Audit Report" "$COMPLIANT_REPORT"; then
+  ok "Generated report for compliant directory"
+else
+  bad "Failed to generate report for compliant directory"
+fi
+
+$AUDIT "$REGRESSION_DIR" --report-out "$REGRESSION_REPORT" >/dev/null 2>&1
+if [ -f "$REGRESSION_REPORT" ] && grep -q "REGRESSION DETECTED" "$REGRESSION_REPORT"; then
+  ok "Generated report for regression directory containing findings"
+else
+  bad "Failed to generate report for regression directory with findings"
+fi
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
