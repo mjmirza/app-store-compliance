@@ -73,6 +73,13 @@ echo "$ERR" | grep -q "sample announcements" && ok "a failed live fetch says the
 APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>/dev/null | python3 -c 'import json,sys; json.load(sys.stdin)' && ok "--json stays valid when the fetch fails" || bad "--json stays valid when the fetch fails"
 rm -rf "$T"
 
+# 7. Verification of --output-docs and --pr-output file generation
+T="$(mktemp -d)"
+$MONITOR --simulate "all" --output-docs "$T/docs.md" --pr-output "$T/pr.md" >/dev/null 2>&1
+[ -s "$T/docs.md" ] && grep -q "<!-- APPLE_POLICY_MONITOR_START -->" "$T/docs.md" && ok "--output-docs generates Apple migration report file" || bad "--output-docs generation"
+[ -s "$T/pr.md" ] && grep -q "## 15. Approver recommendations" "$T/pr.md" && ok "--pr-output generates combined 15-section PR draft" || bad "--pr-output generation"
+rm -rf "$T"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
