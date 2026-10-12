@@ -122,7 +122,7 @@ This report is continuously generated and updated by `scripts/monitor-security.p
 
 ### Tasks for root detection
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for root detection are checked and handled.
+- [ ] **Task 1**: Implement Play Integrity API attestation and perform server-side token validation.
 
 ### Tasks for Keychain
 - **Regulatory Impact**: High priority. Security audit mandates action.
@@ -138,50 +138,50 @@ This report is continuously generated and updated by `scripts/monitor-security.p
 
 ### Tasks for certificate pinning
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml.
+- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml and NSPinnedDomains in Info.plist.
 
 ### Tasks for jailbreak detection
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for jailbreak detection are checked and handled.
+- [ ] **Task 1**: Audit dyld dynamic library loading, sandbox write paths, and symlink integrity on iOS.
 
 ### Tasks for SSL configuration
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for SSL configuration are checked and handled.
+- [ ] **Task 1**: Disable cleartext traffic in AndroidManifest.xml and verify ATS settings in Info.plist.
 
 ### Tasks for backup rules
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for backup rules are checked and handled.
+- [ ] **Task 1**: Configure dataExtractionRules in AndroidManifest.xml and set isExcludedFromBackup on iOS files.
 
 ### Tasks for exported activities
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for exported activities are checked and handled.
+- [ ] **Task 1**: Audit AndroidManifest.xml and explicitly set android:exported="false" on non-launcher activities.
 
 ### Tasks for intent filters
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for intent filters are checked and handled.
+- [ ] **Task 1**: Audit implicit intent filters and require signature-level custom permissions for external components.
 
 ### Tasks for deep links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for deep links are checked and handled.
+- [ ] **Task 1**: Sanitize and validate all incoming URL parameters against injection vulnerabilities.
 
 ### Tasks for universal links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for universal links are checked and handled.
+- [ ] **Task 1**: Verify apple-app-site-association hosting and Associated Domains entitlement.
 
 ### Tasks for app links
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for app links are checked and handled.
+- [ ] **Task 1**: Deploy assetlinks.json with certificate fingerprints and add autoVerify="true" to intent filters.
 
 ### Tasks for authentication flows
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for authentication flows are checked and handled.
+- [ ] **Task 1**: Enforce OAuth 2.1 with PKCE using secure system browser custom tabs.
 
 ### Tasks for session handling
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for session handling are checked and handled.
+- [ ] **Task 1**: Enforce server-side session invalidation on logout and apply UI snapshot blurring on background.
 
 ### Tasks for token storage
 - **Regulatory Impact**: High priority. Security audit mandates action.
-- [ ] **Task**: Verify that all security criteria for token storage are checked and handled.
+- [ ] **Task 1**: Store access and refresh tokens exclusively in hardware-backed Keychain or EncryptedSharedPreferences.
 
 <!-- SECURITY_POLICY_MONITOR_END -->

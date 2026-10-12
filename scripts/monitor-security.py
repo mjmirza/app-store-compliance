@@ -899,7 +899,55 @@ def update_documentation_report(updates, output_filepath, is_simulated=False):
             )
         elif cat == "certificate pinning":
             lines.append(
-                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml."
+                "- [ ] **Task 1**: Populate SPKI pins inside network_security_config.xml and NSPinnedDomains in Info.plist."
+            )
+        elif cat == "jailbreak detection":
+            lines.append(
+                "- [ ] **Task 1**: Audit dyld dynamic library loading, sandbox write paths, and symlink integrity on iOS."
+            )
+        elif cat == "root detection":
+            lines.append(
+                "- [ ] **Task 1**: Implement Play Integrity API attestation and perform server-side token validation."
+            )
+        elif cat == "SSL configuration":
+            lines.append(
+                "- [ ] **Task 1**: Disable cleartext traffic in AndroidManifest.xml and verify ATS settings in Info.plist."
+            )
+        elif cat == "backup rules":
+            lines.append(
+                "- [ ] **Task 1**: Configure dataExtractionRules in AndroidManifest.xml and set isExcludedFromBackup on iOS files."
+            )
+        elif cat == "exported activities":
+            lines.append(
+                "- [ ] **Task 1**: Audit AndroidManifest.xml and explicitly set android:exported=\"false\" on non-launcher activities."
+            )
+        elif cat == "intent filters":
+            lines.append(
+                "- [ ] **Task 1**: Audit implicit intent filters and require signature-level custom permissions for external components."
+            )
+        elif cat == "deep links":
+            lines.append(
+                "- [ ] **Task 1**: Sanitize and validate all incoming URL parameters against injection vulnerabilities."
+            )
+        elif cat == "universal links":
+            lines.append(
+                "- [ ] **Task 1**: Verify apple-app-site-association hosting and Associated Domains entitlement."
+            )
+        elif cat == "app links":
+            lines.append(
+                "- [ ] **Task 1**: Deploy assetlinks.json with certificate fingerprints and add autoVerify=\"true\" to intent filters."
+            )
+        elif cat == "authentication flows":
+            lines.append(
+                "- [ ] **Task 1**: Enforce OAuth 2.1 with PKCE using secure system browser custom tabs."
+            )
+        elif cat == "session handling":
+            lines.append(
+                "- [ ] **Task 1**: Enforce server-side session invalidation on logout and apply UI snapshot blurring on background."
+            )
+        elif cat == "token storage":
+            lines.append(
+                "- [ ] **Task 1**: Store access and refresh tokens exclusively in hardware-backed Keychain or EncryptedSharedPreferences."
             )
         else:
             lines.append(
