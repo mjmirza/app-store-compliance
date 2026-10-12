@@ -22,12 +22,14 @@ https://lumina.app/privacy
 
 # Real landing page flagged as fabricated due to Apple's soft-404 behavior.
 https://developer.apple.com/news/
+https://developer.apple.com/news/upcoming-requirements/
 
 # Mock RSS fixtures in scripts/monitor-ai-policy-test.sh. Never cited as fact.
 https://developer.apple.com/news/?id=ai_test_2026
 https://developer.apple.com/news/?id=arcade_spring
 
 # Fixture app and backend URLs used as inputs by agent-os/hooks/app-store-compliance-guard-test.sh. Never cited as fact.
+http://127.0.0.1:9/none.rss
 http://localhost:54321/auth/v1
 http://localhost:8080
 http://localhost:8787
@@ -36,11 +38,23 @@ https://acme.example.io/.well-known/apple-app-site-association
 https://api.realbackend.io
 https://child.example.io/privacy-policy
 https://example.com/x
+https://example.org/docs/NOPE.md
 https://kiosk.example.io/privacy-policy
 https://realbackend.io/privacy-policy
 https://staging.example.com
+https://staging.example.com/api
 https://app.com/privacy-policy
 https://prod.app.com
+
+# Utah State Legislature and FTC URLs allowlisted for bot-blocking / soft-404 / 2026 future links
+https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf
+https://le.utah.gov/~2025/bills/static/SB0142.html
+https://www.ftc.gov/business-guidance/blog/2026/05/take-it-down-act-enforcement-starts-now-what-know-about-ftc-tida
+https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions
+https://www.ftc.gov/news-events/news/press-releases/2024/04/ftc-finalizes-changes-health-breach-notification-rule
+https://www.ftc.gov/news-events/news/press-releases/2025/01/ftc-finalizes-changes-childrens-privacy-rule-limiting-companies-ability-monetize-kids-data
+https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children
+https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-seeks-public-comment-response-advance-notice-proposed-rulemaking-regarding-negative-option
 
 # Real GitHub page that returns 404 to logged-out clients (README stars badge link).
 https://github.com/mjmirza/app-store-compliance/stargazers
