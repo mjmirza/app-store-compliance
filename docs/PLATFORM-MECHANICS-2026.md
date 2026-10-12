@@ -175,7 +175,7 @@ Verify the in-app delete flow deletes data (not deactivate), and that a publicly
 
 ### 3.5 OFAC sanctions and embargoed-territory availability (LEGAL)
 
-US sanctions prohibit providing goods or services to blocked persons and embargoed territories. Apple itself settled with OFAC for 466,912 dollars in 2019 for hosting a blocked developer's apps, and 2025 reporting found sanctioned-linked apps slipping into both stores, so the developer's own compliance still matters. Verify the developer or entity is not on the OFAC SDN list, and the app's country availability in App Store Connect and Play Console excludes the embargoed territories (Cuba, Iran, North Korea, Syria, and the sanctioned regions of Ukraine). Source. [TTP on sanctioned apps in the stores](https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores).
+US sanctions prohibit providing goods or services to blocked persons and embargoed territories. Apple itself settled with OFAC for 466,912 dollars in 2019 for hosting a blocked developer's apps, and 2025 reporting found sanctioned-linked apps slipping into both stores, so the developer's own compliance still matters. Verify the developer or entity is not on the OFAC SDN list, and the app's country availability in App Store Connect and Play Console excludes the embargoed territories (Cuba, Iran, North Korea, and the sanctioned regions of Ukraine). Source. [TTP on sanctioned apps in the stores](https://www.techtransparencyproject.org/articles/u.s.-sanctioned-firms-find-opening-in-apple-and-google-app-stores).
 
 ### 3.6 ADA Title III accessibility litigation (LEGAL, US)
 
