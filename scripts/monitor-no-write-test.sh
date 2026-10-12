@@ -7,7 +7,7 @@ ok()  { PASS=$((PASS+1)); printf 'PASS  %s\n' "$1"; }
 bad() { FAIL=$((FAIL+1)); printf 'FAIL  %s\n' "$1"; }
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
-for m in regulatory android ai-policy privacy security; do
+for m in regulatory android ai-policy privacy security standards; do
   W="$T/$m"; mkdir -p "$W/app"; cd "$W" || exit 1
   flag="--dir"; [ "$m" = "regulatory" ] && flag="--project"
   OUT="$(python3 "$REPO/scripts/monitor-$m.py" "$flag" app 2>&1)"; RC=$?
@@ -25,7 +25,7 @@ done
 cd "$T/regulatory" || exit 1
 python3 "$REPO/scripts/monitor-regulatory.py" --project app --json 2>"$T/err.txt" | python3 -c 'import json,sys; json.load(sys.stdin)' \
   && grep -qE '^Data\. sample ' "$T/err.txt" && ok "regulatory json stays parseable and the data line goes to stderr" || bad "regulatory json stays parseable and the data line goes to stderr"
-for m in privacy security; do
+for m in privacy security standards; do
   cd "$T/$m" || exit 1
   python3 "$REPO/scripts/monitor-$m.py" --dir app --pr-output "$T/$m/pr/draft.md" >/dev/null 2>&1
   [ -s "$T/$m/pr/draft.md" ] && ok "$m writes the PR draft when its flag is passed" || bad "$m writes the PR draft when its flag is passed"
