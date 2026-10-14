@@ -735,13 +735,13 @@ def main():
     parser.add_argument(
         "--output-docs",
         type=str,
-        default="docs/STANDARDS-POLICY-MIGRATION.md",
+        default=None,
         help="Filepath to write migration tasks and logs",
     )
     parser.add_argument(
         "--pr-output",
         type=str,
-        default="docs/STANDARDS_COMPLIANCE_PR_DRAFT.md",
+        default=None,
         help="Filepath to save the drafted PR",
     )
     parser.add_argument(
@@ -811,6 +811,8 @@ def main():
     if args.output_docs:
         os.makedirs(os.path.dirname(args.output_docs) or ".", exist_ok=True)
         update_documentation_report(classified_updates, args.output_docs, is_simulated=used_mock)
+    else:
+        print("No file written. Pass --output-docs <path> to save this report.")
 
     pr_draft = generate_pull_request_draft(verified_updates, scan_results)
     if used_mock:
@@ -824,6 +826,8 @@ def main():
             print(f"PR draft written successfully to: {args.pr_output}")
         except Exception as e:
             print(f"Failed to write PR draft to {args.pr_output}: {e}", file=sys.stderr)
+    else:
+        print("No PR draft written. Pass --pr-output <path> to save it.")
 
     if args.json:
         report_data = []
