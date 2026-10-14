@@ -56,6 +56,15 @@ assert nums == list(range(1, 16)), nums
 OUT_MOCK="$($MONITOR --mock 2>&1)"
 echo "$OUT_MOCK" | grep -q "TRACK UPDATE: \[Privacy Manifests\]" && ok "mock announcements fallback runs and matches tracks" || bad "mock announcements"
 
+# 7. Verification of --output-docs and --pr-output CLI arguments
+T_DOCS=$(mktemp -d)
+DOCS_FILE="$T_DOCS/APPLE-POLICY-MIGRATION.md"
+PR_FILE="$T_DOCS/APPLE_COMPLIANCE_PR_DRAFT.md"
+$MONITOR --simulate "Privacy Manifests" --output-docs "$DOCS_FILE" --pr-output "$PR_FILE" >/dev/null 2>&1
+[ -f "$DOCS_FILE" ] && grep -q "Apple Developer Requirements Policy Migration & Report" "$DOCS_FILE" && ok "--output-docs creates policy migration report" || bad "--output-docs output file"
+[ -f "$PR_FILE" ] && grep -q "## 1\. Summary" "$PR_FILE" && ok "--pr-output creates 15-section compliance PR draft" || bad "--pr-output output file"
+rm -rf "$T_DOCS"
+
 # A long live report is cut to a readable first screen. --full prints every item.
 T="$(mktemp -d)"
 python3 -c 'import json,sys; json.dump([{"title":"Privacy manifest update %d" % i,"description":"Changes to privacy manifests and required reason APIs.","pubDate":"Mon, 01 Sep 2026 10:00:00 PDT","link":"https://mock.invalid/n/%d" % i} for i in range(40)], open(sys.argv[1],"w"))' "$T/news.json"
