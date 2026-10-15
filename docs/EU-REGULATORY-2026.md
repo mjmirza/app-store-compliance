@@ -91,7 +91,7 @@ On 18 August 2026 Apple announced updated business terms for apps in the EU, eff
 - Initial Acquisition Fee and Store Services Fee. Eliminated on 1 October 2026.
 - Alternative payments. Apps may offer alternative payment options alongside Apple In-App Purchase on the App Store.
 - Marketplace and Web Distribution eligibility. From 1 October 2026 a developer meeting at least one of seven alternative criteria may operate an alternative app marketplace, including a stand-by letter of credit of USD 1,000,000 or one million first annual installs worldwide.
-- Attachment 14. Must be accepted in App Store Connect by the Account Holder, or new EU submissions under the new terms are blocked.
+- Attachment 14. The Account Holder accepts it in the Apple Developer account. Accepting it moves the account to the unified EU business terms and unlocks the alternative payment entitlement and the alternative distribution tools in App Store Connect. Apple's pages read on 15 October 2026 do not say submissions are blocked without it.
 
 Rule for a compliance tool. verify the Account Holder has accepted Attachment 14, and re-check Apple's live page before encoding any fee number. Sources. [Apple, updated business terms for apps in the EU, 18 August 2026](https://developer.apple.com/news/?id=gmws0jgp), [Apple, Attachment 14 added to the ADPLA](https://developer.apple.com/news/?id=0cgo95n6), [Apple DMA and apps in the EU](https://developer.apple.com/support/dma-and-apps-in-the-eu/).
 
