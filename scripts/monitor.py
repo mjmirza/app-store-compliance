@@ -130,7 +130,7 @@ TRACK_METADATA = {
         "release_impact": "Critical",
     },
     "App Tracking Transparency": {
-        "keywords": ["app tracking transparency", "att", "idfa", "user tracking"],
+        "keywords": ["app tracking transparency", "att", "idfa", "user tracking", "attrackingmanager", "requesttrackingauthorization"],
         "patterns": [
             r"app[ -]tracking[ -]transparency",
             r"att",
@@ -669,7 +669,7 @@ def scan_target_repo(repo_path, track_name, metadata):
 
 def strip_html(text):
     """Feed descriptions carry HTML. Match on the visible text only."""
-    text = re.sub(r"<[^>]+>", " ", text or "")
+    text = re.sub(r"<[^<>]*>", " ", text or "")
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 

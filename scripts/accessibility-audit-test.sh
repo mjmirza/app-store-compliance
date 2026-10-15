@@ -519,6 +519,29 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_bad3" "$ISSUE_DIR/lexer_clean2"
+cat << 'EOF' > "$ISSUE_DIR/icon_bad3/Nested.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: { confirm(title: "Delete?") }) {
+            Image(systemName: "trash")
+        }
+        Button(action: { log(label: { Text("log") }) }) { Image(systemName: "gear") }
+        Button(action: {}) { Image(systemName: "xmark") }.accessibilityHidden(isLoading == true)
+    }
+}
+EOF
+
+cat << 'EOF' > "$ISSUE_DIR/lexer_clean2/Interp.swift"
+import SwiftUI
+let a = "Value \(f("Button(action: {}) { Image(systemName: icon) }"))"
+let b = #"before \#"# Button(action: {}) { Image(systemName: "trash") } after"#
+struct V: View {
+    var body: some View { Text(a + b).font(.body) }
+}
+EOF
+
 python3 - "$ISSUE_DIR/big/Big.swift" << 'PY'
 import sys
 block = 'struct V%d: View {\n    var body: some View {\n        Button(action: {}) { Image(systemName: "trash") }\n    }\n}\n'
@@ -526,6 +549,20 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_bad3" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 3 ]; then
+  ok "#834 a title or label inside the action, or conditional hiding, does not hide an icon button"
+else
+  bad "#834 an action argument or conditional hiding suppressed an icon button. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/lexer_clean2" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 buttons inside string interpolation and escaped raw strings are not flagged"
+else
+  bad "#834 flagged a button inside interpolation or an escaped raw string. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_bad2" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 3 ]; then
@@ -541,13 +578,15 @@ else
   bad "#834 flagged a button that only exists in a comment or string. Output:"; echo "$OUT"
 fi
 
+BUDGET="${A11Y_PERF_BUDGET:-10}"
 START=$(python3 -c 'import time; print(time.time())')
-$AUDIT "$ISSUE_DIR/big" --rule APPLE-ACCESSIBILITY-VOICEOVER >/dev/null 2>&1
+BIG_OUT=$($AUDIT "$ISSUE_DIR/big" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); BIG_RC=$?
 ELAPSED=$(python3 -c "import time; print(round(time.time() - $START, 2))")
-if python3 -c "import sys; sys.exit(0 if $ELAPSED < 4 else 1)"; then
-  ok "#834 a 1.5 MB Swift file with 16000 buttons scans in under 4 seconds (${ELAPSED}s)"
+BIG_COUNT=$(echo "$BIG_OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")
+if [ "$BIG_RC" -eq 0 ] && [ "$BIG_COUNT" -eq 16000 ] && python3 -c "import sys; sys.exit(0 if $ELAPSED < $BUDGET else 1)"; then
+  ok "#834 a 1.5 MB Swift file reports all 16000 buttons in under ${BUDGET}s (${ELAPSED}s)"
 else
-  bad "#834 large file scan is too slow (${ELAPSED}s)"
+  bad "#834 large file scan failed, missed buttons, or ran over ${BUDGET}s (rc=$BIG_RC count=$BIG_COUNT ${ELAPSED}s)"
 fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_bad" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)

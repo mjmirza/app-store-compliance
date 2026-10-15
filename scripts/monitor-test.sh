@@ -73,6 +73,23 @@ echo "$ERR" | grep -q "sample announcements" && ok "a failed live fetch says the
 APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>/dev/null | python3 -c 'import json,sys; json.load(sys.stdin)' && ok "--json stays valid when the fetch fails" || bad "--json stays valid when the fetch fails"
 rm -rf "$T"
 
+# A feed full of unmatched angle brackets must not make tag stripping quadratic.
+python3 - "$HERE" <<'PY' && ok "HTML stripping stays linear on unmatched angle brackets" || bad "HTML stripping stays linear on unmatched angle brackets"
+import importlib.util, os, sys, time
+d = sys.argv[1]
+def load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+mon = load("mon", os.path.join(d, "monitor.py"))
+ai = load("ai", os.path.join(d, "monitor-ai-policy.py"))
+for fn in (mon.strip_html, ai.clean_html_text):
+    t = time.time()
+    fn("<" * 200000)
+    assert time.time() - t < 1.0, fn.__name__
+    assert fn("<p>a</p> <b>b</b>") == "a b"
+PY
 # Issue 833. Keywords match whole words on the visible text, not substrings of HTML.
 T="$(mktemp -d)"
 python3 - "$T/news.json" <<'PY'
@@ -85,6 +102,7 @@ items = [
     ("Updated review guidelines", "<p>The App Review Guidelines have changed.</p>"),
     ("Patched vulnerabilities", "<p>Several vulnerabilities are fixed in this release.</p>"),
     ("In-app purchasing changes", "<p>New rules for in-app purchasing.</p>"),
+    ("Tracking API", "<p>ATTrackingManager authorization changes.</p>"),
     ("Camera key", "<p>Update NSCameraUsageDescription strings.</p>"),
     ("Location API", "<p>CLLocationManager authorization changes.</p>"),
     ("StoreKit2 update", "<p>New StoreKit2 APIs.</p>"),
@@ -106,6 +124,7 @@ assert lic in by.get("SLA update", set()), by
 assert "App Store Review Guidelines" in by.get("Updated review guidelines", set()), by
 assert "Security updates" in by.get("Patched vulnerabilities", set()), by
 assert "In-App Purchase policies" in by.get("In-app purchasing changes", set()), by
+assert "App Tracking Transparency" in by.get("Tracking API", set()), by
 assert "Camera and microphone permissions" in by.get("Camera key", set()), by
 assert "Location permissions" in by.get("Location API", set()), by
 assert "In-App Purchase policies" in by.get("StoreKit2 update", set()), by

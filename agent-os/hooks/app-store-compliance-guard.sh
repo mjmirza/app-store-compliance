@@ -885,10 +885,16 @@ dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
   [ -f "$t/package.json" ] && { [ -d "$t/ios" ] || [ -d "$t/android" ]; } && rn_dependency "$t/package.json" && return 0
   for f in "$t"/build.gradle "$t"/build.gradle.kts; do [ -f "$f" ] && grep -qE 'com\.android\.application|android\.application' "$f" 2>/dev/null && return 0; done
   for f in "$t"/ios "$t"/android; do [ -d "$f" ] && native_dir_has_project "$f" && return 0; done
+  # Unity, .NET MAUI, Tauri, Cordova and Capacitor, the same signals scan_tree reads
+  [ -f "$t/ProjectSettings/ProjectVersion.txt" ] && return 0
+  for f in "$t"/*.csproj; do [ -f "$f" ] && grep -qE '<UseMaui>[[:space:]]*true|net[0-9.]+-(ios|android|maccatalyst)' "$f" 2>/dev/null && return 0; done
+  for f in "$t"/tauri.conf.json "$t"/tauri.conf.json5 "$t"/Tauri.toml "$t"/src-tauri/tauri.conf.json "$t"/src-tauri/tauri.conf.json5 "$t"/src-tauri/Tauri.toml; do [ -f "$f" ] && return 0; done
+  [ -f "$t/config.xml" ] && grep -qE '<widget|xmlns:cdv' "$t/config.xml" 2>/dev/null && return 0
+  [ -f "$t/package.json" ] && grep -qE '"@capacitor/core"|"cordova-(ios|android)"' "$t/package.json" 2>/dev/null && return 0
   return 1
 }
 app_roots() {  # prints the roots, one per line, only when two or more distinct apps exist. the project root itself may be one of them
-  local m d r k keep=() atroot=0 ROOT_REAL
+  local m d r k t keep=() atroot=0 ROOT_REAL nl=$'\n' seen=$'\n'
   ROOT_REAL="$(cd "$DIR" 2>/dev/null && pwd -P)" || ROOT_REAL="${DIR%/}"
   {
     find_app 12 -name 'app.json' -o -name 'app.config.js' -o -name 'app.config.ts' -o -name 'app.config.mjs' -o -name 'app.config.cjs' \
@@ -917,7 +923,11 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
     while IFS= read -r r; do
       [ "${r%/}" = "${DIR%/}" ] && { atroot=1; continue; }
       # A linked app is never inside another root's scan, find does not descend it, so it is always its own root.
-      if [ ! -L "${r%/}" ]; then
+      if [ -L "${r%/}" ]; then
+        t="$(cd "$r" 2>/dev/null && pwd -P)" || continue
+        case "$seen" in *"$nl$t$nl"*) continue ;; esac   # two links to one app scan it once, even with spaces in a path
+        seen="$seen$t$nl"
+      else
         for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
         [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue
       fi

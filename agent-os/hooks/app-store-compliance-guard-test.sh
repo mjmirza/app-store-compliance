@@ -1616,6 +1616,18 @@ ln -s "$EXT" "$D/apps/linked"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q '^CLEAR\.' && ! echo "$OUT" | grep -q 'NOT CHECKED' && [ "$RC" -eq 0 ] && ok "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED" || bad "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED (rc=$RC)"
 rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; U="$(mktemp -d)"; mkdir -p "$D/apps" "$U/ProjectSettings" "$U/Assets"
+printf 'm_EditorVersion: 6000.0.1f1\n' > "$U/ProjectSettings/ProjectVersion.txt"
+printf 'using UnityEngine;\nclass A { void S(){ var u="https://staging.example.com"; } }\n' > "$U/Assets/A.cs"
+ln -s "$U" "$D/apps/game"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/apps/game$" && ok "657-6 a linked Unity project is followed like any other app" || bad "657-6 a linked Unity project is followed like any other app (rc=$RC)"
+rm -rf "$D" "$U"
+D="$(mktemp -d)"; EXT="$(mk_ios_bad)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/one"; ln -s "$EXT" "$D/apps/two"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -cE "^App\. $D/apps/(one|two)$")" -eq 1 ] && [ "$RC" -eq 2 ] && ok "657-7 two links to one app scan it once" || bad "657-7 two links to one app scan it once (rc=$RC sections=$(echo "$OUT" | grep -cE '^App\. '))"
+rm -rf "$D" "$EXT"
 # links that point back into the tree, above it, or at themselves must not hang the scan or become apps
 D="$(mk_ios_bad)"; mkdir -p "$D/apps/a"
 ln -s "$D" "$D/apps/a/up"; ln -s . "$D/apps/here"; ln -s loop "$D/apps/loop"; ln -s "$(dirname "$D")" "$D/apps/parent"
