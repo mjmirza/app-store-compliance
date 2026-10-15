@@ -9,6 +9,16 @@ import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
+import html
+
+
+def clean_html_text(raw_text):
+    """Strips raw HTML tags, unescapes entities, and collapses whitespace."""
+    if not raw_text:
+        return ""
+    text = re.sub(r"<[^>]+>", " ", raw_text)
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
 
 # Define default RSS/Atom feed URLs
 APPLE_RSS = "https://developer.apple.com/news/rss/news.rss"
@@ -200,8 +210,8 @@ def parse_rss_feed(url):
 
                     items.append(
                         {
-                            "title": title.strip(),
-                            "description": desc.strip() if desc else "",
+                            "title": clean_html_text(title),
+                            "description": clean_html_text(desc),
                             "link": link.strip(),
                             "pubDate": pub_date.strip(),
                         }

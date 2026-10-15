@@ -73,6 +73,38 @@ echo "$ERR" | grep -q "sample announcements" && ok "a failed live fetch says the
 APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>/dev/null | python3 -c 'import json,sys; json.load(sys.stdin)' && ok "--json stays valid when the fetch fails" || bad "--json stays valid when the fetch fails"
 rm -rf "$T"
 
+# Issue 833. Keywords match whole words on the visible text, not substrings of HTML.
+T="$(mktemp -d)"
+python3 - "$T/news.json" <<'PY'
+import json, sys
+items = [
+    ("Display and platform updates", "<p>New <a href=\"https://developer.apple.com/design/\">display</a> sizes on all platforms and marketplaces. Translations improved.</p>"),
+    ("Retail-related pattern changes", "<p>Pay attention to the new retail-related pattern for administrators.</p>"),
+    ("Updated PLA now available", "<p>The updated PLA is ready to review.</p>"),
+    ("SLA update", "<p>Review the new SLA.</p>"),
+    ("Updated review guidelines", "<p>The App Review Guidelines have changed.</p>"),
+    ("Patched vulnerabilities", "<p>Several vulnerabilities are fixed in this release.</p>"),
+    ("In-app purchasing changes", "<p>New rules for in-app purchasing.</p>"),
+]
+json.dump([{"title": t, "description": d, "pubDate": "Mon, 01 Sep 2026 10:00:00 PDT", "link": "https://mock.invalid/833/%d" % i}
+           for i, (t, d) in enumerate(items)], open(sys.argv[1], "w"))
+PY
+$MONITOR --project "$T" --news-file "$T/news.json" --json 2>/dev/null | python3 -c '
+import json, sys
+by = {}
+for i in json.load(sys.stdin):
+    by.setdefault(i["announcement_title"], set()).add(i["track"])
+lic = "Apple Developer Program License Agreement"
+assert lic not in by.get("Display and platform updates", set()), by
+assert not by.get("Retail-related pattern changes"), by
+assert lic in by.get("Updated PLA now available", set()), by
+assert lic in by.get("SLA update", set()), by
+assert "App Store Review Guidelines" in by.get("Updated review guidelines", set()), by
+assert "Security updates" in by.get("Patched vulnerabilities", set()), by
+assert "In-App Purchase policies" in by.get("In-app purchasing changes", set()), by
+' && ok "keywords match whole words on stripped text (issue 833)" || bad "keywords match whole words on stripped text (issue 833)"
+rm -rf "$T"
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

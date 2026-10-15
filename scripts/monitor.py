@@ -4,6 +4,7 @@ categories against live/mock news and scans a --project for impact."""
 
 import os
 import sys
+import html
 import re
 import json
 import urllib.request
@@ -166,7 +167,7 @@ TRACK_METADATA = {
             "purchase policy",
         ],
         "patterns": [
-            r"in-app[ -]purchase",
+            r"in-app[ -]purchas(?:e|es|ing)",
             r"iap",
             r"storekit",
             r"subscription[ -]term",
@@ -409,7 +410,7 @@ TRACK_METADATA = {
         ],
         "patterns": [
             r"security[ -]update",
-            r"vulnerability",
+            r"vulnerabilit(?:y|ies)",
             r"cve",
             r"encryption[ -]declaration",
         ],
@@ -666,36 +667,30 @@ def scan_target_repo(repo_path, track_name, metadata):
     return affected_files, verdict
 
 
+def strip_html(text):
+    """Feed descriptions carry HTML. Match on the visible text only."""
+    text = re.sub(r"<[^>]+>", " ", text or "")
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def term_regex(term):
+    """Whole-word match with an optional plural, so "pla" never fires on "display" (#833)."""
+    return re.compile(r"(?<![a-z0-9])(?:" + term + r")(?:s|es)?(?![a-z0-9])", re.IGNORECASE)
+
+
 def match_announcement_to_tracks(announcement):
     """
     Checks if a news item matches any of the 25 tracks based on keyword and regex matching.
     Returns a list of matched track names.
     """
     matched = []
-    title = announcement.get("title", "").lower()
-    desc = announcement.get("description", "").lower()
+    title = strip_html(announcement.get("title", "")).lower()
+    desc = strip_html(announcement.get("description", "")).lower()
     combined = f"{title} {desc}"
 
     for track, meta in TRACK_METADATA.items():
-        # 1. Keyword direct check
-        keyword_match = False
-        for kw in meta["keywords"]:
-            if kw in combined:
-                keyword_match = True
-                break
-
-        if keyword_match:
-            matched.append(track)
-            continue
-
-        # 2. Pattern regex check
-        pattern_match = False
-        for pat in meta["patterns"]:
-            if re.search(pat, combined, re.IGNORECASE):
-                pattern_match = True
-                break
-
-        if pattern_match:
+        terms = [re.escape(kw) for kw in meta["keywords"]] + list(meta["patterns"])
+        if any(term_regex(t).search(combined) for t in terms):
             matched.append(track)
 
     return matched
