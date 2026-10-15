@@ -27,6 +27,7 @@ A folder named android in the path is audited with the Google rules unless
 
 Exit codes: 0 clean or advisory, 1 the directory held nothing to audit, 2 a critical finding.
 """
+
 import os
 import sys
 import re
@@ -34,7 +35,13 @@ import json
 import glob
 from urllib.parse import urlparse
 
-FIELD_LIMITS = {"name": 30, "subtitle": 30, "keywords": 100, "promotional_text": 170, "description": 4000}
+FIELD_LIMITS = {
+    "name": 30,
+    "subtitle": 30,
+    "keywords": 100,
+    "promotional_text": 170,
+    "description": 4000,
+}
 # Google Play listing limits, verified 2026-10-15 at support.google.com/googleplay/android-developer/answer/9859152
 GOOGLE_FIELD_LIMITS = {"name": 30, "short_description": 80, "description": 4000}
 PLATFORMS = ("apple", "google")
@@ -42,32 +49,69 @@ APPLE_STD_EULA = "apple.com/legal/internet-services/itunes/dev/stdeula"
 URL_FIELDS = ("privacy_url", "support_url", "marketing_url", "terms_url")
 # fastlane / asc field file name aliases -> canonical field
 ALIASES = {
-    "name": "name", "title": "name", "app_name": "name",
+    "name": "name",
+    "title": "name",
+    "app_name": "name",
     "subtitle": "subtitle",
     "keywords": "keywords",
-    "description": "description", "full_description": "description",
-    "promotional_text": "promotional_text", "promo_text": "promotional_text", "short_description": "promotional_text",
-    "release_notes": "release_notes", "whats_new": "release_notes",
-    "review_notes": "review_notes", "notes": "review_notes",
-    "privacy_url": "privacy_url", "privacy_policy_url": "privacy_url",
-    "support_url": "support_url", "marketing_url": "marketing_url",
-    "terms_url": "terms_url", "eula_url": "terms_url", "license_agreement_url": "terms_url",
-    "contact_email": "contact_email", "email": "contact_email",
+    "description": "description",
+    "full_description": "description",
+    "promotional_text": "promotional_text",
+    "promo_text": "promotional_text",
+    "short_description": "promotional_text",
+    "release_notes": "release_notes",
+    "whats_new": "release_notes",
+    "review_notes": "review_notes",
+    "notes": "review_notes",
+    "privacy_url": "privacy_url",
+    "privacy_policy_url": "privacy_url",
+    "support_url": "support_url",
+    "marketing_url": "marketing_url",
+    "terms_url": "terms_url",
+    "eula_url": "terms_url",
+    "license_agreement_url": "terms_url",
+    "contact_email": "contact_email",
+    "email": "contact_email",
 }
 # On Google Play short_description is its own 80 char field, not Apple promotional text.
 GOOGLE_ALIASES = dict(ALIASES, short_description="short_description")
 
-OTHER_PLATFORMS = ["android", "google play", "play store", "windows phone", "blackberry"]
-FUTURE = ["coming soon", "coming-soon", "will be available", "in a future update", "stay tuned", "future release"]
+OTHER_PLATFORMS = [
+    "android",
+    "google play",
+    "play store",
+    "windows phone",
+    "blackberry",
+]
+FUTURE = [
+    "coming soon",
+    "coming-soon",
+    "will be available",
+    "in a future update",
+    "stay tuned",
+    "future release",
+]
 NEGATIVE_APPLE = ["ios bug", "apple bug", "broken on ios", "fix for ios bug"]
-PLACEHOLDER = ["lorem ipsum", "placeholder", "todo", "fixme", "test data", "dummy", "example.com"]
+PLACEHOLDER = [
+    "lorem ipsum",
+    "placeholder",
+    "todo",
+    "fixme",
+    "test data",
+    "dummy",
+    "example.com",
+]
 CHINA_AI = ["chatgpt", "openai", "gemini", "claude", "anthropic", "copilot"]
 RANKING = ["#1", "number one", "best app", "top app", "free", "no.1", "no. 1"]
 # small safe profanity sample; teams extend in their own config
 CURSE = ["fuck", "shit", "asshole", "bitch", "bastard"]
 
+
 def add(findings, sev, rule, field, msg, fix):
-    findings.append({"severity": sev, "rule": rule, "field": field, "message": msg, "fix": fix})
+    findings.append(
+        {"severity": sev, "rule": rule, "field": field, "message": msg, "fix": fix}
+    )
+
 
 def url_syntax_ok(u):
     """True when u is an http or https URL with a host."""
@@ -79,6 +123,7 @@ def url_syntax_ok(u):
         return False
     return p.scheme in ("http", "https") and bool(host) and " " not in u
 
+
 def is_terms_url(u):
     low = (u or "").lower()
     if APPLE_STD_EULA in low:
@@ -86,17 +131,30 @@ def is_terms_url(u):
     if not url_syntax_ok(low):
         return False
     p = urlparse(low)
-    return bool(re.search(r"terms|eula|tos|legal|conditions|agb|license", p.path + " " + (p.hostname or "")))
+    return bool(
+        re.search(
+            r"terms|eula|tos|legal|conditions|agb|license",
+            p.path + " " + (p.hostname or ""),
+        )
+    )
+
 
 def has_emoji(s):
     for ch in s:
         o = ord(ch)
-        if 0x1F000 <= o <= 0x1FAFF or 0x2600 <= o <= 0x27BF or 0x2190 <= o <= 0x21FF or o in (0x2122, 0x2B50, 0xFE0F):
+        if (
+            0x1F000 <= o <= 0x1FAFF
+            or 0x2600 <= o <= 0x27BF
+            or 0x2190 <= o <= 0x21FF
+            or o in (0x2122, 0x2B50, 0xFE0F)
+        ):
             return True
     return False
 
+
 def lc(s):
     return (s or "").lower()
+
 
 def audit_fields(fields, check_urls=False, platform="apple"):
     findings = []
@@ -109,107 +167,226 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     for f, limit in (FIELD_LIMITS if apple else GOOGLE_FIELD_LIMITS).items():
         v = fields.get(f, "")
         if v and len(v) > limit:
-            add(findings, "high", "BOTH-METADATA-DECORATION", f,
-                f"{f} is {len(v)} chars, over the {limit} limit", f"Trim {f} to {limit} characters or fewer")
+            add(
+                findings,
+                "high",
+                "BOTH-METADATA-DECORATION",
+                f,
+                f"{f} is {len(v)} chars, over the {limit} limit",
+                f"Trim {f} to {limit} characters or fewer",
+            )
 
     # decoration in name / subtitle
     for f in ("name", "subtitle"):
         v = fields.get(f, "")
         if v and has_emoji(v):
-            add(findings, "medium", "BOTH-METADATA-DECORATION", f, f"{f} contains an emoji", f"Remove emoji from {f}")
+            add(
+                findings,
+                "medium",
+                "BOTH-METADATA-DECORATION",
+                f,
+                f"{f} contains an emoji",
+                f"Remove emoji from {f}",
+            )
         for r in RANKING:
             if r in lc(v):
-                add(findings, "high", "BOTH-METADATA-DECORATION", f,
-                    f"{f} contains a ranking or price claim ({r})", f"Remove ranking and price claims from {f}")
+                add(
+                    findings,
+                    "high",
+                    "BOTH-METADATA-DECORATION",
+                    f,
+                    f"{f} contains a ranking or price claim ({r})",
+                    f"Remove ranking and price claims from {f}",
+                )
         words = [w for w in re.findall(r"[A-Za-z]{3,}", v) if w.isupper()]
         if len(words) >= 2:
-            add(findings, "medium", "BOTH-METADATA-DECORATION", f, f"{f} uses ALL CAPS words", f"Use normal case in {f} except a real brand")
+            add(
+                findings,
+                "medium",
+                "BOTH-METADATA-DECORATION",
+                f,
+                f"{f} uses ALL CAPS words",
+                f"Use normal case in {f} except a real brand",
+            )
 
     # other platform mentions (Apple side only, an Android listing may say Android)
-    for f, v in (fields.items() if apple else ()):
+    for f, v in fields.items() if apple else ():
         for term in OTHER_PLATFORMS:
             if term in lc(v):
-                add(findings, "high", "APPLE-2.3-CROSS-PLATFORM-REFERENCE", f,
-                    f"{f} mentions another platform ({term})", f"Remove the reference to {term} from {f}")
+                add(
+                    findings,
+                    "high",
+                    "APPLE-2.3-CROSS-PLATFORM-REFERENCE",
+                    f,
+                    f"{f} mentions another platform ({term})",
+                    f"Remove the reference to {term} from {f}",
+                )
 
     # future functionality
-    for f, v in (fields.items() if apple else ()):
+    for f, v in fields.items() if apple else ():
         for term in FUTURE:
             if term in lc(v):
-                add(findings, "medium", "APPLE-2.3-FUTURE-FUNCTIONALITY", f,
-                    f"{f} promises future functionality ({term})", "Describe only what the build does today")
+                add(
+                    findings,
+                    "medium",
+                    "APPLE-2.3-FUTURE-FUNCTIONALITY",
+                    f,
+                    f"{f} promises future functionality ({term})",
+                    "Describe only what the build does today",
+                )
 
     # negative apple sentiment
-    for f, v in (fields.items() if apple else ()):
+    for f, v in fields.items() if apple else ():
         for term in NEGATIVE_APPLE:
             if term in lc(v):
-                add(findings, "medium", "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT", f,
-                    f"{f} references an iOS bug or Apple negatively", "Remove negative Apple references")
+                add(
+                    findings,
+                    "medium",
+                    "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT",
+                    f,
+                    f"{f} references an iOS bug or Apple negatively",
+                    "Remove negative Apple references",
+                )
 
     # placeholder / test
     for f, v in fields.items():
         for term in PLACEHOLDER:
             if term in lc(v):
-                add(findings, "high", "BOTH-PLACEHOLDER", f, f"{f} contains placeholder text ({term})", "Replace placeholder with real content")
+                add(
+                    findings,
+                    "high",
+                    "BOTH-PLACEHOLDER",
+                    f,
+                    f"{f} contains placeholder text ({term})",
+                    "Replace placeholder with real content",
+                )
 
     # curse words
     for f, v in fields.items():
         for term in CURSE:
             if re.search(r"\b" + re.escape(term) + r"\b", lc(v)):
-                add(findings, "high", "APPLE-2.3-CURSE-WORD", f, f"{f} contains profanity", "Remove profanity from the listing")
+                add(
+                    findings,
+                    "high",
+                    "APPLE-2.3-CURSE-WORD",
+                    f,
+                    f"{f} contains profanity",
+                    "Remove profanity from the listing",
+                )
 
     # keywords formatting (Apple only, Google Play has no keywords field)
     if keywords and apple:
         if ", " in keywords:
-            add(findings, "low", "APPLE-2.3-KEYWORD-FORMAT", "keywords",
-                "keywords field has spaces after commas, which wastes the 100 char budget", "Use commas with no spaces between keywords")
+            add(
+                findings,
+                "low",
+                "APPLE-2.3-KEYWORD-FORMAT",
+                "keywords",
+                "keywords field has spaces after commas, which wastes the 100 char budget",
+                "Use commas with no spaces between keywords",
+            )
         kw = set(w for w in re.split(r"[,\s]+", lc(keywords)) if w)
         dup = kw & set(re.findall(r"[a-z]{3,}", lc(name + " " + subtitle)))
         if dup:
-            add(findings, "low", "APPLE-2.3-KEYWORD-FORMAT", "keywords",
-                f"keywords repeat words already in name or subtitle ({', '.join(sorted(dup))})", "Drop duplicated words, the name and subtitle are already indexed")
+            add(
+                findings,
+                "low",
+                "APPLE-2.3-KEYWORD-FORMAT",
+                "keywords",
+                f"keywords repeat words already in name or subtitle ({', '.join(sorted(dup))})",
+                "Drop duplicated words, the name and subtitle are already indexed",
+            )
 
     # missing privacy policy url
     if not fields.get("privacy_url"):
-        add(findings, "high", "BOTH-MISSING-PRIVACY-POLICY", "privacy_url",
-            "no privacy policy URL found in the metadata", "Set the Privacy Policy URL in App Store Connect and the Play listing")
+        add(
+            findings,
+            "high",
+            "BOTH-MISSING-PRIVACY-POLICY",
+            "privacy_url",
+            "no privacy policy URL found in the metadata",
+            "Set the Privacy Policy URL in App Store Connect and the Play listing",
+        )
 
     # URL fields must be real http or https URLs, checked before any network call
     for f in URL_FIELDS:
         v = fields.get(f, "")
         if v and not url_syntax_ok(v):
-            add(findings, "high", "BOTH-INVALID-METADATA-URL", f,
-                f"{f} is not an http or https URL with a host ({v[:60]})", f"Set {f} to a full https URL")
+            add(
+                findings,
+                "high",
+                "BOTH-INVALID-METADATA-URL",
+                f,
+                f"{f} is not an http or https URL with a host ({v[:60]})",
+                f"Set {f} to a full https URL",
+            )
 
     if apple and not fields.get("support_url"):
-        add(findings, "high", "APPLE-MISSING-SUPPORT-URL", "support_url",
-            "no support URL found in the metadata, App Store Connect requires one", "Set the Support URL in App Store Connect")
+        add(
+            findings,
+            "high",
+            "APPLE-MISSING-SUPPORT-URL",
+            "support_url",
+            "no support URL found in the metadata, App Store Connect requires one",
+            "Set the Support URL in App Store Connect",
+        )
     if not apple:
         email = fields.get("contact_email", "")
         if not email:
-            add(findings, "medium", "GOOGLE-MISSING-CONTACT-EMAIL", "contact_email",
-                "no contact email found, the Play listing requires one", "Set the contact email in the Play Console store listing")
+            add(
+                findings,
+                "medium",
+                "GOOGLE-MISSING-CONTACT-EMAIL",
+                "contact_email",
+                "no contact email found, the Play listing requires one",
+                "Set the contact email in the Play Console store listing",
+            )
         elif not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
-            add(findings, "medium", "GOOGLE-MISSING-CONTACT-EMAIL", "contact_email",
-                f"contact email is not a valid address ({email[:60]})", "Set a working contact email in the Play Console")
+            add(
+                findings,
+                "medium",
+                "GOOGLE-MISSING-CONTACT-EMAIL",
+                "contact_email",
+                f"contact email is not a valid address ({email[:60]})",
+                "Set a working contact email in the Play Console",
+            )
 
     # subscription terms, a real Terms or EULA URL is required, the word alone is not enough
     raw_desc = fields.get("description", "") + " " + fields.get("promotional_text", "")
     desc = lc(raw_desc)
-    if apple and any(t in desc for t in ("subscription", "subscribe", "auto-renew", "per month", "per year")):
-        links = re.findall(r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+", raw_desc)
-        has_terms = any(is_terms_url(u) for u in links) or is_terms_url(fields.get("terms_url", ""))
+    if apple and any(
+        t in desc
+        for t in ("subscription", "subscribe", "auto-renew", "per month", "per year")
+    ):
+        links = re.findall(
+            r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+", raw_desc
+        )
+        has_terms = any(is_terms_url(u) for u in links) or is_terms_url(
+            fields.get("terms_url", "")
+        )
         if not has_terms:
-            add(findings, "high", "APPLE-3.1.2-MISLEADING-PRICING", "description",
-                "subscription mentioned but no Terms of Use or EULA link in the description", "Add functional Terms of Use and Privacy Policy links to the description and the paywall")
+            add(
+                findings,
+                "high",
+                "APPLE-3.1.2-MISLEADING-PRICING",
+                "description",
+                "subscription mentioned but no Terms of Use or EULA link in the description",
+                "Add functional Terms of Use and Privacy Policy links to the description and the paywall",
+            )
 
     # china AI references (advisory, storefront dependent, Apple only)
-    for f in (("name", "subtitle", "keywords", "description") if apple else ()):
+    for f in ("name", "subtitle", "keywords", "description") if apple else ():
         v = lc(fields.get(f, ""))
         for term in CHINA_AI:
             if term in v:
-                add(findings, "medium", "CHINA-AI-REFERENCES", f,
-                    f"{f} references an external AI service ({term}), which can trigger a China storefront rejection", "Remove or localize external AI references for the China storefront")
+                add(
+                    findings,
+                    "medium",
+                    "CHINA-AI-REFERENCES",
+                    f,
+                    f"{f} references an external AI service ({term}), which can trigger a China storefront rejection",
+                    "Remove or localize external AI references for the China storefront",
+                )
                 break
 
     # unreachable URLs
@@ -220,18 +397,30 @@ def audit_fields(fields, check_urls=False, platform="apple"):
         for u in sorted(u for u in urls if url_syntax_ok(u)):
             ok = _url_ok(u)
             if ok is False:
-                add(findings, "high", "BOTH-UNREACHABLE-METADATA-URL", "url", f"URL does not load: {u}", "Fix or remove the broken URL before submission")
+                add(
+                    findings,
+                    "high",
+                    "BOTH-UNREACHABLE-METADATA-URL",
+                    "url",
+                    f"URL does not load: {u}",
+                    "Fix or remove the broken URL before submission",
+                )
 
     return findings
+
 
 def _url_ok(u):
     try:
         import urllib.request
-        req = urllib.request.Request(u, method="HEAD", headers={"User-Agent": "metadata-audit"})
+
+        req = urllib.request.Request(
+            u, method="HEAD", headers={"User-Agent": "metadata-audit"}
+        )
         with urllib.request.urlopen(req, timeout=8) as r:
             return 200 <= r.status < 400
     except Exception:
         return False
+
 
 def _read_text(path):
     try:
@@ -277,18 +466,28 @@ def group_platform(rel, root=None):
     return "google" if "android" in [p.lower() for p in parts] else "apple"
 
 
-def _fields_from(entries, aliases):
-    fields = {}
-    for _path, base, val in entries:
-        if base is not None:
-            canon = aliases.get(base)
-            if canon and val:
-                fields[canon] = val
-        else:
-            for k, v in val.items():
-                kk = aliases.get(str(k).lower())
-                if kk and isinstance(v, str) and v.strip():
-                    fields[kk] = v.strip()
+def _fields_from(entries, aliases, conflicts=None):
+    """Two files for one field keep the longest value, as origin/main did, and the clash goes to conflicts."""
+    fields, src = {}, {}
+    for path, base, val in entries:
+        pairs = (
+            [(aliases.get(base), val)]
+            if base is not None
+            else [
+                (aliases.get(str(k).lower()), v.strip() if isinstance(v, str) else "")
+                for k, v in val.items()
+            ]
+        )
+        for canon, v in pairs:
+            if not canon or not v:
+                continue
+            name = os.path.basename(path)
+            if canon in fields and fields[canon] != v:
+                if conflicts is not None:
+                    conflicts.append((canon, src[canon], name))
+                if len(v) <= len(fields[canon]):
+                    continue
+            fields[canon], src[canon] = v, name
     return fields
 
 
@@ -299,14 +498,15 @@ def _is_below(child, parent):
 def load_locales(d, platform=None):
     """One audit unit per locale folder, each audited on its own.
     Files in a parent folder fill gaps in every locale below it.
-    Returns a list of (label, platform, fields)."""
+    Returns a list of (label, platform, fields, conflicts)."""
     groups = _read_group_files(d)
     rels = sorted(groups)
     units = []
     for rel in rels:
         plat = platform or group_platform(rel, d)
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
-        own = _fields_from(groups[rel], aliases)
+        clash = []
+        own = _fields_from(groups[rel], aliases, clash)
         if not own:
             continue
         # a folder that holds only shared values (urls, email) is not a locale when locales sit below it
@@ -317,20 +517,23 @@ def load_locales(d, platform=None):
             continue
         merged = {}
         for a in sorted((o for o in rels if _is_below(rel, o)), key=len):
-            merged.update(_fields_from(groups[a], aliases))
+            merged.update(_fields_from(groups[a], aliases, clash))
         merged.update(own)
         label = rel if rel != "." else (os.path.basename(os.path.abspath(d)) or d)
-        units.append((label, plat, merged))
+        units.append((label, plat, merged, sorted(set(clash))))
     return units
 
 
 def load_dir(d):
-    """Backward compatible flat view, the union of every locale, first value wins."""
+    """Backward compatible flat view, the union of every locale, the longest value wins as on origin/main."""
     fields = {}
-    for _label, _plat, f in load_locales(d):
+    for _label, _plat, f, _clash in load_locales(d):
         for k, v in f.items():
-            fields.setdefault(k, v)
+            if len(v) > len(fields.get(k, "")):
+                fields[k] = v
     return fields
+
+
 def main():
     args = sys.argv[1:]
     check_urls = "--check-urls" in args
@@ -376,12 +579,12 @@ def main():
 
     units = []
     if d:
-        for label, plat, f in load_locales(d, platform):
+        for label, plat, f, clash in load_locales(d, platform):
             f.update(cli_fields(plat))
-            units.append((label, plat, f))
+            units.append((label, plat, f, clash))
     if not units and raw:
         plat = platform or "apple"
-        units.append(("command line", plat, cli_fields(plat)))
+        units.append(("command line", plat, cli_fields(plat), []))
 
     if not units and d:
         print(f"metadata-audit. no listing files found in {d}. Nothing was audited.")
@@ -400,11 +603,21 @@ def main():
 
     findings = []
     print("== Metadata Audit ==")
-    for label, plat, fields in units:
+    for label, plat, fields, clash in units:
         print(
             f"Locale {label} ({plat}). Fields audited. {', '.join(sorted(fields.keys()))}"
         )
-        for f in audit_fields(fields, check_urls=check_urls, platform=plat):
+        unit = audit_fields(fields, check_urls=check_urls, platform=plat)
+        for canon, a, b in clash:
+            add(
+                unit,
+                "medium",
+                "BOTH-METADATA-DECORATION",
+                canon,
+                f"{canon} has conflicting values in {a} and {b}, the longest was audited",
+                f"Keep one file for {canon} so the store gets the value you audited",
+            )
+        for f in unit:
             f["locale"] = label
             findings.append(f)
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}

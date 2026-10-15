@@ -99,6 +99,17 @@ OUT="$($AUDIT "$A/android/en-US" 2>&1)"
 echo "$OUT" | grep -q 'over the 80 limit' && ok "an android locale folder given directly uses the Google rules" || bad "an android locale folder given directly uses the Google rules"
 rm -rf "$A"
 
+# Two files that both supply one field never hide the overlong one, and the conflict is named (origin/main kept the longest).
+for pair in "name.txt title.txt" "Name.txt title.txt" "name.txt m.json"; do
+  C="$(mktemp -d)"; mkdir -p "$C/en-US"; set -- $pair
+  printf 'This App Name Is Definitely Way Too Long For The Store' > "$C/en-US/$1"
+  if [ "$2" = "m.json" ]; then printf '{"title":"Short"}' > "$C/en-US/m.json"; else printf 'Short' > "$C/en-US/$2"; fi
+  printf '{"privacy_url":"https://a.io/p","support_url":"https://a.io/s"}' > "$C/u.json"
+  OUT="$($AUDIT "$C" 2>&1)"
+  echo "$OUT" | grep -q 'over the 30 limit' && echo "$OUT" | grep -q 'conflicting values' && ok "conflicting name files keep the overlong value and flag the conflict. $pair" || bad "conflicting name files keep the overlong value and flag the conflict. $pair"
+  rm -rf "$C"
+done
+
 echo ""
 # A folder with no listing files was not audited. That is exit 1 with the file names to add, never a pass.
 E="$(mktemp -d)"
