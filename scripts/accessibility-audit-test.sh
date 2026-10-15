@@ -444,6 +444,90 @@ else
   bad "Failed to flag ANDROID-ACCESSIBILITY-SCANNER"
 fi
 
+# --- Issue #834 and --rule regression cases ---
+ISSUE_DIR=$(mktemp -d "/tmp/access_issue834_XXXXXX")
+mkdir -p "$ISSUE_DIR/icon_bad" "$ISSUE_DIR/icon_good" "$ISSUE_DIR/clean" "$ISSUE_DIR/tap"
+
+cat << 'EOF' > "$ISSUE_DIR/icon_bad/IconButton.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button { delete() } label: { Image(systemName: "trash") }
+        Button(action: edit) {
+            Image(systemName: "pencil")
+        }
+    }
+}
+EOF
+
+cat << 'EOF' > "$ISSUE_DIR/icon_good/IconButtonLabeled.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button { delete() } label: { Image(systemName: "trash") }
+            .accessibilityLabel("Delete")
+        Button("Save", systemImage: "square.and.arrow.down") { save() }
+        Button { go() } label: { Label("Go", systemImage: "arrow.right") }
+        Image(systemName: "star")
+    }
+}
+EOF
+
+cat << 'EOF' > "$ISSUE_DIR/clean/Clean.swift"
+import SwiftUI
+// Mentions of UIButton and Button in a comment are not interactions.
+struct V: View {
+    var body: some View {
+        Text("Hello").font(.body)
+    }
+}
+EOF
+
+cat << 'EOF' > "$ISSUE_DIR/tap/Tap.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Text("Hello").onTapGesture { open() }
+    }
+}
+EOF
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_bad" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
+  ok "#834 flagged both icon-only systemName buttons without accessibilityLabel"
+else
+  bad "#834 missed an icon-only systemName button. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_good" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 labeled, titled, and Label-based icon buttons are not flagged"
+else
+  bad "#834 false positive on a labeled icon button. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/clean" 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 a clean file with no interaction gets no finding (haptics, UIKit)"
+else
+  bad "#834 clean file produced findings. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/tap" --rule APPLE-ACCESSIBILITY-HAPTICS 2>&1)
+if echo "$OUT" | grep -q "\[LOW\] APPLE-ACCESSIBILITY-HAPTICS"; then
+  ok "#834 haptics stays an advisory LOW finding on a real tap interaction"
+else
+  bad "#834 haptics not reported as LOW advisory on a real interaction. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/clean" --rule APPLE-ACCESSIBILITY-DYNAMIC 2>&1); RC=$?
+if [ "$RC" -ne 0 ] && ! echo "$OUT" | grep -q "Clean."; then
+  ok "An unknown --rule is an error, never a Clean result"
+else
+  bad "An unknown --rule reported Clean or exited 0 (rc=$RC). Output:"; echo "$OUT"
+fi
+rm -rf "$ISSUE_DIR" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

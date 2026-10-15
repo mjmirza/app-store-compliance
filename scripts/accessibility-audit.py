@@ -38,8 +38,8 @@ RULE_META = {
     },
     "APPLE-ACCESSIBILITY-HAPTICS": {
         "platform": "apple",
-        "severity": "medium",
-        "title": "Haptics tactile feedback missing on interactions",
+        "severity": "low",
+        "title": "Haptic feedback absent on interactions (advisory, not required by WCAG 2.2 or EN 301 549)",
         "fix": "Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback."
     },
     "APPLE-ACCESSIBILITY-KEYBOARD": {
@@ -89,6 +89,118 @@ def scan_files(directory):
                 android_files.append(path)
     return ios_files, android_files
 
+def strip_swift_comments(content):
+    """Blank out // and /* */ comments, keeping newlines and string literals intact."""
+    out = []
+    i, n = 0, len(content)
+    in_str = False
+    while i < n:
+        c = content[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(content[i + 1])
+                i += 2
+                continue
+            if c == '"' or c == "\n":
+                in_str = False
+            i += 1
+        elif c == '"':
+            in_str = True
+            out.append(c)
+            i += 1
+        elif content.startswith("//", i):
+            j = content.find("\n", i)
+            j = n if j == -1 else j
+            out.append(" " * (j - i))
+            i = j
+        elif content.startswith("/*", i):
+            j = content.find("*/", i + 2)
+            j = n if j == -1 else j + 2
+            out.append("".join(ch if ch == "\n" else " " for ch in content[i:j]))
+            i = j
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _match_close(text, start, open_ch, close_ch):
+    """Index just past the bracket matching text[start], skipping string literals. -1 if unbalanced."""
+    depth = 0
+    i, n = start, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            if c == "\\":
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == open_ch:
+            depth += 1
+        elif c == close_ch:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
+def _skip_ws(text, i):
+    while i < len(text) and text[i].isspace():
+        i += 1
+    return i
+
+
+def find_icon_only_buttons(code):
+    """Yield (offset, snippet) for SwiftUI Buttons whose only label is an Image(systemName:)
+    with no accessibilityLabel on the label or on the Button's modifier chain."""
+    for m in re.finditer(r"(?<![A-Za-z0-9_])Button\b", code):
+        i = _skip_ws(code, m.end())
+        label = None
+        if i < len(code) and code[i] == "(":
+            end = _match_close(code, i, "(", ")")
+            if end == -1:
+                continue
+            args = code[i + 1:end - 1]
+            if re.match(r'\s*"', args) or re.search(r"\b(label|title)\s*:", args):
+                continue  # titled button, or label supplied inline
+            i = _skip_ws(code, end)
+            if i < len(code) and code[i] == "{":
+                end2 = _match_close(code, i, "{", "}")
+                if end2 == -1:
+                    continue
+                label = code[i:end2]
+                i = end2
+        elif i < len(code) and code[i] == "{":
+            end = _match_close(code, i, "{", "}")
+            if end == -1:
+                continue
+            i = _skip_ws(code, end)
+            if not code.startswith("label:", i):
+                continue
+            i = _skip_ws(code, i + len("label:"))
+            if i >= len(code) or code[i] != "{":
+                continue
+            end2 = _match_close(code, i, "{", "}")
+            if end2 == -1:
+                continue
+            label = code[i:end2]
+            i = end2
+        if not label or "Image(systemName:" not in label:
+            continue
+        if re.search(r"\b(Text|Label)\s*\(|accessibilityLabel", label):
+            continue
+        chain = re.match(r"(?:\s*\.[^\n]*)*", code[i:]).group(0)
+        if "accessibilityLabel" in chain or "accessibilityHidden(true)" in chain:
+            continue
+        yield m.start(), code[m.start():i].split("\n")[0].strip()
+
+
 def run_rule_scan(rule_id, ios_files, android_files):
     findings = []
 
@@ -123,8 +235,19 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier."
                     })
 
+            code = strip_swift_comments(content)
+            for offset, snippet in find_icon_only_buttons(code):
+                findings.append({
+                    "file": f,
+                    "line": code.count("\n", 0, offset) + 1,
+                    "rule_id": rule_id,
+                    "match": snippet,
+                    "message": "Icon-only Button whose label is an Image(systemName:) has no accessibilityLabel, so VoiceOver reads the symbol name.",
+                    "fix": "Add .accessibilityLabel(\"...\") to the Button, or use Label(\"Title\", systemImage: ...) / Button(\"Title\", systemImage: ...)."
+                })
+
             # Look for UIButton / UIImageView declarations in UIKit swift without accessibility properties
-            if "UIButton" in content or "UIImageView" in content:
+            if re.search(r"\bUI(Button|ImageView)\b", code):
                 if not any(kw in content for kw in ["accessibilityLabel", "accessibilityIdentifier", "isAccessibilityElement"]):
                     findings.append({
                         "file": f,
@@ -227,7 +350,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            if "onTapGesture" in content or "Button" in content:
+            code = strip_swift_comments(content)
+            if re.search(r"\.onTapGesture\b|(?<![A-Za-z0-9_])Button\s*[({]", code):
                 if not any(kw in content for kw in ["FeedbackGenerator", "CoreHaptics", "CHHapticEngine"]):
                     findings.append({
                         "file": f,
@@ -426,6 +550,10 @@ def main():
         return 0
 
     ios_files, android_files = scan_files(args.directory)
+
+    if args.rule and args.rule not in RULE_META:
+        print(f"Unknown rule: {args.rule}. Known rules. {', '.join(RULE_META)}", file=sys.stderr)
+        return 2
 
     rules_to_scan = [args.rule] if args.rule else list(RULE_META.keys())
 
