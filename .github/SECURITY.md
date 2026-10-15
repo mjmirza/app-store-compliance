@@ -8,7 +8,7 @@ That shapes what counts as a security issue here.
 
 ## Supported versions
 
-The default branch is the only supported version. Fixes land on `master` and are not backported.
+The default branch is the only supported version. Fixes land on `main` and are not backported.
 
 ## Reporting a vulnerability
 

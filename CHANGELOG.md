@@ -6,6 +6,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Changed
 
+- The default branch is now `main`. The CI trigger, the README badge and SECURITY.md follow it, and the bot branch ruleset excludes whichever branch is the default.
 - The bot PR gate. The workflow from #442 closed every PR whose branch looked bot-generated, which caught the owner's own Jules scheduled tasks. It is replaced by a gate that closes only pull requests from bot accounts not on the allowlist (Jules, Copilot, Dependabot, GitHub Actions), without deleting the branch. Owner-run bot PRs stay open, land on the project board as Backlog through the auto-add workflow, and are reviewed by hand. The eleven Jules PRs closed on 14 September 2026 had their branches deleted by the old workflow and cannot be reopened.
 
 ### Added
