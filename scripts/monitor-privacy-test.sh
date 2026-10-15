@@ -119,6 +119,36 @@ else
   bad "PR Draft file was not created"
 fi
 
+# Source trust is decided by the URL host, never by text
+if python3 - scripts/monitor-privacy.py <<'TRUSTPY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("mon", sys.argv[1])
+mon = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mon)
+cases = [
+    ("spoofed host suffix", {"title": "Rule", "description": "", "link": "https://ftc.gov.attacker.invalid/article"}, False),
+    ("agency word in title", {"title": "FTC announces a new rule", "description": "", "link": "https://news.example.invalid/story"}, False),
+    ("official domain in text only", {"title": "Rule", "description": "see ftc.gov and developer.apple.com", "link": "https://news.example.invalid/story"}, False),
+    ("userinfo trick", {"title": "Rule", "description": "", "link": "https://ftc.gov@attacker.invalid/"}, False),
+    ("lookalike vendor host", {"title": "Rule", "description": "", "link": "https://developer.apple.com.attacker.invalid/x"}, False),
+    ("legitimate subdomain", {"title": "Rule", "description": "", "link": "https://www.ftc.gov/news"}, True),
+    ("uppercase host", {"title": "Rule", "description": "", "link": "https://DEVELOPER.APPLE.COM/news"}, True),
+]
+failed = 0
+for name, ann, official in cases:
+    prio, verified = mon.classify_source_and_verify(ann, None)
+    if official and (prio, verified) != (1, True):
+        print("  %s: expected (1, True), got (%s, %s)" % (name, prio, verified)); failed += 1
+    if not official and (prio == 1 or verified):
+        print("  %s: expected untrusted, got (%s, %s)" % (name, prio, verified)); failed += 1
+sys.exit(1 if failed else 0)
+TRUSTPY
+then
+  ok "Source trust follows the URL host with a domain boundary match"
+else
+  bad "Source trust can be raised by a spoofed host or by text"
+fi
+
 # Assert no emojis are present in outputs or scripts
 echo "Checking for emojis in scripts and generated files..."
 has_emojis() {
