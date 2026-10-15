@@ -205,6 +205,15 @@ APP="$WORK/app$RANDOM"; mkdir -p "$APP/App"; printf '<plist><dict></dict></plist
 OUT="$(env HOME="$H" bash "$H/.codex/hooks/app-store-compliance-guard.sh" "$APP" 2>&1)"
 echo "$OUT" | grep -q "Regulatory Compliance Deadline Status" && ok "the codex guard finds the deadline list in ~/.agents/skills" || bad "the codex guard finds the deadline list in ~/.agents/skills"
 
+# 6b release-audit.py run from the shared skill finds the guard installed under the tool's own folder
+fresh; run --tool codex >/dev/null
+OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
+echo "$OUT" | grep -qF "Guard. $H/.codex/hooks/app-store-compliance-guard.sh" && ok "release-audit in the shared skill finds the codex guard" || { bad "release-audit in the shared skill finds the codex guard"; echo "$OUT" | grep -i guard | head -3; }
+run --tool gemini >/dev/null; run --tool codex uninstall >/dev/null
+OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
+echo "$OUT" | grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
+rm -rf "$APP"
+
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
 fresh; run --tool gemini >/dev/null; run --tool opencode >/dev/null
 python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); sys.exit(0 if d["description"] and "{{args}}" in d["prompt"] else 1)' "$H/.gemini/commands/app-store-audit.toml" && ok "the gemini command is valid TOML with {{args}}" || bad "the gemini command is valid TOML with {{args}}"

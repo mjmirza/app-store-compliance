@@ -125,8 +125,14 @@ def resolve_guard():
         # installed. <config>/skills/app-store-compliance/scripts -> <config>/hooks
         os.path.normpath(os.path.join(ROOT, "..", "..", "hooks", GUARD_NAME)),
     ]
+    # shared skill in ~/.agents. the installer records each tool's guard path in .guards
+    try:
+        with open(os.path.join(ROOT, ".guards"), encoding="utf-8") as f:
+            candidates += [ln.rstrip("\n").partition("\t")[2] for ln in f if "\t" in ln]
+    except OSError:
+        pass
     for c in candidates:
-        if os.path.isfile(c):
+        if c and os.path.isfile(c):
             return c, None
     return None, "looked in " + " and ".join(candidates)
 

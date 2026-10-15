@@ -701,6 +701,28 @@ def write_owners(owners):
     os.replace(tmp, os.path.join(sk, ".installed-by"))
 
 
+def read_guards():
+    """Each owning tool's installed guard path, so release-audit.py in the shared skill can find one."""
+    out = {}
+    try:
+        with open(os.path.join(skill_dir(), ".guards"), encoding="utf-8") as f:
+            for line in f:
+                t, tab, path = line.rstrip("\n").partition("\t")
+                if tab and t in TOOLS and path:
+                    out[t] = path
+    except OSError:
+        pass
+    return out
+
+
+def write_guards(guards):
+    sk = skill_dir()
+    fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-guards-")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("".join(t + "\t" + guards[t] + "\n" for t in sorted(guards)))
+    os.replace(tmp, os.path.join(sk, ".guards"))
+
+
 def copy_payload(tool, lay, guard):
     if tool != "copilot-repo":
         sk = skill_dir()
@@ -723,6 +745,7 @@ def copy_payload(tool, lay, guard):
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
         write_owners(read_owners() | {tool})
+        write_guards(dict(read_guards(), **{tool: guard}))
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -1070,6 +1093,7 @@ def uninstall(tool, lay, guard, dry):
         owners = read_owners() - {tool}
         if owners:
             write_owners(owners)
+            write_guards({t: p for t, p in read_guards().items() if t in owners})
             print(
                 "Removed the "
                 + SPECS[tool]["name"]
