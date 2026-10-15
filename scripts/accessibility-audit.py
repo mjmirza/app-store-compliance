@@ -181,6 +181,20 @@ def _regex_close(content, start, hashes):
     return n
 
 
+def swift_code_lines(content):
+    """Comments blanked line by line with no string state, so a misread quote never hides a later line.
+    Offsets and newlines are kept."""
+    out = []
+    for line in content.split("\n"):
+        t = line.lstrip(" \t")
+        if t.startswith("//") or t.startswith("/*") or t.startswith("*"):
+            out.append(" " * len(line))
+            continue
+        m = re.search(r"[ \t;{},)]//", line)
+        out.append(line[: m.start() + 1] + " " * (len(line) - m.start() - 1) if m else line)
+    return "\n".join(out)
+
+
 def swift_code_only(content):
     """Blank comments (nested too) and string contents, keeping quotes, newlines and offsets.
     What is left is code, so a Button inside a comment or a string is never read as a control."""
@@ -438,8 +452,14 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 continue
 
             # Find SwiftUI Image usages in code only, so a commented example is never read
+            # The lexer view is precise and the line view never loses code to a misread quote. Both are read.
+            seen = set()
             code = swift_code_only(content)
-            for match in re.finditer(r"\bImage\s*\(([^)]+)\)", code):
+            for view in (code, swift_code_lines(content)):
+              for match in re.finditer(r"\bImage\s*\(([^)]+)\)", view):
+                if match.start() in seen:
+                    continue
+                seen.add(match.start())
                 expr = match.group(1)
                 # Ignore images explicitly defined as decorative or having system accessibility labels/hidden
                 if "decorative:" in expr or "systemName:" in expr:

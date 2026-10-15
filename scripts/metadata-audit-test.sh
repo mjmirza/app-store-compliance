@@ -89,6 +89,8 @@ for u in https://journal.test/legal/privacy https://journal.test/tostadas; do
   OUT="$($AUDIT --description "Monthly subscription. Terms apply. Privacy $u" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
   echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "$u is not a Terms link" || bad "$u is not a Terms link"
 done
+OUT="$($AUDIT --description "Monthly subscription. Terms apply. Privacy https://journal.test/privacy?next=apple.com/legal/internet-services/itunes/dev/stdeula" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "the Apple EULA path in a query string is not a Terms link" || bad "the Apple EULA path in a query string is not a Terms link"
 OUT="$($AUDIT --description "Monthly subscription. Terms of Use https://journal.test/termsofuse" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
 ! echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a termsofuse path is a Terms link" || bad "a termsofuse path is a Terms link"
 

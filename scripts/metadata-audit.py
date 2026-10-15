@@ -126,11 +126,12 @@ def url_syntax_ok(u):
 
 def is_terms_url(u):
     low = (u or "").lower()
-    if APPLE_STD_EULA in low:
-        return True
     if not url_syntax_ok(low):
         return False
     p = urlparse(low)
+    # Apple's standard EULA counts only as that page itself, never as text inside another URL.
+    if p.netloc in ("apple.com", "www.apple.com") and p.path.startswith("/" + APPLE_STD_EULA.split("/", 1)[1]):
+        return True
     if "privacy" in p.path:
         return False
     return bool(

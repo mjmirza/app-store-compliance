@@ -958,6 +958,13 @@ else
 fi
 rm -rf "$I1000_DIR" 2>/dev/null || true
 
+# A Swift bare regex holding a quote never hides the Image after it
+R8_DIR="$(mktemp -d)"; mkdir -p "$R8_DIR/app"
+printf '%s\n' 'import SwiftUI' 'struct V: View { var body: some View { let regex = /"/; Image("logo") } }' > "$R8_DIR/app/V.swift"
+OUT=$($AUDIT "$R8_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("logo")'; then ok "an Image after a Swift regex holding a quote is still reported"; else bad "an Image after a Swift regex holding a quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R8_DIR" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
