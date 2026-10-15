@@ -37,13 +37,43 @@ def _visible_markup(m):
     return " "
 
 
+_XHTML_BLOCKS = {
+    "address", "article", "aside", "blockquote", "br", "dd", "div", "dl", "dt", "figcaption",
+    "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li", "main",
+    "nav", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul",
+}
+
+
+def _xhtml_text(elem):
+    """Text of an XHTML tree. Block elements are separated by a space, inline text runs on."""
+    out, stack = [], [(elem, False)]
+    while stack:  # explicit stack, so a deeply nested feed cannot exhaust recursion
+        node, closing = stack.pop()
+        name = node.tag.split("}", 1)[-1].lower() if isinstance(node.tag, str) else ""
+        block = name in _XHTML_BLOCKS
+        if closing:
+            if block:
+                out.append(" ")
+            if node is not elem and node.tail:
+                out.append(node.tail)
+            continue
+        if block:
+            out.append(" ")
+        if node.text:
+            out.append(node.text)
+        stack.append((node, True))
+        for sub in reversed(list(node)):
+            stack.append((sub, False))
+    return "".join(out)
+
+
 def _feed_text(child, atom):
     """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1). RSS fields are HTML."""
     if not atom:
         return clean_html_text(child.text or "")
     kind = (child.get("type") or "text").strip().lower()
     if kind == "xhtml" or kind.endswith("+xml") and "xhtml" in kind:
-        return re.sub(r"\s+", " ", " ".join(child.itertext())).strip()  # blocks never run together
+        return re.sub(r"\s+", " ", _xhtml_text(child)).strip()
     if kind == "html" or kind == "text/html":
         return clean_html_text(child.text or "")
     return re.sub(r"\s+", " ", child.text or "").strip()
