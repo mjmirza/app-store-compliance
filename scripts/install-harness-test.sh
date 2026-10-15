@@ -90,6 +90,14 @@ done
 fresh; run --tool copilot >/dev/null; run --tool auggie >/dev/null; run --tool windsurf >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a=d["hooks"]["preToolUse"][0]; b=d["hooks"]["PreToolUse"][0]; sys.exit(0 if d["version"]==1 and a["timeoutSec"]==120 and a["bash"].endswith("guard.sh'"'"'") and b["timeout"]==120 and b["command"]==a["bash"] else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
   && ok "copilot file carries the Copilot entry and the VS Code entry" || bad "copilot file carries the Copilot entry and the VS Code entry"
+python3 -c 'import json,sys; a=json.load(open(sys.argv[1]))["hooks"]["preToolUse"][0]; p=a.get("powershell",""); sys.exit(0 if p.startswith("$input | & bash ") and "app-store-compliance-guard.sh" in p and p.rstrip().endswith("exit $LASTEXITCODE") else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
+  && ok "copilot also carries a Windows powershell handler that pipes the payload to the guard and keeps its exit code" || bad "copilot also carries a Windows powershell handler that pipes the payload to the guard and keeps its exit code"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["preToolUse"][0].pop("powershell",None); json.dump(d,open(p,"w"))' "$H/.copilot/hooks/app-store-compliance.json"
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "copilot doctor fails when the Windows handler is missing" || bad "copilot doctor fails when the Windows handler is missing (rc=$RC)"
+run --tool copilot >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["preToolUse"]; sys.exit(0 if len(e)==1 and e[0].get("powershell") else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
+  && ok "copilot install adds the missing Windows handler without a duplicate" || bad "copilot install adds the missing Windows handler without a duplicate"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=d["hooks"]["PreToolUse"][0]; sys.exit(0 if g["matcher"]=="launch-process" and g["hooks"][0]["timeout"]==120000 else 1)' "$H/.augment/settings.json" \
   && ok "auggie uses launch-process and a millisecond timeout" || bad "auggie uses launch-process and a millisecond timeout"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["pre_run_command"][0]; sys.exit(0 if e["show_output"] is True else 1)' "$H/.codeium/windsurf/hooks.json" \

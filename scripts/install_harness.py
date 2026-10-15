@@ -192,6 +192,15 @@ def hook_cmd(tool, guard):
     return "bash '" + guard.replace("'", "'\\''") + "'"
 
 
+def ps_cmd(tool, guard):
+    """The Windows handler Copilot runs in PowerShell. It pipes the payload to bash and keeps the guard's exit code."""
+    target = "./.github/hooks/" + GUARD_NAME if tool == "copilot-repo" else guard
+    if tool != "copilot-repo" and shutil.which("cygpath"):
+        r = subprocess.run(["cygpath", "-m", guard], capture_output=True, text=True)
+        target = r.stdout.strip() or guard
+    return "$input | & bash '" + target.replace("'", "''") + "'; exit $LASTEXITCODE"
+
+
 def ok(msg):
     print("  ok    " + msg)
 
@@ -261,12 +270,24 @@ def new_entry(tool, style, cmd):
             "hooks": [{"type": "command", "command": cmd, key: value}],
         }
     if style == "copilot":
-        return {"type": "command", "bash": cmd, "timeoutSec": 120}
+        return {
+            "type": "command",
+            "bash": cmd,
+            "powershell": ps_cmd(tool, guard_of(cmd)),
+            "timeoutSec": 120,
+        }
     if style == "vscode":
         return {"type": "command", "command": cmd, "timeout": 120}
     if tool == "windsurf":
         return {"command": cmd, "show_output": True}
     return {"command": cmd, "timeout": 120}
+
+
+def guard_of(cmd):
+    """The guard path inside a bash command line this installer wrote."""
+    if cmd.startswith("bash '") and cmd.endswith("'"):
+        return cmd[6:-1].replace("'\\''", "'")
+    return cmd[5:] if cmd.startswith("bash ") else cmd
 
 
 def is_ours(item, cmd, guard):
@@ -305,6 +326,10 @@ def dispatches(tool, style, group, h):
         return False
     if tool == "windsurf":
         return True
+    if style == "copilot":
+        ps = h.get("powershell")
+        if not (isinstance(ps, str) and GUARD_NAME in ps and "exit $LASTEXITCODE" in ps):
+            return False
     key, want = {"nested": spec.get("timeout"), "copilot": ("timeoutSec", 120)}.get(
         style
     ) or ("timeout", 120)
@@ -953,6 +978,8 @@ def check_hooks(tool, lay, guard, app, repo_dir):
         found_any = True
         line = found[0].get("command") or found[0].get("bash")
         prove(line, tool, st, app, repo_dir or "/")
+        if st == "copilot":
+            prove_ps(found[0]["powershell"], tool, app, repo_dir or "/")
     if found_any:
         ok("hook registered in " + shown(lay["config"]))
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:
@@ -991,6 +1018,23 @@ def prove(line, tool, style, app, run_dir):
             + str(rc)
             + ")"
         )
+
+
+def prove_ps(line, tool, app, run_dir):
+    """Runs the Windows handler in PowerShell when one is installed here, as Copilot does on Windows."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        ok("the Windows powershell handler is registered (PowerShell is not installed here to run it)")
+        return
+    r = subprocess.run(
+        [shell, "-NoProfile", "-NonInteractive", "-Command", line],
+        input=json.dumps(payload_for(tool, "copilot", SUBMIT, app)),
+        capture_output=True, text=True, cwd=run_dir, timeout=180,
+    )
+    if r.returncode == 2:
+        ok("the Windows powershell handler blocks a submit command")
+    else:
+        fail("the Windows powershell handler did not block a submit command (exit " + str(r.returncode) + ")")
 
 
 def uninstall(tool, lay, guard, dry):
