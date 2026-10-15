@@ -667,9 +667,26 @@ def scan_target_repo(repo_path, track_name, metadata):
     return affected_files, verdict
 
 
+def drop_html_comments(text):
+    """Remove <!-- --> comments before tags, so quotes inside a comment never pair with markup."""
+    out, i = [], 0
+    while True:
+        a = text.find("<!--", i)
+        if a == -1:
+            out.append(text[i:])
+            return "".join(out)
+        out.append(text[i:a])
+        b = text.find("-->", a + 4)
+        if b == -1:
+            return "".join(out)  # an unterminated comment hides the rest, as a browser does
+        out.append(" ")
+        i = b + 3
+
+
 def strip_html(text):
     """Feed descriptions carry HTML. Match on the visible text only."""
-    text = re.sub(r"""<[A-Za-z/!?](?:[^<>"']|"[^"]*"|'[^']*')*>""", " ", text or "")  # quoted attributes may hold <, and it stays linear
+    text = drop_html_comments(text or "")
+    text = re.sub(r"""<[A-Za-z/!?](?:[^<>"']|"[^"]*"|'[^']*')*>""", " ", text)  # quoted attributes may hold <, and it stays linear
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
