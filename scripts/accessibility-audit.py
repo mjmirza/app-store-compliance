@@ -339,7 +339,12 @@ def find_icon_only_buttons(code):
     pairs = _bracket_pairs(code)
     img_hits = [m.start() for m in IMAGE_SYMBOL.finditer(code)]
     named_hits = [m.start() for m in NAMED_CONTENT.finditer(code)]
-    for m in re.finditer(r"(?<![A-Za-z0-9_.])(?:SwiftUI\s*\.\s*)?Button\b", code):
+    for m in re.finditer(r"(?<![\w.])(?:SwiftUI\s*\.\s*)?Button\b", code):
+        k = m.start() - 1
+        while k >= 0 and code[k].isspace():
+            k -= 1
+        if k >= 0 and code[k] == ".":
+            continue  # a member of something else, such as MyKit . SwiftUI.Button
         i = _skip_ws(code, m.end())
         label = None
         if i < len(code) and code[i] == "(":

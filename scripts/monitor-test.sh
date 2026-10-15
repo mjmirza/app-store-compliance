@@ -95,6 +95,19 @@ assert [x["description"] for x in a] == ["Plain <b>kept</b>", "Rich body", "Inne
 r = ai.parse_rss_feed(fr.as_uri())
 assert r[0]["description"] == "HTML body", r
 assert ai.analyze_announcements([a[0]], ["llm"]), "plain-text <llm> no longer matches"
+edge = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+<entry><title>A</title><content type="text/html">&lt;a href="https://example.org/llm/"&gt;Read&lt;/a&gt;</content></entry>
+<entry><title>B</title><content type="application/xhtml+xml"><div xmlns="http://www.w3.org/1999/xhtml"><h2>Install</h2><p>macOS updates</p></div></content></entry>
+<entry><title>C</title><summary>Keep the llm summary</summary><content src="https://example.org/x"/></entry>
+<entry><title>D</title><content type="text/plain">Plain &lt;llm&gt; kept</content></entry>
+</feed>"""
+fe = pathlib.Path(tmp, "e.xml"); fe.write_text(edge)
+e = ai.parse_rss_feed(fe.as_uri())
+assert e[0]["description"] == "Read", e
+assert e[1]["description"] == "Install macOS updates", e
+assert "llm summary" in e[2]["description"], e
+assert e[3]["description"] == "Plain <llm> kept", e
+assert not ai.analyze_announcements([e[0]], ["llm"]) and not ai.analyze_announcements([e[1]], ["llm"]), "markup or joined blocks made a false llm match"
 PY
 
 # A feed full of unmatched angle brackets must not make tag stripping quadratic.

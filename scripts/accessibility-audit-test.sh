@@ -528,6 +528,9 @@ struct V: View {
         SwiftUI.Button(action: {}) { Image(systemName: "gear") }
         MyKit.Button(action: {}) { Image(systemName: "trash") }
         let b = self.Button(action: {}) { Image(systemName: "star") }
+        let c = MyKit . SwiftUI.Button(action: {}) { Image(systemName: "bell") }
+        let d = ΩSwiftUI.Button(action: {}) { Image(systemName: "flag") }
+        let e = obj . Button(action: {}) { Image(systemName: "pin") }
     }
 }
 EOF

@@ -41,10 +41,10 @@ def _feed_text(child, atom):
     """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1). RSS fields are HTML."""
     if not atom:
         return clean_html_text(child.text or "")
-    kind = (child.get("type") or "text").lower()
-    if kind == "xhtml":
-        return re.sub(r"\s+", " ", "".join(child.itertext())).strip()
-    if kind == "html":
+    kind = (child.get("type") or "text").strip().lower()
+    if kind == "xhtml" or kind.endswith("+xml") and "xhtml" in kind:
+        return re.sub(r"\s+", " ", " ".join(child.itertext())).strip()  # blocks never run together
+    if kind == "html" or kind == "text/html":
         return clean_html_text(child.text or "")
     return re.sub(r"\s+", " ", child.text or "").strip()
 
@@ -226,7 +226,7 @@ def parse_rss_feed(url):
                 tag = clean_tag(elem.tag)
                 if tag in ("item", "entry"):
                     title = ""
-                    desc = ""
+                    desc_parts = []
                     link = ""
                     pub_date = ""
 
@@ -235,7 +235,9 @@ def parse_rss_feed(url):
                         if ctag == "title":
                             title = _feed_text(child, tag == "entry")
                         elif ctag in ("description", "summary", "content"):
-                            desc = _feed_text(child, tag == "entry")
+                            part = _feed_text(child, tag == "entry")
+                            if part:
+                                desc_parts.append(part)  # summary and content both count
                         elif ctag == "link":
                             link_val = child.get("href")
                             if link_val:
@@ -248,7 +250,7 @@ def parse_rss_feed(url):
                     items.append(
                         {
                             "title": title,
-                            "description": desc,
+                            "description": " ".join(desc_parts),
                             "link": link.strip(),
                             "pubDate": pub_date.strip(),
                         }
