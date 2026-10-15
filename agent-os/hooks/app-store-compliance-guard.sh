@@ -13,7 +13,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -30,6 +30,20 @@ elif [ ! -t 0 ]; then
   # An empty hook payload has no command to judge; falling back to scanning the working directory can take minutes.
   [ -z "$STDIN_JSON" ] && exit 0
 fi
+# Cursor beforeShellExecution reads a permission object on stdout, prose there is a schema error (cursor.com/docs/hooks).
+IS_CURSOR=0; CURSOR_SENT=0; CURSOR_FD=0; CURSOR_IDS=""
+printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -qE '"hook_event_name"[[:space:]]*:[[:space:]]*"beforeShellExecution"' && IS_CURSOR=1
+cursor_reply() {  # $1 exit code about to be returned. Prints the permission JSON once, on the real stdout
+  [ "$IS_CURSOR" -eq 1 ] && [ "$CURSOR_SENT" -eq 0 ] || return 0
+  CURSOR_SENT=1
+  if [ "$1" -eq 2 ]; then
+    local why="with ${CRIT:-0} critical rejection risk(s)"
+    [ "${CRIT:-0}" -eq 0 ] && why="because the scan did not finish"
+    printf '{"permission":"deny","user_message":"App Store Compliance Guard blocked this submit %s.","agent_message":"Blocked by app-store-compliance-guard %s. Critical findings. %s Fix each one using the report on stderr, or set APP_STORE_GUARD_OK=1 to override."}\n' "$why" "$why" "${CURSOR_IDS:-none listed.}"
+  else
+    printf '{"permission":"allow"}\n'
+  fi
+}
 
 # Read .tool_input.command as JSON (issue #610). The best installed parser decides. jq, else python3,
 # else a backslash-aware regex. A payload the chosen parser rejects yields no command, so the guard stays silent.
@@ -37,7 +51,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((([$t] | inside(["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd"])) or ($t | test("terminal|shell|powershell"; "i"))) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd","runInTerminal","run_in_terminal"] | any(. == $t)) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -47,12 +61,11 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-import re
-SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd")
+SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd", "runInTerminal", "run_in_terminal")
 info = d.get("tool_info") if isinstance(d, dict) else None
 default = "shell" if isinstance(info, dict) and isinstance(info.get("command_line"), str) else "Bash"
 t = d.get("tool_name", d.get("toolName", default)) if isinstance(d, dict) else None
-if isinstance(d, dict) and isinstance(t, str) and (t in SHELLS or re.search("terminal|shell|powershell", t, re.I)):
+if isinstance(d, dict) and isinstance(t, str) and t in SHELLS:
     ti = d.get("tool_input")
     if not isinstance(ti, dict) and isinstance(d.get("toolInput"), dict):
         ti = d["toolInput"]
@@ -74,14 +87,21 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
     [ "$rc" -eq 0 ] && { printf '%s' "$out"; return 0; }
     [ "$rc" -eq 4 ] && return 0
   fi
-  # No working tool. Prefer the command inside tool_input, else the first command key, then unescape it.
-  local body
+  # No working tool. Prefer the command inside tool_input, then a Copilot toolArgs JSON string, then the first command key.
+  local body ta
   body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
+  if [ -z "$body" ]; then
+    ta="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"toolArgs"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1 | sed -E 's/^"toolArgs"[[:space:]]*:[[:space:]]*"//; s/"$//')"
+    [ -n "$ta" ] && body="$(printf '%s' "$ta" | json_unescape | tr -d '\n\r' | grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
+  fi
   [ -z "$body" ] && body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
   [ -z "$body" ] && body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"command_line"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1 | sed 's/"command_line"/"command"/')"
   [ -z "$body" ] && return 0
-  printf '%s' "$body" | sed -E 's/.*"command"[[:space:]]*:[[:space:]]*"//; s/"$//' \
-    | awk 'BEGIN { hx="0123456789abcdef" }
+  printf '%s' "$body" | sed -E 's/.*"command"[[:space:]]*:[[:space:]]*"//; s/"$//' | json_unescape
+}
+# Decodes JSON string escapes on stdin (newline, tab, quote, ASCII \u), for the no-tools tier.
+json_unescape() {
+  awk 'BEGIN { hx="0123456789abcdef" }
       { n=split($0, part, /\\/); o=part[1]; lit=0
         for (i=2; i<=n; i++) { p=part[i]
           if (lit) { o=o p; lit=0; continue }
@@ -135,16 +155,40 @@ if [ -n "$STDIN_JSON" ]; then
     END { if (cont) printf "%s\n", acc }' 2>/dev/null)"
   [ -z "$CMD" ] && exit 0
   # A commit, tag, note, or gh PR or issue message is text. Its quoted -m, --body, or --title value is blanked,
-  # unless it holds a $( or backtick substitution, which the shell would run.
-  IFS= read -r -d '' INERT_SED <<'INERT'
-/(^|[^A-Za-z0-9_-])(git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(commit|tag|notes)|gh[[:space:]]+(pr|issue)[[:space:]]+(create|comment|edit))([[:space:]]|$)/{
-s/(^|[[:space:]])(-[A-Za-z]*m|--message|-b|--body|-t|--title)([[:space:]]+|=)"[^"$`]*"/\1\2 ""/g
-s/(^|[[:space:]])(-[A-Za-z]*m|--message|-b|--body|-t|--title)([[:space:]]+|=)'[^']*'/\1\2 ''/g
-}
+  # unless it holds a $( or backtick substitution. Only inside that git or gh segment, never a later command's.
+  IFS= read -r -d '' INERT_AWK <<'INERT'
+BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96) }
+function msgflag(w) { return w ~ /^(-[A-Za-z]*m|--message|-b|--body|-t|--title)$/ }
+function blank(s,   o, i, n, c, w, prev, j, body) {
+  o=""; w=""; prev=""; i=1; n=length(s)
+  while (i <= n) { c=substr(s, i, 1)
+    if (c == " " || c == "\t") { if (w != "") { prev=w; w="" }; o=o c; i++; continue }
+    if (c == "\\") { o=o substr(s, i, 2); w=w substr(s, i, 2); i+=2; continue }
+    if (c == sq || c == dq) {
+      j=i+1; while (j <= n && substr(s, j, 1) != c) { if (c == dq && substr(s, j, 1) == "\\") j++; j++ }
+      body=substr(s, i+1, j-i-1)
+      if (((w == "" && msgflag(prev)) || (w ~ /=$/ && msgflag(substr(w, 1, length(w)-1)))) && (c == sq || (index(body, "$") == 0 && index(body, bt) == 0))) {
+        o=o c c; w=w c c; i=j+1; continue }
+      o=o substr(s, i, j-i+1); w=w substr(s, i, j-i+1); i=j+1; continue }
+    o=o c; w=w c; i++ }
+  return o }
+function seg(s,   t) {
+  t=s; sub(/^[ \t({!]+/, "", t)
+  while (t ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", t)
+  if (t ~ /^git([ \t]+[^ \t]+)*[ \t]+(commit|tag|notes)([ \t]|$)/ || t ~ /^gh[ \t]+(pr|issue)[ \t]+(create|comment|edit)([ \t]|$)/) return blank(s)
+  return s }
+{ l=$0; n=length(l); cur=""; out=""; q=""; i=1
+  while (i <= n) { c=substr(l, i, 1)
+    if (q != "") { if (c == "\\" && q == dq) { cur=cur substr(l, i, 2); i+=2; continue }; if (c == q) q=""; cur=cur c; i++; continue }
+    if (c == "\\") { cur=cur substr(l, i, 2); i+=2; continue }
+    if (c == sq || c == dq) { q=c; cur=cur c; i++; continue }
+    if (c == ";" || c == "|" || c == "&") { out=out seg(cur) c; cur=""; i++; continue }
+    cur=cur c; i++ }
+  print out seg(cur) }
 INERT
   # Match raw with quotes and letter escapes stripped. Only a single simple line led by an inert text command
   # (echo, grep, cat) has quoted spans blanked, and a heredoc body is blanked unless an interpreter consumes it.
-  CMD_MATCH="$( { printf '%s' "$CMD" | sed -E "$INERT_SED" 2>/dev/null || printf '%s' "$CMD"; } | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96); hd=0 }
+  CMD_MATCH="$( { printf '%s\n' "$CMD" | awk "$INERT_AWK" 2>/dev/null || printf '%s' "$CMD"; } | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96); hd=0 }
     { l=$0
       if (hd) { t=l; sub(/^\t+/, "", t); if (t == hd_end) { hd=0 } else if (!hd_keep) { l="" } ; print l; next }
       if (match(l, /<<-?[ \t]*[\047"]?[A-Za-z_][A-Za-z0-9_]*[\047"]?/) && substr(l, RSTART+2, 1) != "<") {
@@ -258,10 +302,24 @@ fi
 # See docs/CROSS-PLATFORM-FRAMEWORKS.md: an Android-only command beats a committed ios/
 # folder for the Apple-only checks below (standalone mode has no CMD, unaffected).
 CMD_TARGET_ANDROID_ONLY=0
-if [ -n "$CMD" ] \
-  && printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b' \
-  && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; then
-  CMD_TARGET_ANDROID_ONLY=1
+AND_TARGET_RE='build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|(-p|--platform)([[:space:]]+|=)android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b'
+IOS_TARGET_RE='\bios\b|\bipa\b|xcodebuild|altool|notarytool'
+if [ -n "$CMD" ]; then
+  # Each submitting segment is classified on its own. Android only means every submit in the command is Android.
+  SEG_SUBMITS=0; SEG_ALL_AND=1
+  while IFS= read -r SEG; do
+    [ -n "$SEG" ] && submits "$SEG" || continue
+    SEG_SUBMITS=$((SEG_SUBMITS+1))
+    { printf '%s' "$SEG" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEG" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
+  done <<SEGS
+$(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n')
+SEGS
+  if [ "$SEG_SUBMITS" -gt 0 ]; then
+    [ "$SEG_ALL_AND" -eq 1 ] && CMD_TARGET_ANDROID_ONLY=1
+  # A wrapped submit (npm run, make) names no tool in the command itself, so the whole command decides, as before.
+  elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
+    CMD_TARGET_ANDROID_ONLY=1
+  fi
 fi
 CMD_TARGET_IOS_ONLY=0
 if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \
@@ -270,7 +328,7 @@ if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+
 fi
 
 [ -z "$DIR" ] && DIR="$PWD"
-[ -d "$DIR" ] || { log_err "project dir not found. $DIR"; exit 0; }
+[ -d "$DIR" ] || { log_err "project dir not found. $DIR"; cursor_reply 0; exit 0; }
 [ -L "${DIR%/}" ] && DIR="$(cd "$DIR" 2>/dev/null && pwd -P)"   # find never descends a symlinked start point (issue #612)
 
 # Every text file once, into one blob, so a hundred grep_has calls read one file instead of every file
@@ -310,30 +368,50 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
 
 # Source with comment-only lines and trailing // comments blanked, so a comment never counts as code.
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
-build_code() {
+# Source with comments dropped. Strings (one-line, triple-quoted, JS template) are kept, so a marker in one is text.
+STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/\\\\\"" sq bt "]" }
+    FNR == 1 { blk=0; tq=""; tb=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/) }
+    { l=$0
+      if (!blk && tq == "" && !tb && l !~ fast) { print l; next }
+      n=length(l); o=""; q=""; i=1
+      while (i <= n) { c=substr(l, i, 1)
+        if (blk) { if (c == "*" && substr(l, i+1, 1) == "/") { blk=0; i+=2 } else i++; continue }
+        if (c == "\\") { o=o substr(l, i, 2); i+=2; continue }
+        if (tq != "") { if (substr(l, i, 3) == tq) { o=o tq; tq=""; i+=3 } else { o=o c; i++ }; continue }
+        if (tb) { if (c == bt) tb=0; o=o c; i++; continue }
+        if (q != "") { if (c == q) q=""; o=o c; i++; continue }
+        if (c == "/" && substr(l, i+1, 1) == "/") break
+        if (c == "/" && substr(l, i+1, 1) == "*") { blk=1; i+=2; continue }
+        if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
+        if (c == bt && js) { tb=1; o=o c; i++; continue }
+        if (c == dq || c == sq || c == bt) q=c
+        o=o c; i++ }
+      print o }'
+build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
   CODE_OK=0
   : > "$FILELIST.code" 2>/dev/null || return 0
-  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96) }
-      FNR == 1 { blk=0 }
-      { l=$0
-        if (blk) { p=index(l, "*/"); if (p == 0) { print ""; next }; l=substr(l, p+2); blk=0 }
-        t=l; sub(/^[ \t]+/, "", t)
-        if (substr(t, 1, 2) == "//") { print ""; next }
-        if (substr(t, 1, 2) == "/*") { p=index(substr(t, 3), "*/"); if (p == 0) { blk=1; print ""; next }; l=substr(t, p+4) }
-        if (index(l, "//")) { q=""; n=length(l)
-          for (i=1; i<=n; i++) { c=substr(l, i, 1)
-            if (c == "\\") { i++; continue }
-            if (q == "") { if (c == "\"" || c == sq || c == bt) q=c; else if (c == "/" && substr(l, i+1, 1) == "/") { l=substr(l, 1, i-1); break } }
-            else if (c == q) q="" } }
-        print l }' 2>/dev/null
+  : > "$FILELIST.impl" 2>/dev/null || return 0
+  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk "$STRIP_AWK" 2>/dev/null
+    grep -E '\.html$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { hc=0 } { l=$0; o=""
+        while (l != "") { if (hc) { p=index(l, "-->"); if (p == 0) { l=""; break }; l=substr(l, p+3); hc=0; continue }
+          p=index(l, "<!--"); if (p == 0) { o=o l; break }; o=o substr(l, 1, p-1); l=substr(l, p+4); hc=1 }
+        print o }' 2>/dev/null
+    printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.impl" 2>/dev/null
+  { grep -vF "$BLOB_END" "$FILELIST.impl" 2>/dev/null
     grep -vE "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIh -e '' 2>/dev/null
     printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.code" 2>/dev/null
-  [ "$(tail -n 1 "$FILELIST.code" 2>/dev/null)" = "$BLOB_END" ] && CODE_OK=1
+  [ "$(tail -n 1 "$FILELIST.code" 2>/dev/null)" = "$BLOB_END" ] && [ "$(tail -n 1 "$FILELIST.impl" 2>/dev/null)" = "$BLOB_END" ] && CODE_OK=1
 }
-code_has() {  # grep_has over the comment-stripped source. Falls back to grep_has when the buffer cannot be built
+code_has() {  # grep_has over the comment-stripped source plus raw non-source. Falls back to grep_has without a buffer
   [ -s "$FILELIST" ] || return 1
   [ -n "${CODE_STATE:-}" ] || { build_code; CODE_STATE=1; }
   if [ "${CODE_OK:-0}" -eq 1 ]; then grep -Eqs -e "$1" "$FILELIST.code" 2>/dev/null; return; fi
+  grep_has "$1"
+}
+impl_has() {  # comment-stripped source and HTML only. a .strings, plist or json mention never proves an implementation
+  [ -s "$FILELIST" ] || return 1
+  [ -n "${CODE_STATE:-}" ] || { build_code; CODE_STATE=1; }
+  if [ "${CODE_OK:-0}" -eq 1 ]; then grep -Eqs -e "$1" "$FILELIST.impl" 2>/dev/null; return; fi
   grep_has "$1"
 }
 
@@ -431,7 +509,7 @@ FILELIST="$(mktemp 2>/dev/null)" || FILELIST=""
 # No scan buffer means no scan. Say so rather than end CLEAR on an empty file list.
 if [ -z "$FILELIST" ] || ! : > "$FILELIST" 2>/dev/null; then
   NOTE="NOT CHECKED. The guard could not create its scan buffer in ${TMPDIR:-/tmp}, so nothing was scanned. Point TMPDIR at a writable folder and run it again."
-  if [ -n "$STDIN_JSON" ]; then echo "app-store-compliance-guard. $NOTE" >&2; exit 0; fi
+  if [ -n "$STDIN_JSON" ]; then echo "app-store-compliance-guard. $NOTE" >&2; cursor_reply 0; exit 0; fi
   echo "$NOTE"; exit 1
 fi
 SCAN_ERROR=""
@@ -617,8 +695,9 @@ if [ "$IS_RN" -eq 1 ] && [ "$NEEDS_NATIVE" -eq 1 ]; then
     fi
     if [ "$CMD_TARGET_IOS_ONLY" -eq 0 ]; then
       # Only the permissions array counts. blockedPermissions removes a permission, it never adds one.
-      EX_PERMS="$(cat "${EXPO_CFG[@]}" 2>/dev/null | tr -d '\n\r' | grep -oE '(^|[^A-Za-z])"?permissions"?[[:space:]]*:[[:space:]]*\[[^]]*\]')"
-      if printf '%s' "$EX_PERMS" | grep -q 'ACCESS_BACKGROUND_LOCATION' || ex_cfg 'isAndroidBackgroundLocationEnabled"?[[:space:]]*:[[:space:]]*true'; then
+      EX_PERMS="$(cat "${EXPO_CFG[@]}" 2>/dev/null | tr -d '\n\r' | grep -oE "(^|[^A-Za-z])[\"']?permissions[\"']?[[:space:]]*:[[:space:]]*\\[[^]]*\\]")"
+      # A JS or TS config may quote a key either way, or not at all.
+      if printf '%s' "$EX_PERMS" | grep -q 'ACCESS_BACKGROUND_LOCATION' || ex_cfg "isAndroidBackgroundLocationEnabled[\"']?[[:space:]]*:[[:space:]]*true"; then
         finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location requested in the Expo app config" "Justify with a core feature and prominent disclosure, or use foreground location."
       fi
       if printf '%s' "$EX_PERMS" | grep -qE 'READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG'; then
@@ -656,7 +735,7 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." src 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
-    if ! code_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
+    if ! impl_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
       finding critical "APPLE-5.1.1-NO-ACCOUNT-DELETION" "Account creation found but no in app account deletion" "Add an in app account deletion flow (Apple 5.1.1(v))." src 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'
     fi
   fi
@@ -701,7 +780,7 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if grep_has 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'; then
     ATT_MISS=""
     config_has 'NSUserTrackingUsageDescription|userTrackingPermission' || ATT_MISS="NSUserTrackingUsageDescription in Info.plist or the build settings"
-    code_has 'requestTrackingAuthorization|requestTrackingPermission' || ATT_MISS="${ATT_MISS:+$ATT_MISS and }the ATTrackingManager.requestTrackingAuthorization call"
+    impl_has 'requestTrackingAuthorization|requestTrackingPermission' || ATT_MISS="${ATT_MISS:+$ATT_MISS and }the ATTrackingManager.requestTrackingAuthorization call"
     [ -z "$ATT_MISS" ] || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency, missing $ATT_MISS" "Call the ATT prompt and add NSUserTrackingUsageDescription, both are required (Apple 5.1.2)." src 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'
   fi
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
@@ -1066,9 +1145,27 @@ dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
   [ -f "$t/package.json" ] && grep -qE '"@capacitor/core"|"cordova-(ios|android)"' "$t/package.json" 2>/dev/null && return 0
   return 1
 }
+# Issue #656. Under a root framework app, a bare native project with its own Info.plist or AndroidManifest.xml is a
+# second app, unless a root build file (settings.gradle, Podfile, a workspace) names its path. A native root is unchanged.
+bare_native_apart() {  # $1 candidate dir below $DIR
+  local rel="${1#"${DIR%/}"/}" f
+  case "$rel" in ios|ios/*|android|android/*) return 1 ;; esac
+  # A demo, example, sample, or playground project ships with the repo, never to a store, so it stays in the root scan.
+  case "/$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')/" in
+    */*demo/*|*/*demos/*|*/*example/*|*/*examples/*|*/*sample/*|*/*samples/*|*/playground/*|*/playgrounds/*) return 1 ;;
+  esac
+  find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
+    -o \( -name 'Info.plist' -o -name 'AndroidManifest.xml' \) -print 2>/dev/null | grep . >/dev/null || return 1
+  for f in "$DIR"/settings.gradle "$DIR"/settings.gradle.kts "$DIR"/android/settings.gradle "$DIR"/android/settings.gradle.kts \
+    "$DIR"/Podfile "$DIR"/ios/Podfile "$DIR"/*.xcworkspace/contents.xcworkspacedata "$DIR"/ios/*.xcworkspace/contents.xcworkspacedata; do
+    [ -f "$f" ] && grep -qF -e "$rel" "$f" 2>/dev/null && return 1
+  done
+  return 0
+}
 app_roots() {  # prints the roots, one per line, only when two or more distinct apps exist. the project root itself may be one of them
-  local m d r k t x keep=() seen=() atroot=0 ROOT_REAL
+  local m d r k t x keep=() seen=() atroot=0 rootfw=0 ROOT_REAL
   ROOT_REAL="$(cd "$DIR" 2>/dev/null && pwd -P)" || ROOT_REAL="${DIR%/}"
+  has_framework_marker "$DIR" && rootfw=1
   {
     find_app 12 -name 'app.json' -o -name 'app.config.js' -o -name 'app.config.ts' -o -name 'app.config.mjs' -o -name 'app.config.cjs' \
       -o -name 'pubspec.yaml' -o -name 'capacitor.config.*' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \
@@ -1102,7 +1199,7 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
         seen+=("$t")
       else
         for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
-        [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue
+        [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && ! { [ "$rootfw" -eq 1 ] && bare_native_apart "$r"; } && continue
       fi
       keep+=("$r")
     done
@@ -1121,16 +1218,23 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
 # ----- report routing (issue #610). Hook mode buffers the report. A block goes to stderr, the only
 # stream Claude Code shows on exit 2. A pass stays on stdout. Standalone mode prints straight to stdout.
 emit_report() {  # $1 is the exit code about to be returned
-  [ -n "$REPORT" ] || return 0
-  exec 1>&3 3>&-
-  if [ "$1" -eq 2 ]; then cat "$REPORT" >&2; else cat "$REPORT"; fi
-  rm -f "$REPORT" 2>/dev/null; REPORT=""
+  if [ -n "$REPORT" ]; then
+    exec 1>&3 3>&-
+    CURSOR_IDS="$(grep -oE '\[CRITICAL\] [A-Za-z0-9._-]+' "$REPORT" 2>/dev/null | sed 's/^\[CRITICAL\] //' | sort -u | tr '\n' ' ')"
+    if [ "$1" -eq 2 ] || [ "$IS_CURSOR" -eq 1 ]; then cat "$REPORT" >&2; else cat "$REPORT"; fi
+    rm -f "$REPORT" 2>/dev/null; REPORT=""
+  elif [ "$CURSOR_FD" -eq 1 ]; then
+    exec 1>&3 3>&-; CURSOR_FD=0
+  fi
+  cursor_reply "$1"
 }
 # A hook timeout sends TERM. Flush what was buffered to stderr so the partial report is not lost.
 trap 'emit_report 2; exit 143' INT TERM HUP
 if [ -n "$STDIN_JSON" ]; then
   REPORT="$(mktemp 2>/dev/null)" || REPORT=""
   if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
+  # Unbuffered, Cursor still needs a clean stdout, so the live report goes to stderr instead.
+  if [ -z "$REPORT" ] && [ "$IS_CURSOR" -eq 1 ]; then exec 3>&1; exec 1>&2; CURSOR_FD=1; fi
 fi
 
 # The deadline list prints after the findings, and only for the stores this project ships to (issue #842).

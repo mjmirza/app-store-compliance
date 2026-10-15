@@ -2164,6 +2164,175 @@ for c in 'git commit -m x && eas submit -p ios' 'git commit -m "$(eas submit -p 
 done
 rm -rf "$D"
 
+# ===== Codex review round (October 2026). each case failed on the guard before its fix =====
+FL="fast""lane"
+cx_payload() {  # $1 json shape, $2 command, $3 cwd, $4 tool name. prints one payload
+  python3 -c '
+import json, sys
+kind, cmd, cwd, tool = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+shapes = {
+  "bash": {"tool_name": tool, "tool_input": {"command": cmd}, "cwd": cwd},
+  "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
+  "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+}
+print(json.dumps(shapes[kind]))' "$1" "$2" "$3" "${4:-Bash}"
+}
+CX_NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head tail mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date env ls; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$CX_NOTOOLS/$b"; done
+
+# CX1 a commit message exemption covers only the git segment, never a later command's arguments
+D="$(mk_ios_bad)"
+rr_hook "git commit -m safe; bash -c 'eval \"\$1\"' -m '$FL deliver'" "$D"
+[ "$RC" -eq 2 ] && ok "cx1-1 a -m argument of a later bash -c segment is not blanked as a message" || bad "cx1-1 a -m argument of a later bash -c segment is not blanked as a message (rc=$RC)"
+rr_hook "git commit -m \"wip; $FL deliver | later\" -m 'and && eas submit'" "$D"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx1-2 separators inside a quoted commit message stay text" || bad "cx1-2 separators inside a quoted commit message stay text (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# CX2 a compound command is classified per segment. any Apple upload keeps the Apple checks
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+for c in "./gradlew bundleRelease && $FL deliver" "$FL deliver && echo bundleRelease" "$FL pilot; ./gradlew assembleRelease"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'Command targets Android only' && ok "cx2 Apple checks stay on. $c" || bad "cx2 Apple checks stay on. $c (rc=$RC)"
+done
+rr_hook "./gradlew bundleRelease" "$D"
+rr_has 'Command targets Android only' && ok "cx2 a plain Android build stays Android only" || bad "cx2 a plain Android build stays Android only (rc=$RC)"
+rm -rf "$D"
+
+# CX14 every Android platform flag form is Android only, iOS and all are not
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+for c in "eas build -p android" "eas submit --platform=android" "eas submit --platform android" "eas build -p=android" "eas build --platform  android --profile production"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "cx14 Android only. $c" || bad "cx14 Android only. $c (rc=$RC)"
+done
+for c in "eas build -p ios" "eas build -p all" "eas submit --platform=android && eas submit --platform=ios"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "cx14 not Android only. $c" || bad "cx14 not Android only. $c (rc=$RC)"
+done
+rm -rf "$D"
+
+# CX3 a comment marker inside a string is not a comment. the code after it still counts
+D="$(mk_rr_ios '' 'import AVFoundation
+let help = """
+/* Start a comment using this marker
+"""
+let camera = AVCaptureDevice.default(for: .video)')"
+rr_run "$D"
+rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "cx3-1 /* inside a Swift multiline string does not hide the camera call" || bad "cx3-1 /* inside a Swift multiline string does not hide the camera call (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import CoreLocation
+let a = "x /* y", b = 1
+let m = CLLocationManager()
+let c = "z */ w"')"
+mkdir -p "$D/Web"; printf 'const t = `\n/* not a comment\n`;\nconst cam = "AVCaptureDevice";\n' > "$D/Web/t.ts"
+rr_run "$D"
+rr_has 'Location used without' && rr_has 'Camera used without NSCameraUsageDescription' && ok "cx3-2 /* inside a one-line string and a template literal keeps the code" || bad "cx3-2 /* inside a one-line string and a template literal keeps the code (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+let x = 1 /* deleteAccount */
+let y = "a" + "b" // deleteUser')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx3-3 a mid-line block comment still satisfies nothing" || bad "cx3-3 a mid-line block comment still satisfies nothing (rc=$RC)"
+rm -rf "$D"
+
+# CX4 a translation or config file never satisfies an implementation check
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+mkdir -p "$D/App/en.lproj"; printf '/* TODO: deleteAccount */\n"title" = "deleteUser";\n' > "$D/App/en.lproj/InfoPlist.strings"
+printf '{"deleteAccount": "soon"}\n' > "$D/App/flags.json"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "cx4-1 deleteAccount in InfoPlist.strings or a json config satisfies nothing" || bad "cx4-1 deleteAccount in InfoPlist.strings or a json config satisfies nothing (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+mkdir -p "$D/www"; printf '<html><!-- deleteAccount --><script>function deleteAccount(){ api.del() }</script></html>\n' > "$D/www/index.html"
+rr_run "$D"
+! rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx4-2 a real deletion function in inline HTML script still counts" || bad "cx4-2 a real deletion function in inline HTML script still counts (rc=$RC)"
+rm -rf "$D"
+
+# CX11 Cursor beforeShellExecution always gets permission JSON on stdout, the report on stderr
+CLEAN="$(mk_ios_clean)"; D="$(mk_ios_bad)"; EMPTY="$(mktemp -d)"
+ERRF="$(mktemp)"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$CLEAN" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="allow" else 1)' && [ "$RC" -eq 0 ] && grep -q 'CLEAR' "$ERRF" && ok "cx11-1 an allowed Cursor submit prints permission allow JSON" || bad "cx11-1 an allowed Cursor submit prints permission allow JSON (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$D" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="deny" and d.get("user_message") and d.get("agent_message") else 1)' && [ "$RC" -eq 2 ] && grep -q 'BLOCKED' "$ERRF" && ok "cx11-2 a blocked Cursor submit prints permission deny JSON and exits 2" || bad "cx11-2 a blocked Cursor submit prints permission deny JSON and exits 2 (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$EMPTY" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="allow" else 1)' && [ "$RC" -eq 0 ] && grep -q 'NOT CHECKED' "$ERRF" && ok "cx11-3 a NOT CHECKED Cursor submit still prints valid JSON" || bad "cx11-3 a NOT CHECKED Cursor submit still prints valid JSON (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$CLEAN" | env CLAUDE_PROJECT_DIR="$CLEAN" PATH="$CX_NOTOOLS" bash "$GUARD" 2>"$ERRF" )"; RC=$?
+[ "$OUTJ" = '{"permission":"allow"}' ] && [ "$RC" -eq 0 ] && ok "cx11-4 the no-tools tier also answers Cursor with JSON" || bad "cx11-4 the no-tools tier also answers Cursor with JSON (rc=$RC out=${OUTJ:0:60})"
+rm -rf "$CLEAN" "$D" "$EMPTY" "$ERRF"
+
+# CX16 a managed Expo config with single-quoted keys is read like a double-quoted one
+D="$(mktemp -d)"; printf '{"dependencies":{"expo":"51.0.0"}}' > "$D/package.json"
+printf "export default {\n  expo: { android: { 'permissions': ['android.permission.READ_SMS'] } }\n};\n" > "$D/app.config.js"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-SMS-CALLLOG' && ok "cx16-1 a single-quoted permissions key is read" || bad "cx16-1 a single-quoted permissions key is read (rc=$RC)"
+printf "export default { expo: { android: { 'isAndroidBackgroundLocationEnabled': true } } };\n" > "$D/app.config.js"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && ok "cx16-2 a single-quoted background location flag is read" || bad "cx16-2 a single-quoted background location flag is read (rc=$RC)"
+printf '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0"}}' > "$D/package.json"
+printf "export default { expo: { ios: { infoPlist: { 'NSCameraUsageDescription': 'Scan receipts' } } } };\n" > "$D/app.config.js"
+rr_hook "eas submit -p ios" "$D"
+! rr_has 'Camera module in the Expo app' && ok "cx16-3 a single-quoted camera purpose key is read" || bad "cx16-3 a single-quoted camera purpose key is read (rc=$RC)"
+rm -rf "$D"
+
+# CX17 with no jq and no python3, a Copilot toolArgs JSON string is still parsed (that tier reads no payload cwd)
+D="$(mk_ios_bad)"
+P_CS="$(cx_payload copilot-str "$FL deliver" "$D")"
+OUT="$( cd /tmp && printf '%s' "$P_CS" | env CLAUDE_PROJECT_DIR="$D" PATH="$CX_NOTOOLS" bash "$GUARD" 2>&1 )"; RC=$?
+[ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'App Store Compliance Guard' && ok "cx17-1 a Copilot toolArgs string is parsed on the no-tools tier" || bad "cx17-1 a Copilot toolArgs string is parsed on the no-tools tier (rc=$RC bytes=${#OUT})"
+P_CS="$(cx_payload copilot-str "ls -la" "$D")"
+OUT="$( cd /tmp && printf '%s' "$P_CS" | env CLAUDE_PROJECT_DIR="$D" PATH="$CX_NOTOOLS" bash "$GUARD" 2>&1 )"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx17-2 an ordinary Copilot command stays silent on the no-tools tier" || bad "cx17-2 an ordinary Copilot command stays silent on the no-tools tier (rc=$RC)"
+rm -rf "$D"
+
+# CX18 only real shell tool names carry a command. a read-only MCP tool named like a terminal is silent
+D="$(mk_ios_bad)"
+for tn in jq python3; do
+  TP="$PATH"; [ "$tn" = python3 ] && { TP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head tail mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date env ls python3; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$TP/$b"; done; }
+  for t in mcp__terminal__explain_command mcp__shell__lint myTerminalHelper; do
+    OUT="$( cd /tmp && cx_payload bash "$FL deliver" "$D" "$t" | env -u CLAUDE_PROJECT_DIR PATH="$TP" bash "$GUARD" 2>&1 )"; RC=$?
+    [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx18 $t stays silent (tier=$tn)" || bad "cx18 $t stays silent (tier=$tn rc=$RC)"
+  done
+  for t in run_in_terminal runInTerminal PowerShell execute_cmd; do
+    RC="$( cd /tmp && cx_payload bash "$FL deliver" "$D" "$t" | env -u CLAUDE_PROJECT_DIR PATH="$TP" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+    [ "$RC" = "2" ] && ok "cx18 $t is scanned (tier=$tn)" || bad "cx18 $t is scanned (tier=$tn rc=$RC)"
+  done
+  [ "$tn" = python3 ] && rm -rf "$TP"
+done
+rm -rf "$D" "$CX_NOTOOLS"
+
+# 656 a bare native project under a root framework app is its own app, unless a root build file pulls it in
+mk_fw_root_plus_native() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/native/Legacy/Legacy.xcodeproj" "$d/native/Legacy/Legacy"
+  printf '{"expo":{"name":"root"}}' > "$d/app.json"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/App/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/ios/App/PrivacyInfo.xcprivacy"
+  printf 'let policy="https://root.example.io/privacy-policy"\n' > "$d/ios/App/R.swift"
+  printf 'X=1;\n' > "$d/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/native/Legacy/Legacy/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/native/Legacy/Legacy/L.swift"
+  echo "$d"
+}
+D="$(mk_fw_root_plus_native)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q "^App\. $D/native/Legacy$" && [ "$RC" -eq 2 ] && ok "i656-1 a bare Xcode project under a root Expo app is scanned on its own" || bad "i656-1 a bare Xcode project under a root Expo app is scanned on its own (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+mkdir -p "$D/ios/App.xcworkspace"; printf '<Workspace><FileRef location="group:../native/Legacy/Legacy.xcodeproj"></FileRef></Workspace>\n' > "$D/ios/App.xcworkspace/contents.xcworkspacedata"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "i656-2 a nested project the root workspace references stays merged" || bad "i656-2 a nested project the root workspace references stays merged (rc=$RC)"
+rm -rf "$D"
+D="$(mk_fw_root_plus_native)"; rm -rf "$D/native"
+mkdir -p "$D/android/app" "$D/libs/legacy/src/main"
+printf "include ':app', ':legacy'\nproject(':legacy').projectDir = new File('../libs/legacy')\n" > "$D/android/settings.gradle"
+printf 'apply plugin: "com.android.application"\n' > "$D/android/app/build.gradle"
+printf 'apply plugin: "com.android.application"\nandroid { defaultConfig { targetSdkVersion 36 } }\n' > "$D/libs/legacy/build.gradle"
+printf '<manifest/>' > "$D/libs/legacy/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q '^App\. ' && ok "i656-3 an Android project the root settings.gradle includes stays merged" || bad "i656-3 an Android project the root settings.gradle includes stays merged (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -f "$D/android/settings.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/libs/legacy$" && ok "i656-4 the same Android project with no shared build file is its own app" || bad "i656-4 the same Android project with no shared build file is its own app (rc=$RC)"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
