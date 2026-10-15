@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import bisect
 import os
 import sys
 import re
@@ -89,64 +90,75 @@ def scan_files(directory):
                 android_files.append(path)
     return ios_files, android_files
 
-def strip_swift_comments(content):
-    """Blank out // and /* */ comments, keeping newlines and string literals intact."""
-    out = []
-    i, n = 0, len(content)
-    in_str = False
+def swift_code_only(content):
+    """Blank comments (nested too) and string contents, keeping quotes, newlines and offsets.
+    What is left is code, so a Button inside a comment or a string is never read as a control."""
+    out = list(content)
+    n = len(content)
+    i = 0
+
+    def blank(a, b):
+        for k in range(a, b):
+            if out[k] != "\n":
+                out[k] = " "
+
     while i < n:
         c = content[i]
-        if in_str:
-            out.append(c)
-            if c == "\\" and i + 1 < n:
-                out.append(content[i + 1])
-                i += 2
-                continue
-            if c == '"' or c == "\n":
-                in_str = False
-            i += 1
-        elif c == '"':
-            in_str = True
-            out.append(c)
-            i += 1
-        elif content.startswith("//", i):
+        if content.startswith("//", i):
             j = content.find("\n", i)
             j = n if j == -1 else j
-            out.append(" " * (j - i))
+            blank(i, j)
             i = j
         elif content.startswith("/*", i):
-            j = content.find("*/", i + 2)
-            j = n if j == -1 else j + 2
-            out.append("".join(ch if ch == "\n" else " " for ch in content[i:j]))
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if content.startswith("/*", j):
+                    depth, j = depth + 1, j + 2
+                elif content.startswith("*/", j):
+                    depth, j = depth - 1, j + 2
+                else:
+                    j += 1
+            blank(i, j)
             i = j
+        elif c == "#" or c == '"':
+            hashes = 0
+            while i + hashes < n and content[i + hashes] == "#":
+                hashes += 1
+            q = i + hashes
+            if q >= n or content[q] != '"':
+                i += max(hashes, 1)
+                continue
+            multi = content.startswith('"""', q)
+            opener = 3 if multi else 1
+            close = ('"""' if multi else '"') + "#" * hashes
+            j = q + opener
+            while j < n:
+                if hashes == 0 and content[j] == "\\":
+                    j += 2
+                    continue
+                if not multi and content[j] == "\n":
+                    break
+                if content.startswith(close, j):
+                    break
+                j += 1
+            blank(q + opener, min(j, n))
+            i = min(j + len(close), n) if j < n and content.startswith(close, j) else j
         else:
-            out.append(c)
             i += 1
     return "".join(out)
 
 
 def _match_close(text, start, open_ch, close_ch):
-    """Index just past the bracket matching text[start], skipping string literals. -1 if unbalanced."""
+    """Index just past the bracket matching text[start] in string-blanked code. -1 if unbalanced."""
     depth = 0
-    i, n = start, len(text)
-    in_str = False
-    while i < n:
+    for i in range(start, len(text)):
         c = text[i]
-        if in_str:
-            if c == "\\":
-                i += 2
-                continue
-            if c == '"':
-                in_str = False
-        elif c == '"':
-            in_str = True
-        elif c == open_ch:
+        if c == open_ch:
             depth += 1
         elif c == close_ch:
             depth -= 1
             if depth == 0:
                 return i + 1
-        i += 1
     return -1
 
 
@@ -156,49 +168,93 @@ def _skip_ws(text, i):
     return i
 
 
+def _modifier_chain(code, i):
+    """Read the .modifier(...) chain that follows offset i. Returns (names with args, end offset)."""
+    mods = []
+    n = len(code)
+    while True:
+        j = _skip_ws(code, i)
+        if (
+            j >= n
+            or code[j] != "."
+            or j + 1 >= n
+            or not (code[j + 1].isalpha() or code[j + 1] == "_")
+        ):
+            return mods, i
+        k = j + 1
+        while k < n and (code[k].isalnum() or code[k] == "_"):
+            k += 1
+        name, args = code[j + 1 : k], ""
+        k2 = _skip_ws(code, k)
+        if k2 < n and code[k2] == "(":
+            end = _match_close(code, k2, "(", ")")
+            if end == -1:
+                return mods, i
+            args, k = code[k2:end], end
+            k2 = _skip_ws(code, k)
+        if k2 < n and code[k2] == "{":
+            end = _match_close(code, k2, "{", "}")
+            if end == -1:
+                return mods, i
+            k = end
+        mods.append((name, args))
+        i = k
+
+
+IMAGE_SYMBOL = re.compile(r"\bImage\s*\(\s*systemName\s*:")
+NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
+
+
 def find_icon_only_buttons(code):
-    """Yield (offset, snippet) for SwiftUI Buttons whose only label is an Image(systemName:)
-    with no accessibilityLabel on the label or on the Button's modifier chain."""
-    for m in re.finditer(r"(?<![A-Za-z0-9_])Button\b", code):
+    """Yield (offset, end) for SwiftUI Buttons whose only label is an Image(systemName:)
+    with no accessibilityLabel on the label or on the Button's own modifier chain."""
+    for m in re.finditer(r"(?<![A-Za-z0-9_.])Button\b", code):
         i = _skip_ws(code, m.end())
         label = None
         if i < len(code) and code[i] == "(":
             end = _match_close(code, i, "(", ")")
             if end == -1:
                 continue
-            args = code[i + 1:end - 1]
-            if re.match(r'\s*"', args) or re.search(r"\b(label|title)\s*:", args):
-                continue  # titled button, or label supplied inline
-            i = _skip_ws(code, end)
-            if i < len(code) and code[i] == "{":
-                end2 = _match_close(code, i, "{", "}")
-                if end2 == -1:
+            args = code[i + 1 : end - 1]
+            if re.match(r"\s*#*\"", args) or re.search(r"\btitle\s*:", args):
+                continue  # a titled button reads its title
+            lab = re.search(r"\blabel\s*:\s*\{", args)
+            if lab:
+                start = i + 1 + lab.end() - 1
+                lend = _match_close(code, start, "{", "}")
+                if lend == -1:
                     continue
-                label = code[i:end2]
-                i = end2
+                label = code[start:lend]
+            elif re.search(r"\blabel\s*:", args):
+                continue  # a label view passed by name cannot be read here
+            i = end
+            j = _skip_ws(code, i)
+            if label is None and j < len(code) and code[j] == "{":
+                lend = _match_close(code, j, "{", "}")
+                if lend == -1:
+                    continue
+                label, i = code[j:lend], lend
         elif i < len(code) and code[i] == "{":
             end = _match_close(code, i, "{", "}")
             if end == -1:
                 continue
-            i = _skip_ws(code, end)
-            if not code.startswith("label:", i):
+            j = _skip_ws(code, end)
+            lab = re.match(r"label\s*:\s*\{", code[j : j + 64])
+            if not lab:
                 continue
-            i = _skip_ws(code, i + len("label:"))
-            if i >= len(code) or code[i] != "{":
+            start = j + lab.end() - 1
+            lend = _match_close(code, start, "{", "}")
+            if lend == -1:
                 continue
-            end2 = _match_close(code, i, "{", "}")
-            if end2 == -1:
-                continue
-            label = code[i:end2]
-            i = end2
-        if not label or "Image(systemName:" not in label:
+            label, i = code[start:lend], lend
+        if not label or not IMAGE_SYMBOL.search(label) or NAMED_CONTENT.search(label):
             continue
-        if re.search(r"\b(Text|Label)\s*\(|accessibilityLabel", label):
+        mods, _ = _modifier_chain(code, i)
+        if any(name == "accessibilityLabel" for name, _ in mods):
             continue
-        chain = re.match(r"(?:\s*\.[^\n]*)*", code[i:]).group(0)
-        if "accessibilityLabel" in chain or "accessibilityHidden(true)" in chain:
+        if any(name == "accessibilityHidden" and "true" in args for name, args in mods):
             continue
-        yield m.start(), code[m.start():i].split("\n")[0].strip()
+        yield m.start(), i
 
 
 def run_rule_scan(rule_id, ios_files, android_files):
@@ -235,13 +291,14 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier."
                     })
 
-            code = strip_swift_comments(content)
-            for offset, snippet in find_icon_only_buttons(code):
+            code = swift_code_only(content)
+            newlines = [k for k, ch in enumerate(code) if ch == "\n"]
+            for offset, end in find_icon_only_buttons(code):
                 findings.append({
                     "file": f,
-                    "line": code.count("\n", 0, offset) + 1,
+                    "line": bisect.bisect_right(newlines, offset) + 1,
                     "rule_id": rule_id,
-                    "match": snippet,
+                    "match": content[offset:end].split("\n")[0].strip(),
                     "message": "Icon-only Button whose label is an Image(systemName:) has no accessibilityLabel, so VoiceOver reads the symbol name.",
                     "fix": "Add .accessibilityLabel(\"...\") to the Button, or use Label(\"Title\", systemImage: ...) / Button(\"Title\", systemImage: ...)."
                 })
@@ -350,7 +407,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            code = strip_swift_comments(content)
+            code = swift_code_only(content)
             if re.search(r"\.onTapGesture\b|(?<![A-Za-z0-9_])Button\s*[({]", code):
                 if not any(kw in content for kw in ["FeedbackGenerator", "CoreHaptics", "CHHapticEngine"]):
                     findings.append({

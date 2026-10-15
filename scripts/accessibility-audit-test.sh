@@ -492,6 +492,64 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_bad2" "$ISSUE_DIR/lexer_clean" "$ISSUE_DIR/big"
+cat << 'EOF' > "$ISSUE_DIR/icon_bad2/Inline.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: {}, label: { Image(systemName: "trash") })
+        Button(action: edit) { Image (systemName: "gear") }
+        HStack {
+            Button(action: {}) { Image(systemName: "xmark") }.padding(); Text("Other").accessibilityLabel("Other")
+        }
+    }
+}
+EOF
+
+cat << 'EOF' > "$ISSUE_DIR/lexer_clean/Strings.swift"
+import SwiftUI
+/* outer /* nested Button { } label: { Image(systemName: "a") } */ still a comment Button(action: x) { Image(systemName: "b") } */
+let raw = #"Button(action: x) { Image(systemName: "c") } and "quotes" inside"#
+let multi = """
+Button(action: y) { Image(systemName: "d") }
+see https://example.com/a // not a comment
+"""
+struct V: View {
+    var body: some View { Text(multi).font(.body) }
+}
+EOF
+
+python3 - "$ISSUE_DIR/big/Big.swift" << 'PY'
+import sys
+block = 'struct V%d: View {\n    var body: some View {\n        Button(action: {}) { Image(systemName: "trash") }\n    }\n}\n'
+with open(sys.argv[1], "w") as f:
+    for i in range(16000):
+        f.write(block % i)
+PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_bad2" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 3 ]; then
+  ok "#834 inline label closure, spaced Image (, and a sibling label on the same line are all flagged"
+else
+  bad "#834 missed an inline, spaced, or sibling-shadowed icon button. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/lexer_clean" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 buttons inside nested comments, raw strings, and multiline strings are not flagged"
+else
+  bad "#834 flagged a button that only exists in a comment or string. Output:"; echo "$OUT"
+fi
+
+START=$(python3 -c 'import time; print(time.time())')
+$AUDIT "$ISSUE_DIR/big" --rule APPLE-ACCESSIBILITY-VOICEOVER >/dev/null 2>&1
+ELAPSED=$(python3 -c "import time; print(round(time.time() - $START, 2))")
+if python3 -c "import sys; sys.exit(0 if $ELAPSED < 4 else 1)"; then
+  ok "#834 a 1.5 MB Swift file with 16000 buttons scans in under 4 seconds (${ELAPSED}s)"
+else
+  bad "#834 large file scan is too slow (${ELAPSED}s)"
+fi
+
 OUT=$($AUDIT "$ISSUE_DIR/icon_bad" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
   ok "#834 flagged both icon-only systemName buttons without accessibilityLabel"
