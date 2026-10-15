@@ -54,6 +54,8 @@ for t in codex gemini opencode cursor copilot; do
     [ "$BEFORE" = "$(cat "$(cfg "$t")")" ] && [ "$(count "$t")" = "1" ] && ok "$t a second run is idempotent" || bad "$t a second run is idempotent"
   else
     grep -q 'tool.execute.before' "$(cfg "$t")" && ok "$t plugin written" || bad "$t plugin written"
+    # OpenCode before 1.0 loads plugin/, current OpenCode loads plugins/. Both must carry it.
+    cmp -s "$(cfg "$t")" "$H/.config/opencode/plugin/app-store-compliance.js" && ok "$t plugin also in the plugin/ folder older OpenCode reads" || bad "$t plugin also in the plugin/ folder older OpenCode reads"
     echo "$OUT" | grep -q "the plugin stops a submit command" && ok "$t plugin blocks a submit command in node" || bad "$t plugin blocks a submit command in node"
   fi
   # 2 doctor passes, and fails after uninstall
@@ -62,7 +64,7 @@ for t in codex gemini opencode cursor copilot; do
   run --tool "$t" uninstall >/dev/null
   [ ! -e "$H/.agents/skills/app-store-compliance" ] && ok "$t uninstall removes the shared skill when no tool is left" || bad "$t uninstall removes the shared skill when no tool is left"
   if [ "$t" = "opencode" ]; then
-    [ ! -e "$(cfg "$t")" ] && ok "$t uninstall removes the plugin" || bad "$t uninstall removes the plugin"
+    [ ! -e "$(cfg "$t")" ] && [ ! -e "$H/.config/opencode/plugin/app-store-compliance.js" ] && ok "$t uninstall removes the plugin from both folders" || bad "$t uninstall removes the plugin from both folders"
   else
     [ "$(count "$t")" = "0" ] && ok "$t uninstall removes the hook entry" || bad "$t uninstall removes the hook entry"
   fi

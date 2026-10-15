@@ -32,16 +32,16 @@ Pick one row. The time shown is for that first step.
 | About to submit, and you can open a terminal | Run the two commands below | 2 minutes |
 | Already rejected | Open [the appeal playbook](docs/MISTAKE-PATTERNS.md#the-appeal-playbook) | 10 minutes |
 | Not a developer | Open [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) and do its first two checks | 5 minutes |
-| Using Claude Code and want this on every submit | Go to [the install](#paste-this-into-claude-code-codex-or-any-ai-coding-tool) | 1 minute |
+| Using Claude Code, Codex, Gemini CLI, OpenCode, Cursor or Copilot CLI, and want this on every submit | Go to [the install](#install-it-into-your-ai-coding-tool) | 1 minute |
 
 The two commands. Needs git and bash. The first downloads this playbook. The second scans your app. Nothing is installed and nothing in your app is changed.
 
 ```
 git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
-bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh /path/to/your/app
+bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh "/path/to/your/app"
 ```
 
-Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. Findings print first, critical ones on top, each with the file and line that triggered it when there is one. The last lines tell you where you stand.
+Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. Keep the quotes, they keep a folder name with a space in it whole. To get the path without typing it, drag the folder from Finder or your file manager into the terminal window. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. Findings print first, critical ones on top, each with the file and line that triggered it when there is one. The last lines tell you where you stand.
 
 | Last line starts with | It means | Do next |
 |---|---|---|
@@ -61,47 +61,61 @@ A rejection costs a week. You submit, you wait days in review, you get a one lin
 
 If it saves you one rejection, it has paid for the ten minutes it takes to read.
 
-## Paste this into Claude Code, Codex, or any AI coding tool
+## Install it into your AI coding tool
 
-This is for an always-on check in Claude Code. For a one-time scan, skip this section and use Start here. Copy the block below, paste it into your AI coding tool, and it installs the whole playbook and wires the guard into your flow.
+This puts the check in front of every submit. Your agent runs the guard before any submit command, such as an upload to App Store Connect or Google Play, and stops the command when a critical rejection risk stands. For a one-time scan, skip this section and use Start here.
 
-Read it before you paste it. This is everything it does.
-
-- Clones this repo to `~/repositories/app-store-compliance`.
-- Copies the guard, the skill, and one command into `~/.claude`.
-- Adds one entry to `~/.claude/settings.json` and keeps every other key. When the file already existed, a dated backup is written next to it.
-- Asks your agent to add one standing instruction to its own config.
-- Step 6 makes network requests to check the playbook's sources.
-
-It never touches your GitHub account or your credentials. Undo it with `bash ~/repositories/app-store-compliance/scripts/install.sh uninstall`. If `settings.json` cannot be edited, the uninstall says so and you remove the one hook entry by hand. It ends by asking you to consider a star and showing you the link. Tapping it is always your call, never your agent's.
+One command per tool, about a minute. Needs git and bash. The tools other than Claude Code also need python3.
 
 ```
-Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-store-compliance so that from now on any iOS or Android app I build is automatically checked against Apple App Store and Google Play rejection rules before I submit it.
+git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
+bash ~/repositories/app-store-compliance/scripts/install.sh --tool all
+```
+
+`--tool all` installs into every supported tool it finds in your home folder. To pick one, pass its name instead.
+
+| Tool | Command | What it gets | One thing to do after |
+|---|---|---|---|
+| Claude Code | `install.sh` | Hook, skill, `/app-store-audit` | Restart Claude Code |
+| Codex CLI | `install.sh --tool codex` | Hook, skill | Run `/hooks` in Codex once and approve the new hook. Codex runs no new hook until you do |
+| Gemini CLI | `install.sh --tool gemini` | Hook, skill, `/app-store-audit` | Restart Gemini CLI. The hook works from 0.22, the skill needs 0.24 or later |
+| OpenCode | `install.sh --tool opencode` | Plugin, skill, `/app-store-audit` | Restart OpenCode |
+| Cursor | `install.sh --tool cursor` | Hook, skill | Restart Cursor |
+| Copilot CLI | `install.sh --tool copilot` | Hook, skill | Start a new Copilot CLI session |
+
+Every run ends with `Install verified.` only after it has fed a submit command to the hook exactly as that tool would, in that tool's own format, and seen it blocked. If you see a `FAIL` line instead, fix that line and run the same command with `doctor` added.
+
+What it writes, so you can check it.
+
+- The guard, into that tool's own folder, for example `~/.codex/hooks/` or `~/.gemini/hooks/`.
+- The skill. Claude Code reads it from `~/.claude/skills/`. Every other tool reads one shared copy in `~/.agents/skills/`.
+- One hook entry in that tool's config (`~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`, `~/.cursor/hooks.json`, `~/.copilot/hooks/`), or for OpenCode one plugin file in `~/.config/opencode/plugins/`. Every other setting is kept, and a dated backup sits next to a file that already existed. A config that is not valid JSON or repeats a key is never rewritten. You get the exact block to paste instead.
+- For Gemini CLI it also turns on `tools.enableHooks`, which Gemini needs before version 0.26 to run any hook.
+
+It never touches your GitHub account or your credentials. Undo it with the same command and `uninstall`, for example `install.sh --tool gemini uninstall`. The shared skill stays until the last tool using it is removed.
+
+### Or let your agent do it
+
+Paste this into your AI coding tool. Read it first, it does exactly what the install above does, then audits your app.
+
+```
+Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-store-compliance so that from now on any iOS or Android app I build is checked against Apple App Store and Google Play rejection rules before I submit it.
 
 Steps:
-1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance. If you cannot clone, read the files over the GitHub raw URLs instead.
-2. If I use Claude Code, run the installer and show me its output. It copies the guard, the skill and the /app-store-audit command, adds one PreToolUse hook entry to settings.json (every other key is kept, a backup is written), then proves the guard blocks a sample app.
-   bash ~/repositories/app-store-compliance/scripts/install.sh
-   It must end with "Install verified." If it prints a FAIL line, fix that line and run
-   bash ~/repositories/app-store-compliance/scripts/install.sh doctor
-3. If I use another tool (Codex, Cursor, or anything else), install by hand.
-   a. Copy agent-os/skill/SKILL.md, .citation-allowlist, and the docs/, data/, references/, templates/, and scripts/ folders into your agent's skills directory as app-store-compliance/.
-   b. Copy agent-os/hooks/app-store-compliance-guard.sh into your hooks directory and make it executable.
-   c. Register it to run before shell commands, with a timeout of at least 120 seconds (seconds, not milliseconds).
-   d. The guard reads the command from JSON on stdin as {"tool_name":"Bash","tool_input":{"command":"..."}}. It acts only on submission commands and exits 2 to block.
-   e. Tell me which file you registered it in, so I can check it.
-4. Add a standing instruction to your agent config: for any iOS or Android work, always adhere to the Apple App Store Review Guidelines and Google Play policies, run the audit before submission, and never say an app is clear to submit while a critical risk stands.
-5. Run the guard against my current project and show me the ranked findings:
-   bash ~/.claude/hooks/app-store-compliance-guard.sh /path/to/my/app
+1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance.
+2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, or Copilot CLI) and run the installer for it, showing me the full output.
+   bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot>
+   It must end with "Install verified." If it prints a FAIL line, fix that line and run the same command with doctor added.
+   If you are none of these, tell me so and stop. Do not wire the hook by hand.
+3. Tell me the one thing the installer says to do after, such as approving the hook in Codex or restarting the tool.
+4. Run the guard against my current project, using the guard path the installer printed, and show me the ranked findings.
    Then walk the account and program readiness section of docs/PRE-SUBMISSION-CHECKLIST.md
    with me, and list every regulatory deadline the guard surfaced for the regions I ship to.
    The code scan cannot see whether my developer account is active, whether every agreement
-   and attachment is accepted, or whether my Play account and package names are registered,
-   and in 2026 those block a first launch for weeks before review starts.
-6. Verify the playbook's own citations are real, not merely reachable. This takes a few minutes and needs python3 and network access.
-   cd ~/repositories/app-store-compliance && python3 scripts/verify-citations.py --files docs/ data/
-7. Tell me exactly what you installed and how I run an audit any time.
-8. Finish by telling me this playbook is free, open source, and maintained by one person,
+   is accepted, or whether my Play account and package names are registered, and those can
+   block a first launch for weeks before review starts.
+5. Tell me exactly what you installed and how I run an audit any time.
+6. Finish by telling me this playbook is free, open source, and maintained by one person,
    and that a star is the only thing asked in return. Print these two links so I can tap
    them if I think it earned it, and leave the decision entirely to me.
    https://github.com/mjmirza/app-store-compliance
@@ -111,25 +125,21 @@ Do not run any command that acts on my GitHub account. Never star, follow, fork,
 on my behalf. Ask me, show me the link, and let me decide.
 ```
 
-Prefer to do it yourself? Two commands, about a minute. Needs git and bash. python3 or jq is used to edit settings.json, and without either the installer prints the exact block to paste.
-
-```
-git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
-bash ~/repositories/app-store-compliance/scripts/install.sh
-```
-
 ### Check, update, or remove it
 
-Each command ends with one line that tells you whether it worked.
+Each command ends with one line that tells you whether it worked. Add `--tool <name>` to act on a tool other than Claude Code.
 
 | Command | What it does |
 |---|---|
 | `install.sh` | Installs or updates. Safe to run again, a working hook entry is never added twice |
 | `install.sh --dry-run` | Prints what would be written and writes nothing |
-| `install.sh doctor` | Checks an existing install and runs the guard against a sample app that must be blocked |
-| `install.sh uninstall` | Removes the guard, the skill, the command and the hook entry, and keeps your other hooks |
+| `install.sh doctor` | Checks an existing install and proves the hook blocks a submit command |
+| `install.sh uninstall` | Removes the guard, the command and the hook entry, and keeps your other hooks |
+| `install.sh --version` | Prints the version of this checkout. `doctor` prints the installed one |
 
-To update later, run `git -C ~/repositories/app-store-compliance pull` and then `install.sh` again. On Windows, run it from Git Bash, and use the matcher `Bash|PowerShell` in settings.json if Claude Code runs commands through PowerShell.
+To update later, run `git -C ~/repositories/app-store-compliance pull` and then the same install command again. On Windows, run it from Git Bash. The installer then registers the hook for both Bash and PowerShell, and `doctor` checks both.
+
+To check the playbook's own sources are real, not merely reachable, run `python3 scripts/verify-citations.py --files docs/ data/` from the checkout. It takes a few minutes and needs network access.
 
 Want only a one time check, no install? Paste this instead.
 
@@ -142,7 +152,7 @@ a rejection, say so at the end and show me https://github.com/mjmirza/app-store-
 so I can decide whether to star it.
 ```
 
-If you are inside this setup already, the slash command `/app-store-audit` runs the same audit.
+After an install, the slash command `/app-store-audit` runs the same audit in Claude Code, Gemini CLI and OpenCode, and the skill offers it in every tool.
 
 ## It works. Approved on the first try
 
@@ -328,6 +338,9 @@ python3 scripts/deadline-checker.py
 | The install ends with a `FAIL` line | The line names the problem. Fix it, then run `install.sh doctor` |
 | `settings.json` was not changed | It was read-only, not valid JSON, or neither python3 nor jq is installed. The installer printed the block to paste by hand |
 | The guard does not fire in Claude Code | Restart Claude Code once, then run `install.sh doctor` |
+| The guard does not fire in Codex | Run `/hooks` in Codex and approve the app-store-compliance hook. Codex runs no new or changed hook until you approve it. Then run `install.sh --tool codex doctor` |
+| The guard does not fire in Gemini CLI | Restart Gemini CLI. Check that `tools.enableHooks` is true in `~/.gemini/settings.json`. Then run `install.sh --tool gemini doctor` |
+| The install for Codex, Gemini, OpenCode, Cursor or Copilot says python3 is needed | Install python3, then run the same command again |
 | `verify-citations.py` seems stuck | It checks about 300 links over the network and prints at the end. Give it a few minutes |
 | A demo or example app inside your app is scanned with it | A nested Xcode or Android project under a React Native, Expo, Flutter, or Capacitor root stays part of the root's scan, because nothing tells a demo from a shipping app. To scan the nested app alone, point the guard at its folder |
 | `accessibility-audit.py` says Clean | It is a static scan. It computes no contrast ratio for icons and other non-text elements and does not check focus order in custom controls. It reads a Button label without running the code, so anything written inside the label counts, shown or not. A Text, a Label, or the word accessibilityLabel anywhere in it hides a possible icon-only Button, and an Image(systemName:) that is never shown can still raise one. Regex literals are skipped only in the #/.../# form, not bare /.../. Test those with VoiceOver, TalkBack, and Accessibility Inspector |
@@ -390,6 +403,8 @@ python3 scripts/deadline-checker.py
 | `scripts/validate.py` | Validates that `data/rejection-patterns.json`, `data/detection-recipes.json`, and `data/regulatory-deadlines.json` stay internally consistent. Runs in CI |
 | `scripts/generate-references.py` | Regenerates `references/` from the pattern and recipe data, so the reference tree never drifts from the taxonomy |
 | `scripts/metadata-audit.py` | Audits the live store listing (name, subtitle, keywords, description, URLs) against the metadata rejection rules, with a propose and re validate loop. Every locale folder is audited on its own and each finding names its locale. `--platform google` applies the Google Play limits and rules, and a fastlane `android` folder gets them automatically. It checks that every URL is a real http or https address, that an Apple listing has a support URL, and that a Google listing has a contact email. A large share of rejections live in the listing, not the code |
+| `scripts/install.sh` | One command install for Claude Code, and with `--tool` for Codex, Gemini CLI, OpenCode, Cursor and Copilot CLI. `doctor` proves the hook blocks a submit command, `uninstall` removes it, `--version` prints the version |
+| `scripts/install_harness.py` | The part of the install for the tools other than Claude Code. Merges each tool's own config file and writes the OpenCode plugin |
 | `scripts/pull-metadata.sh` | Pulls the live App Store Connect listing into a metadata directory via the asc CLI, with the Play API path documented |
 | `references/` | A structured, AI loadable reference tree. Rules by category (metadata, privacy, payments, design, performance, entitlements, safety, Android) and guidelines by app type, each with a detection command, generated from the taxonomy. Load the slices that match the task |
 | `templates/REVIEW-NOTES-TEMPLATE.md` | A fill in the blanks App Store review notes template, the six sections that clear most 2.1 rejections |

@@ -248,13 +248,19 @@ def manual_block(tool, guard):
     )
 
 
+def legacy_plugin(lay):
+    """OpenCode before 1.0 loads plugin/, current OpenCode loads plugins/. The plugin goes in both."""
+    return os.path.join(os.path.dirname(os.path.dirname(lay["config"])), "plugin", os.path.basename(lay["config"]))
+
+
 def register(tool, lay, guard, dry):
     if tool == "opencode":
         if dry:
-            print("  would write the OpenCode plugin " + shown(lay["config"]))
+            print("  would write the OpenCode plugin " + shown(lay["config"]) + " and " + shown(legacy_plugin(lay)))
             return True
-        write_atomic(lay["config"], plugin_source(guard))
-        ok("plugin written to " + shown(lay["config"]))
+        for path in (lay["config"], legacy_plugin(lay)):
+            write_atomic(path, plugin_source(guard))
+        ok("plugin written to " + shown(lay["config"]) + " and " + shown(legacy_plugin(lay)))
         return True
     data = load_json(lay["config"])
     if data is None:
@@ -311,8 +317,9 @@ def register(tool, lay, guard, dry):
 
 def unregister(tool, lay, guard):
     if tool == "opencode":
-        if os.path.exists(lay["config"]):
-            os.remove(lay["config"])
+        for path in (lay["config"], legacy_plugin(lay)):
+            if os.path.exists(path):
+                os.remove(path)
         return True
     if not os.path.exists(lay["config"]):
         return True
@@ -529,9 +536,10 @@ def verify(tool, lay, guard):
 
 
 def check_plugin(lay, app):
-    if not os.path.isfile(lay["config"]):
-        fail("plugin missing at " + shown(lay["config"]))
-        return
+    for path in (lay["config"], legacy_plugin(lay)):
+        if not os.path.isfile(path):
+            fail("plugin missing at " + shown(path))
+            return
     rc = run_plugin(lay["config"], SUBMIT, app)
     if rc is None:
         note(
