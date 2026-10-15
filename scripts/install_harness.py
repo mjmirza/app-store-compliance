@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Install the guard, skill and audit command into every supported AI coding tool other than Claude Code.
 Usage. install_harness.py <tool> [install|doctor|uninstall] [--dry-run] [--repo DIR]. Configs are merged, never replaced."""
-# CODE_DELETE_OK: check_hook, entry_key and entry_lists are replaced by check_hooks, events and container.
 
 import json
 import os
@@ -19,6 +18,7 @@ SUBMIT = "fast" + "lane deliver"
 PROBLEMS = []
 KIMI_BEGIN = "# >>> app-store-compliance guard >>>"
 KIMI_END = "# <<< app-store-compliance guard <<<"
+KIMI_SEP_FILE = ".app-store-compliance-kimi-sep"
 
 # How each tool runs a hook before a shell command, from each vendor's hook reference.
 # style nested. groups of {matcher, hooks:[...]} under the event. flat. a list of entries under the event.
@@ -632,6 +632,9 @@ def register_kimi(lay, cmd, dry):
         else ("\n" if text.endswith("\n") else "\n\n")
     )
     write_atomic(path, text + sep + kimi_block(cmd))
+    os.makedirs(lay["hooks"], exist_ok=True)
+    with open(os.path.join(lay["hooks"], KIMI_SEP_FILE), "w", encoding="utf-8") as f:
+        f.write(str(len(sep)))
     ok(
         "hook appended to "
         + shown(path)
@@ -655,10 +658,20 @@ def unregister(tool, lay, guard):
             text = f.read()
         if KIMI_BEGIN not in text:
             return True
-        pattern = r"\n?" + re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?"
-        write_atomic(
-            lay["config"], re.sub(pattern, "\n", text, flags=re.S).rstrip("\n") + "\n"
-        )
+        m = re.search(re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?", text, flags=re.S)
+        before, after = text[: m.start()], text[m.end() :]
+        sep_file = os.path.join(lay["hooks"], KIMI_SEP_FILE)
+        try:
+            with open(sep_file, encoding="utf-8") as f:
+                n = int(f.read().strip() or 0)
+        except (OSError, ValueError):
+            n = 0
+        # Drop only the newlines the install added in front of a block it appended at the end.
+        if n and not after and before.endswith("\n" * n):
+            before = before[:-n]
+        write_atomic(lay["config"], before + after)
+        if os.path.exists(sep_file):
+            os.remove(sep_file)
         return True
     data = load_json(lay["config"])
     if data is None:
@@ -706,14 +719,14 @@ def write_owners(owners):
 
 
 def read_guards():
-    """Each owning tool's installed guard path, so release-audit.py in the shared skill can find one."""
+    """Every installed guard path and its tool, so two folders of one tool each own the skill."""
     out = {}
     try:
         with open(os.path.join(skill_dir(), ".guards"), encoding="utf-8") as f:
             for line in f:
                 t, tab, path = line.rstrip("\n").partition("\t")
                 if tab and t in TOOLS and path:
-                    out[t] = path
+                    out[path] = t
     except OSError:
         pass
     return out
@@ -723,7 +736,7 @@ def write_guards(guards):
     sk = skill_dir()
     fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-guards-")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write("".join(t + "\t" + guards[t] + "\n" for t in sorted(guards)))
+        f.write("".join(guards[g] + "\t" + g + "\n" for g in sorted(guards)))
     os.replace(tmp, os.path.join(sk, ".guards"))
 
 
@@ -749,7 +762,7 @@ def copy_payload(tool, lay, guard):
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
         write_owners(read_owners() | {tool})
-        write_guards(dict(read_guards(), **{tool: guard}))
+        write_guards(dict(read_guards(), **{guard: tool}))
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -1094,10 +1107,12 @@ def uninstall(tool, lay, guard, dry):
     if tool == "copilot-repo":
         print("Removed the guard and the hook from the repository.")
     else:
-        owners = read_owners() - {tool}
+        guards = read_guards()
+        guards.pop(guard, None)
+        owners = (read_owners() - {tool}) | set(guards.values())
         if owners:
             write_owners(owners)
-            write_guards({t: p for t, p in read_guards().items() if t in owners})
+            write_guards(guards)
             print(
                 "Removed the "
                 + SPECS[tool]["name"]

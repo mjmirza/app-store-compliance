@@ -140,7 +140,7 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if "PreT
 # 2d Kimi. A config holding a secret is appended to, never rewritten, and uninstall restores it exactly
 fresh; mkdir -p "$H/.kimi-code"
 printf 'default_model = "k2"\n\n[providers.moonshot]\n%s = "%s"\n' "api""_key" "fixture-not-a-secret" > "$H/.kimi-code/config.toml"
-ORIG="$(cat "$H/.kimi-code/config.toml")"
+cp "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml"
 OUT="$(run --tool kimi)"; RC=$?
 [ "$RC" -eq 0 ] && grep -q '= "fixture-not-a-secret"' "$H/.kimi-code/config.toml" && python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); h=d["hooks"][0]; sys.exit(0 if h["event"]=="PreToolUse" and h["matcher"]=="^Bash$" and h["timeout"]==120 else 1)' "$H/.kimi-code/config.toml" \
   && ok "kimi appends a valid hook block and keeps the existing settings" || bad "kimi appends a valid hook block and keeps the existing settings (rc=$RC)"
@@ -148,7 +148,12 @@ OUT="$(run --tool kimi)"; RC=$?
 run --tool kimi >/dev/null
 [ "$(count kimi)" = "1" ] && ok "kimi a second run adds nothing" || bad "kimi a second run adds nothing"
 run --tool kimi uninstall >/dev/null
-[ "$(cat "$H/.kimi-code/config.toml")" = "$ORIG" ] && ok "kimi uninstall restores the file exactly" || bad "kimi uninstall restores the file exactly"
+cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml" && ok "kimi uninstall restores the file exactly" || bad "kimi uninstall restores the file exactly"
+for tail in "" "\n" "\n\n\n"; do
+  fresh; mkdir -p "$H/.kimi-code"; printf "default_model = \"k2\"$tail" > "$H/.kimi-code/config.toml"; cp "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml"
+  run --tool kimi >/dev/null; run --tool kimi uninstall >/dev/null
+  cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml" && ok "kimi uninstall keeps the original trailing newlines (${#tail} chars)" || bad "kimi uninstall keeps the original trailing newlines (${#tail} chars)"
+done
 
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
@@ -257,6 +262,21 @@ qrun --tool qwen uninstall >/dev/null
 fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
 OUT="$(qrun --tool all --dry-run)"; RC=$?
 echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds qwen through \$QWEN_HOME" || bad "--tool all finds qwen through \$QWEN_HOME (rc=$RC)"
+
+# 8c two installs of one tool, in two config folders, each own the shared skill
+fresh; CA="$WORK/codexa$RANDOM"; CB="$WORK/codexb$RANDOM"; mkdir -p "$CA" "$CB"
+crun() { local c="$1"; shift; env -u QWEN_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR CODEX_HOME="$c" HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+crun "$CA" --tool codex >/dev/null; crun "$CB" --tool codex >/dev/null; crun "$CB" --tool codex uninstall >/dev/null
+[ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && grep -qF "$CA/hooks/app-store-compliance-guard.sh" "$H/.agents/skills/app-store-compliance/.guards" \
+  && ok "uninstalling one codex folder keeps the shared skill for the other" || bad "uninstalling one codex folder keeps the shared skill for the other"
+crun "$CA" --tool codex doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "the remaining codex folder still passes doctor" || bad "the remaining codex folder still passes doctor (rc=$RC)"
+crun "$CA" --tool codex uninstall >/dev/null
+[ ! -e "$H/.agents/skills/app-store-compliance" ] && ok "uninstalling the last codex folder removes the shared skill" || bad "uninstalling the last codex folder removes the shared skill"
+# 8d --tool all expands a QWEN_HOME written with a Windows tilde, as the installer does
+fresh; mkdir -p "$H/qwen-config"
+OUT="$(env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR QWEN_HOME='~\qwen-config' HOME="$H" bash "$INSTALL" --tool all --dry-run 2>&1)"
+echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds a QWEN_HOME written as ~\folder" || bad "--tool all finds a QWEN_HOME written as ~\folder"
 
 # 9 a home folder with an apostrophe still verifies
 H="$WORK/O'Reilly home"; mkdir -p "$H"

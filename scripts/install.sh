@@ -72,7 +72,7 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
   [ -d "${HOME:-}/.copilot" ] && found="$found copilot"
   [ -d "${HOME:-}/.grok" ] && found="$found grok"
-  QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*) QDIR="${HOME:-}${QDIR#\~}" ;; esac
+  QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*|"~\\"*) QDIR="${QDIR#\~}"; QDIR="${HOME:-}/${QDIR#?}" ;; esac
   [ -d "$QDIR" ] && found="$found qwen"
   [ -d "${HOME:-}/.kimi-code" ] && found="$found kimi"
   [ -d "${HOME:-}/.factory" ] && found="$found droid"
