@@ -114,7 +114,7 @@ The European Commission fined Apple 500,000,000 euro on 23 April 2025 for breach
 - Alternative payment processing and every linked out-of-app offer call the `ExternalPurchaseCustomLink` disclosure sheet.
 - If the app offers In-App Purchase, it is shown at the same time as any alternative and at least as prominently, and the product page does not describe alternative payment options.
 - If the app offers only alternatives, alternative processing within the app is selectable on the same screen as any out-of-app offer.
-- Kids category apps and users under the storefront's parental-consent age see alternative processing only behind a parental gate and see no out-of-app offers. Older minors see both only behind a parental gate.
+- Kids category apps and users under the storefront's parental-consent age see alternative processing only behind a parental gate. A Kids category app cannot offer an out-of-app purchase on a website, and users under that age see no out-of-app offers at all. Older minors see both only behind a parental gate.
 - The chosen payment options stay in place across all EU storefronts for 12 months.
 - Monthly transaction reporting is wired (within 15 days of the calendar month end, External Purchase Server API on OS 26.4 or later).
 - Any non-App-Store build passed notarization.
@@ -145,13 +145,13 @@ In scope are consumer products and services delivered through websites AND mobil
 
 ### 4.2 Microenterprise exemption
 
-A microenterprise with fewer than 10 employees AND annual turnover or balance-sheet total not exceeding 2,000,000 euro is exempt, but the exemption applies to services only, not products, has no grace period once thresholds are crossed, and does not apply if the business received accessibility funding. Source. [Greenberg Traurig EAA](https://www.gtlaw.com/en/insights/2025/7/european-accessibility-act-compliance-what-businesses-in-the-eu-market-need-to-know).
+A microenterprise with fewer than 10 employees AND annual turnover or balance-sheet total not exceeding 2,000,000 euro is exempt, and the exemption covers services only, not products (Article 4(5)). Accessibility funding does not remove that exemption. It matters elsewhere. Under Article 14(6), an operator that received outside funding meant to improve accessibility cannot rely on the disproportionate burden defence in Article 14(1)(b). Source. [Directive (EU) 2019/882, Articles 4(5) and 14](https://eur-lex.europa.eu/eli/dir/2019/882/oj).
 
 ### 4.3 The technical bar for apps
 
 - The EAA is met through the harmonised standard EN 301 549. WCAG is the underlying guidelines set.
 - EN 301 549 version 3.2.1 is built on WCAG 2.1 Level AA and adds roughly 64 requirements beyond WCAG, in particular Chapter 11 for non-web software and mobile apps. A WCAG-only audit does NOT satisfy EN 301 549 Chapter 11.
-- EN 301 549 version 4.1.1, expected in 2026, moves to WCAG 2.2.
+- EN 301 549 version 4.1.1 is published by ETSI (file dated 2 September 2026) and moves to WCAG 2.2. Its citation in the Official Journal as a harmonised standard under the EAA was not confirmed here, so check the Official Journal before relying on it for presumption of conformity. Source. [ETSI EN 301 549 V4.1.1](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/04.01.01_60/en_301549v040101p.pdf).
 - Service providers must publish accessibility information. Directive (EU) 2019/882 Article 13(2). "Service providers shall prepare the necessary information in accordance with Annex V and shall explain how the services meet the applicable accessibility requirements. The information shall be made available to the public in written and oral format, including in a manner which is accessible to persons with disabilities." Annex V point 1 places it "in the general terms and conditions, or equivalent document", with a general description of the service, an explanation of its operation, and how the Annex I requirements are met. The Directive never uses the term "accessibility statement", which is the Directive (EU) 2016/2102 Article 7 term for public sector bodies. EN 301 549 V3.2.1 Annex B (informative) and Annex C (normative, determination of conformance) carry no such duty. the standard only names an accessibility statement as an example of product information in clause 12.1.1 NOTE 3. A missing or inaccurate notice can be a separate penalty in some Member States.
 
 Sources. [Directive (EU) 2019/882, Article 13 and Annex V](https://eur-lex.europa.eu/eli/dir/2019/882/oj), [ETSI EN 301 549 V3.2.1](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf), [Directive (EU) 2016/2102 Article 7](https://eur-lex.europa.eu/eli/dir/2016/2102/oj), [Deque EN 301 549](https://www.deque.com/en-301-549-compliance/), [EN 301 549 Chapter 11 for mobile apps](https://auditsu.com/resources/en-301-549-chapter-11-mobile-apps).

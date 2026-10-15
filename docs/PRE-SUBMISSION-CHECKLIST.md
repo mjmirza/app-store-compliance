@@ -67,9 +67,9 @@ For a deep-dive reference across platform best practices, see `docs/MOBILE-SECUR
 - [ ] App name is 30 characters or fewer.
 - [ ] App Review contact phone number is in international format with the country code, for example +852, not digits only.
 - [ ] The first consumable, first non-consumable, first auto-renewable subscription, and first non-renewing subscription are each submitted together with a new app version, never added on their own to an already approved version.
-- [ ] Screenshots cover the required 6.9 inch iPhone size and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
+- [ ] Screenshots include at least one for iPhone with Dynamic Island (medium display), at least one iPad 13 inch screenshot if the app supports iPadOS, and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
 - [ ] iPhone Duo (APPLE-IPHONE-DUO-LAUNCH, ships 23 October 2026). Built with Xcode 27.1 and the iOS 27.1 SDK, and checked in the Duo simulator on the outer display, the inner display open, and the inner display partially folded, in each rotation.
-- [ ] iPhone Duo screenshots uploaded in App Store Connect (accepted since 5 October 2026, they earn the optimized for iPhone Duo badge). From April 2027 every submission must include them (APPLE-IPHONE-DUO-SCREENSHOTS-REQ).
+- [ ] iPhone Duo screenshots uploaded in App Store Connect (accepted since 5 October 2026, they earn the optimized for iPhone Duo badge). From April 2027 they are required for any app using the iOS 27.1 SDK or later (APPLE-IPHONE-DUO-SCREENSHOTS-REQ).
 - [ ] iPhone Duo layout. Layout comes from size classes and scene bounds, never `userInterfaceIdiom`, `UIInterfaceOrientation`, or fixed screen sizes. Custom views stay clear of reserved regions (cameras and the fold).
 - [ ] iPhone Duo bars. Navigation bars, toolbars, and tab bars come from the system navigation containers, and every toolbar item has both an icon and a title so it can present vertically.
 - [ ] The build meets the SDK floor. the 26 SDKs today, the 27 SDKs from April 2027.
@@ -98,7 +98,7 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
 - [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes its Annex V accessibility information in the terms and conditions or an equivalent document (European Accessibility Act, Directive (EU) 2019/882 Article 13(2), in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
 - [ ] If the app offers alternative payments or out-of-app offers in the EU, the StoreKit External Purchases or Offers Entitlement is declared, the disclosure sheet is wired, In-App Purchase (when offered) is shown at the same time and at least as prominently, the chosen options stay in place for 12 months, and monthly reporting is wired (DMA, Attachment 14 terms from 1 October 2026).
-- [ ] Minors are protected on EU alternative payments. Kids category apps and users under the storefront's parental-consent age (13, or higher where set) get alternative processing only behind a parental gate and no out-of-app offers. Older minors get both only behind a parental gate.
+- [ ] Minors are protected on EU alternative payments. Kids category apps and users under the storefront's parental-consent age (13, or higher where set) get alternative processing only behind a parental gate. A Kids category app cannot offer an out-of-app purchase on a website, and users under that age see no out-of-app offers at all. Older minors get both only behind a parental gate.
 
 ## Global specific (USA and other markets, if the app reaches those users)
 

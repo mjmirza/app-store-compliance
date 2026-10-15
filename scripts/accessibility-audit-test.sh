@@ -520,6 +520,17 @@ struct V: View {
 EOF
 
 mkdir -p "$ISSUE_DIR/regex_lit" "$ISSUE_DIR/chain_perf" "$ISSUE_DIR/mod_perf"
+mkdir -p "$ISSUE_DIR/regex_esc"
+cat << 'EOF' > "$ISSUE_DIR/regex_esc/Esc.swift"
+import SwiftUI
+let re = #/foo\/#[/*]/#
+let s = "x \(#/a\/#b/#) y"
+struct V: View {
+    var body: some View {
+        Button(action: {}) { Image(systemName: "gear") }
+    }
+}
+EOF
 cat << 'EOF' > "$ISSUE_DIR/regex_lit/Regex.swift"
 import SwiftUI
 let re = #/[Button(action: {}) { Image(systemName: "trash") }]/#
@@ -649,6 +660,13 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/regex_esc" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Esc.swift:6)"; then
+  ok "#834 an escaped delimiter inside a #/regex/# literal does not end it early, in code or interpolation"
+else
+  bad "#834 an escaped regex delimiter ended the literal early or hid the real Button. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/regex_lit" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Regex.swift:6)"; then

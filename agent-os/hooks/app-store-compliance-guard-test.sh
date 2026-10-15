@@ -1628,6 +1628,12 @@ ln -s "$EXT" "$D/apps/one"; ln -s "$EXT" "$D/apps/two"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$(echo "$OUT" | grep -cE "^App\. $D/apps/(one|two)$")" -eq 1 ] && [ "$RC" -eq 2 ] && ok "657-7 two links to one app scan it once" || bad "657-7 two links to one app scan it once (rc=$RC sections=$(echo "$OUT" | grep -cE '^App\. '))"
 rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; EXT="$(mktemp -d)"; mkdir -p "$D/apps/flutter/lib" "$EXT/App.xcodeproj"
+printf 'name: f\nflutter:\n  uses-material-design: true\n' > "$D/apps/flutter/pubspec.yaml"; printf 'void main() {}\n' > "$D/apps/flutter/lib/main.dart"
+printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"; ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q '^NOT CHECKED' && ! echo "$OUT" | grep -q '^CLEAR' && [ "$RC" -eq 1 ] && ok "657-9 a Flutter app with no native folder beside a clean linked app is NOT CHECKED, never CLEAR" || bad "657-9 a Flutter app with no native folder beside a clean linked app is NOT CHECKED, never CLEAR (rc=$RC)"
+rm -rf "$D" "$EXT"
 for EXCL in vendor build node_modules; do
   D="$(mktemp -d)"; EXT="$(mk_ios_bad)"; mkdir -p "$EXT/App.xcodeproj"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
   ln -s "$EXT" "$D/$EXCL"

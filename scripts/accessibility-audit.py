@@ -152,8 +152,8 @@ def _skip_string(content, q, hashes):
                 j = j + h + (3 if inner[1] else 1)
                 continue
             if h and j + h < n and content[j + h] == "/":
-                end = content.find("/" + "#" * h, j + h + 1)
-                j = n if end == -1 else end + 1 + h
+                end = _regex_close(content, j + h + 1, h)
+                j = min(n, end + 1 + h)
                 continue
             j += max(h, 1)
             continue
@@ -165,6 +165,20 @@ def _skip_string(content, q, hashes):
                 stack.pop()
         j += 1
     return body_start, n, n
+
+
+def _regex_close(content, start, hashes):
+    """Offset of the closing slash of a #/.../# literal, skipping backslash escapes, or len(content)."""
+    close = "/" + "#" * hashes
+    n, j = len(content), start
+    while j < n:
+        if content[j] == "\\":
+            j += 2
+        elif content.startswith(close, j):
+            return j
+        else:
+            j += 1
+    return n
 
 
 def swift_code_only(content):
@@ -203,11 +217,9 @@ def swift_code_only(content):
                 hashes += 1
             q = i + hashes
             if hashes and q < n and content[q] == "/":
-                close = "/" + "#" * hashes
-                end = content.find(close, q + 1)
-                end = n if end == -1 else end
+                end = _regex_close(content, q + 1, hashes)
                 blank(q + 1, end)
-                i = min(n, end + len(close))
+                i = min(n, end + 1 + hashes)
                 continue
             if q >= n or content[q] != '"':
                 i += max(hashes, 1)
