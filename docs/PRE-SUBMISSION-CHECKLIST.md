@@ -95,7 +95,7 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] A short AI-literacy record exists for the team building or operating the AI feature (Article 4, live since 2 February 2025).
 - [ ] No prohibited AI practice ships (manipulation, banned emotion inference, biometric categorisation) (Article 5, live since 2 February 2025).
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
-- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes an accessibility statement (European Accessibility Act, in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
+- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes its Annex V accessibility information in the terms and conditions or an equivalent document (European Accessibility Act, Directive (EU) 2019/882 Article 13(2), in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
 - [ ] If the app promotes external offers in the EU, the external-purchase entitlement is declared, every external link calls the disclosure sheet, IAP and external offers are not mixed on one storefront, and reporting is wired (DMA).
 
 ## Global specific (USA and other markets, if the app reaches those users)
@@ -146,6 +146,7 @@ Cross-cutting.
 - [ ] A UGC or social app has a content filter, in-app report and block, published contact, and 24-hour remove-and-eject (Apple 1.2), plus the Google Play Child Safety Standards items for the Social and Dating categories.
 - [ ] Account-creating app has both an in-app account-and-data deletion flow and a publicly reachable web deletion URL, declared.
 - [ ] Not on the OFAC SDN list, and country availability excludes the embargoed territories.
+- [ ] Releasing in Syria. EAR jurisdiction, classification, and the license exception or license relied on are documented (15 CFR 746.9).
 - [ ] Non-store card payments for real goods implement PSD2 SCA and 3D Secure in the EU or UK, store no card number, and identify the correct PCI SAQ.
 
 ## The two checks that prevent the most rejections
