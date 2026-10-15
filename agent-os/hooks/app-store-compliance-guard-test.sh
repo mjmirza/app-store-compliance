@@ -1538,6 +1538,120 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && [ "$RC" -eq 2 ] && ok "612-37 an app with a peer dependency and its own platform projects is an app" || bad "612-37 an app with a peer dependency and its own platform projects is an app (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
 rm -rf "$D"
 
+# ===== Issues #655, #656, #657. App root detection edges left open by #614 =====
+# An Expo app next to a workspace member that is a React Native app by package.json alone. $1 is the member's native folder.
+mk_rn_pkg_member() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/apps/a/ios/App" "$d/apps/b/src"
+  printf '{"expo":{"name":"a"}}' > "$d/apps/a/app.json"
+  printf '<plist><dict></dict></plist>' > "$d/apps/a/ios/App/Info.plist"
+  printf '{"name":"b","dependencies":{"react":"18.3.1","%s":"0.75.0"}}' "$2" > "$d/apps/b/package.json"
+  printf 'export default function B() {}\n' > "$d/apps/b/src/App.tsx"
+  case "$1" in
+    ios) mkdir -p "$d/apps/b/ios/B"; printf "platform :ios, '15.0'\n" > "$d/apps/b/ios/Podfile"; printf 'import UIKit\n' > "$d/apps/b/ios/B/AppDelegate.swift" ;;
+    android) mkdir -p "$d/apps/b/android/app/src/main/java"; printf 'org.gradle.jvmargs=-Xmx2g\n' > "$d/apps/b/android/gradle.properties" ;;
+  esac
+  echo "$d"
+}
+# 655 a React Native or Expo app with no app.json or app.config is an app when package.json depends on it and it owns a native folder
+D="$(mk_rn_pkg_member ios react-native)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q "^App\. $D/apps/b$" && ok "655-1 a React Native workspace member with an ios folder is its own app" || bad "655-1 a React Native workspace member with an ios folder is its own app (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -rf "$D"
+D="$(mk_rn_pkg_member android expo)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q "^App\. $D/apps/b$" && ok "655-2 an Expo workspace member with only an android folder is its own app" || bad "655-2 an Expo workspace member with only an android folder is its own app (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -rf "$D"
+# a native-module library. peerDependencies, react-native only as a dev dependency, ios and android source folders
+D="$(mk_rn_pkg_member none react)"; rm -rf "$D/apps/b"; mkdir -p "$D/packages/rn-lib/ios" "$D/packages/rn-lib/android/src/main/java"
+printf '{"name":"rn-lib","peerDependencies":{"react-native":"*"},"devDependencies":{"react-native":"0.75.0"}}' > "$D/packages/rn-lib/package.json"
+printf '#import <React/RCTBridgeModule.h>\n' > "$D/packages/rn-lib/ios/RNLib.m"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ok "655-3 a native-module library with peerDependencies is still not an app" || bad "655-3 a native-module library with peerDependencies is still not an app (rc=$RC)"
+# react-native only as a dev dependency, no peerDependencies, an ios folder. a tooling package, not an app
+rm -rf "$D/packages/rn-lib"; mkdir -p "$D/tools/e2e/ios"
+printf '{"name":"e2e","devDependencies":{"react-native":"0.75.0","detox":"20.0.0"}}' > "$D/tools/e2e/package.json"
+printf 'describe("x", () => {})\n' > "$D/tools/e2e/ios/flow.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ok "655-4 react-native as a dev dependency only never makes an app" || bad "655-4 react-native as a dev dependency only never makes an app (rc=$RC)"
+rm -rf "$D"
+
+# 656 documented limit, pinned. a bare Xcode project with its own Info.plist under a root Expo app stays part of the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/examples/NativeDemo/Demo.xcodeproj" "$D/examples/NativeDemo/Demo"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/ios/App/A.swift"
+printf 'X=1;\n' > "$D/examples/NativeDemo/Demo.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/examples/NativeDemo/Demo/Info.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "656-1 a nested demo Xcode project never splits a root framework app" || bad "656-1 a nested demo Xcode project never splits a root framework app (rc=$RC)"
+rm -rf "$D"
+
+# 657 an app directory linked into the tree from outside it is followed one level and scanned
+mk_linked_app() {  # prints the project dir. the linked app lives in a sibling temp dir, removed with rm_linked
+  local d ext; d="$(mktemp -d)"; ext="$(mk_ios_bad)"; mkdir -p "$d/apps"
+  printf 'X=1;\n' > "$ext/App/project.pbxproj"; mkdir -p "$ext/App.xcodeproj"; mv "$ext/App/project.pbxproj" "$ext/App.xcodeproj/"
+  ln -s "$ext" "$d/apps/linked"
+  echo "$d"
+}
+rm_linked() { rm -rf "$(cd "$1/apps/linked" 2>/dev/null && pwd -P)" "$1"; }
+D="$(mk_linked_app)"; mkdir -p "$D/apps/a/ios/App"
+printf '{"expo":{"name":"a"}}' > "$D/apps/a/app.json"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/apps/a/ios/App/Info.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+LINK_SECTION="$(echo "$OUT" | awk '/^App\. .*\/apps\/linked$/{p=1;next} /^App\. |^Summary\.|^== Regulatory/{p=0} p')"
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$LINK_SECTION" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-1 a linked app beside a real app is scanned on its own" || bad "657-1 a linked app beside a real app is scanned on its own (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm_linked "$D"
+D="$(mk_linked_app)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/apps/linked$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-2 a linked app that is the only app is still scanned" || bad "657-2 a linked app that is the only app is still scanned (rc=$RC)"
+rm_linked "$D"
+# a clean linked app must never replace the scan of the project's own unmarked source (adversarial review)
+D="$(mk_ios_bad)"; EXT="$(mk_ios_clean)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/apps/linked$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-4 a clean linked app does not hide the project's own critical findings" || bad "657-4 a clean linked app does not hide the project's own critical findings (rc=$RC)"
+rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; EXT="$(mk_ios_clean)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q '^CLEAR\.' && ! echo "$OUT" | grep -q 'NOT CHECKED' && [ "$RC" -eq 0 ] && ok "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED" || bad "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED (rc=$RC)"
+rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; U="$(mktemp -d)"; mkdir -p "$D/apps" "$U/ProjectSettings" "$U/Assets"
+printf 'm_EditorVersion: 6000.0.1f1\n' > "$U/ProjectSettings/ProjectVersion.txt"
+printf 'using UnityEngine;\nclass A { void S(){ var u="https://staging.example.com"; } }\n' > "$U/Assets/A.cs"
+ln -s "$U" "$D/apps/game"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/apps/game$" && ok "657-6 a linked Unity project is followed like any other app" || bad "657-6 a linked Unity project is followed like any other app (rc=$RC)"
+rm -rf "$D" "$U"
+D="$(mktemp -d)"; EXT="$(mk_ios_bad)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/one"; ln -s "$EXT" "$D/apps/two"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -cE "^App\. $D/apps/(one|two)$")" -eq 1 ] && [ "$RC" -eq 2 ] && ok "657-7 two links to one app scan it once" || bad "657-7 two links to one app scan it once (rc=$RC sections=$(echo "$OUT" | grep -cE '^App\. '))"
+rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; EXT="$(mktemp -d)"; mkdir -p "$D/apps/flutter/lib" "$EXT/App.xcodeproj"
+printf 'name: f\nflutter:\n  uses-material-design: true\n' > "$D/apps/flutter/pubspec.yaml"; printf 'void main() {}\n' > "$D/apps/flutter/lib/main.dart"
+printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"; ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q '^NOT CHECKED' && ! echo "$OUT" | grep -q '^CLEAR' && [ "$RC" -eq 1 ] && ok "657-9 a Flutter app with no native folder beside a clean linked app is NOT CHECKED, never CLEAR" || bad "657-9 a Flutter app with no native folder beside a clean linked app is NOT CHECKED, never CLEAR (rc=$RC)"
+rm -rf "$D" "$EXT"
+for EXCL in vendor build node_modules; do
+  D="$(mktemp -d)"; EXT="$(mk_ios_bad)"; mkdir -p "$EXT/App.xcodeproj"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+  ln -s "$EXT" "$D/$EXCL"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+  ! echo "$OUT" | grep -q "^App\. $D/$EXCL$" && [ "$RC" -ne 2 ] && ok "657-8 an app linked as $EXCL stays excluded like a real $EXCL folder" || bad "657-8 an app linked as $EXCL stays excluded like a real $EXCL folder (rc=$RC)"
+  rm -rf "$D" "$EXT"
+done
+# links that point back into the tree, above it, or at themselves must not hang the scan or become apps
+D="$(mk_ios_bad)"; mkdir -p "$D/apps/a"
+ln -s "$D" "$D/apps/a/up"; ln -s . "$D/apps/here"; ln -s loop "$D/apps/loop"; ln -s "$(dirname "$D")" "$D/apps/parent"
+OUTF="$(mktemp)"; bash "$GUARD" "$D" > "$OUTF" 2>&1 & GPID=$!
+i=0; while kill -0 "$GPID" 2>/dev/null && [ "$i" -lt 120 ]; do sleep 0.5; i=$((i+1)); done
+if kill -0 "$GPID" 2>/dev/null; then kill "$GPID" 2>/dev/null; wait "$GPID" 2>/dev/null; bad "657-3 self-referencing links do not hang the scan (killed after 60s)"
+else wait "$GPID"; RC=$?; OUT="$(cat "$OUTF")"
+  ! echo "$OUT" | grep -q '^App\. ' && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-3 self-referencing links do not hang the scan or become apps" || bad "657-3 self-referencing links do not hang the scan or become apps (rc=$RC)"
+fi
+rm -rf "$D" "$OUTF"
+
 # ===== Issue #658. The run reports how long it took, and says so when it nears the hook timeout =====
 D="$(mk_ios_bad)"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

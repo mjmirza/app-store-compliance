@@ -10,7 +10,7 @@ Stop getting your iOS and Android apps rejected. The enterprise reference and au
 [![Google Play](https://img.shields.io/badge/Google_Play-414141?logo=googleplay&logoColor=white)](https://play.google/developer-content-policy/)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-ready-000000?logo=anthropic&logoColor=white)](#how-you-actually-use-this)
 [![OpenRoots ORA 2.3](https://openroots.org/badge/ora.svg)](https://openroots.org/licenses/ora/2.3)
-[![CI](https://img.shields.io/github/actions/workflow/status/mjmirza/app-store-compliance/ci.yml?branch=master&label=CI)](https://github.com/mjmirza/app-store-compliance/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/mjmirza/app-store-compliance/ci.yml?branch=main&label=CI)](https://github.com/mjmirza/app-store-compliance/actions)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2ea44f)](.github/CONTRIBUTING.md)
 
 [![Stars](https://img.shields.io/github/stars/mjmirza/app-store-compliance?style=social)](https://github.com/mjmirza/app-store-compliance/stargazers)
@@ -329,6 +329,8 @@ python3 scripts/deadline-checker.py
 | `settings.json` was not changed | It was read-only, not valid JSON, or neither python3 nor jq is installed. The installer printed the block to paste by hand |
 | The guard does not fire in Claude Code | Restart Claude Code once, then run `install.sh doctor` |
 | `verify-citations.py` seems stuck | It checks about 300 links over the network and prints at the end. Give it a few minutes |
+| A demo or example app inside your app is scanned with it | A nested Xcode or Android project under a React Native, Expo, Flutter, or Capacitor root stays part of the root's scan, because nothing tells a demo from a shipping app. To scan the nested app alone, point the guard at its folder |
+| `accessibility-audit.py` says Clean | It is a static scan. It computes no contrast ratio for icons and other non-text elements and does not check focus order in custom controls. It reads a Button label without running the code, so anything written inside the label counts, shown or not. A Text, a Label, or the word accessibilityLabel anywhere in it hides a possible icon-only Button, and an Image(systemName:) that is never shown can still raise one. Regex literals are skipped only in the #/.../# form, not bare /.../. Test those with VoiceOver, TalkBack, and Accessibility Inspector |
 
 ## Words used here
 

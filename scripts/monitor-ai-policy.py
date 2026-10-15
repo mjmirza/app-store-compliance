@@ -9,6 +9,95 @@ import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
+import html
+
+
+_COMMENT = r"<!--(?:-?>|.*?--!?>|.*\Z)"
+_BOGUS = r"<(?:[!?]|/(?![A-Za-z]))[^>]*(?:>|\Z)"
+_TAG = r"""</?[A-Za-z](?:[^<>"']|"[^"]*"|'[^']*')*>"""
+HTML_MARKUP = re.compile(
+    _COMMENT
+    + r"|<!\[CDATA\[(.*?)(?:\]\]>|\Z)"
+    + r"""|<(textarea|title)(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>(.*?)(?:</\2(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>|\Z)"""
+    + "|"
+    + _BOGUS
+    + "|"
+    + _TAG,
+    re.S | re.I | re.A,
+)  # every branch ends at its terminator or at the end, so one left-to-right pass stays linear
+_CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I | re.A)
+
+
+_TAG_NAME = re.compile(r"</?([A-Za-z][A-Za-z0-9-]*)", re.A)
+
+
+def _visible_markup(m):
+    """CDATA and textarea or title content is visible text. Inline tags join, other markup separates."""
+    if m.group(1) is not None:
+        return " " + _CDATA_MARKUP.sub(" ", m.group(1)) + " "
+    if m.group(3) is not None:
+        return " " + m.group(3) + " "
+    t = _TAG_NAME.match(m.group(0))
+    return "" if t and t.group(1).lower() in _XHTML_INLINE else " "
+
+
+FEED_NAMESPACES = ("", "http://www.w3.org/2005/Atom", "http://purl.org/rss/1.0/")
+_XHTML_INLINE = {
+    "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "font", "i",
+    "ins", "kbd", "label", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup",
+    "time", "tt", "u", "var",
+}  # every other element separates its text, so an unknown block can never join two words
+
+
+def _xhtml_text(elem):
+    """Text of an XHTML tree. Inline elements run on, every other element is separated by a space."""
+    out, stack = [], [(elem, False)]
+    while stack:  # explicit stack, so a deeply nested feed cannot exhaust recursion
+        node, closing = stack.pop()
+        name = node.tag.split("}", 1)[-1].lower() if isinstance(node.tag, str) else ""
+        block = name not in _XHTML_INLINE
+        if not closing and name in ("script", "style"):
+            stack.append((node, True))  # never visible, only its tail is
+            continue
+        if closing:
+            if block:
+                out.append(" ")
+            if node is not elem and node.tail:
+                out.append(node.tail)
+            continue
+        if block:
+            out.append(" ")
+        if node.text:
+            out.append(node.text)
+        stack.append((node, True))
+        for sub in reversed(list(node)):
+            stack.append((sub, False))
+    return "".join(out)
+
+
+def _feed_text(child, atom, field):
+    """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1, 4.1.3).
+    An RSS title is plain text, an RSS description is HTML."""
+    plain = re.sub(r"\s+", " ", child.text or "").strip()
+    if not atom:  # an RSS title is text with entities, never markup to strip
+        return html.unescape(plain) if field == "title" else clean_html_text(child.text or "")
+    kind = (child.get("type") or "text").split(";")[0].strip().lower()
+    if kind == "xhtml" or kind.endswith("+xml") and "xhtml" in kind:
+        return re.sub(r"\s+", " ", _xhtml_text(child)).strip()
+    if kind in ("html", "text/html"):
+        return clean_html_text(child.text or "")
+    if "/" in kind and not kind.startswith("text/") and not kind.endswith("xml"):
+        return ""  # base64 binary content is not readable text
+    return plain
+
+
+def clean_html_text(raw_text):
+    """Strips raw HTML tags, unescapes entities, and collapses whitespace."""
+    if not raw_text:
+        return ""
+    text = HTML_MARKUP.sub(_visible_markup, raw_text)
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
 
 # Define default RSS/Atom feed URLs
 APPLE_RSS = "https://developer.apple.com/news/rss/news.rss"
@@ -175,20 +264,29 @@ def parse_rss_feed(url):
                     return tag.split("}", 1)[1]
                 return tag
 
+            def ns(e):
+                return e.tag[1:].split("}", 1)[0] if e.tag.startswith("{") else ""
+
             for elem in root.iter():
+                if not isinstance(elem.tag, str):
+                    continue
                 tag = clean_tag(elem.tag)
-                if tag in ("item", "entry"):
+                if tag in ("item", "entry") and ns(elem) in FEED_NAMESPACES:
                     title = ""
-                    desc = ""
+                    desc_parts = []
                     link = ""
                     pub_date = ""
 
                     for child in elem:
+                        if not isinstance(child.tag, str) or ns(child) != ns(elem):
+                            continue  # an extension element never stands in for the feed's own
                         ctag = clean_tag(child.tag)
                         if ctag == "title":
-                            title = child.text or ""
+                            title = _feed_text(child, tag == "entry", "title")
                         elif ctag in ("description", "summary", "content"):
-                            desc = child.text or ""
+                            part = _feed_text(child, tag == "entry", "body")
+                            if part:
+                                desc_parts.append(part)  # summary and content both count
                         elif ctag == "link":
                             link_val = child.get("href")
                             if link_val:
@@ -200,8 +298,8 @@ def parse_rss_feed(url):
 
                     items.append(
                         {
-                            "title": title.strip(),
-                            "description": desc.strip() if desc else "",
+                            "title": title,
+                            "description": " ".join(desc_parts),
                             "link": link.strip(),
                             "pubDate": pub_date.strip(),
                         }

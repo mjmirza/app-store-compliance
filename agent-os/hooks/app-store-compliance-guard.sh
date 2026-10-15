@@ -857,12 +857,50 @@ has_framework_marker() {  # $1 dir. Expo or React Native CLI app.json, app.confi
   [ -f "$1/package.json" ] && grep -qE '"react-native"|"expo"' "$1/package.json" 2>/dev/null && return 0
   return 1
 }
+rn_dependency() {  # $1 package.json. react-native or expo under "dependencies", never a dev or peer dependency (issue #655)
+  tr -d '\n\r' < "$1" 2>/dev/null | grep -oE '"dependencies"[[:space:]]*:[[:space:]]*\{[^}]*\}' | grep -E '"(react-native|expo)"[[:space:]]*:' >/dev/null
+}
+native_dir_has_project() {  # $1 an ios or android folder. 0 when a project marker sits within four levels
+  find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
+    -o \( -name 'Info.plist' -o -name '*.xcodeproj' -o -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
+    | grep . >/dev/null
+}
+linked_app_dir() {  # $1 a symlink below the root (issue #657). 0 when it points at an app directory outside the tree.
+  # One level only. the target is read with plain find, which never follows a further link, so a cycle cannot loop.
+  local t f
+  case "${1##*/}" in ios|android) return 1 ;; esac   # a linked platform folder is not followed, see the documented limits
+  case "${1##*/}" in node_modules|Pods|.git|build|dist|DerivedData|vendor|.dart_tool|Carthage|.pub-cache) return 1 ;; esac   # same names find_app prunes
+  [ -d "$1" ] || return 1
+  t="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+  case "$t/" in "$ROOT_REAL"/*) return 1 ;; esac   # back into the tree, or the tree itself
+  case "$ROOT_REAL/" in "$t"/*) return 1 ;; esac   # the tree's own parent or an ancestor
+  is_library "$t" && return 1
+  dir_has_app_marker "$t"
+}
+dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
+  local t="$1" f
+  for f in app.config.js app.config.ts app.config.mjs app.config.cjs; do [ -f "$t/$f" ] && return 0; done
+  for f in "$t"/capacitor.config.* "$t"/*.xcodeproj "$t"/*.xcworkspace "$t"/settings.gradle "$t"/settings.gradle.kts; do [ -e "$f" ] && return 0; done
+  [ -f "$t/app.json" ] && grep -qE '"(expo|displayName)"' "$t/app.json" 2>/dev/null && return 0
+  [ -f "$t/pubspec.yaml" ] && { [ -d "$t/ios" ] || [ -d "$t/android" ] || [ -f "$t/lib/main.dart" ]; } && return 0
+  [ -f "$t/package.json" ] && { [ -d "$t/ios" ] || [ -d "$t/android" ]; } && rn_dependency "$t/package.json" && return 0
+  for f in "$t"/build.gradle "$t"/build.gradle.kts; do [ -f "$f" ] && grep -qE 'com\.android\.application|android\.application' "$f" 2>/dev/null && return 0; done
+  for f in "$t"/ios "$t"/android; do [ -d "$f" ] && native_dir_has_project "$f" && return 0; done
+  # Unity, .NET MAUI, Tauri, Cordova and Capacitor, the same signals scan_tree reads
+  [ -f "$t/ProjectSettings/ProjectVersion.txt" ] && return 0
+  for f in "$t"/*.csproj; do [ -f "$f" ] && grep -qE '<UseMaui>[[:space:]]*true|net[0-9.]+-(ios|android|maccatalyst)' "$f" 2>/dev/null && return 0; done
+  for f in "$t"/tauri.conf.json "$t"/tauri.conf.json5 "$t"/Tauri.toml "$t"/src-tauri/tauri.conf.json "$t"/src-tauri/tauri.conf.json5 "$t"/src-tauri/Tauri.toml; do [ -f "$f" ] && return 0; done
+  [ -f "$t/config.xml" ] && grep -qE '<widget|xmlns:cdv' "$t/config.xml" 2>/dev/null && return 0
+  [ -f "$t/package.json" ] && grep -qE '"@capacitor/core"|"cordova-(ios|android)"' "$t/package.json" 2>/dev/null && return 0
+  return 1
+}
 app_roots() {  # prints the roots, one per line, only when two or more distinct apps exist. the project root itself may be one of them
-  local m d r k keep=() atroot=0
+  local m d r k t x keep=() seen=() atroot=0 ROOT_REAL
+  ROOT_REAL="$(cd "$DIR" 2>/dev/null && pwd -P)" || ROOT_REAL="${DIR%/}"
   {
     find_app 12 -name 'app.json' -o -name 'app.config.js' -o -name 'app.config.ts' -o -name 'app.config.mjs' -o -name 'app.config.cjs' \
       -o -name 'pubspec.yaml' -o -name 'capacitor.config.*' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \
-      -o -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'build.gradle' -o -name 'build.gradle.kts' | while IFS= read -r m; do
+      -o -name '*.xcodeproj' -o -name '*.xcworkspace' -o -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'package.json' | while IFS= read -r m; do
         case "$m" in *.xcodeproj/*|*.xcworkspace/*) continue ;; esac
         case "/$m/" in *Tests/*|*/androidTest/*|*/__tests__/*|*/test/*|*/tests/*|*/integration_test/*) continue ;; esac
         d="$(dirname "$m")"
@@ -870,14 +908,14 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
           */app.json) grep -qE '"(expo|displayName)"' "$m" 2>/dev/null || continue ;;
           */pubspec.yaml) { [ -d "$d/ios" ] || [ -d "$d/android" ] || [ -f "$d/lib/main.dart" ]; } && ! is_library "$d" || continue ;;
           */build.gradle|*/build.gradle.kts) grep -qE 'com\.android\.application|android\.application' "$m" 2>/dev/null || continue ;;
+          */package.json) { [ -d "$d/ios" ] || [ -d "$d/android" ]; } && rn_dependency "$m" && ! is_library "$d" || continue ;;  # issue #655
         esac
         printf '%s\n' "$d"
       done
-    find_app 12 -type d \( -name ios -o -name android \) | while IFS= read -r d; do
+    find_app 12 \( -type d \( -name ios -o -name android \) \) -o -type l | while IFS= read -r d; do
       case "/$d/" in *Tests/*|*/androidTest/*|*/__tests__/*|*/test/*|*/tests/*|*/integration_test/*) continue ;; esac
-      find "$d" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
-        -o \( -name 'Info.plist' -o -name '*.xcodeproj' -o -name 'AndroidManifest.xml' -o -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
-        | grep . >/dev/null && printf '%s\n' "$d"
+      if [ -L "$d" ]; then linked_app_dir "$d" && printf '%s\n' "$d"; continue; fi
+      native_dir_has_project "$d" && printf '%s\n' "$d"
     done
   } 2>/dev/null | while IFS= read -r r; do
     case "${r##*/}" in ios|android) is_library "$(dirname "$r")" && continue; has_framework_marker "$(dirname "$r")" && r="$(dirname "$r")" ;; esac
@@ -885,14 +923,25 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
   done | sort -u | {
     while IFS= read -r r; do
       [ "${r%/}" = "${DIR%/}" ] && { atroot=1; continue; }
-      for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
-      [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue
+      # A linked app is never inside another root's scan, find does not descend it, so it is always its own root.
+      if [ -L "${r%/}" ]; then
+        t="$(cd "$r" 2>/dev/null && pwd -P)" || continue
+        for x in ${seen[@]+"${seen[@]}"}; do [ "$x" = "$t" ] && continue 2; done   # two links to one app scan it once
+        seen+=("$t")
+      else
+        for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
+        [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue
+      fi
       keep+=("$r")
     done
     if [ "$atroot" -eq 1 ]; then
       [ "${#keep[@]}" -ge 1 ] && printf '%s\n' "$DIR" "${keep[@]}"
     else
-      [ "${#keep[@]}" -ge 2 ] && printf '%s\n' "${keep[@]}"
+      local plain=0 links=()
+      for k in ${keep[@]+"${keep[@]}"}; do if [ -L "${k%/}" ]; then links+=("$k"); else plain=$((plain+1)); fi; done
+      if [ "$plain" -ge 2 ]; then printf '%s\n' "${keep[@]}"
+      # Fewer than two plain apps scan as one tree, as before. A linked app sits beside that scan, never in place of it.
+      elif [ "${#links[@]}" -ge 1 ]; then printf '%s\n' "$DIR" "${links[@]}"; fi
     fi
   }
 }
@@ -942,11 +991,15 @@ $ROOTS
 EOF2
     fi
     DIR="$ROOT"
+    [ -L "${DIR%/}" ] && DIR="$(cd "$DIR" 2>/dev/null && pwd -P)"   # a linked app (issue #657) is walked through its target
     echo "App. $ROOT"
     scan_tree
     flush_findings
     # One scannable sibling must not speak for a root the store checks never ran on.
-    if [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
+    # The project root scanned only beside a linked app, with no marker and nothing found, is not an app (#657).
+    if [ "${ROOT%/}" = "$PROJECT_ROOT" ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && [ "$IS_WEB" -eq 0 ] && [ "$NEEDS_NATIVE" -eq 0 ] && ! dir_has_app_marker "$PROJECT_ROOT"; then
+      :
+    elif [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
       UNCHECKED="${UNCHECKED:+$UNCHECKED, }${ROOT#"$PROJECT_ROOT"/}"
     fi
   done <<EOF

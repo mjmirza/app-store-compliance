@@ -153,6 +153,24 @@ echo "$TOPICS" | grep -q "User disclosure requirements" && echo "$TOPICS" | grep
 echo "$TOPICS" | grep -q "Google Play AI policies" && echo "$TOPICS" | grep -q "AI-generated content disclosures" && echo "$TOPICS" | grep -q "User safety requirements" && ok "Google topics are matched from the stems policies, disclose and safe" || bad "Google topics are matched from the stems policies, disclose and safe"
 rm -f "$STEM_JSON" "$STEM_DOCS" "$STEM_PR"
 
+# Feed descriptions carry HTML. The parser keeps only the visible text, so a keyword
+# inside a link target ("/llm/") cannot match an item that never mentions it.
+HT="$(mktemp -d)"
+cat > "$HT/feed.rss" <<'XML'
+<rss><channel><item><title>Tax &amp;amp; price updates</title>
+<description>&lt;p&gt;Read the &lt;a href="https://developer.example/llm/"&gt;notes&lt;/a&gt; on pricing.&lt;/p&gt;</description>
+<link>https://mock.invalid/html</link><pubDate>Mon, 01 Sep 2026 10:00:00 PDT</pubDate></item></channel></rss>
+XML
+python3 - "$HT/feed.rss" "$(dirname "$0")/monitor-ai-policy.py" <<'PY' && ok "feed items are matched on visible text, not HTML" || bad "feed items are matched on visible text, not HTML"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("m", sys.argv[2]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+items = m.parse_rss_feed("file://" + sys.argv[1])
+assert items[0]["title"] == "Tax & price updates", items
+assert items[0]["description"] == "Read the notes on pricing.", items
+assert not m.analyze_announcements(items, ["llm"]), "matched a word that only appears in a link"
+PY
+rm -rf "$HT"
+
 echo ""
 echo "AI Policy Monitor test suite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

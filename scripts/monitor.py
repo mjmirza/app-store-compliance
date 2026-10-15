@@ -4,6 +4,7 @@ categories against live/mock news and scans a --project for impact."""
 
 import os
 import sys
+import html
 import re
 import json
 import urllib.request
@@ -129,7 +130,7 @@ TRACK_METADATA = {
         "release_impact": "Critical",
     },
     "App Tracking Transparency": {
-        "keywords": ["app tracking transparency", "att", "idfa", "user tracking"],
+        "keywords": ["app tracking transparency", "att", "idfa", "user tracking", "attrackingmanager", "requesttrackingauthorization"],
         "patterns": [
             r"app[ -]tracking[ -]transparency",
             r"att",
@@ -166,7 +167,7 @@ TRACK_METADATA = {
             "purchase policy",
         ],
         "patterns": [
-            r"in-app[ -]purchase",
+            r"in-app[ -]purchas(?:e|es|ing)",
             r"iap",
             r"storekit",
             r"subscription[ -]term",
@@ -409,7 +410,7 @@ TRACK_METADATA = {
         ],
         "patterns": [
             r"security[ -]update",
-            r"vulnerability",
+            r"vulnerabilit(?:y|ies)",
             r"cve",
             r"encryption[ -]declaration",
         ],
@@ -666,36 +667,58 @@ def scan_target_repo(repo_path, track_name, metadata):
     return affected_files, verdict
 
 
+_COMMENT = r"<!--(?:-?>|.*?--!?>|.*\Z)"
+_BOGUS = r"<(?:[!?]|/(?![A-Za-z]))[^>]*(?:>|\Z)"
+_TAG = r"""</?[A-Za-z](?:[^<>"']|"[^"]*"|'[^']*')*>"""
+HTML_MARKUP = re.compile(
+    _COMMENT
+    + r"|<!\[CDATA\[(.*?)(?:\]\]>|\Z)"
+    + r"""|<(textarea|title)(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>(.*?)(?:</\2(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>|\Z)"""
+    + "|"
+    + _BOGUS
+    + "|"
+    + _TAG,
+    re.S | re.I | re.A,
+)  # every branch ends at its terminator or at the end, so one left-to-right pass stays linear
+_CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I | re.A)
+
+
+def _visible_markup(m):
+    """CDATA and textarea or title content is visible text. Everything else is markup."""
+    if m.group(1) is not None:
+        return " " + _CDATA_MARKUP.sub(" ", m.group(1)) + " "
+    if m.group(3) is not None:
+        return " " + m.group(3) + " "
+    return " "
+
+
+def strip_html(text):
+    """Feed descriptions carry HTML. Match on the visible text only."""
+    text = HTML_MARKUP.sub(_visible_markup, text or "")
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def term_regex(term):
+    """Short terms match as words ("pla" never fires on "display", #833); a version may follow ("wcag2.2").
+    Terms of 8 or more characters match inside identifiers ("NSCameraUsageDescription", "CLLocationManager")."""
+    if len(term) >= 8:
+        return re.compile(r"(?:" + term + r")", re.IGNORECASE)
+    return re.compile(r"(?<![a-z0-9])(?:" + term + r")(?:s|es)?(?![a-z])", re.IGNORECASE)
+
+
 def match_announcement_to_tracks(announcement):
     """
     Checks if a news item matches any of the 25 tracks based on keyword and regex matching.
     Returns a list of matched track names.
     """
     matched = []
-    title = announcement.get("title", "").lower()
-    desc = announcement.get("description", "").lower()
+    title = re.sub(r"\s+", " ", html.unescape(announcement.get("title", ""))).lower()  # RSS title is text
+    desc = strip_html(announcement.get("description", "")).lower()
     combined = f"{title} {desc}"
 
     for track, meta in TRACK_METADATA.items():
-        # 1. Keyword direct check
-        keyword_match = False
-        for kw in meta["keywords"]:
-            if kw in combined:
-                keyword_match = True
-                break
-
-        if keyword_match:
-            matched.append(track)
-            continue
-
-        # 2. Pattern regex check
-        pattern_match = False
-        for pat in meta["patterns"]:
-            if re.search(pat, combined, re.IGNORECASE):
-                pattern_match = True
-                break
-
-        if pattern_match:
+        terms = [re.escape(kw) for kw in meta["keywords"]] + list(meta["patterns"])
+        if any(term_regex(t).search(combined) for t in terms):
             matched.append(track)
 
     return matched

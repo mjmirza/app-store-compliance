@@ -74,13 +74,18 @@ There are three EU distribution channels, all still involving Apple. the App Sto
 
 ### 2.2 External purchase links and alternative payments (HARD)
 
-- In June 2025 Apple consolidated the non-IAP options into a single "communication and promotion of offers" entitlement. The entitlement identifier is `com.apple.developer.storekit.external-purchase-link`, and the developer signs the StoreKit External Purchase Link Entitlement Addendum for EU Apps.
-- Every external link the user can tap, click, or scan MUST call the `ExternalPurchaseCustomLink` API to show a system-provided disclosure sheet stating the user will transact with the developer and not Apple.
-- No mixing on the same storefront. An app cannot offer In-App Purchase and promote external offers within the same app on the same App Store storefront and platform.
-- Reporting. external-purchase transactions are reported through the External Purchase Server API monthly, within 15 calendar days of Apple's fiscal-month end.
-- Lost capabilities for external purchases. no Report-a-Problem, no Family Sharing, no Ask-to-Buy, no Apple purchase history or subscription management.
+- From 1 October 2026 the terms sit in Attachment 14 of the Apple Developer Program License Agreement. The Alternative Terms Addendum for Apps in the EU and the StoreKit External Purchase Link Entitlement (EU) Addendum are phased out.
+- Combining is allowed. An app on EU storefronts may sell through Apple In-App Purchase, alternative payment processing within the app, out-of-app offers, or any combination of them.
+- Once a payment option or combination is chosen, it MUST be kept across all EU storefronts for 12 months.
+- When alternatives are offered alongside In-App Purchase, In-App Purchase MUST be presented at the same time and at least as prominently, with Apple-provided artwork on a black or white background, payment flows may not discourage or disrupt it, and the App Store product page may not describe alternative payment options.
+- An app that offers only alternative payment options MUST give users a genuine choice of alternative payment processing within the app, viewable and selectable on the same screen as any out-of-app offers. An app subject to Guideline 3.1.3(b) Multiplatform Services must offer In-App Purchase or alternative processing within the app.
+- Child safety. An app in the Kids category places alternative payment flows behind a parental gate and cannot offer an out-of-app purchase on a website. For users under 13, alternative payments sit behind a parental gate and out-of-app offers are not permitted. For users 13 to 17, both alternative processing and out-of-app offers sit behind a parental gate. Where an EU storefront sets a higher age for parental consent, the same protections apply at that age instead of 13, for example under 16 and 16 to 17.
+- The entitlement is the StoreKit External Purchases or Offers Entitlement, key `com.apple.developer.storekit.custom-purchase-link.allowed-regions`, an array of the ISO country codes where the app offers alternatives. It works on EU storefronts on iOS and iPadOS 26.2 or later and macOS, tvOS, visionOS and watchOS 26.6 or later. Supporting earlier versions needs Apple's agreement.
+- Alternative payment processing in the app, and any out-of-app offer behind a link the user can tap, click, or scan, MUST use the `ExternalPurchaseCustomLink` API to show the system disclosure sheet stating the user will transact with the developer and not Apple.
+- Reporting. every alternative payment transaction, including refunds, renewals and transactions that did not result in a purchase, is reported monthly within 15 days after the end of the calendar month, through the External Purchase Server API for apps on OS 26.4 or later.
+- Transactions outside In-App Purchase do not appear in Report a Problem, Family Sharing, App Store purchase history, or subscription management, and Apple cannot help with their refunds.
 
-Source. [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/).
+Source, read 15 October 2026. [Apple payment options on the App Store in the EU](https://developer.apple.com/support/payment-options-on-the-app-store-in-the-eu/), [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/), [Apple apps in the EU, child safety protections](https://developer.apple.com/support/apps-in-the-eu/#child-safety-protections-for-alternative-payments-on-the-app-store).
 
 ### 2.3 The EU fee model (unified terms from 1 October 2026, verified 5 September 2026)
 
@@ -91,7 +96,7 @@ On 18 August 2026 Apple announced updated business terms for apps in the EU, eff
 - Initial Acquisition Fee and Store Services Fee. Eliminated on 1 October 2026.
 - Alternative payments. Apps may offer alternative payment options alongside Apple In-App Purchase on the App Store.
 - Marketplace and Web Distribution eligibility. From 1 October 2026 a developer meeting at least one of seven alternative criteria may operate an alternative app marketplace, including a stand-by letter of credit of USD 1,000,000 or one million first annual installs worldwide.
-- Attachment 14. Must be accepted in App Store Connect by the Account Holder, or new EU submissions under the new terms are blocked.
+- Attachment 14. The Account Holder accepts it in the Apple Developer account. Accepting it moves the account to the unified EU business terms and unlocks the alternative payment entitlement and the alternative distribution tools in App Store Connect. Apple's pages read on 15 October 2026 do not say submissions are blocked without it.
 
 Rule for a compliance tool. verify the Account Holder has accepted Attachment 14, and re-check Apple's live page before encoding any fee number. Sources. [Apple, updated business terms for apps in the EU, 18 August 2026](https://developer.apple.com/news/?id=gmws0jgp), [Apple, Attachment 14 added to the ADPLA](https://developer.apple.com/news/?id=0cgo95n6), [Apple DMA and apps in the EU](https://developer.apple.com/support/dma-and-apps-in-the-eu/).
 
@@ -105,13 +110,17 @@ The European Commission fined Apple 500,000,000 euro on 23 April 2025 for breach
 
 ### 2.6 What a compliance tool must CHECK for an EU app using DMA entitlements
 
-- The external-purchase entitlement identifier is declared when the app uses external offers.
-- Every external link the user can tap, click, or scan calls the `ExternalPurchaseCustomLink` disclosure sheet.
-- The app does NOT ship both StoreKit IAP and external-offer links on the same EU storefront.
-- External Purchase Server API reporting is wired (monthly, 15-day window).
+- The StoreKit External Purchases or Offers Entitlement is declared when the app offers alternative payments or out-of-app offers.
+- Alternative payment processing and every linked out-of-app offer call the `ExternalPurchaseCustomLink` disclosure sheet.
+- If the app offers In-App Purchase, it is shown at the same time as any alternative and at least as prominently, and the product page does not describe alternative payment options.
+- If the app offers only alternatives, alternative processing within the app is selectable on the same screen as any out-of-app offer.
+- Kids category apps and users under the storefront's parental-consent age see alternative processing only behind a parental gate. A Kids category app cannot offer an out-of-app purchase on a website, and users under that age see no out-of-app offers at all. Older minors see both only behind a parental gate.
+- The chosen payment options stay in place across all EU storefronts for 12 months.
+- Monthly transaction reporting is wired (within 15 days of the calendar month end, External Purchase Server API on OS 26.4 or later).
 - Any non-App-Store build passed notarization.
 - A marketplace app uses MarketplaceKit, installs only from its own domain, and runs moderation, anti-fraud, and refund handling.
-- Entitlement-using code is gated to the minimum OS (iOS and iPadOS 17.4, macOS 14.4, visionOS 1.2, watchOS 10.4).
+- Payment entitlement code is gated to iOS and iPadOS 26.2, and macOS, tvOS, visionOS and watchOS 26.6, unless Apple has agreed to earlier versions.
+- Other DMA entitlement code is gated to its own minimum OS (iOS and iPadOS 17.4, macOS 14.4, visionOS 1.2, watchOS 10.4).
 - Browser-engine and HCE features carry their entitlements and are region-gated to EU or EEA.
 
 ## 3. EU Digital Services Act, trader status (HARD)
@@ -136,16 +145,16 @@ In scope are consumer products and services delivered through websites AND mobil
 
 ### 4.2 Microenterprise exemption
 
-A microenterprise with fewer than 10 employees AND annual turnover or balance-sheet total not exceeding 2,000,000 euro is exempt, but the exemption applies to services only, not products, has no grace period once thresholds are crossed, and does not apply if the business received accessibility funding. Source. [Greenberg Traurig EAA](https://www.gtlaw.com/en/insights/2025/7/european-accessibility-act-compliance-what-businesses-in-the-eu-market-need-to-know).
+A microenterprise with fewer than 10 employees AND annual turnover or balance-sheet total not exceeding 2,000,000 euro is exempt, and the exemption covers services only, not products (Article 4(5)). Accessibility funding does not remove that exemption. It matters elsewhere. Under Article 14(6), an operator that received outside funding meant to improve accessibility cannot rely on the disproportionate burden defence in Article 14(1)(b). Source. [Directive (EU) 2019/882, Articles 4(5) and 14](https://eur-lex.europa.eu/eli/dir/2019/882/oj).
 
 ### 4.3 The technical bar for apps
 
 - The EAA is met through the harmonised standard EN 301 549. WCAG is the underlying guidelines set.
 - EN 301 549 version 3.2.1 is built on WCAG 2.1 Level AA and adds roughly 64 requirements beyond WCAG, in particular Chapter 11 for non-web software and mobile apps. A WCAG-only audit does NOT satisfy EN 301 549 Chapter 11.
-- EN 301 549 version 4.1.1, expected in 2026, moves to WCAG 2.2.
-- An accessibility statement is required (EN 301 549 Annex B and C). A missing or inaccurate statement can be a separate penalty in some Member States.
+- EN 301 549 version 4.1.1 is published by ETSI (file dated 2 September 2026) and moves to WCAG 2.2. Its citation in the Official Journal as a harmonised standard under the EAA was not confirmed here, so check the Official Journal before relying on it for presumption of conformity. Source. [ETSI EN 301 549 V4.1.1](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/04.01.01_60/en_301549v040101p.pdf).
+- Service providers must publish accessibility information. Directive (EU) 2019/882 Article 13(2). "Service providers shall prepare the necessary information in accordance with Annex V and shall explain how the services meet the applicable accessibility requirements. The information shall be made available to the public in written and oral format, including in a manner which is accessible to persons with disabilities." Annex V point 1 places it "in the general terms and conditions, or equivalent document", with a general description of the service, an explanation of its operation, and how the Annex I requirements are met. The Directive never uses the term "accessibility statement", which is the Directive (EU) 2016/2102 Article 7 term for public sector bodies. EN 301 549 V3.2.1 Annex B (informative) and Annex C (normative, determination of conformance) carry no such duty. the standard only names an accessibility statement as an example of product information in clause 12.1.1 NOTE 3. A missing or inaccurate notice can be a separate penalty in some Member States.
 
-Sources. [Deque EN 301 549](https://www.deque.com/en-301-549-compliance/), [EN 301 549 Chapter 11 for mobile apps](https://auditsu.com/resources/en-301-549-chapter-11-mobile-apps).
+Sources. [Directive (EU) 2019/882, Article 13 and Annex V](https://eur-lex.europa.eu/eli/dir/2019/882/oj), [ETSI EN 301 549 V3.2.1](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf), [Directive (EU) 2016/2102 Article 7](https://eur-lex.europa.eu/eli/dir/2016/2102/oj), [Deque EN 301 549](https://www.deque.com/en-301-549-compliance/), [EN 301 549 Chapter 11 for mobile apps](https://auditsu.com/resources/en-301-549-chapter-11-mobile-apps).
 
 ### 4.4 Penalties
 
@@ -157,7 +166,7 @@ Penalties are set per Member State. Germany, administrative fines up to 100,000 
 - Dynamic Type. system font scaling supported, no fixed layout that breaks at larger text.
 - Color contrast at WCAG 2.1 AA (4.5 to 1 for text, 3 to 1 for large text and UI), no information carried by color alone.
 - Reduce Motion honored, logical focus order, adequate touch-target size.
-- An accessibility statement published and reachable.
+- Annex V accessibility information (how the service meets the Annex I requirements) published in the terms and conditions or an equivalent document, accessible and reachable (Directive (EU) 2019/882 Article 13(2)).
 - A flag that WCAG-only coverage leaves an EN 301 549 Chapter 11 gap.
 
 These map onto the Apple accessibility discipline the setup already carries (Dynamic Type, VoiceOver, contrast, Reduce Motion). The difference the EAA adds is that this is now a legal requirement with fines, not only a quality bar.
@@ -231,8 +240,8 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | Third-party-AI consent (Apple 5.1.2(i)) | A consent modal naming the AI provider and data types, shown before data leaves the device | live since 13 Nov 2025 |
 | DSA trader status | Trader or non-trader declared and verified before EU distribution | live since 17 Feb 2025 |
 | Age-rating questionnaire | Answered for every app, capabilities match behaviour | deadline 31 Jan 2026 |
-| European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, accessibility statement published | live since 28 Jun 2025 |
-| DMA external purchase | Entitlement declared, disclosure sheet wired, no IAP mix, reporting wired | live |
+| European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, Annex V accessibility information published (Art. 13(2)) | live since 28 Jun 2025 |
+| DMA alternative payments | Entitlement declared, disclosure sheet wired, In-App Purchase at equal prominence when offered, minors behind parental gates, options kept 12 months, reporting wired | live, Attachment 14 terms from 1 Oct 2026 |
 | Notarization | Any non-App-Store build notarized | live |
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
 | EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |

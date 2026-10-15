@@ -67,8 +67,9 @@ For a deep-dive reference across platform best practices, see `docs/MOBILE-SECUR
 - [ ] App name is 30 characters or fewer.
 - [ ] App Review contact phone number is in international format with the country code, for example +852, not digits only.
 - [ ] The first consumable, first non-consumable, first auto-renewable subscription, and first non-renewing subscription are each submitted together with a new app version, never added on their own to an already approved version.
-- [ ] Screenshots cover the required 6.9 inch iPhone size and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
+- [ ] Screenshots include at least one for iPhone with Dynamic Island (medium display), at least one iPad 13 inch screenshot if the app supports iPadOS, and, for watch apps, one Apple Watch size used consistently across every localization, checked against the current App Store Connect specification page.
 - [ ] iPhone Duo (APPLE-IPHONE-DUO-LAUNCH, ships 23 October 2026). Built with Xcode 27.1 and the iOS 27.1 SDK, and checked in the Duo simulator on the outer display, the inner display open, and the inner display partially folded, in each rotation.
+- [ ] iPhone Duo screenshots uploaded in App Store Connect (accepted since 5 October 2026, they earn the optimized for iPhone Duo badge). From April 2027 they are required for any app using the iOS 27.1 SDK or later (APPLE-IPHONE-DUO-SCREENSHOTS-REQ).
 - [ ] iPhone Duo layout. Layout comes from size classes and scene bounds, never `userInterfaceIdiom`, `UIInterfaceOrientation`, or fixed screen sizes. Custom views stay clear of reserved regions (cameras and the fold).
 - [ ] iPhone Duo bars. Navigation bars, toolbars, and tab bars come from the system navigation containers, and every toolbar item has both an icon and a title so it can present vertically.
 - [ ] The build meets the SDK floor. the 26 SDKs today, the 27 SDKs from April 2027.
@@ -95,8 +96,9 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] A short AI-literacy record exists for the team building or operating the AI feature (Article 4, live since 2 February 2025).
 - [ ] No prohibited AI practice ships (manipulation, banned emotion inference, biometric categorisation) (Article 5, live since 2 February 2025).
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
-- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes an accessibility statement (European Accessibility Act, in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
-- [ ] If the app promotes external offers in the EU, the external-purchase entitlement is declared, every external link calls the disclosure sheet, IAP and external offers are not mixed on one storefront, and reporting is wired (DMA).
+- [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes its Annex V accessibility information in the terms and conditions or an equivalent document (European Accessibility Act, Directive (EU) 2019/882 Article 13(2), in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
+- [ ] If the app offers alternative payments or out-of-app offers in the EU, the StoreKit External Purchases or Offers Entitlement is declared, the disclosure sheet is wired, In-App Purchase (when offered) is shown at the same time and at least as prominently, the chosen options stay in place for 12 months, and monthly reporting is wired (DMA, Attachment 14 terms from 1 October 2026).
+- [ ] Minors are protected on EU alternative payments. Kids category apps and users under the storefront's parental-consent age (13, or higher where set) get alternative processing only behind a parental gate. A Kids category app cannot offer an out-of-app purchase on a website, and users under that age see no out-of-app offers at all. Older minors get both only behind a parental gate.
 
 ## Global specific (USA and other markets, if the app reaches those users)
 
@@ -146,6 +148,7 @@ Cross-cutting.
 - [ ] A UGC or social app has a content filter, in-app report and block, published contact, and 24-hour remove-and-eject (Apple 1.2), plus the Google Play Child Safety Standards items for the Social and Dating categories.
 - [ ] Account-creating app has both an in-app account-and-data deletion flow and a publicly reachable web deletion URL, declared.
 - [ ] Not on the OFAC SDN list, and country availability excludes the embargoed territories.
+- [ ] Releasing in Syria. EAR jurisdiction, classification, and the license exception or license relied on are documented (15 CFR 746.9).
 - [ ] Non-store card payments for real goods implement PSD2 SCA and 3D Secure in the EU or UK, store no card number, and identify the correct PCI SAQ.
 
 ## The two checks that prevent the most rejections
