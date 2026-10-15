@@ -1950,6 +1950,180 @@ for c in "fastlane --version" "fastlane --help" "fastlane --env production tests
 done
 rm -rf "$D"
 
+# ===== Rule precision round (October 2026 review). each case failed on the guard before its fix =====
+rr_run() { OUT="$(bash "$GUARD" "$1" 2>&1)"; RC=$?; }
+rr_has() { printf '%s\n' "$OUT" | grep -q -e "$1"; }
+rr_hook() {  # $1 command, $2 project dir. sets OUT (stdout and stderr) and RC
+  OUT="$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | CLAUDE_PROJECT_DIR="$2" bash "$GUARD" 2>&1)"; RC=$?
+}
+mk_rr_ios() {  # $1 Info.plist dict body, $2 Swift source
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  printf '<plist><dict>%s<key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' "$1" > "$d/App/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/App/PrivacyInfo.xcprivacy"
+  printf '%s\nlet policy = "https://realbackend.io/privacy-policy"\n' "$2" > "$d/App/X.swift"
+  echo "$d"
+}
+
+# A02 a usage-description key or a deletion call that exists only in a comment satisfies nothing
+D="$(mk_rr_ios '' 'import AVFoundation
+// NSCameraUsageDescription is set later
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A02-1 a camera key named only in a Swift comment still raises the finding" || bad "rr-A02-1 a camera key named only in a Swift comment still raises the finding (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+// deleteAccount comes in the next release
+/* func deleteUser() {} */')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "rr-A02-2 a deletion call that exists only in comments raises the finding" || bad "rr-A02-2 a deletion call that exists only in comments raises the finding (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+class A { func signIn() {} }
+let dev = AVCaptureDevice.default(for: .video)
+let endpoint = "https://api.realbackend.io/v1/deleteAccount" // removes the user')"
+mkdir -p "$D/App.xcodeproj"; printf 'INFOPLIST_KEY_NSCameraUsageDescription = "Scan receipts";\n' > "$D/App.xcodeproj/project.pbxproj"
+rr_run "$D"
+! rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'NO-ACCOUNT-DELETION' && ok "rr-A02-3 a build-setting key and a deletion URL before a trailing comment stay clean" || bad "rr-A02-3 a build-setting key and a deletion URL before a trailing comment stay clean (rc=$RC)"
+rm -rf "$D"
+D="$(mk_ios_clean)"; rr_run "$D"
+! rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'NO-ACCOUNT-DELETION' && [ "$RC" -eq 0 ] && ok "rr-A02-4 the clean iOS fixture stays clean" || bad "rr-A02-4 the clean iOS fixture stays clean (rc=$RC)"
+rm -rf "$D"
+
+# A13 ATT needs both halves, the purpose string and the authorization call, and names the missing one
+D="$(mk_rr_ios '<key>NSUserTrackingUsageDescription</key><string>Measure ads</string>' 'import AppsFlyerLib
+let af = AppsFlyerLib.shared()')"
+rr_run "$D"
+rr_has 'APPLE-5.1.2-MISSING-ATT' && rr_has 'requestTrackingAuthorization call' && ! rr_has 'NSUserTrackingUsageDescription in Info.plist' && ok "rr-A13-1 a purpose string without the request call is flagged and the call is named" || bad "rr-A13-1 a purpose string without the request call is flagged and the call is named"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AppsFlyerLib
+import AppTrackingTransparency
+// NSUserTrackingUsageDescription
+ATTrackingManager.requestTrackingAuthorization { _ in }')"
+rr_run "$D"
+rr_has 'APPLE-5.1.2-MISSING-ATT' && rr_has 'NSUserTrackingUsageDescription in Info.plist' && ! rr_has 'requestTrackingAuthorization call' && ok "rr-A13-2 the request call without a purpose string is flagged and the key is named" || bad "rr-A13-2 the request call without a purpose string is flagged and the key is named"
+rm -rf "$D"
+D="$(mk_rr_ios '<key>NSUserTrackingUsageDescription</key><string>Measure ads</string>' 'import AppsFlyerLib
+import AppTrackingTransparency
+ATTrackingManager.requestTrackingAuthorization { _ in AppsFlyerLib.shared().start() }')"
+rr_run "$D"
+! rr_has 'APPLE-5.1.2-MISSING-ATT' && ok "rr-A13-3 both halves present stays clean" || bad "rr-A13-3 both halves present stays clean"
+rm -rf "$D"
+
+# A10 a vendored privacy manifest is the SDK's, never the app's own
+D="$(mk_rr_ios '' 'let d = UserDefaults.standard')"
+rm -f "$D/App/PrivacyInfo.xcprivacy"
+mkdir -p "$D/Pods/SomeSDK" "$D/.build/checkouts/Lib/Sources" "$D/node_modules/x/ios" "$D/ios/.symlinks/plugins/p/ios"
+for v in Pods/SomeSDK .build/checkouts/Lib/Sources node_modules/x/ios ios/.symlinks/plugins/p/ios; do printf '%s' "$PLIST_EMPTY" > "$D/$v/PrivacyInfo.xcprivacy"; done
+rr_run "$D"
+rr_has 'APPLE-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-1 vendored manifests alone do not count as the app manifest" || bad "rr-A10-1 vendored manifests alone do not count as the app manifest (rc=$RC)"
+printf '%s' "$PLIST_EMPTY" > "$D/App/PrivacyInfo.xcprivacy"
+rr_run "$D"
+! rr_has 'APPLE-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-2 an app manifest beside vendored ones stays clean" || bad "rr-A10-2 an app manifest beside vendored ones stays clean"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/ios/.symlinks/plugins/permission_handler/ios" "$D/lib"
+printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$D/pubspec.yaml"
+printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){}\n" > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/ios/.symlinks/plugins/permission_handler/ios/PrivacyInfo.xcprivacy"
+rr_run "$D"
+rr_has 'FLUTTER-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-3 a Flutter plugin manifest under .symlinks is not the app manifest" || bad "rr-A10-3 a Flutter plugin manifest under .symlinks is not the app manifest"
+rm -rf "$D"
+
+# A12 framework IAP plugins need a restore call too, and their own restore APIs count
+mk_rr_flutter_iap() {  # $1 Dart body
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/lib"
+  printf 'name: t\ndependencies:\n  purchases_flutter: ^8.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:purchases_flutter/purchases_flutter.dart';\n%s\n" "$1" > "$d/lib/main.dart"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/ios/Runner/PrivacyInfo.xcprivacy"
+  echo "$d"
+}
+D="$(mk_rr_flutter_iap 'void buy() { Purchases.purchasePackage(p); }')"; rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-1 RevenueCat purchases without restore are flagged" || bad "rr-A12-1 RevenueCat purchases without restore are flagged"
+rm -rf "$D"
+D="$(mk_rr_flutter_iap 'void buy() { Purchases.purchasePackage(p); }
+void restore() { Purchases.restorePurchases(); }')"; rr_run "$D"
+! rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-2 Purchases.restorePurchases counts as restore" || bad "rr-A12-2 Purchases.restorePurchases counts as restore"
+rm -rf "$D"
+mk_rr_unity_iap() {  # $1 C# body
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ProjectSettings" "$d/Assets"
+  printf 'm_EditorVersion: 2022.3.1f1\n' > "$d/ProjectSettings/ProjectVersion.txt"
+  printf 'using UnityEngine.Purchasing;\nclass Shop { %s }\n' "$1" > "$d/Assets/Shop.cs"
+  echo "$d"
+}
+D="$(mk_rr_unity_iap 'void Buy() { controller.InitiatePurchase("gems"); }')"; rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-3 Unity IAP without restore is flagged" || bad "rr-A12-3 Unity IAP without restore is flagged"
+rm -rf "$D"
+D="$(mk_rr_unity_iap 'void Restore() { apple.RestoreTransactions(r => {}); }')"; rr_run "$D"
+! rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-4 Unity RestoreTransactions counts as restore" || bad "rr-A12-4 Unity RestoreTransactions counts as restore"
+rm -rf "$D"
+
+# A09 an Android-only build command never meets a native Apple finding, an iOS command still does
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/android/app/src/main" "$D/lib"
+printf 'name: t\n' > "$D/pubspec.yaml"; printf 'void main(){}\n' > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf 'import AVFoundation\nlet dev = AVCaptureDevice.default(for: .video)\n' > "$D/ios/Runner/Cam.swift"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/android/app/src/main/AndroidManifest.xml"
+rr_hook "flutter build appbundle --release" "$D"
+! rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ! rr_has 'APPLE-EXPORT-COMPLIANCE' && ok "rr-A09-1 an Android-only build skips the native Apple checks" || bad "rr-A09-1 an Android-only build skips the native Apple checks (rc=$RC)"
+for c in "./gradlew bundleRelease" "flutter build ipa"; do
+  rr_hook "$c" "$D"
+  case "$c" in
+    *ipa) rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A09-2 an iOS build still raises the Apple finding" || bad "rr-A09-2 an iOS build still raises the Apple finding (rc=$RC)" ;;
+    *) ! rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ok "rr-A09-3 a Gradle release bundle skips the native Apple checks" || bad "rr-A09-3 a Gradle release bundle skips the native Apple checks (rc=$RC)" ;;
+  esac
+done
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ok "rr-A09-4 a standalone scan still covers both stores" || bad "rr-A09-4 a standalone scan still covers both stores"
+rm -rf "$D"
+
+# A24 no scan buffer means NOT CHECKED, never CLEAR
+# macOS mktemp ignores an unusable TMPDIR, so a PATH shim stands in. one fails, one hands back a path that cannot be written.
+D="$(mk_ios_clean)"; SHIMS="$(mktemp -d)"; mkdir -p "$SHIMS/fail" "$SHIMS/bad"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMS/fail/mktemp"
+printf '#!/bin/sh\necho /nonexistent/ascg-tmp/buffer\n' > "$SHIMS/bad/mktemp"
+chmod +x "$SHIMS/fail/mktemp" "$SHIMS/bad/mktemp"
+for s in fail bad; do
+  OUT="$(PATH="$SHIMS/$s:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?
+  [ "$RC" -eq 1 ] && rr_has 'NOT CHECKED' && ! rr_has '^CLEAR' && ok "rr-A24-1 no scan buffer is NOT CHECKED with exit 1 (mktemp $s)" || bad "rr-A24-1 no scan buffer is NOT CHECKED with exit 1 (mktemp $s rc=$RC)"
+  ERR="$(python3 -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"xcrun altool --upload-app -f a.ipa"}}))' | PATH="$SHIMS/$s:$PATH" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/null)"; RC=$?
+  [ "$RC" -eq 0 ] && printf '%s' "$ERR" | grep -q 'NOT CHECKED' && ok "rr-A24-2 as a hook no scan buffer fails open and says NOT CHECKED (mktemp $s)" || bad "rr-A24-2 as a hook no scan buffer fails open and says NOT CHECKED (mktemp $s rc=$RC)"
+done
+rm -rf "$D" "$SHIMS"
+
+# A11 a managed Expo app has its app config checked, and a critical config finding blocks
+mk_rr_expo() {  # $1 package.json, $2 app.json
+  local d; d="$(mktemp -d)"
+  printf '%s' "$1" > "$d/package.json"; printf '%s' "$2" > "$d/app.json"
+  echo "$d"
+}
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0"}}' '{"expo":{"name":"x","android":{"permissions":["ACCESS_BACKGROUND_LOCATION"]}}}')"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && ok "rr-A11-1 background location in the Expo config blocks an Android submit" || bad "rr-A11-1 background location in the Expo config blocks an Android submit (rc=$RC)"
+rr_hook "eas submit -p ios" "$D"
+[ "$RC" -eq 0 ] && ! rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && rr_has 'NOT CHECKED' && ok "rr-A11-2 an iOS-only submit skips the Android config check" || bad "rr-A11-2 an iOS-only submit skips the Android config check (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0"}}' '{"expo":{"name":"x","android":{"permissions":["android.permission.READ_SMS"]}}}')"
+rr_run "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-SMS-CALLLOG' && rr_has 'Camera module in the Expo app' && ok "rr-A11-3 a standalone scan reads the Expo config, SMS blocks and the camera string is named" || bad "rr-A11-3 a standalone scan reads the Expo config, SMS blocks and the camera string is named (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0","@react-native-async-storage/async-storage":"1.0.0"}}' '{"expo":{"name":"x","plugins":[["expo-camera",{"cameraPermission":"Scan receipts to log expenses"}]],"ios":{"privacyManifests":{"NSPrivacyAccessedAPITypes":[]}},"android":{"blockedPermissions":["android.permission.ACCESS_BACKGROUND_LOCATION","android.permission.READ_SMS"]}}}')"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 0 ] && rr_has 'critical=0 high=0 medium=0' && rr_has 'NOT CHECKED' && ok "rr-A11-4 a clean Expo config with blockedPermissions stays clean and NOT CHECKED" || bad "rr-A11-4 a clean Expo config with blockedPermissions stays clean and NOT CHECKED (rc=$RC)"
+rm -rf "$D"
+
+# FP1 a commit or PR message is text, a real submit beside it is not
+D="$(mk_ios_bad)"
+for c in 'git commit -m "docs: mention eas build"' "git commit -am 'note the fastlane deliver lane'" 'gh pr create --title "Ship" --body "run eas submit -p ios after merge"' 'git tag -a v1 -m "eas submit done"'; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "rr-FP1 a message stays silent. $c" || bad "rr-FP1 a message stays silent. $c (rc=$RC bytes=${#OUT})"
+done
+for c in 'git commit -m x && eas submit -p ios' 'git commit -m "$(eas submit -p ios)"'; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "rr-FP1 a real submit beside a message blocks. $c" || bad "rr-FP1 a real submit beside a message blocks. $c (rc=$RC)"
+done
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

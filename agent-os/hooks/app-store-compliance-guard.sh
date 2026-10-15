@@ -10,10 +10,10 @@ HOOK_LOG="${HOME:-}/.claude/hooks/hook-log.sh"
 [ -f "$HOOK_LOG" ] && source "$HOOK_LOG" 2>/dev/null || true
 log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compliance-guard" "$@"; else echo "app-store-compliance-guard: $*" >&2; fi; }
 
-CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""
+CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -119,9 +119,17 @@ if [ -n "$STDIN_JSON" ]; then
       if (k%2==1) { acc=acc substr(l,1,n-1) " "; cont=1 } else { printf "%s%s\n", acc, l; acc="" } }
     END { if (cont) printf "%s\n", acc }' 2>/dev/null)"
   [ -z "$CMD" ] && exit 0
+  # A commit, tag, note, or gh PR or issue message is text. Its quoted -m, --body, or --title value is blanked,
+  # unless it holds a $( or backtick substitution, which the shell would run.
+  IFS= read -r -d '' INERT_SED <<'INERT'
+/(^|[^A-Za-z0-9_-])(git([[:space:]]+[^;&|[:space:]]+)*[[:space:]]+(commit|tag|notes)|gh[[:space:]]+(pr|issue)[[:space:]]+(create|comment|edit))([[:space:]]|$)/{
+s/(^|[[:space:]])(-[A-Za-z]*m|--message|-b|--body|-t|--title)([[:space:]]+|=)"[^"$`]*"/\1\2 ""/g
+s/(^|[[:space:]])(-[A-Za-z]*m|--message|-b|--body|-t|--title)([[:space:]]+|=)'[^']*'/\1\2 ''/g
+}
+INERT
   # Match raw with quotes and letter escapes stripped. Only a single simple line led by an inert text command
   # (echo, grep, cat) has quoted spans blanked, and a heredoc body is blanked unless an interpreter consumes it.
-  CMD_MATCH="$(printf '%s' "$CMD" | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96); hd=0 }
+  CMD_MATCH="$( { printf '%s' "$CMD" | sed -E "$INERT_SED" 2>/dev/null || printf '%s' "$CMD"; } | awk 'BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96); hd=0 }
     { l=$0
       if (hd) { t=l; sub(/^\t+/, "", t); if (t == hd_end) { hd=0 } else if (!hd_keep) { l="" } ; print l; next }
       if (match(l, /<<-?[ \t]*[\047"]?[A-Za-z_][A-Za-z0-9_]*[\047"]?/) && substr(l, RSTART+2, 1) != "<") {
@@ -239,6 +247,11 @@ if [ -n "$CMD" ] \
   && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; then
   CMD_TARGET_ANDROID_ONLY=1
 fi
+CMD_TARGET_IOS_ONLY=0
+if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \
+  && ! printf '%s' "$CMD" | grep -qiE 'android|(-p|--platform)[[:space:]=]+all'; then
+  CMD_TARGET_IOS_ONLY=1
+fi
 
 [ -z "$DIR" ] && DIR="$PWD"
 [ -d "$DIR" ] || { log_err "project dir not found. $DIR"; exit 0; }
@@ -268,6 +281,52 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
   local out
   out="$(grep '/AndroidManifest\.xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
   [ -n "$out" ]
+}
+
+# Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
+CONFIG_FILES_RE='(\.plist|/InfoPlist\.strings|\.pbxproj|\.xcconfig|/project\.ya?ml|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
+config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
+  [ -s "$FILELIST" ] || return 1
+  local out
+  out="$(grep -E "$CONFIG_FILES_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
+  [ -n "$out" ]
+}
+
+# Source with comment-only lines and trailing // comments blanked, so a comment never counts as code.
+SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
+build_code() {
+  CODE_OK=0
+  : > "$FILELIST.code" 2>/dev/null || return 0
+  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96) }
+      FNR == 1 { blk=0 }
+      { l=$0
+        if (blk) { p=index(l, "*/"); if (p == 0) { print ""; next }; l=substr(l, p+2); blk=0 }
+        t=l; sub(/^[ \t]+/, "", t)
+        if (substr(t, 1, 2) == "//") { print ""; next }
+        if (substr(t, 1, 2) == "/*") { p=index(substr(t, 3), "*/"); if (p == 0) { blk=1; print ""; next }; l=substr(t, p+4) }
+        if (index(l, "//")) { q=""; n=length(l)
+          for (i=1; i<=n; i++) { c=substr(l, i, 1)
+            if (c == "\\") { i++; continue }
+            if (q == "") { if (c == "\"" || c == sq || c == bt) q=c; else if (c == "/" && substr(l, i+1, 1) == "/") { l=substr(l, 1, i-1); break } }
+            else if (c == q) q="" } }
+        print l }' 2>/dev/null
+    grep -vE "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIh -e '' 2>/dev/null
+    printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.code" 2>/dev/null
+  [ "$(tail -n 1 "$FILELIST.code" 2>/dev/null)" = "$BLOB_END" ] && CODE_OK=1
+}
+code_has() {  # grep_has over the comment-stripped source. Falls back to grep_has when the buffer cannot be built
+  [ -s "$FILELIST" ] || return 1
+  [ -n "${CODE_STATE:-}" ] || { build_code; CODE_STATE=1; }
+  if [ "${CODE_OK:-0}" -eq 1 ]; then grep -Eqs -e "$1" "$FILELIST.code" 2>/dev/null; return; fi
+  grep_has "$1"
+}
+
+# The app's own privacy manifest. A copy under Pods, Carthage, node_modules, SwiftPM or Flutter symlinks is the SDK's.
+own_privacy_manifest() {
+  find "$DIR" -mindepth 1 \( -type d \( -name node_modules -o -name Pods -o -name Carthage -o -name .build -o -name checkouts \
+    -o -name SourcePackages -o -name .symlinks -o -name vendor -o -name .pub-cache -o -name .dart_tool -o -name DerivedData \
+    -o -name build -o -name .git ${NESTED_PRUNE[@]+"${NESTED_PRUNE[@]}"} \) -prune \) -o -name 'PrivacyInfo.xcprivacy' -print 2>/dev/null \
+    | grep . >/dev/null
 }
 
 # True only if a STRING LITERAL containing the regex appears in RELEASE-reachable source. For
@@ -352,7 +411,14 @@ find_tree() {  # find "$DIR" <expr>, the whole tree as before, minus the nested 
   if [ "${#NESTED_PRUNE[@]}" -eq 0 ]; then find "$DIR" "$@" 2>/dev/null
   else find "$DIR" \( -type d \( -name '' "${NESTED_PRUNE[@]}" \) -prune \) -o "$@" 2>/dev/null; fi
 }
-FILELIST="$(mktemp 2>/dev/null || echo /tmp/ascg.$$)"
+FILELIST="$(mktemp 2>/dev/null)" || FILELIST=""
+# No scan buffer means no scan. Say so rather than end CLEAR on an empty file list.
+if [ -z "$FILELIST" ] || ! : > "$FILELIST" 2>/dev/null; then
+  NOTE="NOT CHECKED. The guard could not create its scan buffer in ${TMPDIR:-/tmp}, so nothing was scanned. Point TMPDIR at a writable folder and run it again."
+  if [ -n "$STDIN_JSON" ]; then echo "app-store-compliance-guard. $NOTE" >&2; exit 0; fi
+  echo "$NOTE"; exit 1
+fi
+SCAN_ERROR=""
 
 # ----- the scan of one tree (issue #612). Runs once per app root, or once on the project root -----
 scan_tree() {
@@ -376,9 +442,11 @@ find "$DIR" -mindepth 1 \
   -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
   -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
   -o -name '*.cs' -o -name '*.rs' -o -name '*.csproj' -o -name '*.xaml' -o -name '*.toml' \
+  -o -name 'InfoPlist.strings' \
   \) -print 2>/dev/null \
-  > "$FILELIST"
+  > "$FILELIST" || : 2>/dev/null >> "$FILELIST" || SCAN_ERROR="the file list could not be written to $FILELIST"
 build_blob
+CODE_STATE=""
 
 # ----- platform detection -----
 # Every find below pipes into `grep .`, never `grep -q .`, for the reason in release_string_has:
@@ -449,7 +517,7 @@ fi
 echo "Frameworks. Flutter=$IS_FLUTTER ReactNative/Expo=$IS_RN Ionic/Capacitor/Cordova=$IS_IONIC Unity=$IS_UNITY MAUI=$IS_MAUI Tauri=$IS_TAURI KotlinMultiplatform=$IS_KMP"
 [ "$IS_UNITY" -eq 1 ] && echo "Unity. No Xcode or Gradle project exists before export, so Info.plist and the Gradle settings were not read. Scan the exported project too."
 [ "$IS_TAURI" -eq 1 ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && echo "Tauri. No src-tauri/gen/apple or gen/android folder. Run cargo tauri ios init or cargo tauri android init before a mobile submit, then scan again."
-[ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only framework checks suppressed for this run."
+[ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && echo "Command targets Android only. Apple-only checks suppressed for this run."
 echo ""
 
 # ===== shared checks =====
@@ -484,7 +552,7 @@ fi
 # iOS-only Apple requirement, gated on IS_IOS so an Android-only build is never blocked for it.
 if [ "$IS_FLUTTER" -eq 1 ]; then
   if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && grep_has 'permission_handler|image_picker|geolocator|device_info_plus|package_info_plus|shared_preferences|sqflite|firebase_'; then
-    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
+    if ! own_privacy_manifest; then
       finding critical "FLUTTER-PRIVACY-MANIFEST-MISSING" "Flutter plugins that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere in the project" "Add an app-level PrivacyInfo.xcprivacy AND confirm each Flutter plugin ships its own (permission_handler, image_picker, and most first-party plugins added theirs from Flutter 3.19+). A missing plugin-level manifest is invisible to Apple's aggregator unless the app manifest also declares that plugin's reason codes. This check only runs against an iOS target."
     fi
   fi
@@ -502,8 +570,47 @@ if [ "$IS_RN" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     fi
   fi
   if grep_has 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'; then
-    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
+    if ! own_privacy_manifest; then
       finding critical "RN-PRIVACY-MANIFEST-MISSING" "React Native native modules that touch required-reason APIs but no PrivacyInfo.xcprivacy anywhere" "Add an app-level PrivacyInfo.xcprivacy. Native modules bundled transitively via JS deps (analytics, storage, device-info libraries) each need their own manifest aggregated in the final IPA; this is easy to miss because the dependency is JS-side." src 'Firebase|@react-native-firebase|expo-file-system|expo-application|AsyncStorage|@react-native-async-storage'
+    fi
+  fi
+fi
+
+# ===== Managed Expo app config, read when no ios or android folder exists yet =====
+# EAS builds the native folders in the cloud, so the config is all there is to read. Native code stays NOT CHECKED.
+if [ "$IS_RN" -eq 1 ] && [ "$NEEDS_NATIVE" -eq 1 ]; then
+  EXPO_CFG=()
+  for f in "$DIR/app.json" "$DIR/app.config.js" "$DIR/app.config.ts" "$DIR/app.config.mjs" "$DIR/app.config.cjs"; do
+    if [ -f "$f" ]; then EXPO_CFG+=("$f"); fi
+  done
+  if [ "${#EXPO_CFG[@]}" -gt 0 ]; then
+    EXPO_READ=1
+    echo "Expo config. No ios or android folder, so only the app config was read for store checks."
+    ex_cfg() { grep -Eqs -e "$1" "${EXPO_CFG[@]}"; }
+    ex_dep() { grep -Eqs -e "$1" "$DIR/package.json" "${EXPO_CFG[@]}"; }
+    if [ "$CMD_TARGET_ANDROID_ONLY" -eq 0 ]; then
+      if ex_dep '"(expo-camera|expo-image-picker|expo-barcode-scanner|react-native-vision-camera)"' && ! ex_cfg 'NSCameraUsageDescription|cameraPermission'; then
+        finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera module in the Expo app with no camera purpose string in the app config" "Set ios.infoPlist.NSCameraUsageDescription, or the plugin cameraPermission option, to a specific reason. The generic plugin default is a common 5.1.1 rejection."
+      fi
+      if ex_dep '"(expo-location|react-native-geolocation-service|@react-native-community/geolocation)"' && ! ex_cfg 'NSLocation[A-Za-z]*UsageDescription|location(WhenInUse|AlwaysAndWhenInUse|Always)Permission'; then
+        finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location module in the Expo app with no location purpose string in the app config" "Set ios.infoPlist.NSLocationWhenInUseUsageDescription, or the plugin locationWhenInUsePermission option, to a specific reason."
+      fi
+      if ex_dep '"(@react-native-async-storage/async-storage|expo-file-system|expo-application|@react-native-firebase/[a-z-]+)"' && ! ex_cfg 'privacyManifests'; then
+        finding medium "RN-PRIVACY-MANIFEST-MISSING" "Required-reason modules installed but the Expo app config sets no ios.privacyManifests" "Declare the accessed API categories and reasons under ios.privacyManifests, so the manifest EAS generates carries them."
+      fi
+    fi
+    if [ "$CMD_TARGET_IOS_ONLY" -eq 0 ]; then
+      # Only the permissions array counts. blockedPermissions removes a permission, it never adds one.
+      EX_PERMS="$(cat "${EXPO_CFG[@]}" 2>/dev/null | tr -d '\n\r' | grep -oE '(^|[^A-Za-z])"?permissions"?[[:space:]]*:[[:space:]]*\[[^]]*\]')"
+      if printf '%s' "$EX_PERMS" | grep -q 'ACCESS_BACKGROUND_LOCATION' || ex_cfg 'isAndroidBackgroundLocationEnabled"?[[:space:]]*:[[:space:]]*true'; then
+        finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location requested in the Expo app config" "Justify with a core feature and prominent disclosure, or use foreground location."
+      fi
+      if printf '%s' "$EX_PERMS" | grep -qE 'READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG'; then
+        finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission in the Expo app config" "Use the permissions declaration for an approved core use case, or drop it."
+      fi
+      if printf '%s' "$EX_PERMS" | grep -q 'MANAGE_EXTERNAL_STORAGE'; then
+        finding critical "GOOGLE-PERM-ALL-FILES" "All files access in the Expo app config" "Use scoped storage. Request all files access only for a qualifying use case."
+      fi
     fi
   fi
 fi
@@ -520,33 +627,34 @@ if [ "$IS_IONIC" -eq 1 ] && [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding critical "IONIC-UIWEBVIEW-DEPRECATED" "Deprecated UIWebView symbol referenced (directly or via a stale plugin)" "Apple auto-rejects (ITMS-90809) any binary statically linking UIWebView. Update every Capacitor/Cordova plugin to a version using WKWebView; a stale plugin can pull this in even when app code never references it." src 'UIWebView'
   fi
   if grep_has '@capacitor/|Capacitor\.'; then
-    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
+    if ! own_privacy_manifest; then
       finding high "IONIC-PRIVACY-MANIFEST-MISSING" "Capacitor/Cordova plugins present but no PrivacyInfo.xcprivacy" "Capacitor plugin manifest support is less standardized than Flutter's; verify each plugin wrapping a native SDK (camera, geolocation, ads) ships PrivacyInfo.xcprivacy, and add the app-level one." src '@capacitor/|Capacitor\.'
     fi
   fi
 fi
 
 # ===== iOS checks =====
-if [ "$IS_IOS" -eq 1 ]; then
+# Gated like the framework checks, so an Android-only command never meets an Apple finding.
+if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
     finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." src 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
-    if ! grep_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
+    if ! code_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
       finding critical "APPLE-5.1.1-NO-ACCOUNT-DELETION" "Account creation found but no in app account deletion" "Add an in app account deletion flow (Apple 5.1.1(v))." src 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'
     fi
   fi
   if grep_has 'AVCaptureDevice|UIImagePickerController'; then
-    grep_has 'NSCameraUsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera used without NSCameraUsageDescription" "Add NSCameraUsageDescription with a specific reason." src 'AVCaptureDevice|UIImagePickerController'
+    config_has 'NSCameraUsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera used without NSCameraUsageDescription" "Add NSCameraUsageDescription with a specific reason." src 'AVCaptureDevice|UIImagePickerController'
   fi
   if grep_has 'CLLocationManager'; then
-    grep_has 'NSLocation.*UsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location used without a location usage description" "Add the matching NSLocation usage description with a specific reason." src 'CLLocationManager'
+    config_has 'NSLocation.*UsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location used without a location usage description" "Add the matching NSLocation usage description with a specific reason." src 'CLLocationManager'
   fi
   if grep_has 'PHPhotoLibrary|PHPicker'; then
-    grep_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason." src 'PHPhotoLibrary|PHPicker'
+    config_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason." src 'PHPhotoLibrary|PHPicker'
   fi
   if grep_has 'CNContactStore'; then
-    grep_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
+    config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
     grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
@@ -575,7 +683,10 @@ if [ "$IS_IOS" -eq 1 ]; then
   # "Branch", which collide with ordinary English ("Adjust times", a git branch) and false-flag a
   # tracking SDK that is not present.
   if grep_has 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'; then
-    grep_has 'ATTrackingManager|NSUserTrackingUsageDescription' || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency" "Call the ATT prompt and add NSUserTrackingUsageDescription (Apple 5.1.2)." src 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'
+    ATT_MISS=""
+    config_has 'NSUserTrackingUsageDescription|userTrackingPermission' || ATT_MISS="NSUserTrackingUsageDescription in Info.plist or the build settings"
+    code_has 'requestTrackingAuthorization|requestTrackingPermission' || ATT_MISS="${ATT_MISS:+$ATT_MISS and }the ATTrackingManager.requestTrackingAuthorization call"
+    [ -z "$ATT_MISS" ] || finding high "APPLE-5.1.2-MISSING-ATT" "Tracking SDK without App Tracking Transparency, missing $ATT_MISS" "Call the ATT prompt and add NSUserTrackingUsageDescription, both are required (Apple 5.1.2)." src 'AppsFlyerLib|import AppsFlyer|AdjustConfig|AdjustEvent|import Adjust[^A-Za-z]|BranchEvent|BranchUniversalObject|import Branch[^A-Za-z]|FBSDKCoreKit|FBSDKLogin|ASIdentifierManager|advertisingIdentifier'
   fi
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
@@ -598,7 +709,7 @@ if [ "$IS_IOS" -eq 1 ]; then
   fi
   # Privacy manifest, the top modern Apple upload rejection since 2024
   if grep_has 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'; then
-    if ! find_tree -name 'PrivacyInfo.xcprivacy' -print | grep . >/dev/null; then
+    if ! own_privacy_manifest; then
       finding critical "APPLE-PRIVACY-MANIFEST-MISSING" "Required reason APIs or SDKs present but no PrivacyInfo.xcprivacy" "Add a privacy manifest with approved reason codes and tracking domains, and confirm each SDK ships its signed manifest." src 'Firebase|Alamofire|UserDefaults|systemUptime|FileManager\.default|ProcessInfo'
     fi
   fi
@@ -616,6 +727,7 @@ if [ "$IS_IOS" -eq 1 ]; then
   done
   if [ -n "$MANIFEST_VALIDATOR" ] && command -v python3 >/dev/null 2>&1; then
     # Same exclusions as the source file list. A pod's manifest is the vendor's job, a Tests fixture never ships.
+    : > "$FILELIST.manifest" 2>/dev/null || SCAN_ERROR="the privacy manifest results could not be written to $FILELIST.manifest"
     find "$DIR" -mindepth 1 \
       \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
         -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
@@ -637,8 +749,9 @@ if [ "$IS_IOS" -eq 1 ]; then
     finding medium "APPLE-MANIFEST-VALIDATOR-UNAVAILABLE" "Privacy manifests present but python3 or scripts/validate-privacy-manifest.py is missing, so their internals were not validated" "Install python3 and keep scripts/validate-privacy-manifest.py next to the guard, or run plutil -lint on each manifest by hand."
   fi
   [ "$IS_UNITY" -eq 1 ] || grep_has 'ITSAppUsesNonExemptEncryption' || finding high "APPLE-EXPORT-COMPLIANCE-MISSING" "ITSAppUsesNonExemptEncryption not set" "Set it in Info.plist or the build stalls in Missing Compliance and never reaches review."
-  if grep_has 'SKProduct|Product\.purchase|StoreKit'; then
-    grep_has 'restorePurchases|restoreCompletedTransactions|AppStore\.sync|Restore Purchases' || finding high "APPLE-RESTORE-PURCHASES-MISSING" "StoreKit purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src 'SKProduct|Product\.purchase|StoreKit'
+  # A framework app reaches StoreKit through a plugin, each with its own restore call.
+  if grep_has "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"; then
+    grep_has 'restorePurchases|RestorePurchases|restoreCompletedTransactions|restoreTransactions|RestoreTransactions|getAvailablePurchases|queryPastPurchases|AppStore\.sync|Restore Purchases' || finding high "APPLE-RESTORE-PURCHASES-MISSING" "In-app purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"
   fi
   if grep_has 'deleteAccount|delete account'; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form." src 'mailto:|deactivate'
@@ -1076,6 +1189,13 @@ if [ "$CRIT" -gt 0 ]; then
   [ "${REPORT_DEGRADED:-0}" = "1" ] && echo "BLOCKED. $CRIT critical rejection risk(s). Full report on stdout (no temp file available for buffering)." >&2
   emit_report 2; exit 2
 fi
+# A scan buffer that failed mid-run leaves the result unknown, never CLEAR.
+if [ -n "$SCAN_ERROR" ]; then
+  NOTE="NOT CHECKED. The scan could not run because $SCAN_ERROR."
+  echo ""; echo "$NOTE"
+  if [ -n "$STDIN_JSON" ]; then emit_report 0; echo "$NOTE" >&2; exit 0; fi
+  exit 1
+fi
 # A verdict line every time. Exit 0 with nothing scanned reads as a pass, so it is named and, run by hand, exits 1.
 if [ -n "$UNCHECKED" ] || { [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] || [ "$ANY_NEEDS_NATIVE" -eq 1 ]; }; }; then
   NOTE="NOT CHECKED. No iOS or Android project was found in $DIR, so the store checks did not run."
@@ -1083,6 +1203,7 @@ if [ -n "$UNCHECKED" ] || { [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] ||
     NOTE="NOT CHECKED. No ios or android folder in $UNCHECKED, so the store checks did not run there. The other app roots had 0 critical risks."
     NEXT="Next. Create the native project in each folder named above (npx expo prebuild, npx cap add, flutter create, or cargo tauri ios init), then run the guard again."
   elif [ "$ANY_RN" -eq 1 ]; then NEXT="Next. This looks like an Expo or React Native app with no ios or android folder. Run npx expo prebuild, then run the guard again."
+    [ "$EXPO_READ" -eq 1 ] && NOTE="NOT CHECKED. No ios or android folder in $DIR, so the native code checks did not run. Only the Expo app config was read."
   elif [ "$ANY_NEEDS_NATIVE" -eq 1 ]; then NEXT="Next. This app has no ios or android folder yet. Run $NATIVE_HINT, then run the guard again."
   else NEXT="Next. Point the guard at the folder that holds your Xcode project or your Android app folder."; fi
   echo ""; echo "$NOTE"; echo "$NEXT"
