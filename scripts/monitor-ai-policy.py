@@ -28,15 +28,20 @@ HTML_MARKUP = re.compile(
 _CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I | re.A)
 
 
+_TAG_NAME = re.compile(r"</?([A-Za-z][A-Za-z0-9-]*)", re.A)
+
+
 def _visible_markup(m):
-    """CDATA and textarea or title content is visible text. Everything else is markup."""
+    """CDATA and textarea or title content is visible text. Inline tags join, other markup separates."""
     if m.group(1) is not None:
         return " " + _CDATA_MARKUP.sub(" ", m.group(1)) + " "
     if m.group(3) is not None:
         return " " + m.group(3) + " "
-    return " "
+    t = _TAG_NAME.match(m.group(0))
+    return "" if t and t.group(1).lower() in _XHTML_INLINE else " "
 
 
+FEED_NAMESPACES = ("", "http://www.w3.org/2005/Atom", "http://purl.org/rss/1.0/")
 _XHTML_INLINE = {
     "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "font", "i",
     "ins", "kbd", "label", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup",
@@ -51,6 +56,9 @@ def _xhtml_text(elem):
         node, closing = stack.pop()
         name = node.tag.split("}", 1)[-1].lower() if isinstance(node.tag, str) else ""
         block = name not in _XHTML_INLINE
+        if not closing and name in ("script", "style"):
+            stack.append((node, True))  # never visible, only its tail is
+            continue
         if closing:
             if block:
                 out.append(" ")
@@ -67,16 +75,20 @@ def _xhtml_text(elem):
     return "".join(out)
 
 
-def _feed_text(child, atom):
-    """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1). RSS fields are HTML."""
+def _feed_text(child, atom, field):
+    """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1, 4.1.3).
+    An RSS title is plain text, an RSS description is HTML."""
+    plain = re.sub(r"\s+", " ", child.text or "").strip()
     if not atom:
-        return clean_html_text(child.text or "")
-    kind = (child.get("type") or "text").strip().lower()
+        return plain if field == "title" else clean_html_text(child.text or "")
+    kind = (child.get("type") or "text").split(";")[0].strip().lower()
     if kind == "xhtml" or kind.endswith("+xml") and "xhtml" in kind:
         return re.sub(r"\s+", " ", _xhtml_text(child)).strip()
-    if kind == "html" or kind == "text/html":
+    if kind in ("html", "text/html"):
         return clean_html_text(child.text or "")
-    return re.sub(r"\s+", " ", child.text or "").strip()
+    if "/" in kind and not kind.startswith("text/") and not kind.endswith("xml"):
+        return ""  # base64 binary content is not readable text
+    return plain
 
 
 def clean_html_text(raw_text):
@@ -252,20 +264,27 @@ def parse_rss_feed(url):
                     return tag.split("}", 1)[1]
                 return tag
 
+            def ns(e):
+                return e.tag[1:].split("}", 1)[0] if e.tag.startswith("{") else ""
+
             for elem in root.iter():
+                if not isinstance(elem.tag, str):
+                    continue
                 tag = clean_tag(elem.tag)
-                if tag in ("item", "entry"):
+                if tag in ("item", "entry") and ns(elem) in FEED_NAMESPACES:
                     title = ""
                     desc_parts = []
                     link = ""
                     pub_date = ""
 
                     for child in elem:
+                        if not isinstance(child.tag, str) or ns(child) != ns(elem):
+                            continue  # an extension element never stands in for the feed's own
                         ctag = clean_tag(child.tag)
                         if ctag == "title":
-                            title = _feed_text(child, tag == "entry")
+                            title = _feed_text(child, tag == "entry", "title")
                         elif ctag in ("description", "summary", "content"):
-                            part = _feed_text(child, tag == "entry")
+                            part = _feed_text(child, tag == "entry", "body")
                             if part:
                                 desc_parts.append(part)  # summary and content both count
                         elif ctag == "link":

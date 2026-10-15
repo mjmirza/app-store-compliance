@@ -272,6 +272,7 @@ def _top_level_args(code, start, end, pairs):
     return parts
 
 
+DIRECTIVE = re.compile(r"#(?:if|elseif|else|endif)\b")
 LABELED_CLOSURE = re.compile(r"\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{")
 
 
@@ -281,17 +282,17 @@ def _modifier_chain(code, i, pairs):
     n = len(code)
     while True:
         j = _skip_ws(code, i)
-        if (
-            j >= n
-            or code[j] != "."
-            or j + 1 >= n
-            or not (code[j + 1].isalpha() or code[j + 1] == "_")
-        ):
+        if DIRECTIVE.match(code, j):  # #if / #else / #endif lines between modifiers
+            eol = code.find("\n", j)
+            i = n if eol == -1 else eol
+            continue
+        d = _skip_ws(code, j + 1) if j < n and code[j] == "." else n
+        if d >= n or not (code[d].isalpha() or code[d] == "_"):
             return mods, i
-        k = j + 1
+        k = d
         while k < n and (code[k].isalnum() or code[k] == "_"):
             k += 1
-        name, args = code[j + 1 : k], None
+        name, args = code[d:k], None
         k2 = _skip_ws(code, k)
         if k2 < n and code[k2] == "(":
             end = pairs.get(k2, -1)
@@ -315,7 +316,24 @@ NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
 TITLED_ARG = re.compile(r"\s*(#*\"|title\s*:)")
 LABEL_ARG = re.compile(r"\s*label\s*:")
 LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*\{")
-HIDDEN_TRUE = re.compile(r"\(\s*true\s*\)")
+HIDDEN_TRUE = re.compile(r"\((?:\s*\()*\s*true\s*(?:\)\s*)*\)")
+ACC_HIDDEN = re.compile(r"\bhidden\s*:\s*(?:\(\s*)*true\b")
+ACC_LABEL = re.compile(r"\blabel\s*:")
+LABEL_OFF = re.compile(r"\bisEnabled\s*:\s*false\b")
+UNLABELED_ARG = re.compile(r"\s*(?![A-Za-z_][A-Za-z0-9_]*\s*:)[^\s{]")
+
+
+def _labels_button(code, name, args):
+    """True when a modifier gives the Button a spoken label or hides it from VoiceOver."""
+    if name == "accessibilityLabel":
+        return not (args and LABEL_OFF.search(code, *args))
+    if name == "accessibilityRepresentation":
+        return True
+    if name == "accessibilityHidden":
+        return bool(args and HIDDEN_TRUE.fullmatch(code, *args))
+    if name == "accessibility" and args:
+        return bool(ACC_LABEL.search(code, *args) or ACC_HIDDEN.search(code, *args))
+    return False
 
 
 def _any_in(hits, a, b):
@@ -341,7 +359,9 @@ def _line_end(text, start, end):
 def find_icon_only_buttons(code):
     """Yield (offset, end) for SwiftUI Buttons whose only label is an Image(systemName:)
     with no accessibilityLabel on the label or on the Button's own modifier chain."""
+    code = code.replace("`", " ")  # escaped identifiers read as plain names, offsets kept
     pairs = _bracket_pairs(code)
+    closer = {end - 1: start for start, end in pairs.items() if code[start] == "("}
     img_hits = [m.start() for m in IMAGE_SYMBOL.finditer(code)]
     named_hits = [m.start() for m in NAMED_CONTENT.finditer(code)]
     for m in re.finditer(r"(?<![\w.])(?:SwiftUI\s*\.\s*)?Button\b", code):
@@ -357,8 +377,10 @@ def find_icon_only_buttons(code):
             if end == -1:
                 continue
             parts = _top_level_args(code, i + 1, end - 1, pairs)
-            if any(TITLED_ARG.match(code, a, b) for a, b in parts):
-                continue  # a titled button reads its title
+            if any(
+                TITLED_ARG.match(code, a, b) or UNLABELED_ARG.match(code, a, b) for a, b in parts
+            ):
+                continue  # a titled button reads its title, literal or not
             label_part = next(
                 ((a, b) for a, b in parts if LABEL_ARG.match(code, a, b)), None
             )
@@ -388,13 +410,15 @@ def find_icon_only_buttons(code):
             continue
         if not _any_in(img_hits, label[0], label[1]) or _any_in(named_hits, label[0], label[1]):
             continue  # the whole label counts, see the documented limit in README.md
-        mods, _ = _modifier_chain(code, i, pairs)
-        if any(name == "accessibilityLabel" for name, _ in mods):
-            continue
-        if any(
-            name == "accessibilityHidden" and args and HIDDEN_TRUE.fullmatch(code, *args)
-            for name, args in mods
-        ):
+        mods, end = _modifier_chain(code, i, pairs)
+        while True:  # (Button { ... }).modifier reads through the parentheses
+            j = _skip_ws(code, end)
+            o = closer.get(j)
+            if o is None or code[o + 1 : m.start()].strip():
+                break
+            more, end = _modifier_chain(code, j + 1, pairs)
+            mods += more
+        if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
 def run_rule_scan(rule_id, ios_files, android_files):

@@ -116,6 +116,26 @@ ff = pathlib.Path(tmp, "f.xml"); ff.write_text(fs)
 f = ai.parse_rss_feed(ff.as_uri())
 assert f[0]["description"] == "Install macOS updates Fill Mac", f
 assert not ai.analyze_announcements(f, ["llm"]), "an unlisted block element joined two words"
+X = "http://www.w3.org/1999/xhtml"
+sw = ('<feed xmlns="http://www.w3.org/2005/Atom" xmlns:e="urn:ext">'
+      '<entry><title>S</title><content type="xhtml"><div xmlns="' + X + '"><script>generative AI</script><style>/* llm */</style><p>Pricing changes.</p></div></content></entry>'
+      '<entry><title>Real</title><e:title>generative AI</e:title><e:summary>generative AI</e:summary><summary>Pricing changes.</summary>'
+      '<e:entry><title>generative AI fake</title></e:entry></entry>'
+      '<entry><title>M</title><content type="text/html; charset=utf-8">&lt;a href="/llm/"&gt;Read&lt;/a&gt;</content></entry>'
+      '<entry><title>B</title><content type="application/octet-stream">aiAA</content></entry>'
+      '</feed>')
+fw = pathlib.Path(tmp, "w.xml"); fw.write_text(sw)
+w = ai.parse_rss_feed(fw.as_uri())
+assert [x["title"] for x in w] == ["S", "Real", "M", "B"], w
+assert [x["description"] for x in w] == ["Pricing changes.", "Pricing changes.", "Read", ""], w
+assert not ai.analyze_announcements(w, ["generative ai", "llm", "ai"]), "script, a foreign element, MIME parameters or binary content matched"
+rt = '<rss><channel><item><title>New &lt;generative AI&gt; rules</title><description>&lt;p&gt;artificial&lt;em&gt;intelligence&lt;/em&gt;&lt;/p&gt;</description></item></channel></rss>'
+fx = pathlib.Path(tmp, "x.xml"); fx.write_text(rt)
+x = ai.parse_rss_feed(fx.as_uri())
+assert x[0]["title"] == "New <generative AI> rules", x
+assert x[0]["description"] == "artificialintelligence", x
+for fn in (ai.clean_html_text,):
+    assert fn("<p>Hello</p><p>World</p>") == "Hello World", fn
 assert ai.analyze_announcements(i, ["llm"]), "an inline element split a keyword"
 assert not ai.analyze_announcements([e[0]], ["llm"]) and not ai.analyze_announcements([e[1]], ["llm"]), "markup or joined blocks made a false llm match"
 PY

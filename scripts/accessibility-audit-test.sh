@@ -520,6 +520,31 @@ struct V: View {
 EOF
 
 mkdir -p "$ISSUE_DIR/regex_lit" "$ISSUE_DIR/chain_perf" "$ISSUE_DIR/mod_perf"
+mkdir -p "$ISSUE_DIR/sweep15"
+cat << 'EOF' > "$ISSUE_DIR/sweep15/S.swift"
+import SwiftUI
+struct V: View {
+    let title = "Pause"
+    var body: some View {
+        Button(title) { icon = Image(systemName: "pause") }
+        (Button(action: {}) { Image(systemName: "trash") }).accessibilityLabel("Delete")
+        Button(action: {}) { Image(systemName: "a") } . accessibilityLabel("A")
+        Button(action: {}) { Image(systemName: "b") }
+        #if DEBUG
+            .padding()
+        #endif
+            .accessibilityLabel("B")
+        Button(action: {}) { Image(systemName: "c") }.`accessibilityLabel`("C")
+        Button(action: {}) { Image(systemName: "d"); `Text`("D") }
+        Button(action: {}) { Image(systemName: "e") }.accessibility(label: Text("E"))
+        Button(action: {}) { Image(systemName: "f") }.accessibility(hidden: true)
+        Button(action: {}) { Image(systemName: "g") }.accessibilityRepresentation { Text("G") }
+        Button(action: {}) { Image(systemName: "h") }.accessibilityHidden((true))
+        `Button`(action: {}) { Image(systemName: "i") }
+        Button(action: {}) { Image(systemName: "j") }.accessibilityLabel("J", isEnabled: false)
+    }
+}
+EOF
 mkdir -p "$ISSUE_DIR/multi_closure"
 cat << 'EOF' > "$ISSUE_DIR/multi_closure/M.swift"
 import SwiftUI
@@ -687,6 +712,13 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/sweep15" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ] && echo "$OUT" | grep -q "S.swift:19)" && echo "$OUT" | grep -q "S.swift:20)"; then
+  ok "#834 titled by a variable, parenthesized, spaced dot, #if block, escaped names, accessibility(label:/hidden:), representation and ((true)) all read, and an escaped Button or a disabled label is still reported"
+else
+  bad "#834 the round 15 sweep cases changed. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/multi_closure" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "M.swift:7)"; then
