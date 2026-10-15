@@ -2200,6 +2200,15 @@ for c in "./gradlew bundleRelease && $FL deliver" "$FL deliver && echo bundleRel
 done
 rr_hook "./gradlew bundleRelease" "$D"
 rr_has 'Command targets Android only' && ok "cx2 a plain Android build stays Android only" || bad "cx2 a plain Android build stays Android only (rc=$RC)"
+# An Apple upload is never Android, and an Android word inside another tool's argument is not a gradle task or flag
+for c in "$FL deliver output_path:bundleRelease" "$FL pilot upload ipa:app-bundleRelease.ipa" "$FL upload_to_testflight build:assembleRelease" "$FL --verbose deliver notes:run-android" "$FL deliver --platform android" "$FL testflight -p android"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'Command targets Android only' && ok "cx2b an Apple upload keeps the Apple checks. $c" || bad "cx2b an Apple upload keeps the Apple checks. $c (rc=$RC)"
+done
+for c in "./gradlew :app:bundleRelease" "./gradlew clean app:assembleRelease --stacktrace" "flutter build appbundle --release"; do
+  rr_hook "$c" "$D"
+  rr_has 'Command targets Android only' && ok "cx2b a real Android task stays Android only. $c" || bad "cx2b a real Android task stays Android only. $c (rc=$RC)"
+done
 rm -rf "$D"
 
 # CX14 every Android platform flag form is Android only, iOS and all are not

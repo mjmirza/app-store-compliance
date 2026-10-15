@@ -302,15 +302,19 @@ fi
 # See docs/CROSS-PLATFORM-FRAMEWORKS.md: an Android-only command beats a committed ios/
 # folder for the Apple-only checks below (standalone mode has no CMD, unaffected).
 CMD_TARGET_ANDROID_ONLY=0
-AND_TARGET_RE='build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|(-p|--platform)([[:space:]]+|=)android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b'
-IOS_TARGET_RE='\bios\b|\bipa\b|xcodebuild|altool|notarytool'
+# An Android token must be the gradle task, the platform flag or the build verb itself, never a word inside another argument.
+W_END='([[:space:]]|$)'
+AND_TARGET_RE="(^|[[:space:]])flutter[[:space:]]+build[[:space:]]+(apk|appbundle)$W_END|(^|[[:space:]/])gradlew?([[:space:]]+[^[:space:]]+)*[[:space:]]+:?([A-Za-z0-9_.-]+:)*(assembleRelease|bundleRelease)$W_END|(^|[[:space:]])(run-android|run:android)$W_END|(^|[[:space:]])(-p|--platform)([[:space:]]+|=)android$W_END|capacitor[[:space:]]+android$W_END|(^|[[:space:]])-buildtarget[[:space:]]+android$W_END|(^|[[:space:]=])net[0-9.]+-android$W_END|tauri[[:space:]]+android$W_END"
+# An Apple upload in a segment means that segment is never Android, whatever words its arguments carry.
+IOS_TARGET_RE='\bios\b|\bipa\b|xcodebuild|altool|notarytool|transporter|fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|appstore|testflight|upload_to_app_store|upload_to_testflight)([^A-Za-z0-9_]|$)'
 if [ -n "$CMD" ]; then
   # Each submitting segment is classified on its own. Android only means every submit in the command is Android.
   SEG_SUBMITS=0; SEG_ALL_AND=1
   while IFS= read -r SEG; do
     [ -n "$SEG" ] && submits "$SEG" || continue
     SEG_SUBMITS=$((SEG_SUBMITS+1))
-    { printf '%s' "$SEG" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEG" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
+    SEGN="$(fl_norm "$SEG")"
+    { printf '%s' "$SEGN" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
   done <<SEGS
 $(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n')
 SEGS
