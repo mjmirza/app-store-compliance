@@ -85,6 +85,10 @@ items = [
     ("Updated review guidelines", "<p>The App Review Guidelines have changed.</p>"),
     ("Patched vulnerabilities", "<p>Several vulnerabilities are fixed in this release.</p>"),
     ("In-app purchasing changes", "<p>New rules for in-app purchasing.</p>"),
+    ("Camera key", "<p>Update NSCameraUsageDescription strings.</p>"),
+    ("Location API", "<p>CLLocationManager authorization changes.</p>"),
+    ("StoreKit2 update", "<p>New StoreKit2 APIs.</p>"),
+    ("WCAG2.2 alignment", "<p>Apps should meet WCAG2.2.</p>"),
 ]
 json.dump([{"title": t, "description": d, "pubDate": "Mon, 01 Sep 2026 10:00:00 PDT", "link": "https://mock.invalid/833/%d" % i}
            for i, (t, d) in enumerate(items)], open(sys.argv[1], "w"))
@@ -102,6 +106,10 @@ assert lic in by.get("SLA update", set()), by
 assert "App Store Review Guidelines" in by.get("Updated review guidelines", set()), by
 assert "Security updates" in by.get("Patched vulnerabilities", set()), by
 assert "In-App Purchase policies" in by.get("In-app purchasing changes", set()), by
+assert "Camera and microphone permissions" in by.get("Camera key", set()), by
+assert "Location permissions" in by.get("Location API", set()), by
+assert "In-App Purchase policies" in by.get("StoreKit2 update", set()), by
+assert "Accessibility requirements" in by.get("WCAG2.2 alignment", set()), by
 ' && ok "keywords match whole words on stripped text (issue 833)" || bad "keywords match whole words on stripped text (issue 833)"
 rm -rf "$T"
 

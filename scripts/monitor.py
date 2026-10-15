@@ -674,8 +674,11 @@ def strip_html(text):
 
 
 def term_regex(term):
-    """Whole-word match with an optional plural, so "pla" never fires on "display" (#833)."""
-    return re.compile(r"(?<![a-z0-9])(?:" + term + r")(?:s|es)?(?![a-z0-9])", re.IGNORECASE)
+    """Short terms match as words ("pla" never fires on "display", #833); a version may follow ("wcag2.2").
+    Terms of 8 or more characters match inside identifiers ("NSCameraUsageDescription", "CLLocationManager")."""
+    if len(term) >= 8:
+        return re.compile(r"(?:" + term + r")", re.IGNORECASE)
+    return re.compile(r"(?<![a-z0-9])(?:" + term + r")(?:s|es)?(?![a-z])", re.IGNORECASE)
 
 
 def match_announcement_to_tracks(announcement):
