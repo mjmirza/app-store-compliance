@@ -270,6 +270,8 @@ PY
       jq --arg c "$HOOK_CMD" --arg m "$MATCHER" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(.hooks |= map(select((.command? // "" | tostring | (. as $x | $x == $c or ([$g, $t] | any(. as $s | $x == "bash " + $s or $x == "bash \u0027" + $s + "\u0027" or $x == "bash \"" + $s + "\"")))) | not)) | select((.hooks | length) > 0))) + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 120}]}])' "$cur" > "$tmp" || { rm -f "$tmp" "$tmp.in"; return 4; }
       rm -f "$tmp.in"; mv "$tmp" "$SETTINGS"; return 0
     fi
+    # Removal owns its handler under any matcher, so an older Bash-only entry is removed too.
+    [ -n "$cur" ] && jq -e --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | .hooks[]?.command? // "" | tostring | select(. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\"")))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     [ "$present" -ne 0 ] && return 3
     tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
     cp -p "$cur" "$SETTINGS.bak-$(date +%Y%m%d-%H%M%S)"

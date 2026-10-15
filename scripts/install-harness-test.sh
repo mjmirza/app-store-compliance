@@ -98,6 +98,10 @@ run --tool copilot doctor >/dev/null; RC=$?
 run --tool copilot >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["preToolUse"]; sys.exit(0 if len(e)==1 and e[0].get("powershell") else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
   && ok "copilot install adds the missing Windows handler without a duplicate" || bad "copilot install adds the missing Windows handler without a duplicate"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["preToolUse"][0]["powershell"]="Write-Output app-store-compliance-guard.sh; exit $LASTEXITCODE"; json.dump(d,open(p,"w"))' "$H/.copilot/hooks/app-store-compliance.json"
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "copilot doctor fails when the Windows handler was edited" || bad "copilot doctor fails when the Windows handler was edited (rc=$RC)"
+run --tool copilot >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=d["hooks"]["PreToolUse"][0]; sys.exit(0 if g["matcher"]=="launch-process" and g["hooks"][0]["timeout"]==120000 else 1)' "$H/.augment/settings.json" \
   && ok "auggie uses launch-process and a millisecond timeout" || bad "auggie uses launch-process and a millisecond timeout"
 python3 -c 'import json,os,sys; c=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]; sys.exit(0 if c==sys.argv[2] and os.access(c,os.X_OK) and open(c).readline().startswith("#!") else 1)' "$H/.augment/settings.json" "$H/.augment/hooks/app-store-compliance-guard.sh" \
@@ -290,10 +294,19 @@ if command -v node >/dev/null 2>&1; then
 const m = await import(process.argv[1]);
 const p = await m.AppStoreCompliance({ directory: process.argv[2] });
 const run = async (c) => { try { await p["tool.execute.before"]({ tool: "bash" }, { args: { command: c } }); return "allowed" } catch (e) { return "thrown" } };
-console.log((await run("fast" + "lane deliver")) + " " + (await run("ls -la")));
+console.log((await run("fast" + "lane deliver")) + " " + (await run("f\\ast" + "lane deliver")) + " " + (await run("ea" + "s\tsubmit")) + " " + (await run("ls -la")));
 ' "$(cfg opencode)" "$H" 2>/dev/null)"
-  [ "$RES" = "thrown allowed" ] && ok "opencode refuses a submit when the guard cannot run and allows other commands" || bad "opencode refuses a submit when the guard cannot run and allows other commands (got $RES)"
+  [ "$RES" = "thrown thrown thrown allowed" ] && ok "opencode refuses a submit when the guard cannot run and allows other commands" || bad "opencode refuses a submit when the guard cannot run and allows other commands (got $RES)"
 else ok "opencode guard-failure check skipped, node not installed"; fi
+# 8h a CRLF Kimi config reinstalls without a rewrite
+fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
+run --tool kimi >/dev/null; N1="$(ls "$H/.kimi-code" | grep -c bak)"; OUT="$(run --tool kimi)"; N2="$(ls "$H/.kimi-code" | grep -c bak)"
+[ "$N1" = "$N2" ] && echo "$OUT" | grep -q 'already registered' && ok "kimi a second run on a CRLF config changes nothing" || bad "kimi a second run on a CRLF config changes nothing ($N1 $N2)"
+# 8i without node the OpenCode install never says verified
+fresh; mkdir -p "$H/.config/opencode"
+NONODE="$WORK/nonode$RANDOM"; mkdir -p "$NONODE"; for b in bash sh python3 grep sed awk cat cp mv rm mkdir chmod dirname basename tr head tail find date ls env printf mktemp uname cmp wc sort; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
+OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
+echo "$OUT" | grep -q 'not fully verified' && ! echo "$OUT" | grep -q '^Install verified' && ok "opencode without node says not fully verified" || bad "opencode without node says not fully verified"
 # 8g a non-Claude doctor says when the checkout is newer than the install
 fresh; mkdir -p "$H/.codex"; run --tool codex >/dev/null; printf '1.0.0' > "$H/.agents/skills/app-store-compliance/VERSION"
 OUT="$(run --tool codex doctor)"

@@ -16,6 +16,7 @@ GUARD_NAME = "app-store-compliance-guard.sh"
 PAYLOAD_DIRS = ("docs", "data", "references", "templates", "scripts")
 SUBMIT = "fast" + "lane deliver"
 PROBLEMS = []
+UNVERIFIED = []
 KIMI_BEGIN = "# >>> app-store-compliance guard >>>"
 KIMI_END = "# <<< app-store-compliance guard <<<"
 KIMI_SEP_FILE = ".app-store-compliance-kimi-sep"
@@ -250,7 +251,7 @@ def load_json(path):
     return data
 
 
-def write_atomic(path, text):
+def write_atomic(path, text, newline=None):
     folder = os.path.dirname(path)
     os.makedirs(folder, exist_ok=True)
     real = os.path.realpath(path)
@@ -260,7 +261,7 @@ def write_atomic(path, text):
             path + ".bak-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(os.getpid()),
         )
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(real) or folder, prefix=".asc-")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with os.fdopen(fd, "w", encoding="utf-8", newline=newline) as f:
         f.write(text)
     if os.path.exists(real):
         shutil.copymode(real, tmp)
@@ -348,7 +349,7 @@ def dispatches(tool, style, group, h):
         return False
     if style == "copilot":
         ps = h.get("powershell")
-        if not (isinstance(ps, str) and GUARD_NAME in ps and "exit $LASTEXITCODE" in ps):
+        if ps != ps_cmd(tool, guard_of(str(h.get("bash", "")))):
             return False
     key, want = {"nested": spec.get("timeout"), "copilot": ("timeoutSec", 120)}.get(
         style
@@ -410,7 +411,7 @@ def plugin_source(guard):
         '    if (r.status === 2) throw new Error((r.stdout || "") + (r.stderr || "") || "Blocked by the App Store compliance guard.");\n'
         '    if (r.error || (r.status !== 0 && r.status !== 1)) {\n'
         '      const why = "The App Store compliance guard could not run (" + (r.error ? r.error.message : "exit " + r.status) + "). Run install.sh --tool opencode doctor.";\n'
-        '      if (/fastlane|eas |xcrun|altool|notarytool|transporter|gradle|bundletool|xcodebuild|flutter|expo|capacitor|cap |cordova|ionic|unity|dotnet|tauri|npm|pnpm|yarn|bun |make|turbo|nx |lerna/i.test(command)) throw new Error(why);\n'
+        '      if (/fastlane|eas |xcrun|altool|notarytool|transporter|gradle|bundletool|xcodebuild|flutter|expo|capacitor|cap |cordova|ionic|unity|dotnet|tauri|npm|pnpm|yarn|bun |make|turbo|nx |lerna/i.test(command.replace(/[\\\\\\x27"`]/g, "").replace(/\\s+/g, " "))) throw new Error(why);\n'
         '      console.error(why);\n'
         '    }\n'
         "  },\n"
@@ -446,7 +447,7 @@ def kimi_block(cmd):
 
 def kimi_entry(text):
     """The [[hooks]] table inside our marked block, {} when it does not parse, None when absent."""
-    m = re.search(re.escape(KIMI_BEGIN) + r"\n(.*?)" + re.escape(KIMI_END), text, re.S)
+    m = re.search(re.escape(KIMI_BEGIN) + r"\r?\n(.*?)" + re.escape(KIMI_END), text, re.S)
     if not m:
         return None
     try:
@@ -622,7 +623,7 @@ def register_kimi(lay, cmd, dry):
             print("  would rewrite the guard block in " + shown(path) + ", with a backup")
             return True
         pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?"
-        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S))
+        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S), newline="")
         ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
     if dry:
@@ -633,7 +634,7 @@ def register_kimi(lay, cmd, dry):
         )
         return True
     sep = "" if not text or text.endswith(nl + nl) else (nl if text.endswith(nl) else nl + nl)
-    write_atomic(path, text + sep + kimi_block(cmd).replace("\n", nl))
+    write_atomic(path, text + sep + kimi_block(cmd).replace("\n", nl), newline="")
     os.makedirs(lay["hooks"], exist_ok=True)
     with open(os.path.join(lay["hooks"], KIMI_SEP_FILE), "w", encoding="utf-8") as f:
         f.write(json.dumps(sep))
@@ -672,7 +673,7 @@ def unregister(tool, lay, guard):
         # Drop only the newlines the install added in front of a block it appended at the end.
         if sep and not after and before.endswith(sep):
             before = before[: -len(sep)]
-        write_atomic(lay["config"], before + after)
+        write_atomic(lay["config"], before + after, newline="")
         if os.path.exists(sep_file):
             os.remove(sep_file)
         return True
@@ -960,7 +961,10 @@ def verify(tool, lay, guard, repo_dir):
             + " doctor"
         )
         return 1
-    print("Install verified.")
+    if UNVERIFIED:
+        print("Installed, but not fully verified. " + "; ".join(UNVERIFIED) + ". Install node and run doctor to verify.")
+    else:
+        print("Install verified.")
     if tool != "copilot-repo":
         print("Check your app now.   bash " + shown(guard) + ' "/path/to/your/app"')
     print(AFTER[tool])
@@ -977,6 +981,7 @@ def check_plugin(lay, app):
         note(
             "node not found, so the plugin was not exercised here. OpenCode runs it with its own runtime."
         )
+        UNVERIFIED.append("the OpenCode plugin was not exercised (node not found)")
         return
     if rc == 2:
         ok("the plugin stops a submit command")

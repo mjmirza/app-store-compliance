@@ -237,6 +237,10 @@ if command -v jq >/dev/null 2>&1; then
   OUT="$(ASC_UNAME=MINGW64_NT-10.0 PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash|PowerShell"] else 1)' "$C/settings.json" && [ "$(hooks)" = "1" ] && [ "$RC" -eq 0 ] \
     && ok "with jq only a Windows reinstall upgrades the matcher once" || bad "with jq only a Windows reinstall upgrades the matcher once (rc=$RC entries=$(hooks))"
+  # an old Bash-only entry is still removed by a jq-only Windows uninstall
+  fresh; run >/dev/null
+  ASC_UNAME=MINGW64_NT-10.0 PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" uninstall >/dev/null 2>&1; RC=$?
+  [ "$(hooks)" = "0" ] && [ "$RC" -eq 0 ] && ok "with jq only a Windows uninstall removes an old Bash-only entry" || bad "with jq only a Windows uninstall removes an old Bash-only entry (rc=$RC entries=$(hooks))"
   rm -rf "$SHIM"
 fi
 
