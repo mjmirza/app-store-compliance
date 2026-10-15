@@ -269,8 +269,12 @@ def _read_group_files(d):
     return groups
 
 
-def group_platform(rel):
-    return "google" if "android" in [p.lower() for p in rel.split(os.sep)] else "apple"
+def group_platform(rel, root=None):
+    # The root's own name and its parent count too, so metadata/android and metadata/android/en-US stay Google.
+    parts = rel.split(os.sep)
+    if root:
+        parts = os.path.abspath(root).split(os.sep)[-2:] + parts
+    return "google" if "android" in [p.lower() for p in parts] else "apple"
 
 
 def _fields_from(entries, aliases):
@@ -300,7 +304,7 @@ def load_locales(d, platform=None):
     rels = sorted(groups)
     units = []
     for rel in rels:
-        plat = platform or group_platform(rel)
+        plat = platform or group_platform(rel, d)
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
         own = _fields_from(groups[rel], aliases)
         if not own:
