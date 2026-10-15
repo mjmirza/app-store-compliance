@@ -32,6 +32,7 @@ for arg in "$@"; do
     install|doctor|uninstall) MODE="$arg" ;;
     --dry-run) DRY=1 ;;
     -h|--help) MODE="help" ;;
+    --version) MODE="version" ;;
     *) echo "Unknown argument. $arg" >&2; echo "Usage. install.sh [install|doctor|uninstall] [--dry-run]" >&2; exit 2 ;;
   esac
 done
@@ -236,6 +237,12 @@ verify() {
   if [ -f "$GUARD" ] && [ -f "$GUARD_SRC" ] && ! cmp -s "$GUARD" "$GUARD_SRC"; then
     warn "installed guard differs from this checkout. Run install.sh again to update it."
   fi
+  if [ -f "$SKILL/VERSION" ]; then
+    good "version $(cat "$SKILL/VERSION")"
+    if [ -f "$REPO/VERSION" ] && ! cmp -s "$SKILL/VERSION" "$REPO/VERSION"; then
+      warn "this checkout is version $(cat "$REPO/VERSION"). Run install.sh again to update."
+    fi
+  fi
   local missing="" p
   for p in SKILL.md data/rejection-patterns.json data/regulatory-deadlines.json docs/PRE-SUBMISSION-CHECKLIST.md references scripts/deadline-checker.py scripts/validate-privacy-manifest.py templates .citation-allowlist; do
     [ -e "$SKILL/$p" ] || missing="$missing $p"
@@ -290,6 +297,7 @@ do_install() {
   cp "$GUARD_SRC" "$GUARD" && chmod +x "$GUARD"
   cp "$REPO/agent-os/skill/SKILL.md" "$SKILL/SKILL.md"
   cp "$REPO/.citation-allowlist" "$SKILL/.citation-allowlist"
+  [ -f "$REPO/VERSION" ] && cp "$REPO/VERSION" "$SKILL/VERSION"
   local d
   for d in $PAYLOAD_DIRS; do
     rm -rf "${SKILL:?}/$d"
@@ -324,7 +332,8 @@ do_uninstall() {
 }
 
 case "$MODE" in
-  help) say "Usage. install.sh [install|doctor|uninstall] [--dry-run]"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
+  version) printf 'app-store-compliance %s\n' "$(cat "$REPO/VERSION" 2>/dev/null || echo unknown)" ;;
+  help) say "Usage. install.sh [install|doctor|uninstall] [--dry-run] [--version]"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
   install) do_install ;;
   doctor) verify ;;
   uninstall) do_uninstall ;;

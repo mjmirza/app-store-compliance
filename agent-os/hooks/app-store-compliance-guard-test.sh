@@ -941,7 +941,7 @@ rm -rf "$D"
 # 94 a 5MB payload that is valid JSON with the command up front is scanned, well under the cap
 D="$(mk_ios_bad)"
 BIG="$(mktemp)"; { printf '{"tool_name":"Bash","tool_input":{"command":"npx eas submit --platform ios","description":"'; head -c 5000000 /dev/zero | tr '\0' 'x'; printf '"}}'; } > "$BIG"
-OUT="$(bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
+OUT="$(CLAUDE_PROJECT_DIR="$D" bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-32 5MB valid payload is scanned" || bad "610-32 5MB valid payload is scanned (rc=$RC bytes=${#OUT})"
 rm -rf "$D"
 
@@ -1896,6 +1896,58 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rm -rf "$D/apps/fl"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR' && ok "c4-2 a plain Dart package beside a native app does not stop CLEAR" || bad "c4-2 a plain Dart package beside a native app does not stop CLEAR (rc=$RC)"
+rm -rf "$D"
+
+# Harness payloads (2.0.0). Codex, Gemini CLI, Cursor, Copilot CLI and OpenCode each send the shell command
+# in their own shape. Each must reach the scan on the jq and python3 tiers, and a non-shell tool must stay silent.
+D="$(mk_ios_bad)"
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date env; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+harness_payload() { python3 -c '
+import json, sys
+kind, cmd, cwd = sys.argv[1], sys.argv[2], sys.argv[3]
+shapes = {
+  "codex": {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "gemini": {"hook_event_name": "BeforeTool", "tool_name": "run_shell_command", "tool_input": {"command": cmd}, "cwd": cwd},
+  "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
+  "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+  "copilot-obj": {"toolName": "bash", "toolArgs": {"command": cmd}, "cwd": cwd},
+  "opencode": {"tool_name": "bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "write": {"tool_name": "Write", "tool_input": {"command": cmd, "file_path": "x"}, "cwd": cwd},
+  "gemini-write": {"tool_name": "write_file", "tool_input": {"command": cmd}, "cwd": cwd},
+  "copilot-edit": {"toolName": "edit", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+}
+print(json.dumps(shapes[kind]))' "$1" "$2" "$3"; }
+SUB="fastlane deliver"
+for tier in "$PATH" "$NOJQ"; do
+  tn="${tier##*/}"; [ "$tier" = "$PATH" ] && tn=jq
+  for kind in codex gemini cursor copilot-str copilot-obj opencode; do
+    RC="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+    [ "$RC" = "2" ] && ok "h-$kind blocks a submit command and scans the payload cwd (tier=$tn)" || bad "h-$kind blocks a submit command and scans the payload cwd (tier=$tn rc=$RC)"
+  done
+  for kind in write gemini-write copilot-edit; do
+    OUT="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" 2>&1 )"; RC=$?
+    [ "$RC" = "0" ] && [ -z "$OUT" ] && ok "h-$kind a non-shell tool stays silent (tier=$tn)" || bad "h-$kind a non-shell tool stays silent (tier=$tn rc=$RC)"
+  done
+  RC="$( cd /tmp && harness_payload codex "ls -la" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+  [ "$RC" = "0" ] && ok "h-ordinary an ordinary command stays silent (tier=$tn)" || bad "h-ordinary an ordinary command stays silent (tier=$tn rc=$RC)"
+done
+# CLAUDE_PROJECT_DIR still wins over the payload cwd, so Claude Code behaves exactly as before.
+CLEAN="$(mk_ios_clean)"
+RC="$( harness_payload codex "$SUB" "$D" | CLAUDE_PROJECT_DIR="$CLEAN" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+[ "$RC" = "0" ] && ok "h-precedence CLAUDE_PROJECT_DIR wins over the payload cwd" || bad "h-precedence CLAUDE_PROJECT_DIR wins over the payload cwd (rc=$RC)"
+# A payload cwd that is not a directory falls back to the working directory.
+RC="$( cd "$CLEAN" && harness_payload codex "$SUB" "/nonexistent/x" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" >/dev/null 2>&1; echo $? )"
+[ "$RC" = "0" ] && ok "h-badcwd a missing payload cwd falls back to the working directory" || bad "h-badcwd a missing payload cwd falls back to the working directory (rc=$RC)"
+rm -rf "$CLEAN" "$NOJQ"
+# fastlane global options before the action or lane must not hide a submission.
+for c in "fastlane --verbose deliver" "fastlane --env production deliver" "bundle exec fastlane --verbose pilot" "fastlane --capture_output ios release" "fastlane -v upload_to_testflight"; do
+  RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "2" ] && ok "fl-opt blocks. $c" || bad "fl-opt blocks. $c (rc=$RC)"
+done
+for c in "fastlane --version" "fastlane --help" "fastlane --env production tests"; do
+  RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "0" ] && ok "fl-opt silent. $c" || bad "fl-opt silent. $c (rc=$RC)"
+done
 rm -rf "$D"
 
 echo ""

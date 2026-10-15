@@ -37,7 +37,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if (((.tool_name? // "Bash") == "Bash" or .tool_name == "PowerShell") | not) then empty else ((.tool_input.command? | strings) // (.command? | strings) // empty) end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // "Bash") as $t | if ([$t] | inside(["Bash","PowerShell","bash","powershell","run_shell_command","shell"]) | not) then empty else ((.tool_input.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -47,10 +47,20 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-if isinstance(d, dict) and d.get("tool_name", "Bash") in ("Bash", "PowerShell"):
+SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell")
+t = d.get("tool_name", d.get("toolName", "Bash")) if isinstance(d, dict) else None
+if isinstance(d, dict) and isinstance(t, str) and t in SHELLS:
     ti = d.get("tool_input")
+    ta = d.get("toolArgs")
+    if isinstance(ta, str):
+        try:
+            ta = json.loads(ta)
+        except Exception:
+            ta = None
     if isinstance(ti, dict) and isinstance(ti.get("command"), str):
         c = ti["command"]
+    elif isinstance(ta, dict) and isinstance(ta.get("command"), str):
+        c = ta["command"]
     elif isinstance(d.get("command"), str):
         c = d["command"]
 sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
@@ -79,8 +89,26 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
         printf "%s", o }'
 }
 
+# The working folder another harness reports in the payload (Codex, Gemini CLI, Cursor, Copilot CLI send cwd).
+payload_cwd() {
+  if tool_ok jq -n true; then
+    printf '%s' "$STDIN_JSON" | jq -rs 'if length == 1 and (.[0] | type) == "object" then (.[0].cwd? | strings) // empty else empty end' 2>/dev/null
+    return 0
+  fi
+  if tool_ok python3 -c pass; then
+    printf '%s' "$STDIN_JSON" | python3 -c '
+import json, sys
+try:
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+except Exception:
+    sys.exit(0)
+c = d.get("cwd") if isinstance(d, dict) else None
+sys.stdout.write(c if isinstance(c, str) else "")' 2>/dev/null
+  fi
+}
+
 if [ -n "$STDIN_JSON" ]; then
-  # Only a Bash or PowerShell tool call carries a shell command. The jq and python3 tiers check the top-level tool_name.
+  # Only a shell tool call (Bash, PowerShell, run_shell_command, shell) carries a shell command. The jq and python3 tiers check the top-level tool_name.
   # The no-tools tier cannot tell a top-level key from a nested one, so it scans rather than skips.
   CMD="$(payload_command 2>/dev/null | tr -d '\000')"
   # Fold a backslash-newline continuation (odd trailing backslashes) into one space. Bare newlines stay,
@@ -112,6 +140,13 @@ if [ -n "$STDIN_JSON" ]; then
   CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/(npm|pnpm|yarn|bun|brew|pip3?|gem|cargo)[[:space:]]+(install|add|i|uninstall|remove)([[:space:]][^;&|$`]*)?//g')"
   # A Debug publish is a local build, never a store upload.
   CMD_MATCH="$(printf '%s' "$CMD_MATCH" | sed -E 's/dotnet[[:space:]]+publish[^;&|]*(-c|--configuration)[[:space:]=]+[Dd]ebug[^;&|]*//g')"
+  # fastlane global options sit before the action or lane (fastlane --env production deliver). Drop them.
+  fl_norm() { printf '%s' "$1" | sed -E ':a
+s/(fastlane)[[:space:]]+--env([[:space:]]+|=)[^-[:space:];&|][^[:space:];&|]*/\1/
+ta
+s/(fastlane)[[:space:]]+--?[A-Za-z][A-Za-z0-9_-]*/\1/
+ta'; }
+  CMD_MATCH="$(fl_norm "$CMD_MATCH")"
   SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build'
   UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
   # A custom fastlane lane submits when a word in its name says so, when its Fastfile block calls an
@@ -132,7 +167,7 @@ $(find "$DIR" -maxdepth 3 -name Fastfile -not -path '*/node_modules/*' 2>/dev/nu
 FASTFILES
     return 1
   }
-  submits() { printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || printf '%s' "$1" | grep -qE 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
+  submits() { set -- "$(fl_norm "$1")"; printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || printf '%s' "$1" | grep -qE 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
   # What a package script or a make target runs, one level deep, so a wrapped submit is still seen.
   wrapper_body() {
     local name esc sub pj seg w prev mf targets mfiles
@@ -170,7 +205,13 @@ FASTFILES
     && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make)[[:space:]]|gradlew?[[:space:]]+\$'; then
     exit 0
   fi
-  DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+  DIR="${CLAUDE_PROJECT_DIR:-}"
+  if [ -z "$DIR" ]; then
+    PCWD="$(payload_cwd 2>/dev/null)"
+    if [ -n "$PCWD" ] && [ -d "$PCWD" ]; then DIR="$PCWD"
+    elif [ -n "${GEMINI_PROJECT_DIR:-}" ] && [ -d "${GEMINI_PROJECT_DIR}" ]; then DIR="$GEMINI_PROJECT_DIR"
+    else DIR="$PWD"; fi
+  fi
   # A leading "cd <dir> &&" scopes the scan to that app (an EAS monorepo submits from apps/<app>).
   # The target must resolve inside the project root, otherwise the root is scanned as before.
   FIRST="$(printf '%s' "$CMD" | head -1)"

@@ -193,6 +193,14 @@ run doctor >/dev/null; RC=$?
 run uninstall >/dev/null
 [ "$(hooks)" = "0" ] && ok "uninstall removes the hook for a folder with an apostrophe" || bad "uninstall removes the hook for a folder with an apostrophe (entries=$(hooks))"
 
+# 24 the installed version is recorded and reported, so a user can tell what they run
+fresh
+run >/dev/null
+V="$(cat VERSION 2>/dev/null)"
+[ -n "$V" ] && [ "$(cat "$C/skills/app-store-compliance/VERSION" 2>/dev/null)" = "$V" ] && ok "install records the playbook version" || bad "install records the playbook version (repo=$V)"
+OUT="$(run doctor)"; echo "$OUT" | grep -q "^  ok    version $V" && ok "doctor prints the installed version" || bad "doctor prints the installed version"
+[ "$(run --version)" = "app-store-compliance $V" ] && ok "--version prints the checkout version" || bad "--version prints the checkout version"
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
