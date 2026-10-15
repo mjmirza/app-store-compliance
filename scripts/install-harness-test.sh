@@ -156,6 +156,27 @@ for pair in "codex gemini" "gemini codex"; do
     && ok "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes" || bad "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes (rc=$RC)"
 done
 
+# 4c an entry that names the guard but would never dispatch is caught by doctor and repaired by install
+fresh; run --tool codex >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["PreToolUse"][0]["matcher"]="Read"; json.dump(d,open(p,"w"))' "$(cfg codex)"
+run --tool codex doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "codex doctor fails when the guard sits on the Read matcher" || bad "codex doctor fails when the guard sits on the Read matcher (rc=$RC)"
+run --tool codex >/dev/null; run --tool codex doctor >/dev/null; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=[g for g in d["hooks"]["PreToolUse"] if any("guard.sh" in h["command"] for h in g["hooks"])]; sys.exit(0 if [x["matcher"] for x in g]==["Bash"] else 1)' "$(cfg codex)" && [ "$RC" -eq 0 ] \
+  && ok "codex install moves the guard back onto Bash and doctor then passes" || bad "codex install moves the guard back onto Bash and doctor then passes (rc=$RC)"
+fresh; run --tool gemini >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=d["hooks"]["BeforeTool"][0]["hooks"][0]; h["type"]="prompt"; h.pop("timeout"); json.dump(d,open(p,"w"))' "$(cfg gemini)"
+run --tool gemini doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "gemini doctor fails on a wrong handler type and a missing timeout" || bad "gemini doctor fails on a wrong handler type and a missing timeout (rc=$RC)"
+run --tool gemini >/dev/null; run --tool gemini doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count gemini)" = "1" ] && ok "gemini install repairs the handler once" || bad "gemini install repairs the handler once (rc=$RC entries=$(count gemini))"
+fresh; run --tool kimi >/dev/null
+python3 -c 'import sys; p=sys.argv[1]; t=open(p).read(); i=t.index("command = "); j=t.index("\n",i); open(p,"w").write(t[:i]+"command = \"bash /no/such/app-store-compliance-guard.sh\""+t[j:])' "$(cfg kimi)"
+run --tool kimi doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "kimi doctor tests the command actually registered in config.toml" || bad "kimi doctor tests the command actually registered in config.toml (rc=$RC)"
+run --tool kimi >/dev/null; run --tool kimi doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count kimi)" = "1" ] && ok "kimi install rewrites a broken block once" || bad "kimi install rewrites a broken block once (rc=$RC entries=$(count kimi))"
+
 # 5 a config that is not valid JSON, or repeats a key, is never rewritten
 for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"allow":["x"]}}'; do
   fresh; mkdir -p "$H/.codex"; printf '%s' "$body" > "$H/.codex/hooks.json"

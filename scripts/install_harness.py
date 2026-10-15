@@ -287,6 +287,59 @@ def ours_in(style, groups, cmd, guard):
     return [g for g in groups if is_ours(g, cmd, guard)]
 
 
+def matcher_hits(m, name):
+    if m in (None, "", "*"):
+        return True
+    try:
+        return re.fullmatch(str(m), name) is not None
+    except re.error:
+        return False
+
+
+def dispatches(tool, style, group, h):
+    """True when the tool would run this handler for a shell call and give it time to finish."""
+    spec = SPECS[tool]
+    if style == "nested" and not matcher_hits(group.get("matcher"), spec["matcher"]):
+        return False
+    if style in ("nested", "copilot", "vscode") and h.get("type", "command") != "command":
+        return False
+    if tool == "windsurf":
+        return True
+    key, want = {"nested": spec.get("timeout"), "copilot": ("timeoutSec", 120)}.get(
+        style
+    ) or ("timeout", 120)
+    t = h.get(key)
+    return isinstance(t, (int, float)) and not isinstance(t, bool) and t >= want
+
+
+def live_in(tool, style, groups, cmd, guard):
+    """Our handlers that would actually run, the ones doctor may certify."""
+    if style == "nested":
+        return [
+            h
+            for g in groups
+            for h in (g.get("hooks") if isinstance(g.get("hooks"), list) else [])
+            if is_ours(h, cmd, guard) and dispatches(tool, style, g, h)
+        ]
+    return [g for g in groups if is_ours(g, cmd, guard) and dispatches(tool, style, None, g)]
+
+
+def without_ours(style, groups, cmd, guard):
+    """The groups with every handler of ours removed, dropping a group only we filled."""
+    if style != "nested":
+        return [g for g in groups if not is_ours(g, cmd, guard)]
+    kept = []
+    for g in groups:
+        hs = g.get("hooks") if isinstance(g.get("hooks"), list) else []
+        mine = [h for h in hs if is_ours(h, cmd, guard)]
+        if mine:
+            g["hooks"] = [h for h in hs if not is_ours(h, cmd, guard)]
+            if not g["hooks"]:
+                continue
+        kept.append(g)
+    return kept
+
+
 def container(lay, data):
     """The object that holds the event lists, created if missing. None when the shape is wrong."""
     if not lay["wrap"]:
@@ -339,6 +392,39 @@ def kimi_block(cmd):
         )
         + "\n"
     )
+
+
+def kimi_entry(text):
+    """The [[hooks]] table inside our marked block, {} when it does not parse, None when absent."""
+    m = re.search(re.escape(KIMI_BEGIN) + r"\n(.*?)" + re.escape(KIMI_END), text, re.S)
+    if not m:
+        return None
+    try:
+        import tomllib
+
+        hooks = tomllib.loads(m.group(1)).get("hooks")
+        return hooks[0] if isinstance(hooks, list) and hooks and isinstance(hooks[0], dict) else {}
+    except ImportError:
+        out = {}
+        for line in m.group(1).splitlines():
+            k, eq, v = line.partition("=")
+            if eq:
+                try:
+                    out[k.strip()] = json.loads(v.strip())
+                except ValueError:
+                    return {}
+        return out
+    except Exception:
+        return {}
+
+
+def kimi_live(h):
+    """True when Kimi would run this handler before a shell command and give it time to finish."""
+    if not h or h.get("event") != "PreToolUse" or not isinstance(h.get("command"), str):
+        return False
+    t = h.get("timeout")
+    ok_time = isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 120
+    return ok_time and matcher_hits(h.get("matcher"), "Bash")
 
 
 def command_text(tool, guard):
@@ -437,7 +523,9 @@ def register(tool, lay, guard, dry):
             )
             print(manual_block(tool, lay, cmd))
             return False
-        if not ours_in(st, groups, cmd, guard):
+        if not live_in(tool, st, groups, cmd, guard):
+            # An entry of ours that would never run is replaced, never left beside the new one.
+            groups[:] = without_ours(st, groups, cmd, guard)
             groups.append(new_entry(tool, st, cmd))
             changed = True
     if tool == "gemini" and data["tools"].get("enableHooks") is not True:
@@ -475,7 +563,16 @@ def register_kimi(lay, cmd, dry):
         with open(path, encoding="utf-8") as f:
             text = f.read()
     if KIMI_BEGIN in text:
-        ok("hook already registered in " + shown(path))
+        h = kimi_entry(text)
+        if kimi_live(h) and h.get("command") == cmd:
+            ok("hook already registered in " + shown(path))
+            return True
+        if dry:
+            print("  would rewrite the guard block in " + shown(path) + ", with a backup")
+            return True
+        pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?"
+        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd), text, count=1, flags=re.S))
+        ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
     if dry:
         print(
@@ -529,17 +626,7 @@ def unregister(tool, lay, guard):
         groups = box.get(ev)
         if not isinstance(groups, list) or not ours_in(st, groups, cmd, guard):
             continue
-        if st == "nested":
-            kept = []
-            for g in groups:
-                had = any(is_ours(h, cmd, guard) for h in g.get("hooks", []))
-                g["hooks"] = [
-                    h for h in g.get("hooks", []) if not is_ours(h, cmd, guard)
-                ]
-                if g["hooks"] or not had:
-                    kept.append(g)
-        else:
-            kept = [g for g in groups if not is_ours(g, cmd, guard)]
+        kept = without_ours(st, groups, cmd, guard)
         if kept:
             box[ev] = kept
         else:
@@ -834,7 +921,15 @@ def check_kimi(lay, guard, app):
     except Exception:
         fail(shown(lay["config"]) + " no longer parses as TOML")
         return
-    prove(hook_cmd("kimi", guard), "kimi", "toml", app, app)
+    h = kimi_entry(text)
+    if not kimi_live(h):
+        fail(
+            "the guard block in "
+            + shown(lay["config"])
+            + " would not run before a shell command. Check its event, matcher and timeout, or run install again"
+        )
+        return
+    prove(h["command"], "kimi", "toml", app, app)
 
 
 def check_hooks(tool, lay, guard, app, repo_dir):
@@ -845,9 +940,15 @@ def check_hooks(tool, lay, guard, app, repo_dir):
     found_any = False
     for ev, st in events(tool):
         groups = box.get(ev)
-        found = ours_in(st, groups, cmd, guard) if isinstance(groups, list) else []
+        found = live_in(tool, st, groups, cmd, guard) if isinstance(groups, list) else []
         if not found:
-            fail("no " + ev + " hook entry for the guard in " + shown(lay["config"]))
+            if isinstance(groups, list) and ours_in(st, groups, cmd, guard):
+                fail(
+                    "the " + ev + " entry in " + shown(lay["config"])
+                    + " names the guard but would never run it. Check its matcher, type and timeout, or run install again"
+                )
+            else:
+                fail("no " + ev + " hook entry for the guard in " + shown(lay["config"]))
             continue
         found_any = True
         line = found[0].get("command") or found[0].get("bash")
