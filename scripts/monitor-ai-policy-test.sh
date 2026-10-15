@@ -158,7 +158,7 @@ rm -f "$STEM_JSON" "$STEM_DOCS" "$STEM_PR"
 HT="$(mktemp -d)"
 cat > "$HT/feed.rss" <<'XML'
 <rss><channel><item><title>Tax &amp;amp; price updates</title>
-<description>&lt;p&gt;Read the &lt;a href="https://developer.apple.com/llm/"&gt;notes&lt;/a&gt; on pricing.&lt;/p&gt;</description>
+<description>&lt;p&gt;Read the &lt;a href="https://developer.example/llm/"&gt;notes&lt;/a&gt; on pricing.&lt;/p&gt;</description>
 <link>https://mock.invalid/html</link><pubDate>Mon, 01 Sep 2026 10:00:00 PDT</pubDate></item></channel></rss>
 XML
 python3 - "$HT/feed.rss" "$(dirname "$0")/monitor-ai-policy.py" <<'PY' && ok "feed items are matched on visible text, not HTML" || bad "feed items are matched on visible text, not HTML"

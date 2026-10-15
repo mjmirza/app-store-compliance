@@ -512,7 +512,7 @@ import SwiftUI
 let raw = #"Button(action: x) { Image(systemName: "c") } and "quotes" inside"#
 let multi = """
 Button(action: y) { Image(systemName: "d") }
-see https://example.com/a // not a comment
+see https://docs.example/a // not a comment
 """
 struct V: View {
     var body: some View { Text(multi).font(.body) }

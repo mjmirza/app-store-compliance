@@ -78,7 +78,7 @@ T="$(mktemp -d)"
 python3 - "$T/news.json" <<'PY'
 import json, sys
 items = [
-    ("Display and platform updates", "<p>New <a href=\"https://developer.apple.com/design/\">display</a> sizes on all platforms and marketplaces. Translations improved.</p>"),
+    ("Display and platform updates", "<p>New <a href=\"https://developer.example/design/\">display</a> sizes on all platforms and marketplaces. Translations improved.</p>"),
     ("Retail-related pattern changes", "<p>Pay attention to the new retail-related pattern for administrators.</p>"),
     ("Updated PLA now available", "<p>The updated PLA is ready to review.</p>"),
     ("SLA update", "<p>Review the new SLA.</p>"),
