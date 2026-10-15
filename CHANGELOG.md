@@ -16,12 +16,14 @@ This release changes the licence and the release audit's exit codes, so it is a 
 
 ### Changed
 
+- Shell tools are matched against an exact name list, which adds `runInTerminal` and `run_in_terminal`. An MCP tool whose name merely contains terminal or shell is no longer scanned.
 - The default branch is now `main`. The CI trigger, the README badge and SECURITY.md follow it, and the bot branch ruleset excludes whichever branch is the default.
 - The bot PR gate. The workflow from #442 closed every PR whose branch looked bot-generated, which caught the owner's own Jules scheduled tasks. It is replaced by a gate that closes only pull requests from bot accounts not on the allowlist (Jules, Copilot, Dependabot, GitHub Actions), without deleting the branch. Owner-run bot PRs stay open, land on the project board as Backlog through the auto-add workflow, and are reviewed by hand. The eleven Jules PRs closed on 14 September 2026 had their branches deleted by the old workflow and cannot be reopened.
 
 ### Added
 
-- Install for every major AI coding tool. `install.sh --tool codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|droid|auggie|windsurf` installs the guard, the skill and, where the tool supports it, the `/app-store-audit` command, and registers the hook in that tool's own config, merged with every other setting and backed up. `--tool all` installs into every tool it finds. Each install ends with `Install verified.` only after it feeds a submit command to the hook in that tool's own payload format and sees it blocked. OpenCode gets a plugin, because it has no hook config, written to both `plugins/` (current OpenCode) and `plugin/` (OpenCode before 1.0, which reads only that folder). Checked live on this machine. The real Codex CLI and the real Qwen Code 0.25.1 each stopped a submit command with the guard's findings. The real Gemini CLI 0.22.5 and OpenCode 0.14.1 loaded the hook and the plugin, and their model call could not run here (no Gemini licence on the account, no free OpenCode model available), so their blocking is proven by feeding each tool's own payload to the installed hook. 129 tests in `scripts/install-harness-test.sh`, in CI.
+- A bare Xcode or Android project under a root framework app (Expo, React Native, Flutter, Capacitor), with its own Info.plist or AndroidManifest.xml and no root build file that names it, is scanned as its own app. Projects in a demo, example, sample or playground folder stay in the root scan, so their findings still count (#656).
+- Install for every major AI coding tool. `install.sh --tool codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|droid|auggie|windsurf` installs the guard, the skill and, where the tool supports it, the `/app-store-audit` command, and registers the hook in that tool's own config, merged with every other setting and backed up. `--tool all` installs into every tool it finds. Each install ends with `Install verified.` only after it feeds a submit command to the hook in that tool's own payload format and sees it blocked. OpenCode gets a plugin, because it has no hook config, written to both `plugins/` (current OpenCode) and `plugin/` (OpenCode before 1.0, which reads only that folder). Checked live on this machine. The real Codex CLI and the real Qwen Code 0.25.1 each stopped a submit command with the guard's findings. The real Gemini CLI 0.22.5 and OpenCode 0.14.1 loaded the hook and the plugin, and their model call could not run here (no Gemini licence on the account, no free OpenCode model available), so their blocking is proven by feeding each tool's own payload to the installed hook. 149 tests in `scripts/install-harness-test.sh`, in CI.
 - GitHub Copilot in every place it runs. `--tool copilot` covers Copilot CLI and Copilot in VS Code with one file that carries both hook formats. `--tool copilot-repo --repo <app>` writes the hook into the app's own `.github/hooks` for the Copilot cloud agent and JetBrains, with nothing written to your home folder.
 - Kimi Code gets one marked block appended to its config, and the rest of that file, which can hold API keys, is never rewritten or printed. Uninstall restores the file exactly. Factory Droid keeps using `settings.json` when its hooks already live there, because Droid ignores them once `hooks.json` exists.
 - The guard reads the request format of Grok, Factory Droid, Augment Auggie, Windsurf, VS Code, Kiro and Goose, and finds the project folder from each tool's own field.
@@ -67,6 +69,22 @@ This release changes the licence and the release audit's exit codes, so it is a 
 
 ### Fixed
 
+- A git or gh message is treated as text only inside its own command segment, so a later `bash -c` with a `-m` argument that runs a submit is still scanned.
+- Android-only targeting is decided per submitting segment. A compound command that also uploads to Apple keeps every Apple check, and every `-p` or `--platform` form (`-p android`, `--platform=android`, `-p=android`) is recognised.
+- The comment stripper keeps one-line, triple-quoted and template strings, so a `/*` inside a string no longer hides the code after it, and a block comment in the middle of a line counts as a comment.
+- Account deletion and the App Tracking Transparency prompt must appear in source or HTML. A mention in a `.strings`, plist or json file no longer satisfies them.
+- Cursor `beforeShellExecution` always gets permission JSON on stdout (`allow`, or `deny` with exit 2), with the report on stderr. Before, an allowed submit printed prose, which Cursor treats as invalid.
+- Single-quoted and bare keys in a managed Expo `app.config` file are read.
+- With neither jq nor python3 installed, a Copilot `toolArgs` JSON string is parsed instead of passing unchecked.
+- Uninstalling one tool no longer deletes the shared skill another tool still uses, in either install order.
+- `doctor` and `install` check the hook's matcher, handler type and timeout, not only its command. Install repairs a hook that would never run, and Kimi doctor tests the command written in `config.toml`.
+- The Copilot hook carries a `powershell` handler for Windows that passes the guard's exit code through.
+- On Windows, reinstalling widens a Bash-only Claude Code hook to `Bash|PowerShell`, and `doctor` checks that the matcher covers both.
+- Auggie gets the guard's executable script path, as its hook docs require, instead of a shell command string.
+- The Qwen Code install, `doctor`, `uninstall` and `--tool all` follow `$QWEN_HOME` when it is set.
+- `release-audit.py` run from the shared skill in `~/.agents` finds the guard installed under the tool's own folder.
+- `metadata-audit.py` applies the Google rules when given `metadata/android` or one of its locale folders directly.
+- The installed-layout release-audit test fixture includes `VERSION`, so all 19 of its tests run.
 - A privacy purpose string kept only in `InfoPlist.strings` no longer counts. Apple reads the key from `Info.plist` or the `INFOPLIST_KEY_` build settings, and rejects an upload without it (ITMS-90683). That file only translates a key that already exists.
 - Eight guard rules tightened after an adversarial review. A purpose string named only in a code comment no longer passes. App Tracking Transparency needs both the purpose string and the authorization call, and the finding names the missing half. A privacy manifest inside `Pods`, `node_modules` or another dependency folder no longer counts as the app's own. The restore check covers the framework purchase plugins. An Android-only build never meets an Apple finding. A temp folder that cannot be written gives NOT CHECKED, never CLEAR. A managed Expo app has its app config read. The text of a commit or pull request message is no longer scanned as a command.
 
