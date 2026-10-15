@@ -235,6 +235,21 @@ assert "Accessibility requirements" in by.get("WCAG2.2 alignment", set()), by
 ' && ok "keywords match whole words on stripped text (issue 833)" || bad "keywords match whole words on stripped text (issue 833)"
 rm -rf "$T"
 
+# Issue #1000. Inline markup joins, so L<em>LM</em> reads LLM. Block markup still separates.
+python3 - "$HERE" <<'PY' && ok "inline markup joins a split keyword, block markup still separates (issue 1000)" || bad "inline markup joins a split keyword, block markup still separates (issue 1000)"
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("mon", os.path.join(sys.argv[1], "monitor.py"))
+mon = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mon)
+assert mon.strip_html("<p>Apps that call an L<em>LM</em> must disclose it.</p>") == "Apps that call an LLM must disclose it.", mon.strip_html("<p>L<em>LM</em></p>")
+assert mon.strip_html("<p>Hello</p><p>World</p>") == "Hello World"
+assert mon.strip_html("Hello<br>World") == "Hello World"
+item = {"title": "Platform news", "description": "<p>Apps that call an L<em>LM</em> must disclose it.</p>"}
+assert mon.match_announcement_to_tracks(item), "an inline element split the llm keyword"
+item = {"title": "Platform news", "description": "<p>New Store<b>Kit</b> APIs.</p>"}
+assert "In-App Purchase policies" in mon.match_announcement_to_tracks(item), "an inline element split storekit"
+PY
+
 echo ""
 echo "monitor-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
