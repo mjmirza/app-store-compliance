@@ -37,7 +37,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // "Bash") as $t | if ([$t] | inside(["Bash","PowerShell","bash","powershell","run_shell_command","shell"]) | not) then empty else ((.tool_input.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((([$t] | inside(["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd"])) or ($t | test("terminal|shell|powershell"; "i"))) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -47,10 +47,17 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell")
-t = d.get("tool_name", d.get("toolName", "Bash")) if isinstance(d, dict) else None
-if isinstance(d, dict) and isinstance(t, str) and t in SHELLS:
+import re
+SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd")
+info = d.get("tool_info") if isinstance(d, dict) else None
+default = "shell" if isinstance(info, dict) and isinstance(info.get("command_line"), str) else "Bash"
+t = d.get("tool_name", d.get("toolName", default)) if isinstance(d, dict) else None
+if isinstance(d, dict) and isinstance(t, str) and (t in SHELLS or re.search("terminal|shell|powershell", t, re.I)):
     ti = d.get("tool_input")
+    if not isinstance(ti, dict) and isinstance(d.get("toolInput"), dict):
+        ti = d["toolInput"]
+    if not isinstance(ti, dict) and isinstance(info, dict) and isinstance(info.get("command_line"), str):
+        ti = {"command": info["command_line"]}
     ta = d.get("toolArgs")
     if isinstance(ta, str):
         try:
@@ -71,6 +78,7 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
   local body
   body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
   [ -z "$body" ] && body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
+  [ -z "$body" ] && body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"command_line"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1 | sed 's/"command_line"/"command"/')"
   [ -z "$body" ] && return 0
   printf '%s' "$body" | sed -E 's/.*"command"[[:space:]]*:[[:space:]]*"//; s/"$//' \
     | awk 'BEGIN { hx="0123456789abcdef" }
@@ -92,7 +100,7 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
 # The working folder another harness reports in the payload (Codex, Gemini CLI, Cursor, Copilot CLI send cwd).
 payload_cwd() {
   if tool_ok jq -n true; then
-    printf '%s' "$STDIN_JSON" | jq -rs 'if length == 1 and (.[0] | type) == "object" then (.[0].cwd? | strings) // empty else empty end' 2>/dev/null
+    printf '%s' "$STDIN_JSON" | jq -rs 'if length == 1 and (.[0] | type) == "object" then .[0] | ((.cwd? | strings) // (.tool_info.cwd? | strings) // (.working_dir? | strings) // (.tool_input.cwd? | strings) // (.workspace_roots[0]? | strings) // empty) else empty end' 2>/dev/null
     return 0
   fi
   if tool_ok python3 -c pass; then
@@ -102,8 +110,15 @@ try:
     d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
 except Exception:
     sys.exit(0)
-c = d.get("cwd") if isinstance(d, dict) else None
-sys.stdout.write(c if isinstance(c, str) else "")' 2>/dev/null
+c = None
+if isinstance(d, dict):
+    ti, info, roots = d.get("tool_input"), d.get("tool_info"), d.get("workspace_roots")
+    for v in (d.get("cwd"), info.get("cwd") if isinstance(info, dict) else None, d.get("working_dir"),
+              ti.get("cwd") if isinstance(ti, dict) else None, roots[0] if isinstance(roots, list) and roots else None):
+        if isinstance(v, str) and v:
+            c = v
+            break
+sys.stdout.write(c or "")' 2>/dev/null
   fi
 }
 
@@ -218,6 +233,7 @@ FASTFILES
     PCWD="$(payload_cwd 2>/dev/null)"
     if [ -n "$PCWD" ] && [ -d "$PCWD" ]; then DIR="$PCWD"
     elif [ -n "${GEMINI_PROJECT_DIR:-}" ] && [ -d "${GEMINI_PROJECT_DIR}" ]; then DIR="$GEMINI_PROJECT_DIR"
+    elif [ -n "${AUGMENT_PROJECT_DIR:-}" ] && [ -d "${AUGMENT_PROJECT_DIR}" ]; then DIR="$AUGMENT_PROJECT_DIR"
     else DIR="$PWD"; fi
   fi
   # A leading "cd <dir> &&" scopes the scan to that app (an EAS monorepo submits from apps/<app>).
@@ -284,7 +300,7 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
 }
 
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
-CONFIG_FILES_RE='(\.plist|/InfoPlist\.strings|\.pbxproj|\.xcconfig|/project\.ya?ml|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
+CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|/project\.ya?ml|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
   [ -s "$FILELIST" ] || return 1
   local out
@@ -644,16 +660,16 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
       finding critical "APPLE-5.1.1-NO-ACCOUNT-DELETION" "Account creation found but no in app account deletion" "Add an in app account deletion flow (Apple 5.1.1(v))." src 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'
     fi
   fi
-  if grep_has 'AVCaptureDevice|UIImagePickerController'; then
+  if code_has 'AVCaptureDevice|UIImagePickerController'; then
     config_has 'NSCameraUsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Camera used without NSCameraUsageDescription" "Add NSCameraUsageDescription with a specific reason." src 'AVCaptureDevice|UIImagePickerController'
   fi
-  if grep_has 'CLLocationManager'; then
+  if code_has 'CLLocationManager'; then
     config_has 'NSLocation.*UsageDescription' || finding critical "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Location used without a location usage description" "Add the matching NSLocation usage description with a specific reason." src 'CLLocationManager'
   fi
-  if grep_has 'PHPhotoLibrary|PHPicker'; then
-    config_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason." src 'PHPhotoLibrary|PHPicker'
+  if code_has 'PHPhotoLibrary'; then
+    config_has 'NSPhotoLibrary.*UsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Photos used without a photo library usage description" "Add NSPhotoLibraryUsageDescription with a specific reason." src 'PHPhotoLibrary'
   fi
-  if grep_has 'CNContactStore'; then
+  if code_has 'CNContactStore'; then
     config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then

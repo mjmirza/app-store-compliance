@@ -1911,6 +1911,15 @@ shapes = {
   "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
   "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
   "copilot-obj": {"toolName": "bash", "toolArgs": {"command": cmd}, "cwd": cwd},
+  "grok": {"hookEventName": "PreToolUse", "toolName": "Bash", "toolInput": {"command": cmd}, "cwd": cwd},
+  "droid": {"hook_event_name": "PreToolUse", "tool_name": "Execute", "tool_input": {"command": cmd}, "cwd": cwd},
+  "auggie": {"hook_event_name": "PreToolUse", "tool_name": "launch-process", "tool_input": {"command": cmd}, "workspace_roots": [cwd]},
+  "windsurf": {"agent_action_name": "pre_run_command", "tool_info": {"command_line": cmd, "cwd": cwd}},
+  "vscode": {"hook_event_name": "PreToolUse", "tool_name": "runInTerminal", "tool_input": {"command": cmd}, "cwd": cwd},
+  "kiro": {"hook_event_name": "preToolUse", "tool_name": "execute_bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "goose": {"hook_event_name": "PreToolUse", "tool_name": "shell", "tool_input": {"command": cmd}, "working_dir": cwd},
+  "grok-read": {"hookEventName": "PreToolUse", "toolName": "Read", "toolInput": {"command": cmd, "path": "x"}, "cwd": cwd},
+  "windsurf-read": {"agent_action_name": "pre_read_code", "tool_info": {"file_path": cmd, "cwd": cwd}},
   "opencode": {"tool_name": "bash", "tool_input": {"command": cmd}, "cwd": cwd},
   "write": {"tool_name": "Write", "tool_input": {"command": cmd, "file_path": "x"}, "cwd": cwd},
   "gemini-write": {"tool_name": "write_file", "tool_input": {"command": cmd}, "cwd": cwd},
@@ -1920,11 +1929,11 @@ print(json.dumps(shapes[kind]))' "$1" "$2" "$3"; }
 SUB="fastlane deliver"
 for tier in "$PATH" "$NOJQ"; do
   tn="${tier##*/}"; [ "$tier" = "$PATH" ] && tn=jq
-  for kind in codex gemini cursor copilot-str copilot-obj opencode; do
+  for kind in codex gemini cursor copilot-str copilot-obj opencode grok droid auggie windsurf vscode kiro goose; do
     RC="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
     [ "$RC" = "2" ] && ok "h-$kind blocks a submit command and scans the payload cwd (tier=$tn)" || bad "h-$kind blocks a submit command and scans the payload cwd (tier=$tn rc=$RC)"
   done
-  for kind in write gemini-write copilot-edit; do
+  for kind in write gemini-write copilot-edit grok-read windsurf-read; do
     OUT="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" 2>&1 )"; RC=$?
     [ "$RC" = "0" ] && [ -z "$OUT" ] && ok "h-$kind a non-shell tool stays silent (tier=$tn)" || bad "h-$kind a non-shell tool stays silent (tier=$tn rc=$RC)"
   done
@@ -1987,6 +1996,37 @@ rr_run "$D"
 rm -rf "$D"
 D="$(mk_ios_clean)"; rr_run "$D"
 ! rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'NO-ACCOUNT-DELETION' && [ "$RC" -eq 0 ] && ok "rr-A02-4 the clean iOS fixture stays clean" || bad "rr-A02-4 the clean iOS fixture stays clean (rc=$RC)"
+rm -rf "$D"
+
+# A02b a purpose string that exists only in InfoPlist.strings satisfies nothing, Apple reads Info.plist (ITMS-90683)
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/App/en.lproj"; printf '"NSCameraUsageDescription" = "Scan receipts";\n' > "$D/App/en.lproj/InfoPlist.strings"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding" || bad "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding (rc=$RC)"
+rm -rf "$D"
+
+# A02c a permission API named only in a comment is not a use, and the system photo picker needs no permission
+D="$(mk_rr_ios '' 'class A {}
+// TODO maybe use AVCaptureDevice and CLLocationManager later
+/* CNContactStore() */')"
+rr_run "$D"
+! rr_has 'MISSING-USAGE-DESCRIPTION' && ok "rr-A02-6 a camera, location or contacts API named only in comments raises nothing" || bad "rr-A02-6 a camera, location or contacts API named only in comments raises nothing (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import PhotosUI
+let picker = PHPickerViewController(configuration: PHPickerConfiguration())')"
+rr_run "$D"
+! rr_has 'Photos used without' && ok "rr-A02-7 PHPickerViewController alone needs no photo library purpose string" || bad "rr-A02-7 PHPickerViewController alone needs no photo library purpose string (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import Photos
+PHPhotoLibrary.requestAuthorization { _ in }')"
+rr_run "$D"
+rr_has 'Photos used without' && ok "rr-A02-8 PHPhotoLibrary access still needs the photo library purpose string" || bad "rr-A02-8 PHPhotoLibrary access still needs the photo library purpose string (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video) // camera for receipts')"
+rr_run "$D"
+rr_has 'Camera used without' && [ "$RC" -eq 2 ] && ok "rr-A02-9 a real camera call with a trailing comment still blocks" || bad "rr-A02-9 a real camera call with a trailing comment still blocks (rc=$RC)"
 rm -rf "$D"
 
 # A13 ATT needs both halves, the purpose string and the authorization call, and names the missing one
