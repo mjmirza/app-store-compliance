@@ -415,10 +415,60 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     return findings
 
+def generate_markdown_report(audited_dir, ios_count, android_count, findings):
+    report = []
+    report.append("# Accessibility Compliance Report")
+    report.append("")
+    report.append("## Executive Summary")
+    report.append("")
+    report.append("This report documents the continuous accessibility compliance audit across Apple (iOS/iPadOS) and Android platforms in accordance with the European Accessibility Act (EAA), WCAG 2.1 AA standards, Apple Human Interface Guidelines (HIG), and Google Android Accessibility Guidelines.")
+    report.append("")
+    report.append(f"- **Audited Directory**: `{audited_dir}`")
+    report.append(f"- **Scanned Files**: iOS ({ios_count}), Android ({android_count})")
+    report.append(f"- **Audit Status**: {'Clean (0 Regressions)' if not findings else f'Regressions Detected ({len(findings)} Findings)'}")
+    report.append("")
+    report.append("## Evaluated Accessibility Domains & Rules")
+    report.append("")
+    report.append("### Apple (iOS / iPadOS)")
+    report.append("- **VoiceOver (`APPLE-ACCESSIBILITY-VOICEOVER`)**: Verifies accessibility labels, traits, and hints for interactive views and non-decorative imagery.")
+    report.append("- **Dynamic Type (`APPLE-ACCESSIBILITY-DYNAMICTYPE`)**: Ensures relative font sizing or `adjustsFontForContentSizeCategory` is active rather than static point sizes.")
+    report.append("- **Reduce Motion (`APPLE-ACCESSIBILITY-REDUCEMOTION`)**: Verifies animations respect `UIAccessibility.isReduceMotionEnabled` or `@Environment(\\.accessibilityReduceMotion)`.")
+    report.append("- **Color Contrast (`APPLE-ACCESSIBILITY-COLORCONTRAST`)**: Checks adaptivity to system color settings and high-contrast modes (`isDarkerSystemColorsEnabled`).")
+    report.append("- **Haptics (`APPLE-ACCESSIBILITY-HAPTICS`)**: Verifies tactile haptic feedback (`UIImpactFeedbackGenerator`) accompanies key user interactions.")
+    report.append("- **Keyboard Navigation (`APPLE-ACCESSIBILITY-KEYBOARD`)**: Verifies hardware keyboard focus state tracking (`@FocusState`, `focusable()`, `keyCommands`).")
+    report.append("")
+    report.append("### Android")
+    report.append("- **TalkBack (`ANDROID-ACCESSIBILITY-TALKBACK`)**: Verifies `contentDescription` is present on XML and Jetpack Compose images and interactive controls.")
+    report.append("- **Font Scaling (`ANDROID-ACCESSIBILITY-FONTSCALING`)**: Verifies text sizing uses scale-independent pixels (`sp`) instead of density-independent pixels (`dp`).")
+    report.append("- **High Contrast (`ANDROID-ACCESSIBILITY-HIGHCONTRAST`)**: Ensures views use semantic material theme colors (`?attr/colorOnSurface`) rather than hardcoded hex colors.")
+    report.append("- **Accessibility Scanner (`ANDROID-ACCESSIBILITY-SCANNER`)**: Verifies interactive touch targets meet or exceed the minimum recommended 48dp x 48dp size threshold.")
+    report.append("")
+    report.append("## Audit Findings")
+    report.append("")
+    if not findings:
+        report.append("No accessibility compliance regressions found across the audited files.")
+    else:
+        report.append("| Rule ID | Platform | Severity | Location | Issue Description | Recommended Fix |")
+        report.append("| --- | --- | --- | --- | --- | --- |")
+        for f in findings:
+            meta = RULE_META[f["rule_id"]]
+            loc = f"{f['file']}:{f['line']}"
+            report.append(f"| `{f['rule_id']}` | {meta['platform'].title()} | {meta['severity'].upper()} | `{loc}` | {f['message']} | {f['fix']} |")
+    report.append("")
+    report.append("## Recommendations & Improvement Guidelines")
+    report.append("")
+    report.append("1. **Continuous VoiceOver & TalkBack Testing**: Audit new custom controls with screen readers enabled to ensure correct traversal order and semantic announcements.")
+    report.append("2. **Dynamic Scaling Verification**: Test layouts with maximum font size settings enabled to prevent text clipping, ellipsis truncation, or broken layout constraints.")
+    report.append("3. **Touch Target Enforcement**: Maintain at least 48dp x 48dp touch targets across all mobile form factors, padding small icon buttons appropriately.")
+    report.append("4. **Automated CI Integration**: Run `scripts/accessibility-audit.py` in continuous integration pipelines to catch regressions prior to store release.")
+    report.append("")
+    return "\n".join(report)
+
 def main():
     parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
     parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
+    parser.add_argument("--report-out", help="Path to write report markdown file.")
     args = parser.parse_args()
 
     if not os.path.isdir(args.directory):
@@ -438,6 +488,16 @@ def main():
 
     # Sort findings by rule ID and file path
     all_findings.sort(key=lambda x: (x["rule_id"], x["file"], x["line"]))
+
+    if args.report_out:
+        report_md = generate_markdown_report(args.directory, len(ios_files), len(android_files), all_findings)
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(args.report_out)), exist_ok=True)
+            with open(args.report_out, "w", encoding="utf-8") as rf:
+                rf.write(report_md)
+            print(f"Report written to {args.report_out}")
+        except Exception as err:
+            print(f"Error writing report to {args.report_out}: {err}", file=sys.stderr)
 
     print("== Accessibility Compliance Audit ==")
     print(f"Audited directory. {args.directory}")
