@@ -274,12 +274,12 @@ def parse_rss_feed(url):
             parents = {c: p for p in root.iter() for c in p}
 
             def base_of(e):
-                """The xml:base in scope at e, resolved from the root down."""
+                """The xml:base in scope at e, resolved from the fetched URL down."""
                 chain = []
                 while e is not None:
                     chain.append(e.get(XML_BASE))
                     e = parents.get(e)
-                base = ""
+                base = url
                 for b in reversed(chain):
                     if b and b.strip():
                         base = urllib.parse.urljoin(base, b.strip())
@@ -329,7 +329,7 @@ def parse_rss_feed(url):
                     if links:  # alternate or no rel first, any other relation only as a fallback
                         _, href, link_elem = next((x for x in links if x[0]), links[0])
                         base = base_of(link_elem)
-                        link = urllib.parse.urljoin(base, href) if base else href
+                        link = urllib.parse.urljoin(base, href)
                     pub_date = next(
                         (dates[k] for k in ("published", "updated", "dc") if dates.get(k, "").strip()),
                         "",

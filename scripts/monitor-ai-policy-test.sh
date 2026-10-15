@@ -201,6 +201,13 @@ cat > "$I1000/base.atom" <<'XML'
 XML
 feed_case "#1000 an inherited xml:base resolves a relative Atom link" "$I1000/base.atom" \
   'assert items[0]["link"] == "https://example.invalid/news/policy", items'
+mkdir -p "$I1000/feeds"
+cat > "$I1000/feeds/rel-base.atom" <<'XML'
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="../news/"><entry><title>Policy</title>
+<link rel="alternate" href="policy"/><summary>AI update</summary></entry></feed>
+XML
+feed_case "#1000 a relative xml:base resolves against the feed's own URL" "$I1000/feeds/rel-base.atom" \
+  'assert items[0]["link"] == "file://" + sys.argv[1].rsplit("/feeds/", 1)[0] + "/news/policy", items'
 cat > "$I1000/encoded.rss" <<'XML'
 <rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>Platform news</title>
 <description>Short teaser.</description>

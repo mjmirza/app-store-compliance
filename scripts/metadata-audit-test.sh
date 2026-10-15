@@ -81,6 +81,16 @@ OUT="$($AUDIT --description "Monthly subscription. More at https://legal.example
 echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a legal-looking link without the word terms or EULA is still flagged" || bad "a legal-looking link without the word terms or EULA is still flagged"
 OUT="$($AUDIT --description "Read our policy at https:///privacy" --privacy_url https://real.app/p --support_url https://real.app/help --check-urls 2>&1)"
 echo "$OUT" | grep -q 'BOTH-UNREACHABLE-METADATA-URL' && ok "a malformed URL in the description is reported with --check-urls" || bad "a malformed URL in the description is reported with --check-urls"
+OUT="$($AUDIT --description "Monthly subscription." --promotional_text "Terms of Use https://journal.test/terms" --privacy_url https://journal.test/p --support_url https://journal.test/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a Terms link only in the promotional text is flagged" || bad "a Terms link only in the promotional text is flagged"
+OUT="$($AUDIT --description "Monthly subscription. Terms apply. Privacy https://tos.example/privacy" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a privacy link on a tos host is not a Terms link" || bad "a privacy link on a tos host is not a Terms link"
+for u in https://journal.test/legal/privacy https://journal.test/tostadas; do
+  OUT="$($AUDIT --description "Monthly subscription. Terms apply. Privacy $u" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+  echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "$u is not a Terms link" || bad "$u is not a Terms link"
+done
+OUT="$($AUDIT --description "Monthly subscription. Terms of Use https://journal.test/termsofuse" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+! echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a termsofuse path is a Terms link" || bad "a termsofuse path is a Terms link"
 
 # Every locale is audited on its own, and each finding says which locale.
 L="$(mktemp -d)"; mkdir -p "$L/en-US" "$L/de-DE"

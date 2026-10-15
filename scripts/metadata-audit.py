@@ -131,10 +131,12 @@ def is_terms_url(u):
     if not url_syntax_ok(low):
         return False
     p = urlparse(low)
+    if "privacy" in p.path:
+        return False
     return bool(
         re.search(
-            r"(^|[^a-z])(terms|eula|tos|legal|conditions|agb|licen[cs]e)",
-            p.path + " " + (p.hostname or ""),
+            r"(^|[^a-z])(terms|eula|conditions|licen[cs]e)|(^|[^a-z])(tos|agb|legal)([^a-z]|$)",
+            p.path,
         )
     )
 
@@ -359,9 +361,10 @@ def audit_fields(fields, check_urls=False, platform="apple"):
         for t in ("subscription", "subscribe", "auto-renew", "per month", "per year")
     ):
         links = re.findall(
-            r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+", raw_desc
+            r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+",
+            fields.get("description", ""),
         )
-        # Apple reads the link in the description, so a separate terms_url field never replaces it.
+        # Apple reads the link in the description itself, so promotional text or a terms_url field never replaces it.
         has_terms = any(is_terms_url(u) for u in links) and ("terms" in desc or "eula" in desc)
         if not has_terms:
             add(
