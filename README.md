@@ -84,7 +84,7 @@ bash ~/repositories/app-store-compliance/scripts/install.sh --tool all
 | GitHub Copilot CLI and Copilot in VS Code | `install.sh --tool copilot` | Hook, skill | Start a new Copilot CLI session and reload VS Code |
 | GitHub Copilot cloud agent and Copilot in JetBrains | `install.sh --tool copilot-repo --repo "/path/to/your/app"` | Hook in your app's `.github/hooks` | Commit `.github/hooks` to your default branch. The cloud agent reads hooks only from there |
 | Grok | `install.sh --tool grok` | Hook, skill | Start a new Grok session |
-| Qwen Code | `install.sh --tool qwen` | Hook, skill | Restart Qwen Code |
+| Qwen Code | `install.sh --tool qwen` | Hook, skill, in `$QWEN_HOME` when it is set | Restart Qwen Code |
 | Kimi Code | `install.sh --tool kimi` | Hook, skill | Restart Kimi Code |
 | Factory Droid | `install.sh --tool droid` | Hook, skill | Start a new Droid session |
 | Augment Auggie | `install.sh --tool auggie` | Hook, skill | Start a new Auggie session |
@@ -159,7 +159,7 @@ Each command ends with one line that tells you whether it worked. Add `--tool <n
 | `install.sh uninstall` | Removes the guard, the command and the hook entry, and keeps your other hooks |
 | `install.sh --version` | Prints the version of this checkout. `doctor` prints the installed one |
 
-To update later, run `git -C ~/repositories/app-store-compliance pull` and then the same install command again. On Windows, run it from Git Bash. The installer then registers the hook for both Bash and PowerShell, and `doctor` checks both.
+To update later, run `git -C ~/repositories/app-store-compliance pull` and then the same install command again. On Windows, run it from Git Bash. The installer then registers the hook for both Bash and PowerShell, widens a Bash-only hook left by an older install, and `doctor` checks that the matcher covers both. Copilot gets a `powershell` handler next to its `bash` one.
 
 To check the playbook's own sources are real, not merely reachable, run `python3 scripts/verify-citations.py --files docs/ data/` from the checkout. It takes a few minutes and needs network access.
 
