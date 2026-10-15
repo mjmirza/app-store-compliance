@@ -107,7 +107,7 @@ Each of these was checked against its own documentation. Where a tool can block 
 
 | Tool | What to do |
 |---|---|
-| Kiro CLI | Kiro blocks a tool call when a `PreToolUse` command hook exits non-zero, and the guard already reads Kiro's `execute_bash` and `execute_pwsh` payloads. Its docs do not yet confirm how the payload reaches the command or give a full hook file, so the installer does not wire it. Run the guard by hand before a submit, and add the instruction from step 4 of the paste block below to `~/.kiro/steering/` |
+| Kiro CLI | Kiro sends the event as JSON on stdin and blocks the tool when a `PreToolUse` command hook exits non-zero, and the guard reads Kiro's `execute_bash` and `execute_pwsh` payloads. The installer does not wire it yet. After `install.sh`, add `.kiro/hooks/app-store-compliance.json` to the project with `{"version":"v1","hooks":[{"name":"app-store-compliance","trigger":"PreToolUse","matcher":"^(execute_bash\|execute_pwsh)$","action":{"type":"command","command":"bash ~/.claude/hooks/app-store-compliance-guard.sh"}}]}`. Kiro also stops on exit 1, so a high finding blocks there too. Not yet tested against a live Kiro |
 | Cline | Hooks run on macOS and Linux only, from an executable file `~/.cline/hooks/PreToolUse` that answers `{"cancel":true}`. Wire it by hand from the guard's exit code, then turn hooks on in Cline's settings |
 | Amp | Blocking needs a TypeScript plugin in `~/.config/amp/plugins/`. Not installed automatically yet. Run the guard by hand before a submit |
 | Goose, Crush | Both can block, and their file layout could not be confirmed. Run the guard by hand before a submit |
