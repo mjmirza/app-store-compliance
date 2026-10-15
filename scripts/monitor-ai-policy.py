@@ -37,20 +37,20 @@ def _visible_markup(m):
     return " "
 
 
-_XHTML_BLOCKS = {
-    "address", "article", "aside", "blockquote", "br", "dd", "div", "dl", "dt", "figcaption",
-    "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li", "main",
-    "nav", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul",
-}
+_XHTML_INLINE = {
+    "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "font", "i",
+    "ins", "kbd", "label", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup",
+    "time", "tt", "u", "var",
+}  # every other element separates its text, so an unknown block can never join two words
 
 
 def _xhtml_text(elem):
-    """Text of an XHTML tree. Block elements are separated by a space, inline text runs on."""
+    """Text of an XHTML tree. Inline elements run on, every other element is separated by a space."""
     out, stack = [], [(elem, False)]
     while stack:  # explicit stack, so a deeply nested feed cannot exhaust recursion
         node, closing = stack.pop()
         name = node.tag.split("}", 1)[-1].lower() if isinstance(node.tag, str) else ""
-        block = name in _XHTML_BLOCKS
+        block = name not in _XHTML_INLINE
         if closing:
             if block:
                 out.append(" ")

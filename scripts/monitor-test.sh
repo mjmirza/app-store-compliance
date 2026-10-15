@@ -111,6 +111,11 @@ inl = '<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>I</title><content
 fi = pathlib.Path(tmp, "i.xml"); fi.write_text(inl)
 i = ai.parse_rss_feed(fi.as_uri())
 assert i[0]["description"] == "New LLM policy One Two", i
+fs = '<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>F</title><content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><fieldset>Install</fieldset><fieldset>macOS updates</fieldset><custom-x>Fill</custom-x><custom-y>Mac</custom-y></div></content></entry></feed>'
+ff = pathlib.Path(tmp, "f.xml"); ff.write_text(fs)
+f = ai.parse_rss_feed(ff.as_uri())
+assert f[0]["description"] == "Install macOS updates Fill Mac", f
+assert not ai.analyze_announcements(f, ["llm"]), "an unlisted block element joined two words"
 assert ai.analyze_announcements(i, ["llm"]), "an inline element split a keyword"
 assert not ai.analyze_announcements([e[0]], ["llm"]) and not ai.analyze_announcements([e[1]], ["llm"]), "markup or joined blocks made a false llm match"
 PY
