@@ -73,6 +73,8 @@ OUT="$($AUDIT --description "Subscription renews monthly. Terms of Use https://w
 echo "$OUT" | grep -q 'MISLEADING-PRICING' && bad "the Apple standard EULA link satisfies the terms check" || ok "the Apple standard EULA link satisfies the terms check"
 OUT="$($AUDIT --description "Subscription renews monthly. Terms https://real.app/terms" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
 echo "$OUT" | grep -q 'MISLEADING-PRICING' && bad "an own terms link satisfies the terms check" || ok "an own terms link satisfies the terms check"
+OUT="$($AUDIT --description "Monthly subscription for journaling." --terms_url https://journal.test/terms --privacy_url https://journal.test/p --support_url https://journal.test/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a separate terms_url field does not replace the link in the description" || bad "a separate terms_url field does not replace the link in the description"
 
 # Every locale is audited on its own, and each finding says which locale.
 L="$(mktemp -d)"; mkdir -p "$L/en-US" "$L/de-DE"
