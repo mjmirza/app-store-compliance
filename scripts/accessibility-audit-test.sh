@@ -520,6 +520,19 @@ struct V: View {
 EOF
 
 mkdir -p "$ISSUE_DIR/regex_lit" "$ISSUE_DIR/chain_perf" "$ISSUE_DIR/mod_perf"
+mkdir -p "$ISSUE_DIR/multi_closure"
+cat << 'EOF' > "$ISSUE_DIR/multi_closure/M.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: {}) { Image(systemName: "trash") }
+            .contextMenu { Text("Menu") } preview: { Text("Preview") }
+            .accessibilityLabel("Delete")
+        Button(action: {}) { Image(systemName: "gear") }
+            .contextMenu { Text("Menu") } preview: { Text("Preview") }
+    }
+}
+EOF
 mkdir -p "$ISSUE_DIR/qualified"
 cat << 'EOF' > "$ISSUE_DIR/qualified/Q.swift"
 import SwiftUI
@@ -674,6 +687,13 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/multi_closure" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "M.swift:7)"; then
+  ok "#834 a modifier with several trailing closures does not end the chain before its accessibilityLabel"
+else
+  bad "#834 a multi-closure modifier hid a later accessibilityLabel, or a real finding was lost. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/qualified" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Q.swift:4)"; then

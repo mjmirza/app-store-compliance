@@ -272,6 +272,9 @@ def _top_level_args(code, start, end, pairs):
     return parts
 
 
+LABELED_CLOSURE = re.compile(r"\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*\{")
+
+
 def _modifier_chain(code, i, pairs):
     """Read the .modifier(...) chain that follows offset i. Returns (names with args, end offset)."""
     mods = []
@@ -296,11 +299,13 @@ def _modifier_chain(code, i, pairs):
                 return mods, i
             args, k = (k2, end), end
             k2 = _skip_ws(code, k)
-        if k2 < n and code[k2] == "{":
+        while k2 < n and code[k2] == "{":  # one trailing closure, then any labeled ones
             end = pairs.get(k2, -1)
             if end == -1:
                 return mods, i
             k = end
+            m = LABELED_CLOSURE.match(code, k)
+            k2 = m.end() - 1 if m else n
         mods.append((name, args))
         i = k
 
