@@ -137,6 +137,12 @@ if command -v jq >/dev/null 2>&1; then
   OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
   PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" >/dev/null 2>&1
   [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && [ "$(hooks)" = "1" ] && grep -q '"opus"' "$C/settings.json" && ok "with jq only the hook is merged once and verified" || bad "with jq only the hook is merged once and verified (rc=$RC entries=$(hooks))"
+  # jq keeps only the last of two repeated keys, so a repeated key must stop the jq path too
+  for body in '{"permissions":{"deny":["Bash(*)"]},"permissions":{"allow":["Bash(*)"]}}' '{"hooks":{"PreToolUse":[]},"a":{"b":1,"b":2}}'; do
+    fresh; printf '%s' "$body" > "$C/settings.json"
+    OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
+    [ "$RC" -eq 1 ] && [ "$(cat "$C/settings.json")" = "$body" ] && echo "$OUT" | grep -q '"PreToolUse"' && ok "with jq only a repeated key leaves settings.json untouched" || bad "with jq only a repeated key leaves settings.json untouched (rc=$RC)"
+  done
   rm -rf "$SHIM"
 fi
 
@@ -200,6 +206,14 @@ V="$(cat VERSION 2>/dev/null)"
 [ -n "$V" ] && [ "$(cat "$C/skills/app-store-compliance/VERSION" 2>/dev/null)" = "$V" ] && ok "install records the playbook version" || bad "install records the playbook version (repo=$V)"
 OUT="$(run doctor)"; echo "$OUT" | grep -q "^  ok    version $V" && ok "doctor prints the installed version" || bad "doctor prints the installed version"
 [ "$(run --version)" = "app-store-compliance $V" ] && ok "--version prints the checkout version" || bad "--version prints the checkout version"
+
+# 25 on Windows (Git Bash, MSYS, Cygwin) the hook also covers PowerShell, and doctor proves a PowerShell call is blocked
+fresh
+OUT="$(ASC_UNAME=MINGW64_NT-10.0 run)"; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash|PowerShell"] else 1)' "$C/settings.json" && [ "$RC" -eq 0 ] && ok "Git Bash registers Bash|PowerShell" || bad "Git Bash registers Bash|PowerShell (rc=$RC)"
+echo "$OUT" | grep -q "blocks a submit command run through PowerShell" && ok "doctor proves the PowerShell path on Windows" || bad "doctor proves the PowerShell path on Windows"
+fresh; run >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash"] else 1)' "$C/settings.json" && ok "macOS and Linux keep the Bash matcher" || bad "macOS and Linux keep the Bash matcher"
 
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"

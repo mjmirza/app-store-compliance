@@ -16,6 +16,12 @@ SKILL="$CONF/skills/app-store-compliance"
 CMD_FILE="$CONF/commands/app-store-audit.md"
 SETTINGS="$CONF/settings.json"
 PAYLOAD_DIRS="docs data references templates scripts"
+# Claude Code on Windows may run commands through PowerShell, so the hook covers both there.
+case "${ASC_UNAME:-$(uname -s 2>/dev/null)}" in
+  MINGW*|MSYS*|CYGWIN*) MATCHER="Bash|PowerShell" ;;
+  *) MATCHER="Bash" ;;
+esac
+export ASC_MATCHER="$MATCHER"
 
 # shellcheck disable=SC2088
 if [ "$CONF" = "${HOME:-}/.claude" ]; then SHOWN='~/.claude'; else SHOWN="$CONF"; fi
@@ -94,7 +100,7 @@ manual_block() {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "$MATCHER",
         "hooks": [
           { "type": "command", "command": "$HOOK_CMD", "timeout": 120 }
         ]
@@ -180,7 +186,7 @@ if action == "add":
                 changed = True
     else:
         pre.append(
-            {"matcher": "Bash", "hooks": [{"type": "command", "command": cmd, "timeout": 120}]}
+            {"matcher": os.environ.get("ASC_MATCHER", "Bash"), "hooks": [{"type": "command", "command": cmd, "timeout": 120}]}
         )
         hooks["PreToolUse"] = pre
         data["hooks"] = hooks
@@ -221,6 +227,8 @@ PY
     if [ -n "$cur" ]; then
       jq -e 'type == "object" and ((.hooks // {}) | type == "object") and ((.hooks.PreToolUse // []) | type == "array") and ((.hooks.PreToolUse // []) | all(type == "object" and ((.hooks // []) | type == "array")))' "$cur" >/dev/null 2>&1 || return 4
       [ -w "$cur" ] || return 6
+      # --stream reads every key as written, a parse keeps only the last of a repeated key. Unequal counts mean a repeat.
+      [ "$(jq -c --stream . "$cur" 2>/dev/null | wc -l)" -eq "$(jq -c tostream "$cur" 2>/dev/null | wc -l)" ] || return 4
     fi
     local present=1
     [ -n "$cur" ] && jq -e --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
@@ -229,7 +237,7 @@ PY
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
       if [ -n "$cur" ]; then cp -p "$cur" "$SETTINGS.bak-$(date +%Y%m%d-%H%M%S)"; else cur="/dev/null"; fi
       if [ "$cur" = "/dev/null" ]; then printf '{}' > "$tmp.in"; cur="$tmp.in"; fi
-      jq --arg c "$HOOK_CMD" '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{matcher: "Bash", hooks: [{type: "command", command: $c, timeout: 120}]}])' "$cur" > "$tmp" || { rm -f "$tmp" "$tmp.in"; return 4; }
+      jq --arg c "$HOOK_CMD" --arg m "$MATCHER" '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 120}]}])' "$cur" > "$tmp" || { rm -f "$tmp" "$tmp.in"; return 4; }
       rm -f "$tmp.in"; mv "$tmp" "$SETTINGS"; return 0
     fi
     [ "$present" -ne 0 ] && return 3
@@ -306,6 +314,10 @@ verify() {
       if [ "$rc" -eq 2 ]; then good "the registered hook command blocks a submit command"; else fail "the registered hook command did not block a submit command (exit $rc, expected 2). Command. $reg"; fi
       out="$( cd "$fx" && printf '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}' | env -u CLAUDE_PROJECT_DIR bash -c "$reg" 2>&1 )"; rc=$?
       if [ "$rc" -eq 0 ] && [ -z "$out" ]; then good "the registered hook command stays silent on an ordinary command"; else fail "the registered hook command reacted to an ordinary command (exit $rc)"; fi
+      if [ "$MATCHER" != "Bash" ]; then
+        ( cd "$fx" && printf '{"tool_name":"PowerShell","tool_input":{"command":"fastlane deliver"}}' | env -u CLAUDE_PROJECT_DIR bash -c "$reg" >/dev/null 2>&1 ); rc=$?
+        if [ "$rc" -eq 2 ]; then good "the registered hook command blocks a submit command run through PowerShell"; else fail "the registered hook command did not block a PowerShell submit command (exit $rc)"; fi
+      fi
     fi
     rm -rf "$fx"
   fi
