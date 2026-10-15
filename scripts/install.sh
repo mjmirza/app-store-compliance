@@ -297,13 +297,16 @@ for e in d.get("hooks",{}).get("PreToolUse",[]):
     except re.error: ok=False
     if not ok: continue
     for h in e.get("hooks",[]):
-        c=str(h.get("command","")) if isinstance(h,dict) else ""
+        if not isinstance(h,dict) or h.get("type","command")!="command": continue
+        t=h.get("timeout",600)
+        if isinstance(t,bool) or not isinstance(t,(int,float)) or t<30: continue
+        c=str(h.get("command",""))
         if (c.strip()==hc or any(c.strip() in ("bash " + s, "bash \"" + s + "\"", "bash \u0027" + s + "\u0027") for s in n)) and "#" not in c and c.strip().startswith("bash "):
             print(c); sys.exit(0)' "$SETTINGS" "$HOOK_CMD" "$GUARD" "$SHOWN/hooks/$GUARD_NAME" 2>/dev/null
     return 0
   fi
   if have jq -n true; then
-    jq -r --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
+    jq -r --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and (.type // "command") == "command" and (((.timeout // 600) | numbers) >= 30)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
     return 0
   fi
   grep -qF "$SHOWN/hooks/$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"

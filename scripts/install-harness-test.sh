@@ -278,6 +278,27 @@ fresh; mkdir -p "$H/qwen-config"
 OUT="$(env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR QWEN_HOME='~\qwen-config' HOME="$H" bash "$INSTALL" --tool all --dry-run 2>&1)"
 echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds a QWEN_HOME written as ~\folder" || bad "--tool all finds a QWEN_HOME written as ~\folder"
 
+# 8e Kimi keeps CRLF line endings byte for byte through install and uninstall
+fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n\r\n' > "$H/.kimi-code/config.toml"; cp "$H/.kimi-code/config.toml" "$WORK/kimi-crlf.toml"
+run --tool kimi >/dev/null; run --tool kimi uninstall >/dev/null
+cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-crlf.toml" && ok "kimi uninstall keeps CRLF line endings" || bad "kimi uninstall keeps CRLF line endings"
+# 8f the OpenCode plugin never lets a submit through when the guard cannot run
+fresh; mkdir -p "$H/.config/opencode"; run --tool opencode >/dev/null
+rm -f "$(gdir opencode)/app-store-compliance-guard.sh"
+if command -v node >/dev/null 2>&1; then
+  RES="$(node --input-type=module -e '
+const m = await import(process.argv[1]);
+const p = await m.AppStoreCompliance({ directory: process.argv[2] });
+const run = async (c) => { try { await p["tool.execute.before"]({ tool: "bash" }, { args: { command: c } }); return "allowed" } catch (e) { return "thrown" } };
+console.log((await run("fast" + "lane deliver")) + " " + (await run("ls -la")));
+' "$(cfg opencode)" "$H" 2>/dev/null)"
+  [ "$RES" = "thrown allowed" ] && ok "opencode refuses a submit when the guard cannot run and allows other commands" || bad "opencode refuses a submit when the guard cannot run and allows other commands (got $RES)"
+else ok "opencode guard-failure check skipped, node not installed"; fi
+# 8g a non-Claude doctor says when the checkout is newer than the install
+fresh; mkdir -p "$H/.codex"; run --tool codex >/dev/null; printf '1.0.0' > "$H/.agents/skills/app-store-compliance/VERSION"
+OUT="$(run --tool codex doctor)"
+echo "$OUT" | grep -q "this checkout is version" && ok "codex doctor says the checkout is newer" || bad "codex doctor says the checkout is newer"
+
 # 9 a home folder with an apostrophe still verifies
 H="$WORK/O'Reilly home"; mkdir -p "$H"
 OUT="$(run --tool cursor)"; RC=$?

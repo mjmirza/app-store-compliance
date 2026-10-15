@@ -114,6 +114,12 @@ fresh; run >/dev/null
 python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["PreToolUse"][0]["hooks"][0]["command"]="bash /no/such/app-store-compliance-guard.sh"; json.dump(d,open(p,"w"))' "$C/settings.json"
 run doctor >/dev/null; RC=$?
 [ "$RC" -eq 1 ] && ok "doctor fails when the registered command cannot run" || bad "doctor fails when the registered command cannot run (rc=$RC)"
+for patch in 'h["type"]="prompt"' 'h["timeout"]=1'; do
+  fresh; run >/dev/null
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=d["hooks"]["PreToolUse"][0]["hooks"][0]; exec(sys.argv[2]); json.dump(d,open(p,"w"))' "$C/settings.json" "$patch"
+  run doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "doctor fails for a hook Claude would not run as intended. $patch" || bad "doctor fails for a hook Claude would not run as intended. $patch (rc=$RC)"
+done
 
 # 15 a settings.json with a repeated key is ambiguous and is never rewritten
 fresh

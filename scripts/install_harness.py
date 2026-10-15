@@ -408,6 +408,11 @@ def plugin_source(guard):
         '      encoding: "utf8", timeout: 120000, cwd: directory,\n'
         "    });\n"
         '    if (r.status === 2) throw new Error((r.stdout || "") + (r.stderr || "") || "Blocked by the App Store compliance guard.");\n'
+        '    if (r.error || (r.status !== 0 && r.status !== 1)) {\n'
+        '      const why = "The App Store compliance guard could not run (" + (r.error ? r.error.message : "exit " + r.status) + "). Run install.sh --tool opencode doctor.";\n'
+        '      if (/fastlane|eas |xcrun|altool|notarytool|transporter|gradle|bundletool|xcodebuild|flutter|expo|capacitor|cap |cordova|ionic|unity|dotnet|tauri|npm|pnpm|yarn|bun |make|turbo|nx |lerna/i.test(command)) throw new Error(why);\n'
+        '      console.error(why);\n'
+        '    }\n'
         "  },\n"
         "});\n"
     )
@@ -605,8 +610,9 @@ def register_kimi(lay, cmd, dry):
             fail(shown(path) + " is read-only. It was not changed.")
             print(manual_block("kimi", lay, cmd))
             return False
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8", newline="") as f:
             text = f.read()
+    nl = "\r\n" if "\r\n" in text else "\n"
     if KIMI_BEGIN in text:
         h = kimi_entry(text)
         if kimi_live(h) and h.get("command") == cmd:
@@ -615,8 +621,8 @@ def register_kimi(lay, cmd, dry):
         if dry:
             print("  would rewrite the guard block in " + shown(path) + ", with a backup")
             return True
-        pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?"
-        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd), text, count=1, flags=re.S))
+        pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?"
+        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S))
         ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
     if dry:
@@ -626,15 +632,11 @@ def register_kimi(lay, cmd, dry):
             + ", keeping everything else, with a backup"
         )
         return True
-    sep = (
-        ""
-        if not text or text.endswith("\n\n")
-        else ("\n" if text.endswith("\n") else "\n\n")
-    )
-    write_atomic(path, text + sep + kimi_block(cmd))
+    sep = "" if not text or text.endswith(nl + nl) else (nl if text.endswith(nl) else nl + nl)
+    write_atomic(path, text + sep + kimi_block(cmd).replace("\n", nl))
     os.makedirs(lay["hooks"], exist_ok=True)
     with open(os.path.join(lay["hooks"], KIMI_SEP_FILE), "w", encoding="utf-8") as f:
-        f.write(str(len(sep)))
+        f.write(json.dumps(sep))
     ok(
         "hook appended to "
         + shown(path)
@@ -654,21 +656,22 @@ def unregister(tool, lay, guard):
     if not os.path.exists(lay["config"]):
         return True
     if style == "toml":
-        with open(lay["config"], encoding="utf-8") as f:
+        with open(lay["config"], encoding="utf-8", newline="") as f:
             text = f.read()
         if KIMI_BEGIN not in text:
             return True
-        m = re.search(re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?", text, flags=re.S)
+        m = re.search(re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?", text, flags=re.S)
         before, after = text[: m.start()], text[m.end() :]
         sep_file = os.path.join(lay["hooks"], KIMI_SEP_FILE)
         try:
             with open(sep_file, encoding="utf-8") as f:
-                n = int(f.read().strip() or 0)
+                sep = json.loads(f.read() or '""')
         except (OSError, ValueError):
-            n = 0
+            sep = ""
+        sep = "\n" * sep if isinstance(sep, int) else (sep if isinstance(sep, str) else "")
         # Drop only the newlines the install added in front of a block it appended at the end.
-        if n and not after and before.endswith("\n" * n):
-            before = before[:-n]
+        if sep and not after and before.endswith(sep):
+            before = before[: -len(sep)]
         write_atomic(lay["config"], before + after)
         if os.path.exists(sep_file):
             os.remove(sep_file)
@@ -920,7 +923,14 @@ def verify(tool, lay, guard, repo_dir):
             ok("skill payload complete at " + shown(sk))
         if os.path.isfile(os.path.join(sk, "VERSION")):
             with open(os.path.join(sk, "VERSION")) as f:
-                ok("version " + f.read().strip())
+                inst = f.read().strip()
+            ok("version " + inst)
+            repo_v = os.path.join(REPO, "VERSION")
+            if os.path.isfile(repo_v):
+                with open(repo_v) as f:
+                    cur = f.read().strip()
+                if cur and cur != inst:
+                    note("this checkout is version " + cur + ". Run install.sh --tool " + tool + " again to update.")
     if lay["command"]:
         if os.path.isfile(lay["command"]):
             ok("audit command at " + shown(lay["command"]))
