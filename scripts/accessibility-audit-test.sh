@@ -520,6 +520,17 @@ struct V: View {
 EOF
 
 mkdir -p "$ISSUE_DIR/regex_lit" "$ISSUE_DIR/chain_perf" "$ISSUE_DIR/mod_perf"
+mkdir -p "$ISSUE_DIR/qualified"
+cat << 'EOF' > "$ISSUE_DIR/qualified/Q.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        SwiftUI.Button(action: {}) { Image(systemName: "gear") }
+        MyKit.Button(action: {}) { Image(systemName: "trash") }
+        let b = self.Button(action: {}) { Image(systemName: "star") }
+    }
+}
+EOF
 mkdir -p "$ISSUE_DIR/regex_esc"
 cat << 'EOF' > "$ISSUE_DIR/regex_esc/Esc.swift"
 import SwiftUI
@@ -660,6 +671,13 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/qualified" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Q.swift:4)"; then
+  ok "#834 SwiftUI.Button is read as a Button, another module's or a member's Button is not"
+else
+  bad "#834 a SwiftUI-qualified Button was missed, or an unrelated member Button was flagged. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/regex_esc" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Esc.swift:6)"; then

@@ -73,6 +73,30 @@ echo "$ERR" | grep -q "sample announcements" && ok "a failed live fetch says the
 APPLE_NEWS_RSS_URL="http://127.0.0.1:9/none.rss" $MONITOR --project "$T" --json 2>/dev/null | python3 -c 'import json,sys; json.load(sys.stdin)' && ok "--json stays valid when the fetch fails" || bad "--json stays valid when the fetch fails"
 rm -rf "$T"
 
+# Atom text fields are plain text unless type says html or xhtml (RFC 4287 3.1.1). RSS stays HTML.
+python3 - "$HERE" <<'PY' && ok "Atom plain-text fields keep angle brackets, html and xhtml are stripped, RSS stays HTML" || bad "Atom plain-text fields keep angle brackets, html and xhtml are stripped, RSS stays HTML"
+import importlib.util, os, sys, tempfile, pathlib
+d = sys.argv[1]
+spec = importlib.util.spec_from_file_location("ai", os.path.join(d, "monitor-ai-policy.py"))
+ai = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ai)
+atom = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+<entry><title type="text">Policy changes for &lt;llm&gt; integrations</title><summary>Plain &lt;b&gt;kept&lt;/b&gt;</summary></entry>
+<entry><title>No type &lt;llm&gt; here</title><summary type="html">&lt;p&gt;Rich &lt;a href="https://x/llm"&gt;body&lt;/a&gt;&lt;/p&gt;</summary></entry>
+<entry><title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">Xhtml <b>title</b></div></title><content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Inner <a href="https://x/att">text</a></p></div></content></entry>
+</feed>"""
+rss = """<?xml version="1.0"?><rss><channel><item><title>T</title><description>&lt;p&gt;HTML &lt;a href="https://x/llm"&gt;body&lt;/a&gt;&lt;/p&gt;</description></item></channel></rss>"""
+tmp = tempfile.mkdtemp()
+fa = pathlib.Path(tmp, "a.xml"); fa.write_text(atom)
+fr = pathlib.Path(tmp, "r.xml"); fr.write_text(rss)
+a = ai.parse_rss_feed(fa.as_uri())
+assert [x["title"] for x in a] == ["Policy changes for <llm> integrations", "No type <llm> here", "Xhtml title"], a
+assert [x["description"] for x in a] == ["Plain <b>kept</b>", "Rich body", "Inner text"], a
+r = ai.parse_rss_feed(fr.as_uri())
+assert r[0]["description"] == "HTML body", r
+assert ai.analyze_announcements([a[0]], ["llm"]), "plain-text <llm> no longer matches"
+PY
+
 # A feed full of unmatched angle brackets must not make tag stripping quadratic.
 python3 - "$HERE" <<'PY' && ok "HTML stripping stays linear on unmatched angle brackets" || bad "HTML stripping stays linear on unmatched angle brackets"
 import importlib.util, os, sys, time

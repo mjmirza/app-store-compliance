@@ -37,6 +37,18 @@ def _visible_markup(m):
     return " "
 
 
+def _feed_text(child, atom):
+    """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1). RSS fields are HTML."""
+    if not atom:
+        return clean_html_text(child.text or "")
+    kind = (child.get("type") or "text").lower()
+    if kind == "xhtml":
+        return re.sub(r"\s+", " ", "".join(child.itertext())).strip()
+    if kind == "html":
+        return clean_html_text(child.text or "")
+    return re.sub(r"\s+", " ", child.text or "").strip()
+
+
 def clean_html_text(raw_text):
     """Strips raw HTML tags, unescapes entities, and collapses whitespace."""
     if not raw_text:
@@ -221,9 +233,9 @@ def parse_rss_feed(url):
                     for child in elem:
                         ctag = clean_tag(child.tag)
                         if ctag == "title":
-                            title = child.text or ""
+                            title = _feed_text(child, tag == "entry")
                         elif ctag in ("description", "summary", "content"):
-                            desc = child.text or ""
+                            desc = _feed_text(child, tag == "entry")
                         elif ctag == "link":
                             link_val = child.get("href")
                             if link_val:
@@ -235,8 +247,8 @@ def parse_rss_feed(url):
 
                     items.append(
                         {
-                            "title": clean_html_text(title),
-                            "description": clean_html_text(desc),
+                            "title": title,
+                            "description": desc,
                             "link": link.strip(),
                             "pubDate": pub_date.strip(),
                         }
