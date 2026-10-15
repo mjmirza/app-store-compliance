@@ -75,6 +75,12 @@ OUT="$($AUDIT --description "Subscription renews monthly. Terms https://real.app
 echo "$OUT" | grep -q 'MISLEADING-PRICING' && bad "an own terms link satisfies the terms check" || ok "an own terms link satisfies the terms check"
 OUT="$($AUDIT --description "Monthly subscription for journaling." --terms_url https://journal.test/terms --privacy_url https://journal.test/p --support_url https://journal.test/help 2>&1)"
 echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a separate terms_url field does not replace the link in the description" || bad "a separate terms_url field does not replace the link in the description"
+OUT="$($AUDIT --name Photos --description "Monthly subscription. Privacy policy https://photos.app/privacy" --privacy_url https://photos.app/privacy --support_url https://photos.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a privacy link on a host named photos is not a Terms link" || bad "a privacy link on a host named photos is not a Terms link"
+OUT="$($AUDIT --description "Monthly subscription. More at https://legal.example.app/x" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "a legal-looking link without the word terms or EULA is still flagged" || bad "a legal-looking link without the word terms or EULA is still flagged"
+OUT="$($AUDIT --description "Read our policy at https:///privacy" --privacy_url https://real.app/p --support_url https://real.app/help --check-urls 2>&1)"
+echo "$OUT" | grep -q 'BOTH-UNREACHABLE-METADATA-URL' && ok "a malformed URL in the description is reported with --check-urls" || bad "a malformed URL in the description is reported with --check-urls"
 
 # Every locale is audited on its own, and each finding says which locale.
 L="$(mktemp -d)"; mkdir -p "$L/en-US" "$L/de-DE"

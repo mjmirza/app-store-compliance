@@ -133,7 +133,7 @@ def is_terms_url(u):
     p = urlparse(low)
     return bool(
         re.search(
-            r"terms|eula|tos|legal|conditions|agb|license",
+            r"(^|[^a-z])(terms|eula|tos|legal|conditions|agb|licen[cs]e)",
             p.path + " " + (p.hostname or ""),
         )
     )
@@ -362,7 +362,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
             r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+", raw_desc
         )
         # Apple reads the link in the description, so a separate terms_url field never replaces it.
-        has_terms = any(is_terms_url(u) for u in links)
+        has_terms = any(is_terms_url(u) for u in links) and ("terms" in desc or "eula" in desc)
         if not has_terms:
             add(
                 findings,
@@ -393,6 +393,15 @@ def audit_fields(fields, check_urls=False, platform="apple"):
         urls = set()
         for v in fields.values():
             urls.update(re.findall(r"https?://[^\s)\"']+", v or ""))
+        for u in sorted(u for u in urls if not url_syntax_ok(u)):
+            add(
+                findings,
+                "high",
+                "BOTH-UNREACHABLE-METADATA-URL",
+                "url",
+                f"URL is malformed: {u}",
+                "Fix or remove the broken URL before submission",
+            )
         for u in sorted(u for u in urls if url_syntax_ok(u)):
             ok = _url_ok(u)
             if ok is False:
