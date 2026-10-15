@@ -24,7 +24,7 @@ T=$(mktemp -d); mkdir -p "$T/en-US"
 printf 'Lumina Studio' > "$T/en-US/name.txt"
 printf 'photo,editor,filters' > "$T/en-US/keywords.txt"
 printf 'A focused editor with layers and presets.' > "$T/en-US/description.txt"
-printf '{"privacy_policy_url":"https://lumina.app/privacy"}' > "$T/m.json"
+printf '{"privacy_policy_url":"https://lumina.app/privacy","support_url":"https://lumina.app/support"}' > "$T/m.json"
 OUT="$($AUDIT "$T" 2>&1)"; RC=$?
 if echo "$OUT" | grep -qE '\[(HIGH|MEDIUM)\]'; then bad "clean dir flagged high/medium"; else ok "clean dir passes"; fi
 # 5 propose writes the fixes file
@@ -43,6 +43,56 @@ OUT="$($AUDIT 2>&1)"; RC=$?
 # 8 subscription without terms flagged
 OUT="$($AUDIT --description "Subscribe for premium, auto-renew monthly" 2>&1)"
 echo "$OUT" | grep -q 'MISLEADING-PRICING\|Terms' && ok "flags subscription without terms" || bad "subscription terms"
+
+# Google Play has its own limits and rules. Short description is 80 chars, not Apple's 170 promotional text.
+LONG80="$(python3 -c 'print("x"*100)')"
+OUT="$($AUDIT --platform google --title "Lumina" --short_description "$LONG80" --privacy_url https://lumina.app/p --contact_email hi@lumina.app 2>&1)"
+echo "$OUT" | grep -q 'over the 80 limit' && ok "google short description is held to 80 chars" || bad "google short description is held to 80 chars"
+OK70="$(python3 -c 'print("x"*70)')"
+OUT="$($AUDIT --platform google --title "Lumina" --short_description "$OK70" --privacy_url https://lumina.app/p --contact_email hi@lumina.app 2>&1)"
+echo "$OUT" | grep -q 'over the' && bad "a 70 char google short description passes" || ok "a 70 char google short description passes"
+OUT="$($AUDIT --platform google --title "Lumina" --full_description "Get the Android app today" --privacy_url https://lumina.app/p --contact_email hi@lumina.app 2>&1)"
+echo "$OUT" | grep -q 'CROSS-PLATFORM-REFERENCE' && bad "an Android listing saying Android is not an Apple violation" || ok "an Android listing saying Android is not an Apple violation"
+OUT="$($AUDIT --platform google --title "Lumina" --privacy_url https://lumina.app/p 2>&1)"
+echo "$OUT" | grep -q 'MISSING-CONTACT-EMAIL' && ok "google listing without a contact email is flagged" || bad "google listing without a contact email is flagged"
+OUT="$($AUDIT --platform windows --name "Lumina" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q 'apple or google' && ok "an unknown platform exits 1" || bad "an unknown platform exits 1 (rc=$RC)"
+
+# URLs must be real http or https URLs before any network check.
+OUT="$($AUDIT --name 'Real App' --privacy_url nonsense --support_url https://real.app/help --check-urls 2>&1)"
+echo "$OUT" | grep -q 'INVALID-METADATA-URL' && ! echo "$OUT" | grep -q '^Clean' && ok "a privacy url that is not a url is flagged" || bad "a privacy url that is not a url is flagged"
+OUT="$($AUDIT --name 'Real App' --privacy_url ftp://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'INVALID-METADATA-URL' && ok "a non http privacy url is flagged" || bad "a non http privacy url is flagged"
+OUT="$($AUDIT --name 'Real App' --privacy_url https://real.app/p 2>&1)"
+echo "$OUT" | grep -q 'MISSING-SUPPORT-URL' && ok "apple listing without a support url is flagged" || bad "apple listing without a support url is flagged"
+
+# A subscription needs a real Terms or EULA link, not the word terms.
+OUT="$($AUDIT --description "Subscription. Terms apply." --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "the word terms without a link is flagged" || bad "the word terms without a link is flagged"
+OUT="$($AUDIT --description "Subscription renews monthly. Terms of Use https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && bad "the Apple standard EULA link satisfies the terms check" || ok "the Apple standard EULA link satisfies the terms check"
+OUT="$($AUDIT --description "Subscription renews monthly. Terms https://real.app/terms" --privacy_url https://real.app/p --support_url https://real.app/help 2>&1)"
+echo "$OUT" | grep -q 'MISLEADING-PRICING' && bad "an own terms link satisfies the terms check" || ok "an own terms link satisfies the terms check"
+
+# Every locale is audited on its own, and each finding says which locale.
+L="$(mktemp -d)"; mkdir -p "$L/en-US" "$L/de-DE"
+printf 'Lumina Studio Photo Editor' > "$L/en-US/name.txt"
+printf 'App fuer Android' > "$L/de-DE/name.txt"
+printf '{"privacy_policy_url":"https://lumina.app/privacy","support_url":"https://lumina.app/support"}' > "$L/m.json"
+OUT="$($AUDIT "$L" 2>&1)"
+echo "$OUT" | grep 'CROSS-PLATFORM-REFERENCE' | grep -q 'de-DE' && ok "a short German name with a violation is audited and named" || bad "a short German name with a violation is audited and named"
+echo "$OUT" | grep 'CROSS-PLATFORM-REFERENCE' | grep -q 'en-US' && bad "the clean English name is not blamed" || ok "the clean English name is not blamed"
+rm -rf "$L"
+
+# A fastlane android folder is audited with the Google rules even without --platform.
+A="$(mktemp -d)"; mkdir -p "$A/android/en-US"
+printf 'Lumina' > "$A/android/en-US/title.txt"
+printf '%s' "$LONG80" > "$A/android/en-US/short_description.txt"
+printf 'Get the Android app today' > "$A/android/en-US/full_description.txt"
+printf '{"privacy_policy_url":"https://lumina.app/privacy","contact_email":"hi@lumina.app"}' > "$A/android/m.json"
+OUT="$($AUDIT "$A" 2>&1)"
+echo "$OUT" | grep -q 'over the 80 limit' && ! echo "$OUT" | grep -q 'CROSS-PLATFORM-REFERENCE' && ok "a fastlane android folder uses the Google rules" || bad "a fastlane android folder uses the Google rules"
+rm -rf "$A"
 
 echo ""
 # A folder with no listing files was not audited. That is exit 1 with the file names to add, never a pass.

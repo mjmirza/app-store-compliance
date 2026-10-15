@@ -19,6 +19,11 @@ Usage:
     metadata-audit.py --name "..." --keywords "..." --description "..."   audit fields
     metadata-audit.py <dir> --propose           write <dir>/.metadata-fixes.md with suggested fixes
     metadata-audit.py <dir> --check-urls        also HEAD-check URLs (needs network)
+    metadata-audit.py <dir> --platform google   use the Google Play limits and rules (default apple)
+
+Every locale folder is audited on its own and each finding names its locale.
+A folder named android in the path is audited with the Google rules unless
+--platform is given.
 
 Exit codes: 0 clean or advisory, 1 the directory held nothing to audit, 2 a critical finding.
 """
@@ -27,8 +32,14 @@ import sys
 import re
 import json
 import glob
+from urllib.parse import urlparse
 
 FIELD_LIMITS = {"name": 30, "subtitle": 30, "keywords": 100, "promotional_text": 170, "description": 4000}
+# Google Play listing limits, verified 2026-10-15 at support.google.com/googleplay/android-developer/answer/9859152
+GOOGLE_FIELD_LIMITS = {"name": 30, "short_description": 80, "description": 4000}
+PLATFORMS = ("apple", "google")
+APPLE_STD_EULA = "apple.com/legal/internet-services/itunes/dev/stdeula"
+URL_FIELDS = ("privacy_url", "support_url", "marketing_url", "terms_url")
 # fastlane / asc field file name aliases -> canonical field
 ALIASES = {
     "name": "name", "title": "name", "app_name": "name",
@@ -40,7 +51,11 @@ ALIASES = {
     "review_notes": "review_notes", "notes": "review_notes",
     "privacy_url": "privacy_url", "privacy_policy_url": "privacy_url",
     "support_url": "support_url", "marketing_url": "marketing_url",
+    "terms_url": "terms_url", "eula_url": "terms_url", "license_agreement_url": "terms_url",
+    "contact_email": "contact_email", "email": "contact_email",
 }
+# On Google Play short_description is its own 80 char field, not Apple promotional text.
+GOOGLE_ALIASES = dict(ALIASES, short_description="short_description")
 
 OTHER_PLATFORMS = ["android", "google play", "play store", "windows phone", "blackberry"]
 FUTURE = ["coming soon", "coming-soon", "will be available", "in a future update", "stay tuned", "future release"]
@@ -54,6 +69,25 @@ CURSE = ["fuck", "shit", "asshole", "bitch", "bastard"]
 def add(findings, sev, rule, field, msg, fix):
     findings.append({"severity": sev, "rule": rule, "field": field, "message": msg, "fix": fix})
 
+def url_syntax_ok(u):
+    """True when u is an http or https URL with a host."""
+    u = (u or "").strip()
+    try:
+        p = urlparse(u)
+        host = p.hostname
+    except ValueError:
+        return False
+    return p.scheme in ("http", "https") and bool(host) and " " not in u
+
+def is_terms_url(u):
+    low = (u or "").lower()
+    if APPLE_STD_EULA in low:
+        return True
+    if not url_syntax_ok(low):
+        return False
+    p = urlparse(low)
+    return bool(re.search(r"terms|eula|tos|legal|conditions|agb|license", p.path + " " + (p.hostname or "")))
+
 def has_emoji(s):
     for ch in s:
         o = ord(ch)
@@ -64,14 +98,15 @@ def has_emoji(s):
 def lc(s):
     return (s or "").lower()
 
-def audit_fields(fields, check_urls=False):
+def audit_fields(fields, check_urls=False, platform="apple"):
     findings = []
+    apple = platform == "apple"
     name = fields.get("name", "")
     subtitle = fields.get("subtitle", "")
     keywords = fields.get("keywords", "")
 
     # char limits
-    for f, limit in FIELD_LIMITS.items():
+    for f, limit in (FIELD_LIMITS if apple else GOOGLE_FIELD_LIMITS).items():
         v = fields.get(f, "")
         if v and len(v) > limit:
             add(findings, "high", "BOTH-METADATA-DECORATION", f,
@@ -90,22 +125,22 @@ def audit_fields(fields, check_urls=False):
         if len(words) >= 2:
             add(findings, "medium", "BOTH-METADATA-DECORATION", f, f"{f} uses ALL CAPS words", f"Use normal case in {f} except a real brand")
 
-    # other platform mentions (Apple side)
-    for f, v in fields.items():
+    # other platform mentions (Apple side only, an Android listing may say Android)
+    for f, v in (fields.items() if apple else ()):
         for term in OTHER_PLATFORMS:
             if term in lc(v):
                 add(findings, "high", "APPLE-2.3-CROSS-PLATFORM-REFERENCE", f,
                     f"{f} mentions another platform ({term})", f"Remove the reference to {term} from {f}")
 
     # future functionality
-    for f, v in fields.items():
+    for f, v in (fields.items() if apple else ()):
         for term in FUTURE:
             if term in lc(v):
                 add(findings, "medium", "APPLE-2.3-FUTURE-FUNCTIONALITY", f,
                     f"{f} promises future functionality ({term})", "Describe only what the build does today")
 
     # negative apple sentiment
-    for f, v in fields.items():
+    for f, v in (fields.items() if apple else ()):
         for term in NEGATIVE_APPLE:
             if term in lc(v):
                 add(findings, "medium", "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT", f,
@@ -123,8 +158,8 @@ def audit_fields(fields, check_urls=False):
             if re.search(r"\b" + re.escape(term) + r"\b", lc(v)):
                 add(findings, "high", "APPLE-2.3-CURSE-WORD", f, f"{f} contains profanity", "Remove profanity from the listing")
 
-    # keywords formatting
-    if keywords:
+    # keywords formatting (Apple only, Google Play has no keywords field)
+    if keywords and apple:
         if ", " in keywords:
             add(findings, "low", "APPLE-2.3-KEYWORD-FORMAT", "keywords",
                 "keywords field has spaces after commas, which wastes the 100 char budget", "Use commas with no spaces between keywords")
@@ -139,15 +174,37 @@ def audit_fields(fields, check_urls=False):
         add(findings, "high", "BOTH-MISSING-PRIVACY-POLICY", "privacy_url",
             "no privacy policy URL found in the metadata", "Set the Privacy Policy URL in App Store Connect and the Play listing")
 
-    # subscription ToS / PP in description
-    desc = lc(fields.get("description", "") + " " + fields.get("promotional_text", ""))
-    if any(t in desc for t in ("subscription", "subscribe", "auto-renew", "per month", "per year")):
-        if "terms" not in desc and "eula" not in desc:
+    # URL fields must be real http or https URLs, checked before any network call
+    for f in URL_FIELDS:
+        v = fields.get(f, "")
+        if v and not url_syntax_ok(v):
+            add(findings, "high", "BOTH-INVALID-METADATA-URL", f,
+                f"{f} is not an http or https URL with a host ({v[:60]})", f"Set {f} to a full https URL")
+
+    if apple and not fields.get("support_url"):
+        add(findings, "high", "APPLE-MISSING-SUPPORT-URL", "support_url",
+            "no support URL found in the metadata, App Store Connect requires one", "Set the Support URL in App Store Connect")
+    if not apple:
+        email = fields.get("contact_email", "")
+        if not email:
+            add(findings, "medium", "GOOGLE-MISSING-CONTACT-EMAIL", "contact_email",
+                "no contact email found, the Play listing requires one", "Set the contact email in the Play Console store listing")
+        elif not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
+            add(findings, "medium", "GOOGLE-MISSING-CONTACT-EMAIL", "contact_email",
+                f"contact email is not a valid address ({email[:60]})", "Set a working contact email in the Play Console")
+
+    # subscription terms, a real Terms or EULA URL is required, the word alone is not enough
+    raw_desc = fields.get("description", "") + " " + fields.get("promotional_text", "")
+    desc = lc(raw_desc)
+    if apple and any(t in desc for t in ("subscription", "subscribe", "auto-renew", "per month", "per year")):
+        links = re.findall(r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+", raw_desc)
+        has_terms = any(is_terms_url(u) for u in links) or is_terms_url(fields.get("terms_url", ""))
+        if not has_terms:
             add(findings, "high", "APPLE-3.1.2-MISLEADING-PRICING", "description",
                 "subscription mentioned but no Terms of Use or EULA link in the description", "Add functional Terms of Use and Privacy Policy links to the description and the paywall")
 
-    # china AI references (advisory, storefront dependent)
-    for f in ("name", "subtitle", "keywords", "description"):
+    # china AI references (advisory, storefront dependent, Apple only)
+    for f in (("name", "subtitle", "keywords", "description") if apple else ()):
         v = lc(fields.get(f, ""))
         for term in CHINA_AI:
             if term in v:
@@ -160,7 +217,7 @@ def audit_fields(fields, check_urls=False):
         urls = set()
         for v in fields.values():
             urls.update(re.findall(r"https?://[^\s)\"']+", v or ""))
-        for u in sorted(urls):
+        for u in sorted(u for u in urls if url_syntax_ok(u)):
             ok = _url_ok(u)
             if ok is False:
                 add(findings, "high", "BOTH-UNREACHABLE-METADATA-URL", "url", f"URL does not load: {u}", "Fix or remove the broken URL before submission")
@@ -176,49 +233,125 @@ def _url_ok(u):
     except Exception:
         return False
 
-def load_dir(d):
-    fields = {}
-    for path in glob.glob(os.path.join(d, "**", "*.txt"), recursive=True):
-        base = os.path.splitext(os.path.basename(path))[0].lower()
-        canon = ALIASES.get(base)
-        if not canon:
+def _read_text(path):
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            return fh.read().strip()
+    except Exception:
+        return None
+
+
+def _read_json(path):
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def _read_group_files(d):
+    """Return {folder relative to d: [(path, base or None, text or dict)]} for listing files."""
+    groups = {}
+    for path in sorted(glob.glob(os.path.join(d, "**", "*.txt"), recursive=True)):
+        txt = _read_text(path)
+        if txt is None:
             continue
-        try:
-            txt = open(path, encoding="utf-8", errors="ignore").read().strip()
-        except Exception:
-            continue
-        # keep the longest value if multiple locales
-        if len(txt) > len(fields.get(canon, "")):
-            fields[canon] = txt
-    # also look for a json metadata file with urls
-    for jp in glob.glob(os.path.join(d, "**", "*.json"), recursive=True):
-        try:
-            data = json.load(open(jp, encoding="utf-8", errors="ignore"))
-        except Exception:
-            continue
+        rel = os.path.relpath(os.path.dirname(path), d)
+        groups.setdefault(rel, []).append(
+            (path, os.path.splitext(os.path.basename(path))[0].lower(), txt)
+        )
+    for path in sorted(glob.glob(os.path.join(d, "**", "*.json"), recursive=True)):
+        data = _read_json(path)
         if isinstance(data, dict):
-            for k, v in data.items():
-                kk = ALIASES.get(k.lower())
-                if kk and isinstance(v, str) and v.strip() and len(v) > len(fields.get(kk, "")):
+            groups.setdefault(os.path.relpath(os.path.dirname(path), d), []).append(
+                (path, None, data)
+            )
+    return groups
+
+
+def group_platform(rel):
+    return "google" if "android" in [p.lower() for p in rel.split(os.sep)] else "apple"
+
+
+def _fields_from(entries, aliases):
+    fields = {}
+    for _path, base, val in entries:
+        if base is not None:
+            canon = aliases.get(base)
+            if canon and val:
+                fields[canon] = val
+        else:
+            for k, v in val.items():
+                kk = aliases.get(str(k).lower())
+                if kk and isinstance(v, str) and v.strip():
                     fields[kk] = v.strip()
     return fields
 
+
+def _is_below(child, parent):
+    return child != parent and (parent == "." or child.startswith(parent + os.sep))
+
+
+def load_locales(d, platform=None):
+    """One audit unit per locale folder, each audited on its own.
+    Files in a parent folder fill gaps in every locale below it.
+    Returns a list of (label, platform, fields)."""
+    groups = _read_group_files(d)
+    rels = sorted(groups)
+    units = []
+    for rel in rels:
+        plat = platform or group_platform(rel)
+        aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
+        own = _fields_from(groups[rel], aliases)
+        if not own:
+            continue
+        # a folder that holds only shared values (urls, email) is not a locale when locales sit below it
+        has_children = any(
+            _is_below(o, rel) and _fields_from(groups[o], aliases) for o in rels
+        )
+        if has_children and not (set(own) - set(URL_FIELDS) - {"contact_email"}):
+            continue
+        merged = {}
+        for a in sorted((o for o in rels if _is_below(rel, o)), key=len):
+            merged.update(_fields_from(groups[a], aliases))
+        merged.update(own)
+        label = rel if rel != "." else (os.path.basename(os.path.abspath(d)) or d)
+        units.append((label, plat, merged))
+    return units
+
+
+def load_dir(d):
+    """Backward compatible flat view, the union of every locale, first value wins."""
+    fields = {}
+    for _label, _plat, f in load_locales(d):
+        for k, v in f.items():
+            fields.setdefault(k, v)
+    return fields
 def main():
     args = sys.argv[1:]
     check_urls = "--check-urls" in args
     propose = "--propose" in args
     args = [a for a in args if a not in ("--check-urls", "--propose")]
 
-    fields = {}
+    platform = None
+    if "--platform" in args:
+        i = args.index("--platform")
+        platform = (args[i + 1] if i + 1 < len(args) else "").lower()
+        del args[i : i + 2]
+        if platform not in PLATFORMS:
+            print(
+                f"metadata-audit. unknown platform '{platform}'. Use apple or google.",
+                file=sys.stderr,
+            )
+            return 1
+
+    raw = {}
     d = None
     i = 0
     while i < len(args):
         a = args[i]
         if a.startswith("--"):
-            key = a[2:]
-            val = args[i+1] if i+1 < len(args) else ""
-            canon = ALIASES.get(key, key)
-            fields[canon] = val
+            raw[a[2:]] = args[i + 1] if i + 1 < len(args) else ""
             i += 2
         elif os.path.isdir(a) or d is None:
             d = a
@@ -227,21 +360,49 @@ def main():
             i += 1
 
     if d and not os.path.isdir(d):
-        print(f"metadata-audit. {d} is not a directory. Nothing was audited.", file=sys.stderr)
+        print(
+            f"metadata-audit. {d} is not a directory. Nothing was audited.",
+            file=sys.stderr,
+        )
         return 1
-    if d:
-        fields.update({k: v for k, v in load_dir(d).items() if k not in fields})
 
-    if not fields and d:
+    def cli_fields(plat):
+        aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
+        return {aliases.get(k, k): v for k, v in raw.items()}
+
+    units = []
+    if d:
+        for label, plat, f in load_locales(d, platform):
+            f.update(cli_fields(plat))
+            units.append((label, plat, f))
+    if not units and raw:
+        plat = platform or "apple"
+        units.append(("command line", plat, cli_fields(plat)))
+
+    if not units and d:
         print(f"metadata-audit. no listing files found in {d}. Nothing was audited.")
-        print("Add name.txt, subtitle.txt, keywords.txt and description.txt (the fastlane metadata layout),")
-        print("or pull them with scripts/pull-metadata.sh, or pass --name, --keywords and --description.")
+        print(
+            "Add name.txt, subtitle.txt, keywords.txt and description.txt (the fastlane metadata layout),"
+        )
+        print(
+            "or pull them with scripts/pull-metadata.sh, or pass --name, --keywords and --description."
+        )
         return 1
-    if not fields:
-        print("metadata-audit. nothing to audit. Pass a metadata directory, or --name, --keywords and --description.")
+    if not units:
+        print(
+            "metadata-audit. nothing to audit. Pass a metadata directory, or --name, --keywords and --description."
+        )
         return 0
 
-    findings = audit_fields(fields, check_urls=check_urls)
+    findings = []
+    print("== Metadata Audit ==")
+    for label, plat, fields in units:
+        print(
+            f"Locale {label} ({plat}). Fields audited. {', '.join(sorted(fields.keys()))}"
+        )
+        for f in audit_fields(fields, check_urls=check_urls, platform=plat):
+            f["locale"] = label
+            findings.append(f)
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     findings.sort(key=lambda f: order.get(f["severity"], 9))
 
@@ -250,13 +411,11 @@ def main():
     med = sum(1 for f in findings if f["severity"] == "medium")
     low = sum(1 for f in findings if f["severity"] == "low")
 
-    print("== Metadata Audit ==")
-    print(f"Fields audited. {', '.join(sorted(fields.keys()))}")
     print("")
     if not findings:
         print("Clean. No metadata rejection risks found.")
     for f in findings:
-        print(f"  [{f['severity'].upper()}] {f['rule']}  ({f['field']})")
+        print(f"  [{f['severity'].upper()}] {f['rule']}  ({f['field']}, {f['locale']})")
         print(f"      {f['message']}")
         print(f"      fix. {f['fix']}")
     print("")
@@ -264,15 +423,23 @@ def main():
 
     if propose and d:
         report = os.path.join(d, ".metadata-fixes.md")
-        lines = ["# Metadata fix suggestions", "",
-                 "Proposed fixes from metadata-audit. Review each before applying. Source copy is not overwritten.", ""]
+        lines = [
+            "# Metadata fix suggestions",
+            "",
+            "Proposed fixes from metadata-audit. Review each before applying. Source copy is not overwritten.",
+            "",
+        ]
         for f in findings:
-            lines.append(f"- [{f['severity']}] {f['field']}. {f['message']}")
+            lines.append(
+                f"- [{f['severity']}] {f['locale']} {f['field']}. {f['message']}"
+            )
             lines.append(f"  - fix. {f['fix']}")
-        open(report, "w").write("\n".join(lines) + "\n")
+        with open(report, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
         print(f"Wrote suggestions to {report}")
 
     return 2 if crit > 0 else 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
