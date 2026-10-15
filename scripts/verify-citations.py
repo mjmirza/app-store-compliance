@@ -111,20 +111,6 @@ def host_of(url):
     return m.group(1).lower() if m else ""
 
 
-def host_blocks_all(url, cache):
-    """A 404 whose own host homepage also answers 404 is a host refusing automation
-    (ftc.gov does this), not a missing page. A dead page on a healthy host still fails."""
-    m = re.match(r"(https?://[^/]+)", url)
-    if not m:
-        return False
-    root = m.group(1) + "/"
-    if url.rstrip("/") + "/" == root:
-        return False
-    if root not in cache:
-        cache[root] = fetch(root)[0]
-    return cache[root] == 404
-
-
 def collect_urls(root, only=None):
     found = {}
     targets = only if only else [root]
@@ -211,7 +197,6 @@ def main():
 
     fabricated, dead, blocked, transient, ok = [], [], [], [], 0
     own_controls = set(SOFT404_PROBES.values())
-    root_codes = {}
     for url in sorted(urls):
         # Skip the verifier's own bogus control ids and its gauntlet fixtures.
         if url in allow or url in own_controls:
@@ -232,8 +217,6 @@ def main():
             transient.append((url, code, sorted(urls[url])))
         elif 200 <= code < 400:
             ok += 1
-        elif code == 404 and host_blocks_all(url, root_codes):
-            blocked.append((url, code))
         else:
             dead.append((url, code, sorted(urls[url])))
 

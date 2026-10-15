@@ -874,6 +874,10 @@ linked_app_dir() {  # $1 a symlink below the root (issue #657). 0 when it points
   case "$t/" in "$ROOT_REAL"/*) return 1 ;; esac   # back into the tree, or the tree itself
   case "$ROOT_REAL/" in "$t"/*) return 1 ;; esac   # the tree's own parent or an ancestor
   is_library "$t" && return 1
+  dir_has_app_marker "$t"
+}
+dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
+  local t="$1" f
   for f in app.config.js app.config.ts app.config.mjs app.config.cjs; do [ -f "$t/$f" ] && return 0; done
   for f in "$t"/capacitor.config.* "$t"/*.xcodeproj "$t"/*.xcworkspace "$t"/settings.gradle "$t"/settings.gradle.kts; do [ -e "$f" ] && return 0; done
   [ -f "$t/app.json" ] && grep -qE '"(expo|displayName)"' "$t/app.json" 2>/dev/null && return 0
@@ -922,7 +926,11 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
     if [ "$atroot" -eq 1 ]; then
       [ "${#keep[@]}" -ge 1 ] && printf '%s\n' "$DIR" "${keep[@]}"
     else
-      { [ "${#keep[@]}" -ge 2 ] || { [ "${#keep[@]}" -eq 1 ] && [ -L "${keep[0]%/}" ]; }; } && printf '%s\n' "${keep[@]}"
+      local plain=0 links=()
+      for k in ${keep[@]+"${keep[@]}"}; do if [ -L "${k%/}" ]; then links+=("$k"); else plain=$((plain+1)); fi; done
+      if [ "$plain" -ge 2 ]; then printf '%s\n' "${keep[@]}"
+      # Fewer than two plain apps scan as one tree, as before. A linked app sits beside that scan, never in place of it.
+      elif [ "${#links[@]}" -ge 1 ]; then printf '%s\n' "$DIR" "${links[@]}"; fi
     fi
   }
 }
@@ -977,7 +985,10 @@ EOF2
     scan_tree
     flush_findings
     # One scannable sibling must not speak for a root the store checks never ran on.
-    if [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
+    # The project root scanned only beside a linked app, with no marker and nothing found, is not an app (#657).
+    if [ "${ROOT%/}" = "$PROJECT_ROOT" ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && [ "$IS_WEB" -eq 0 ] && ! dir_has_app_marker "$PROJECT_ROOT"; then
+      :
+    elif [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
       UNCHECKED="${UNCHECKED:+$UNCHECKED, }${ROOT#"$PROJECT_ROOT"/}"
     fi
   done <<EOF

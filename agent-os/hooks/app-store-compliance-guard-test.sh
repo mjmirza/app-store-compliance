@@ -1605,6 +1605,17 @@ D="$(mk_linked_app)"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^App\. $D/apps/linked$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-2 a linked app that is the only app is still scanned" || bad "657-2 a linked app that is the only app is still scanned (rc=$RC)"
 rm_linked "$D"
+# a clean linked app must never replace the scan of the project's own unmarked source (adversarial review)
+D="$(mk_ios_bad)"; EXT="$(mk_ios_clean)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/apps/linked$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-4 a clean linked app does not hide the project's own critical findings" || bad "657-4 a clean linked app does not hide the project's own critical findings (rc=$RC)"
+rm -rf "$D" "$EXT"
+D="$(mktemp -d)"; EXT="$(mk_ios_clean)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+ln -s "$EXT" "$D/apps/linked"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q '^CLEAR\.' && ! echo "$OUT" | grep -q 'NOT CHECKED' && [ "$RC" -eq 0 ] && ok "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED" || bad "657-5 an empty project root beside a clean linked app is CLEAR, not NOT CHECKED (rc=$RC)"
+rm -rf "$D" "$EXT"
 # links that point back into the tree, above it, or at themselves must not hang the scan or become apps
 D="$(mk_ios_bad)"; mkdir -p "$D/apps/a"
 ln -s "$D" "$D/apps/a/up"; ln -s . "$D/apps/here"; ln -s loop "$D/apps/loop"; ln -s "$(dirname "$D")" "$D/apps/parent"
