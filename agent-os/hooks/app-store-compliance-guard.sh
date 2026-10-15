@@ -249,7 +249,7 @@ FASTFILES
     local pre='.*(^|[^A-Za-z0-9_./-])'
     name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspaces[[:space:]]+foreach${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?${opts}[[:space:]]+([A-Za-z0-9:_.][A-Za-z0-9:_.-]*).*/\8/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(turbo|lerna)${opts}[[:space:]]+run[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+run(-many)?[[:space:]]+([A-Za-z0-9_.@\/-]+:)?([A-Za-z0-9_.][A-Za-z0-9_.-]*).*/\6/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+(run-many|affected)([[:space:]]+[^[:space:]]+)*[[:space:]]+(-t|--targets?)[=[:space:]]+([A-Za-z0-9_.-]+).*/\7/p" | head -1)"
@@ -258,28 +258,36 @@ FASTFILES
     case "$name" in run|run-many|affected|exec|install|i|add|x|dlx) name="" ;; esac
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
     if [ -n "$name" ]; then
-      local sel sub all files pick s2 base f d pat scoped
+      local sel sub all files pick s2 base f d pat scoped one
       esc="$(printf '%s' "$name" | sed 's/\./\\./g')"
       # The package the runner names, or the folder it runs in. Unknown or none named means every package is read.
       local rseg="$1"
-      sel="$(printf '%s' "$rseg" | sed -nE 's/.*(yarn[[:space:]]+workspace|(^|[[:space:]])(--filter|-F|--workspace|-w))([=[:space:]]+)([^[:space:]]+).*/\5/p' | head -1)"
+      sel="$(printf '%s\n' "$rseg" | grep -oE '(yarn[[:space:]]+workspace|(^|[[:space:]])(--filter|-F|--workspace|-w|--scope))[=[:space:]]+[^[:space:]]+' | sed -E 's/.*[=[:space:]]//')"
       [ -z "$sel" ] && sel="$(printf '%s' "$rseg" | sed -nE 's/.*nx[^;&|]*[[:space:]]run[[:space:]]+([A-Za-z0-9_.@\/-]+):.*/\1/p' | head -1)"
       sub="$(printf '%s' "$rseg" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
       case "$sub" in /*|*..*) sub="" ;; esac
-      all=0; printf '%s' "$rseg" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|nx[^;&|]*run-many|[[:space:]](-r|--recursive|-ws|--workspaces|foreach)([[:space:]=]|$)' && all=1
+      all=0; printf '%s' "$rseg" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|(^|[^A-Za-z0-9_./-])nx[[:space:]]|[[:space:]](-r|--recursive|-ws|--workspaces|foreach)([[:space:]=]|$)' && all=1
       files="$(find "$DIR" -maxdepth 6 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build \) -prune \) -o \( -name package.json -o -name project.json \) -print 2>/dev/null | head -200)"
       if [ -n "$sub" ] && [ -f "$DIR/$sub/package.json" ]; then pick="$DIR/$sub/package.json"
       elif [ -n "$sel" ]; then
-        s2="${sel#./}"; s2="${s2%/}"; base="${s2##*/}"
-        # bash 3.2 misreads a case pattern inside $( ), so the scope test sits out here.
-        scoped=0; pat="(@[^/\"]+/)?$base"
-        case "$s2" in @*/*) scoped=1; pat="$s2" ;; esac
-        pick="$(printf '%s\n' "$files" | while IFS= read -r f; do
-          [ -n "$f" ] || continue; d="$(dirname "$f")"
-          if [ "$scoped" -eq 0 ] && { [ "${d##*/}" = "$base" ] || [ "${d%/$s2}" != "$d" ]; }; then echo "$f"; continue; fi
-          tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"$pat\"" && echo "$f"
-        done)"
-        [ -z "$pick" ] && pick="$files"
+        pick=""
+        while IFS= read -r s2; do
+          [ -n "$s2" ] || continue
+          s2="${s2#./}"; s2="${s2#!}"; s2="${s2#^}"; s2="${s2#...}"; s2="${s2%...}"; s2="${s2#\{}"; s2="${s2%\}}"; s2="${s2%/}"; base="${s2##*/}"
+          # bash 3.2 misreads a case pattern inside $( ), so the scope test sits out here.
+          scoped=0; pat="(@[^/\"]+/)?$base"
+          case "$s2" in @*/*) scoped=1; pat="$s2" ;; esac
+          one="$(printf '%s\n' "$files" | while IFS= read -r f; do
+            [ -n "$f" ] || continue; d="$(dirname "$f")"
+            if [ "$scoped" -eq 0 ] && { [ "${d##*/}" = "$base" ] || [ "${d%/$s2}" != "$d" ]; }; then echo "$f"; continue; fi
+            tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"$pat\"" && echo "$f"
+          done)"
+          if [ -z "$one" ]; then pick="$files"; break; fi
+          pick="$pick
+$one"
+        done <<SELS
+$sel
+SELS
       elif [ "$all" -eq 1 ]; then pick="$files"
       else pick="$DIR/package.json"; fi
       pick="$(printf '%s\n%s' "$DIR/package.json" "$pick" | awk 'NF && !seen[$0]++')"
@@ -308,6 +316,7 @@ FASTFILES
   }
   wrapper_body() {  # every runner and make segment, so a later web build never masks an earlier submit
     local sg
+    runner_body "$CMD_MATCH"
     printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n' | while IFS= read -r sg; do
       [ -n "$sg" ] && runner_body "$sg"
     done
@@ -425,45 +434,20 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
   [ -n "$out" ]
 }
 
-# Source with comment-only lines and trailing // comments blanked, so a comment never counts as code.
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
-# Source with comments dropped. Strings, Swift raw strings and #/regex/#, and Rust r".." stay text.
-# A /* opens a comment only at the start of a line, or after a separator when it closes on that line.
-STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/\\\\\"" sq bt "]" }
-    function flush(   k) { if (nb) { for (k=1; k<=nb; k++) print br[k]; nb=0 } }
-    FNR == 1 { flush(); blk=0; tq=""; tb=0; rr=""; rml=0; resc=""; pcont=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.swift$/); rs=(FILENAME ~ /\.rs$/); cs=(FILENAME ~ /\.cs$/) }
-    { l=$0
-      if (!blk && tq == "" && !tb && rr == "" && l !~ fast) { pcont=0; print l; next }
-      n=length(l); o=""; q=""; i=1; sl=0
-      while (i <= n) { c=substr(l, i, 1)
-        if (blk) { if (c == "*" && substr(l, i+1, 1) == "/") { blk=0; i+=2 } else i++; continue }
-        if (rr != "" && resc != "" && c == "\\" && substr(l, i+1, length(resc)) == resc) { o=o substr(l, i, 2+length(resc)); i+=2+length(resc); continue }
-        if (rr != "") { if (substr(l, i, length(rr)) == rr) { o=o rr; i+=length(rr); rr="" } else { o=o c; i++ }; continue }
-        if (c == "\\") { o=o substr(l, i, 2); i+=2; continue }
-        if (tq != "") { if (substr(l, i, 3) == tq) { o=o tq; tq=""; i+=3 } else { o=o c; i++ }; continue }
-        if (tb) { if (c == bt) tb=0; o=o c; i++; continue }
-        if (q != "") { if (c == q) q=""; o=o c; i++; continue }
-        if (sw && c == "#") { j=i; while (substr(l, j, 1) == "#") j++
-          if (substr(l, j, 1) == dq) { h=substr(l, i, j-i); rml=(substr(l, j, 3) == dq dq dq); rr=(rml ? dq dq dq : dq) h; resc=h; o=o h (rml ? dq dq dq : dq); i=j+(rml ? 3 : 1); continue }
-          if (substr(l, j, 1) == "/") { h=substr(l, i, j-i); rr="/" h; resc=""; rml=(j == n); o=o h "/"; i=j+1; continue } }
-        if (cs && c == "@" && (substr(l, i+1, 1) == dq || (substr(l, i+1, 1) == "$" && substr(l, i+2, 1) == dq))) { k=(substr(l, i+1, 1) == dq ? 1 : 2); rr=dq; resc=""; rml=1; o=o substr(l, i, k+1); i+=k+1; continue }
-        if (rs && (c == "r" || (c == "b" && substr(l, i+1, 1) == "r")) && (i == 1 || substr(l, i-1, 1) !~ /[A-Za-z0-9_]/)) { k=(c == "b" ? i+2 : i+1); j=k; while (substr(l, j, 1) == "#") j++
-          if (substr(l, j, 1) == dq) { h=substr(l, k, j-k); rr=dq h; resc=""; rml=1; o=o substr(l, i, j-i+1); i=j+1; continue } }
-        if (c == "/" && substr(l, i+1, 1) == "/" && (substr(l, 1, i-1) ~ /^[ \t]*$/ || (tc && !sl && substr(l, i-1, 1) ~ /[ \t;{},)]/))) break
-        if (c == "/" && substr(l, i+1, 1) == "*") { pv=(i > 1 ? substr(l, i-1, 1) : "")
-          rest=substr(l, i+2); nq=gsub(dq, dq, rest)
-          if ((substr(l, 1, i-1) ~ /^[ \t]*$/ && !pcont && nq % 2 == 0) || (!sl && pv ~ /[ \t;{},)]/ && index(substr(l, i+2), "*/") > 0)) { blk=1; i+=2; continue } }
-        if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
-        if (c == bt && js) { tb=1; o=o c; i++; continue }
-        if (c == dq || c == sq || c == bt) q=c
-        if (c == "/") sl=1
-        o=o c; i++ }
-      pcont=(l ~ /\\$/)
-      if (rr != "" && !rml) rr=""
-      if (blk) { nb++; bo[nb]=o; br[nb]=$0; next }
-      if (nb) { for (k=1; k<=nb; k++) print bo[k]; nb=0 }
-      print o }
-    END { flush() }'
+# Source with comments dropped, line by line and without string state, so a misread quote can never hide a later line.
+# A line led by //, /*, * or */ is a comment. tc=1 (the implementation buffer) also drops a trailing // or a closed /* */.
+STRIP_AWK='function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
+    { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
+      t=l; sub(/^[ \t]+/, "", t)
+      if (substr(t, 1, 2) == "//") { print ""; next }
+      if (substr(t, 1, 2) == "/*" || substr(t, 1, 1) == "*") { k=0; s=l
+        while ((j=index(s, "*/")) > 0) { k+=j+1; s=substr(s, j+2) }
+        print (k ? substr(l, k+1) : ""); next }
+      if (tc) {
+        while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) l=substr(l, 1, o-1) substr(l, o+c+3)
+        if (index(l, "//") && (o=opener(l, "//")) > 0 && substr(l, o+2) !~ /<\/|\/>/) l=substr(l, 1, o-1) }
+      print l }'
 build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
   CODE_OK=0
   : > "$FILELIST.code" 2>/dev/null || return 0
@@ -1244,7 +1228,7 @@ bare_native_apart() {  # $1 candidate dir below $DIR
     || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
       | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
   # A native host that embeds the root framework (brownfield) shares its dependencies, so it stays in the root scan.
-  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|import Capacitor' "$1" \
+  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController' "$1" \
     --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' --include='Podfile' --include='*.pbxproj' \
     --exclude-dir=Pods --exclude-dir=node_modules --exclude-dir=build 2>/dev/null | grep . >/dev/null && return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.

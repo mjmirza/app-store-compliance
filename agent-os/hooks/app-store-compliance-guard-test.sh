@@ -2269,7 +2269,7 @@ rm -rf "$D"
 D="$(mk_rr_ios '' 'import AVFoundation
 let s = #"raw"# /* AVCaptureDevice.default(for: .video) */')"
 rr_run "$D"
-! rr_has 'Camera used without' && ok "cx3b a block comment after a closed raw string is still a comment" || bad "cx3b a block comment after a closed raw string is still a comment (rc=$RC)"
+rr_has 'Camera used without' && ok "cx3b a mid-line block comment counts as a trigger, as in 1.0.0" || bad "cx3b a mid-line block comment counts as a trigger, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_rr_ios '' 'class A { func signIn() {} }
 let s = #"\"# // deleteAccount')"
@@ -2419,9 +2419,15 @@ for rs in 'let s = r#"
 done
 D="$(mk_rr_ios '' 'import AVFoundation
 /* a real
-   multiline AVCaptureDevice comment */')"
+ * multiline AVCaptureDevice comment */')"
 rr_run "$D"
-! rr_has 'Camera used without' && ok "r3-3b a real multiline block comment is still a comment" || bad "r3-3b a real multiline block comment is still a comment (rc=$RC)"
+! rr_has 'Camera used without' && ok "r3-3b a block comment led by * on each line is still a comment" || bad "r3-3b a block comment led by * on each line is still a comment (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+/* an unmarked line inside a block counts as code, as in 1.0.0
+   AVCaptureDevice.default(for: .video) */')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "r3-3c an unmarked line inside a block counts, as in 1.0.0" || bad "r3-3c an unmarked line inside a block counts, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 # R3-4 translation text never proves StoreKit or a restore control
 D="$(mk_rr_ios '' 'import Stripe')"
@@ -2701,6 +2707,46 @@ printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
 printf 'let url = CodePush.bundleURL()\n' > "$D/Native/Entry.swift"
 rr_run "$D"
 rr_has 'RN-OTA-UNDECLARED' && ok "r7-4 a brownfield host keeps the React Native checks" || bad "r7-4 a brownfield host keeps the React Native checks (rc=$RC)"
+rm -rf "$D"
+# R8 Codex round 7
+# R8-1 a multi-line Rust string holding /* and quotes never hides a camera call
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'let pattern = "first' '/* \"quoted\"' 'last";' 'let camera = unsafe {' '    AVCaptureDevice::defaultDeviceWithMediaType(AVMediaTypeVideo)' '};' '/* end */' > "$D/App/cam.rs"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r8-1 a multi-line string holding /* never hides a camera call" || bad "r8-1 a multi-line string holding /* never hides a camera call (rc=$RC)"
+rm -rf "$D"
+# R8-2 JSX text holding // never hides the deletion handler after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' 'export const S = () => <View><Text>a // b</Text><Button onPress={deleteAccount} /></View>;' > "$D/App/Settings.tsx"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r8-2 JSX text holding // keeps the handler after it" || bad "r8-2 JSX text holding // keeps the handler after it (rc=$RC)"
+rm -rf "$D"
+# R8-3 an Objective-C Capacitor host is brownfield and stays in the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '#import <Capacitor/Capacitor.h>\n@interface H : CAPBridgeViewController\n@end\n@implementation H { UIWebView *old; }\n@end\n' > "$D/Native/Host.m"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r8-3 an Objective-C Capacitor host keeps the Ionic checks" || bad "r8-3 an Objective-C Capacitor host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R8-4 a quoted folder holding a ; is never split into two commands
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/a;b"; printf '{"name":"ab","scripts":{"ship":"eas submit -p ios"}}' > "$D/apps/a;b/package.json"
+rr_hook "npm --prefix \"apps/a;b\" run ship" "$D"
+[ "$RC" -eq 2 ] && ok "r8-4 a quoted folder with ; still finds the script" || bad "r8-4 a quoted folder with ; still finds the script (rc=$RC)"
+# R8-5 a script defined only in a child package, reached by nx, bun or several filters
+mkdir -p "$D/apps/mobile" "$D/apps/web"
+printf '{"name":"@acme/mobile","scripts":{"ship":"eas submit -p ios"}}' > "$D/apps/mobile/package.json"
+printf '{"name":"@acme/web","scripts":{"ship":"vercel deploy"}}' > "$D/apps/web/package.json"
+for c in "nx ship mobile" "nx affected --target=ship" "bun run --filter @acme/mobile ship" "pnpm --filter @acme/mobile --filter @acme/web ship"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r8-5 scanned. $c" || bad "r8-5 scanned. $c (rc=$RC)"
+done
 rm -rf "$D"
 # R7-6 a purpose key in an XcodeGen include, an Nx project.json, a Tuist helper or a Cordova config.xml counts
 for f in targets/App.yml project.json Tuist/ProjectDescriptionHelpers/Info.swift config.xml; do
