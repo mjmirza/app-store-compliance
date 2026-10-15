@@ -32,8 +32,9 @@ else
   HOOK_CMD="bash '$(printf '%s' "$GUARD" | sed "s/'/'\\\\''/g")'"
 fi
 
-MODE="install"; DRY=0; TOOL="claude"
-USAGE="Usage. install.sh [install|doctor|uninstall] [--tool claude|codex|gemini|opencode|cursor|copilot|all] [--dry-run] [--version]"
+MODE="install"; DRY=0; TOOL="claude"; REPO_DIR=""
+TOOL_NAMES="claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|droid|auggie|windsurf|all"
+USAGE="Usage. install.sh [install|doctor|uninstall] [--tool $TOOL_NAMES] [--repo DIR] [--dry-run] [--version]"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     install|doctor|uninstall) MODE="$1" ;;
@@ -42,12 +43,14 @@ while [ "$#" -gt 0 ]; do
     --version) MODE="version" ;;
     --tool=*) TOOL="${1#--tool=}" ;;
     --tool) [ "$#" -ge 2 ] || { echo "--tool needs a name." >&2; echo "$USAGE" >&2; exit 2; }; TOOL="$2"; shift ;;
+    --repo=*) REPO_DIR="${1#--repo=}" ;;
+    --repo) [ "$#" -ge 2 ] || { echo "--repo needs a folder." >&2; exit 2; }; REPO_DIR="$2"; shift ;;
     *) echo "Unknown argument. $1" >&2; echo "$USAGE" >&2; exit 2 ;;
   esac
   shift
 done
 case "$TOOL" in
-  claude|codex|gemini|opencode|cursor|copilot|all) ;;
+  claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|droid|auggie|windsurf|all) ;;
   *) echo "Unknown tool. $TOOL" >&2; echo "$USAGE" >&2; exit 2 ;;
 esac
 
@@ -57,9 +60,8 @@ run_harness() {
     echo "python3 is needed to install for $1. Install python3, or follow the manual steps in the README." >&2
     return 1
   fi
-  local extra=""; [ "$DRY" -eq 1 ] && extra="--dry-run"
-  # shellcheck disable=SC2086
-  python3 "$REPO/scripts/install_harness.py" "$1" "$MODE" $extra
+  local args=("$1" "$MODE"); [ "$DRY" -eq 1 ] && args+=(--dry-run); [ -n "$REPO_DIR" ] && args+=(--repo "$REPO_DIR")
+  python3 "$REPO/scripts/install_harness.py" "${args[@]}"
 }
 if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; then
   found=""; rc_all=0
@@ -69,6 +71,12 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${XDG_CONFIG_HOME:-${HOME:-}/.config}/opencode" ] && found="$found opencode"
   [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
   [ -d "${HOME:-}/.copilot" ] && found="$found copilot"
+  [ -d "${HOME:-}/.grok" ] && found="$found grok"
+  [ -d "${HOME:-}/.qwen" ] && found="$found qwen"
+  [ -d "${HOME:-}/.kimi-code" ] && found="$found kimi"
+  [ -d "${HOME:-}/.factory" ] && found="$found droid"
+  [ -d "${HOME:-}/.augment" ] && found="$found auggie"
+  [ -d "${HOME:-}/.codeium/windsurf" ] && found="$found windsurf"
   [ -z "$found" ] && { echo "No supported AI coding tool found in your home folder. Pass --tool with one name."; exit 1; }
   echo "Found.$found"
   for t in $found; do
@@ -386,7 +394,7 @@ do_uninstall() {
 
 case "$MODE" in
   version) printf 'app-store-compliance %s\n' "$(cat "$REPO/VERSION" 2>/dev/null || echo unknown)" ;;
-  help) say "$USAGE"; say "  --tool     the AI coding tool to install into, claude by default. all installs into every one found"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
+  help) say "$USAGE"; say "  --tool     the AI coding tool to install into, claude by default. all installs into every one found"; say "  --repo     with --tool copilot-repo, the app repository whose .github/hooks gets the guard"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
   install) do_install ;;
   doctor) verify ;;
   uninstall) do_uninstall ;;

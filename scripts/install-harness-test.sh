@@ -20,33 +20,47 @@ cfg() {
     opencode) echo "$H/.config/opencode/plugins/app-store-compliance.js" ;;
     cursor) echo "$H/.cursor/hooks.json" ;;
     copilot) echo "$H/.copilot/hooks/app-store-compliance.json" ;;
+    grok) echo "$H/.grok/hooks/app-store-compliance.json" ;;
+    qwen) echo "$H/.qwen/settings.json" ;;
+    kimi) echo "$H/.kimi-code/config.toml" ;;
+    droid) echo "$H/.factory/hooks.json" ;;
+    auggie) echo "$H/.augment/settings.json" ;;
+    windsurf) echo "$H/.codeium/windsurf/hooks.json" ;;
+  esac
+}
+gdir() {  # where each tool's guard lands
+  case "$1" in
+    opencode) echo "$H/.config/opencode/hooks" ;; kimi) echo "$H/.kimi-code/hooks" ;; droid) echo "$H/.factory/hooks" ;;
+    auggie) echo "$H/.augment/hooks" ;; windsurf) echo "$H/.codeium/windsurf/hooks" ;; *) echo "$H/.$1/hooks" ;;
   esac
 }
 count() {  # how many hook entries point at the guard
+  if [ "$1" = "kimi" ]; then grep -c "app-store-compliance-guard.sh" "$(cfg kimi)" 2>/dev/null || true; return; fi
   python3 - "$1" "$(cfg "$1")" <<'PY'
 import json, sys
 tool, path = sys.argv[1], sys.argv[2]
-key = {"codex": "PreToolUse", "gemini": "BeforeTool", "cursor": "beforeShellExecution", "copilot": "preToolUse"}[tool]
+key = {"codex": "PreToolUse", "gemini": "BeforeTool", "cursor": "beforeShellExecution", "copilot": "preToolUse",
+       "grok": "PreToolUse", "qwen": "PreToolUse", "droid": "PreToolUse", "auggie": "PreToolUse", "windsurf": "pre_run_command"}[tool]
 try:
     d = json.load(open(path))
 except Exception:
     print(0); sys.exit()
-groups = d.get("hooks", {}).get(key, [])
+box = d if tool == "droid" else d.get("hooks", {})
+groups = box.get(key, [])
 n = 0
 for g in groups:
-    items = g.get("hooks", []) if tool in ("codex", "gemini") else [g]
+    items = g.get("hooks", []) if tool in ("codex", "gemini", "grok", "qwen", "droid", "auggie") else [g]
     n += sum("app-store-compliance-guard.sh" in str(h.get("command", h.get("bash", ""))) for h in items)
 print(n)
 PY
 }
 
-for t in codex gemini opencode cursor copilot; do
+for t in codex gemini opencode cursor copilot grok qwen kimi droid auggie windsurf; do
   # 1 a fresh install verifies itself end to end
   fresh
   OUT="$(run --tool "$t")"; RC=$?
   [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && ok "$t fresh install verifies" || { bad "$t fresh install verifies (rc=$RC)"; echo "$OUT" | tail -15; }
-  case "$t" in opencode) GD="$H/.config/opencode/hooks" ;; *) GD="$H/.$t/hooks" ;; esac
-  [ -x "$GD/app-store-compliance-guard.sh" ] && ok "$t guard is installed and executable" || bad "$t guard is installed and executable"
+  [ -x "$(gdir "$t")/app-store-compliance-guard.sh" ] && ok "$t guard is installed and executable" || bad "$t guard is installed and executable"
   [ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && [ -f "$H/.agents/skills/app-store-compliance/VERSION" ] && ok "$t shared skill and version installed" || bad "$t shared skill and version installed"
   if [ "$t" != "opencode" ]; then
     [ "$(count "$t")" = "1" ] && ok "$t hook registered once" || bad "$t hook registered once (got $(count "$t"))"
@@ -71,6 +85,49 @@ for t in codex gemini opencode cursor copilot; do
   run --tool "$t" doctor >/dev/null; RC=$?
   [ "$RC" -eq 1 ] && ok "$t doctor fails when nothing is installed" || bad "$t doctor fails when nothing is installed (rc=$RC)"
 done
+
+# 2b vendor-specific shapes. Copilot carries its own entry and the one VS Code reads, Auggie counts milliseconds.
+fresh; run --tool copilot >/dev/null; run --tool auggie >/dev/null; run --tool windsurf >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a=d["hooks"]["preToolUse"][0]; b=d["hooks"]["PreToolUse"][0]; sys.exit(0 if d["version"]==1 and a["timeoutSec"]==120 and a["bash"].endswith("guard.sh'"'"'") and b["timeout"]==120 and b["command"]==a["bash"] else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
+  && ok "copilot file carries the Copilot entry and the VS Code entry" || bad "copilot file carries the Copilot entry and the VS Code entry"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=d["hooks"]["PreToolUse"][0]; sys.exit(0 if g["matcher"]=="launch-process" and g["hooks"][0]["timeout"]==120000 else 1)' "$H/.augment/settings.json" \
+  && ok "auggie uses launch-process and a millisecond timeout" || bad "auggie uses launch-process and a millisecond timeout"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["pre_run_command"][0]; sys.exit(0 if e["show_output"] is True else 1)' "$H/.codeium/windsurf/hooks.json" \
+  && ok "windsurf shows the guard output to the user" || bad "windsurf shows the guard output to the user"
+
+# 2c Droid keeps using settings.json when its hooks live there, and never shadows them with a new hooks.json
+fresh; mkdir -p "$H/.factory"
+printf '{"model":"x","hooks":{"PostToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"fmt"}]}]}}' > "$H/.factory/settings.json"
+OUT="$(run --tool droid)"; RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$H/.factory/hooks.json" ] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["model"]=="x" and d["hooks"]["PostToolUse"] and d["hooks"]["PreToolUse"][0]["matcher"]=="Execute" else 1)' "$H/.factory/settings.json" \
+  && ok "droid adds to settings.json when its hooks already live there" || bad "droid adds to settings.json when its hooks already live there (rc=$RC)"
+run --tool droid uninstall >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if "PreToolUse" not in d["hooks"] and d["hooks"]["PostToolUse"] else 1)' "$H/.factory/settings.json" \
+  && ok "droid uninstall keeps the other settings.json hooks" || bad "droid uninstall keeps the other settings.json hooks"
+
+# 2d Kimi. A config holding a secret is appended to, never rewritten, and uninstall restores it exactly
+fresh; mkdir -p "$H/.kimi-code"
+printf 'default_model = "k2"\n\n[providers.moonshot]\n%s = "%s"\n' "api""_key" "fixture-not-a-secret" > "$H/.kimi-code/config.toml"
+ORIG="$(cat "$H/.kimi-code/config.toml")"
+OUT="$(run --tool kimi)"; RC=$?
+[ "$RC" -eq 0 ] && grep -q '= "fixture-not-a-secret"' "$H/.kimi-code/config.toml" && python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); h=d["hooks"][0]; sys.exit(0 if h["event"]=="PreToolUse" and h["matcher"]=="^Bash$" and h["timeout"]==120 else 1)' "$H/.kimi-code/config.toml" \
+  && ok "kimi appends a valid hook block and keeps the existing settings" || bad "kimi appends a valid hook block and keeps the existing settings (rc=$RC)"
+! echo "$OUT" | grep -q "fixture-not-a-secret" && ok "kimi install never prints the config contents" || bad "kimi install never prints the config contents"
+run --tool kimi >/dev/null
+[ "$(count kimi)" = "1" ] && ok "kimi a second run adds nothing" || bad "kimi a second run adds nothing"
+run --tool kimi uninstall >/dev/null
+[ "$(cat "$H/.kimi-code/config.toml")" = "$ORIG" ] && ok "kimi uninstall restores the file exactly" || bad "kimi uninstall restores the file exactly"
+
+# 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
+fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
+OUT="$(run --tool copilot-repo)"; RC=$?
+[ "$RC" -eq 2 ] && echo "$OUT" | grep -q "Pass --repo" && ok "copilot-repo without --repo exits 2 and says what to pass" || bad "copilot-repo without --repo exits 2 (rc=$RC)"
+OUT="$(run --tool copilot-repo --repo "$APPR")"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && [ -x "$APPR/.github/hooks/app-store-compliance-guard.sh" ] \
+  && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["hooks"]["preToolUse"][0]["bash"]=="bash ./.github/hooks/app-store-compliance-guard.sh" else 1)' "$APPR/.github/hooks/app-store-compliance.json" \
+  && [ ! -e "$H/.agents" ] && ok "copilot-repo writes a relative hook into the repository and nothing in HOME" || { bad "copilot-repo writes a relative hook into the repository (rc=$RC)"; echo "$OUT" | tail -8; }
+run --tool copilot-repo --repo "$APPR" uninstall >/dev/null
+[ ! -e "$APPR/.github/hooks/app-store-compliance.json" ] && [ ! -e "$APPR/.github/hooks/app-store-compliance-guard.sh" ] && ok "copilot-repo uninstall removes both files" || bad "copilot-repo uninstall removes both files"
 
 # 3 existing settings survive and get a backup (Gemini keeps ide and security, Codex keeps its other hooks)
 fresh; mkdir -p "$H/.gemini" "$H/.codex"

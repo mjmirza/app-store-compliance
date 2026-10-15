@@ -32,7 +32,7 @@ Pick one row. The time shown is for that first step.
 | About to submit, and you can open a terminal | Run the two commands below | 2 minutes |
 | Already rejected | Open [the appeal playbook](docs/MISTAKE-PATTERNS.md#the-appeal-playbook) | 10 minutes |
 | Not a developer | Open [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) and do its first two checks | 5 minutes |
-| Using Claude Code, Codex, Gemini CLI, OpenCode, Cursor or Copilot CLI, and want this on every submit | Go to [the install](#install-it-into-your-ai-coding-tool) | 1 minute |
+| Using an AI coding tool (Claude Code, Codex, Gemini CLI, GitHub Copilot, Cursor, Grok, Qwen, Kimi and more), and want this on every submit | Go to [the install](#install-it-into-your-ai-coding-tool) | 1 minute |
 
 The two commands. Needs git and bash. The first downloads this playbook. The second scans your app. Nothing is installed and nothing in your app is changed.
 
@@ -65,7 +65,7 @@ If it saves you one rejection, it has paid for the ten minutes it takes to read.
 
 This puts the check in front of every submit. Your agent runs the guard before any submit command, such as an upload to App Store Connect or Google Play, and stops the command when a critical rejection risk stands. For a one-time scan, skip this section and use Start here.
 
-One command per tool, about a minute. Needs git and bash. The tools other than Claude Code also need python3.
+One command per tool, about a minute. Needs git and bash. Every tool other than Claude Code also needs python3.
 
 ```
 git clone https://github.com/mjmirza/app-store-compliance ~/repositories/app-store-compliance
@@ -81,7 +81,14 @@ bash ~/repositories/app-store-compliance/scripts/install.sh --tool all
 | Gemini CLI | `install.sh --tool gemini` | Hook, skill, `/app-store-audit` | Restart Gemini CLI. The hook works from 0.22, the skill needs 0.24 or later |
 | OpenCode | `install.sh --tool opencode` | Plugin, skill, `/app-store-audit` | Restart OpenCode |
 | Cursor | `install.sh --tool cursor` | Hook, skill | Restart Cursor |
-| Copilot CLI | `install.sh --tool copilot` | Hook, skill | Start a new Copilot CLI session |
+| GitHub Copilot CLI and Copilot in VS Code | `install.sh --tool copilot` | Hook, skill | Start a new Copilot CLI session and reload VS Code |
+| GitHub Copilot cloud agent and Copilot in JetBrains | `install.sh --tool copilot-repo --repo "/path/to/your/app"` | Hook in your app's `.github/hooks` | Commit `.github/hooks` to your default branch. The cloud agent reads hooks only from there |
+| Grok | `install.sh --tool grok` | Hook, skill | Start a new Grok session |
+| Qwen Code | `install.sh --tool qwen` | Hook, skill | Restart Qwen Code |
+| Kimi Code | `install.sh --tool kimi` | Hook, skill | Restart Kimi Code |
+| Factory Droid | `install.sh --tool droid` | Hook, skill | Start a new Droid session |
+| Augment Auggie | `install.sh --tool auggie` | Hook, skill | Start a new Auggie session |
+| Windsurf | `install.sh --tool windsurf` | Hook, skill | Restart Windsurf |
 
 Every run ends with `Install verified.` only after it has fed a submit command to the hook exactly as that tool would, in that tool's own format, and seen it blocked. If you see a `FAIL` line instead, fix that line and run the same command with `doctor` added.
 
@@ -91,6 +98,21 @@ What it writes, so you can check it.
 - The skill. Claude Code reads it from `~/.claude/skills/`. Every other tool reads one shared copy in `~/.agents/skills/`.
 - One hook entry in that tool's config (`~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`, `~/.cursor/hooks.json`, `~/.copilot/hooks/`), or for OpenCode one plugin file in `~/.config/opencode/plugins/`. Every other setting is kept, and a dated backup sits next to a file that already existed. A config that is not valid JSON or repeats a key is never rewritten. You get the exact block to paste instead.
 - For Gemini CLI it also turns on `tools.enableHooks`, which Gemini needs before version 0.26 to run any hook.
+- For Kimi Code it appends one marked `[[hooks]]` block to `~/.kimi-code/config.toml` and never rewrites or prints the rest of that file, which can hold API keys. Uninstall removes exactly that block.
+- For Factory Droid it writes to `~/.factory/settings.json` when your hooks already live there, because Droid ignores them once `~/.factory/hooks.json` exists.
+
+#### Tools the installer does not wire, and what to do instead
+
+Each of these was checked against its own documentation. Where a tool can block a command but its format could not be confirmed, you get the manual step rather than a guess.
+
+| Tool | What to do |
+|---|---|
+| Kiro CLI | Its docs do not yet say how a hook blocks a command. Run the guard by hand before a submit, and add the instruction from step 4 of the paste block below to `~/.kiro/steering/` |
+| Cline | Hooks run on macOS and Linux only, from an executable file `~/.cline/hooks/PreToolUse` that answers `{"cancel":true}`. Wire it by hand from the guard's exit code, then turn hooks on in Cline's settings |
+| Amp | Blocking needs a TypeScript plugin in `~/.config/amp/plugins/`. Not installed automatically yet. Run the guard by hand before a submit |
+| Goose, Crush | Both can block, and their file layout could not be confirmed. Run the guard by hand before a submit |
+| Roo Code, Continue | No hook, only a deny list. Add the submit commands (`fastlane`, `xcrun altool`, `eas submit`, `gradle bundleRelease`) to Roo's `deniedCommands` or to the exclude list in Continue's `permissions.yaml` |
+| Aider, Copilot for Xcode | No way to run a check before a command. Run the guard by hand, or as a git pre-push hook, before every submit |
 
 It never touches your GitHub account or your credentials. Undo it with the same command and `uninstall`, for example `install.sh --tool gemini uninstall`. The shared skill stays until the last tool using it is removed.
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Install the guard, skill and audit command into Codex, Gemini CLI, OpenCode, Cursor or Copilot CLI.
-Usage. install_harness.py <tool> [install|doctor|uninstall] [--dry-run]. Configs are merged, never replaced."""
+"""Install the guard, skill and audit command into every supported AI coding tool other than Claude Code.
+Usage. install_harness.py <tool> [install|doctor|uninstall] [--dry-run] [--repo DIR]. Configs are merged, never replaced."""
+# CODE_DELETE_OK: check_hook, entry_key and entry_lists are replaced by check_hooks, events and container.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -13,9 +15,78 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUARD_NAME = "app-store-compliance-guard.sh"
 PAYLOAD_DIRS = ("docs", "data", "references", "templates", "scripts")
-TOOLS = ("codex", "gemini", "opencode", "cursor", "copilot")
 SUBMIT = "fast" + "lane deliver"
 PROBLEMS = []
+KIMI_BEGIN = "# >>> app-store-compliance guard >>>"
+KIMI_END = "# <<< app-store-compliance guard <<<"
+
+# How each tool runs a hook before a shell command, from each vendor's hook reference.
+# style nested. groups of {matcher, hooks:[...]} under the event. flat. a list of entries under the event.
+SPECS = {
+    "codex": {
+        "name": "Codex CLI",
+        "style": "nested",
+        "event": "PreToolUse",
+        "matcher": "Bash",
+        "timeout": ("timeout", 120),
+    },
+    "gemini": {
+        "name": "Gemini CLI",
+        "style": "nested",
+        "event": "BeforeTool",
+        "matcher": "run_shell_command",
+        "timeout": ("timeout", 120000),
+    },
+    "grok": {
+        "name": "Grok",
+        "style": "nested",
+        "event": "PreToolUse",
+        "matcher": "Bash",
+        "timeout": ("timeout", 120),
+    },
+    "qwen": {
+        "name": "Qwen Code",
+        "style": "nested",
+        "event": "PreToolUse",
+        "matcher": "run_shell_command",
+        "timeout": ("timeout", 120),
+    },
+    "droid": {
+        "name": "Factory Droid",
+        "style": "nested",
+        "event": "PreToolUse",
+        "matcher": "Execute",
+        "timeout": ("timeout", 120),
+    },
+    "auggie": {
+        "name": "Augment Auggie",
+        "style": "nested",
+        "event": "PreToolUse",
+        "matcher": "launch-process",
+        "timeout": ("timeout", 120000),
+    },
+    "cursor": {"name": "Cursor", "style": "flat", "event": "beforeShellExecution"},
+    "copilot": {"name": "Copilot CLI and VS Code", "style": "copilot"},
+    "copilot-repo": {"name": "Copilot cloud agent and JetBrains", "style": "copilot"},
+    "windsurf": {"name": "Windsurf", "style": "flat", "event": "pre_run_command"},
+    "kimi": {"name": "Kimi Code", "style": "toml"},
+    "opencode": {"name": "OpenCode", "style": "plugin"},
+}
+TOOLS = tuple(SPECS)
+AFTER = {
+    "codex": "Open Codex and run /hooks once to approve the new hook. Codex runs no new or changed hook until you do.",
+    "gemini": "Restart Gemini CLI so it loads the hook. Skills need Gemini CLI 0.24 or later, the hook works from 0.22.",
+    "grok": "Start a new Grok session so it loads the hook.",
+    "qwen": "Restart Qwen Code so it loads the hook.",
+    "droid": "Start a new Droid session so it loads the hook.",
+    "auggie": "Start a new Auggie session so it loads the hook.",
+    "cursor": "Restart Cursor so it loads ~/.cursor/hooks.json.",
+    "copilot": "Start a new Copilot CLI session, and reload VS Code, so they load the hook.",
+    "copilot-repo": "Commit .github/hooks to your default branch. The Copilot cloud agent reads hooks only from there.",
+    "windsurf": "Restart Windsurf so it loads the hook.",
+    "kimi": "Restart Kimi Code so it loads the hook.",
+    "opencode": "Restart OpenCode so it loads the plugin.",
+}
 
 
 def home():
@@ -29,50 +100,83 @@ def skill_dir():
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
 
-def layout(tool):
+def layout(tool, repo_dir=None):
     """Where each tool keeps its hooks, its hook config and its commands, from each tool's own docs."""
     h = home()
-    if tool == "codex":
-        base = os.environ.get("CODEX_HOME") or os.path.join(h, ".codex")
+    if tool == "copilot-repo":
+        base = os.path.join(repo_dir or "", ".github")
         return {
-            "base": base,
             "hooks": os.path.join(base, "hooks"),
-            "config": os.path.join(base, "hooks.json"),
+            "config": os.path.join(base, "hooks", "app-store-compliance.json"),
             "command": None,
-        }
-    if tool == "gemini":
-        base = os.path.join(h, ".gemini")
-        return {
-            "base": base,
-            "hooks": os.path.join(base, "hooks"),
-            "config": os.path.join(base, "settings.json"),
-            "command": os.path.join(base, "commands", "app-store-audit.toml"),
+            "wrap": True,
         }
     if tool == "opencode":
         base = os.path.join(
             os.environ.get("XDG_CONFIG_HOME") or os.path.join(h, ".config"), "opencode"
         )
         return {
-            "base": base,
             "hooks": os.path.join(base, "hooks"),
             "config": os.path.join(base, "plugins", "app-store-compliance.js"),
             "command": os.path.join(base, "commands", "app-store-audit.md"),
+            "wrap": True,
         }
-    if tool == "cursor":
-        base = os.path.join(h, ".cursor")
+    if tool == "droid":
+        base = os.path.join(h, ".factory")
+        hooks_json, settings = (
+            os.path.join(base, "hooks.json"),
+            os.path.join(base, "settings.json"),
+        )
+        # Droid reads settings.json hooks only while hooks.json is absent. Creating hooks.json would switch them off.
+        uses_settings = not os.path.exists(hooks_json) and has_hooks_key(settings)
         return {
-            "base": base,
             "hooks": os.path.join(base, "hooks"),
-            "config": os.path.join(base, "hooks.json"),
+            "config": settings if uses_settings else hooks_json,
             "command": None,
+            "wrap": uses_settings,
         }
-    base = os.path.join(h, ".copilot")
-    return {
-        "base": base,
-        "hooks": os.path.join(base, "hooks"),
-        "config": os.path.join(base, "hooks", "app-store-compliance.json"),
-        "command": None,
+    bases = {
+        "codex": os.environ.get("CODEX_HOME") or os.path.join(h, ".codex"),
+        "gemini": os.path.join(h, ".gemini"),
+        "grok": os.path.join(h, ".grok"),
+        "qwen": os.path.join(h, ".qwen"),
+        "auggie": os.path.join(h, ".augment"),
+        "cursor": os.path.join(h, ".cursor"),
+        "copilot": os.path.join(h, ".copilot"),
+        "windsurf": os.path.join(h, ".codeium", "windsurf"),
+        "kimi": os.path.join(h, ".kimi-code"),
     }
+    base = bases[tool]
+    configs = {
+        "codex": "hooks.json",
+        "gemini": "settings.json",
+        "grok": os.path.join("hooks", "app-store-compliance.json"),
+        "qwen": "settings.json",
+        "auggie": "settings.json",
+        "cursor": "hooks.json",
+        "copilot": os.path.join("hooks", "app-store-compliance.json"),
+        "windsurf": "hooks.json",
+        "kimi": "config.toml",
+    }
+    command = (
+        os.path.join(base, "commands", "app-store-audit.toml")
+        if tool == "gemini"
+        else None
+    )
+    return {
+        "hooks": os.path.join(base, "hooks"),
+        "config": os.path.join(base, configs[tool]),
+        "command": command,
+        "wrap": True,
+    }
+
+
+def has_hooks_key(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return isinstance(json.load(f).get("hooks"), dict)
+    except Exception:
+        return False
 
 
 def shown(path):
@@ -80,7 +184,11 @@ def shown(path):
     return "~" + path[len(h) :] if path.startswith(h + os.sep) else path
 
 
-def hook_cmd(guard):
+def hook_cmd(tool, guard):
+    if tool == "copilot-repo":
+        return (
+            "bash ./.github/hooks/" + GUARD_NAME
+        )  # the cloud agent runs it from the repository root
     return "bash '" + guard.replace("'", "'\\''") + "'"
 
 
@@ -136,59 +244,55 @@ def write_atomic(path, text):
     os.replace(tmp, real)
 
 
-def entry_key(tool):
-    return {
-        "codex": "PreToolUse",
-        "gemini": "BeforeTool",
-        "cursor": "beforeShellExecution",
-        "copilot": "preToolUse",
-    }[tool]
+def events(tool):
+    """(event key, style) pairs this tool's file carries. Copilot carries its own form and the Claude form VS Code reads."""
+    spec = SPECS[tool]
+    if spec["style"] == "copilot":
+        return [("preToolUse", "copilot"), ("PreToolUse", "vscode")]
+    return [(spec["event"], spec["style"])]
 
 
-def entry_lists(data, tool):
-    """The hook groups this tool runs before a shell command, created if missing. None when the shape is wrong."""
-    hooks = data.setdefault("hooks", {})
-    if not isinstance(hooks, dict):
-        return None
-    groups = hooks.setdefault(entry_key(tool), [])
-    if not isinstance(groups, list) or not all(isinstance(g, dict) for g in groups):
-        return None
-    return groups
+def new_entry(tool, style, cmd):
+    spec = SPECS[tool]
+    if style == "nested":
+        key, value = spec["timeout"]
+        return {
+            "matcher": spec["matcher"],
+            "hooks": [{"type": "command", "command": cmd, key: value}],
+        }
+    if style == "copilot":
+        return {"type": "command", "bash": cmd, "timeoutSec": 120}
+    if style == "vscode":
+        return {"type": "command", "command": cmd, "timeout": 120}
+    if tool == "windsurf":
+        return {"command": cmd, "show_output": True}
+    return {"command": cmd, "timeout": 120}
 
 
-def is_ours(item, guard):
+def is_ours(item, cmd, guard):
     if not isinstance(item, dict):
         return False
     c = str(item.get("command", item.get("bash", ""))).strip()
-    return c in (hook_cmd(guard), "bash " + guard, 'bash "' + guard + '"')
+    return c in (cmd, "bash " + guard, 'bash "' + guard + '"', "bash '" + guard + "'")
 
 
-def ours_in(tool, groups, guard):
-    if tool in ("codex", "gemini"):
+def ours_in(style, groups, cmd, guard):
+    if style == "nested":
         return [
             h
             for g in groups
             for h in (g.get("hooks") if isinstance(g.get("hooks"), list) else [])
-            if is_ours(h, guard)
+            if is_ours(h, cmd, guard)
         ]
-    return [g for g in groups if is_ours(g, guard)]
+    return [g for g in groups if is_ours(g, cmd, guard)]
 
 
-def new_entry(tool, guard):
-    cmd = hook_cmd(guard)
-    if tool == "codex":
-        return {
-            "matcher": "Bash",
-            "hooks": [{"type": "command", "command": cmd, "timeout": 120}],
-        }
-    if tool == "gemini":  # Gemini counts the timeout in milliseconds
-        return {
-            "matcher": "run_shell_command",
-            "hooks": [{"type": "command", "command": cmd, "timeout": 120000}],
-        }
-    if tool == "cursor":
-        return {"command": cmd, "timeout": 120}
-    return {"type": "command", "bash": cmd, "timeoutSec": 120}
+def container(lay, data):
+    """The object that holds the event lists, created if missing. None when the shape is wrong."""
+    if not lay["wrap"]:
+        return data
+    hooks = data.setdefault("hooks", {})
+    return hooks if isinstance(hooks, dict) else None
 
 
 def plugin_source(guard):
@@ -208,6 +312,32 @@ def plugin_source(guard):
         '    if (r.status === 2) throw new Error((r.stdout || "") + (r.stderr || "") || "Blocked by the App Store compliance guard.");\n'
         "  },\n"
         "});\n"
+    )
+
+
+def legacy_plugin(lay):
+    """OpenCode before 1.0 loads plugin/, current OpenCode loads plugins/. The plugin goes in both."""
+    return os.path.join(
+        os.path.dirname(os.path.dirname(lay["config"])),
+        "plugin",
+        os.path.basename(lay["config"]),
+    )
+
+
+def kimi_block(cmd):
+    return (
+        "\n".join(
+            [
+                KIMI_BEGIN,
+                "[[hooks]]",
+                'event = "PreToolUse"',
+                'matcher = "^Bash$"',
+                "command = " + json.dumps(cmd),
+                "timeout = 120",
+                KIMI_END,
+            ]
+        )
+        + "\n"
     )
 
 
@@ -231,77 +361,96 @@ def command_text(tool, guard):
     return "description = " + json.dumps(desc) + '\nprompt = """\n' + body + '"""\n'
 
 
-def manual_block(tool, guard):
+def manual_block(tool, lay, cmd):
     if tool == "opencode":
-        return plugin_source(guard)
-    data = {"hooks": {entry_key(tool): [new_entry(tool, guard)]}}
+        return plugin_source(cmd)
+    if tool == "kimi":
+        return (
+            "\nAppend this to "
+            + shown(lay["config"])
+            + " yourself.\n\n"
+            + kimi_block(cmd)
+        )
+    events_map = {ev: [new_entry(tool, st, cmd)] for ev, st in events(tool)}
+    data = {"hooks": events_map} if lay["wrap"] else events_map
     if tool == "gemini":
         data["tools"] = {"enableHooks": True}
-    if tool in ("cursor", "copilot"):
+    if tool in ("cursor", "copilot", "copilot-repo"):
         data["version"] = 1
     return (
         "\nMerge this into "
-        + shown(layout(tool)["config"])
+        + shown(lay["config"])
         + " yourself.\n\n"
         + json.dumps(data, indent=2)
         + "\n"
     )
 
 
-def legacy_plugin(lay):
-    """OpenCode before 1.0 loads plugin/, current OpenCode loads plugins/. The plugin goes in both."""
-    return os.path.join(os.path.dirname(os.path.dirname(lay["config"])), "plugin", os.path.basename(lay["config"]))
-
-
 def register(tool, lay, guard, dry):
-    if tool == "opencode":
+    cmd = hook_cmd(tool, guard)
+    style = SPECS[tool]["style"]
+    if style == "plugin":
         if dry:
-            print("  would write the OpenCode plugin " + shown(lay["config"]) + " and " + shown(legacy_plugin(lay)))
+            print(
+                "  would write the OpenCode plugin "
+                + shown(lay["config"])
+                + " and "
+                + shown(legacy_plugin(lay))
+            )
             return True
         for path in (lay["config"], legacy_plugin(lay)):
             write_atomic(path, plugin_source(guard))
-        ok("plugin written to " + shown(lay["config"]) + " and " + shown(legacy_plugin(lay)))
+        ok(
+            "plugin written to "
+            + shown(lay["config"])
+            + " and "
+            + shown(legacy_plugin(lay))
+        )
         return True
+    if style == "toml":
+        return register_kimi(lay, cmd, dry)
     data = load_json(lay["config"])
     if data is None:
         fail(
             shown(lay["config"])
             + " is not valid JSON, repeats a key, is read-only, or has an unexpected shape. It was not changed."
         )
-        print(manual_block(tool, guard))
+        print(manual_block(tool, lay, cmd))
         return False
-    if tool in ("cursor", "copilot"):
+    if tool in ("cursor", "copilot", "copilot-repo"):
         data.setdefault("version", 1)
     if tool == "gemini" and not isinstance(data.setdefault("tools", {}), dict):
         fail(
             shown(lay["config"])
             + " has a tools key that is not an object. It was not changed."
         )
-        print(manual_block(tool, guard))
+        print(manual_block(tool, lay, cmd))
         return False
-    groups = entry_lists(data, tool)
-    if groups is None:
-        fail(
-            shown(lay["config"])
-            + " has a hooks key with an unexpected shape. It was not changed."
-        )
-        print(manual_block(tool, guard))
-        return False
+    box = container(lay, data)
     changed = False
+    for ev, st in events(tool):
+        groups = box.setdefault(ev, []) if isinstance(box, dict) else None
+        if not isinstance(groups, list) or not all(isinstance(g, dict) for g in groups):
+            fail(
+                shown(lay["config"])
+                + " has hooks with an unexpected shape. It was not changed."
+            )
+            print(manual_block(tool, lay, cmd))
+            return False
+        if not ours_in(st, groups, cmd, guard):
+            groups.append(new_entry(tool, st, cmd))
+            changed = True
     if tool == "gemini" and data["tools"].get("enableHooks") is not True:
         data["tools"]["enableHooks"] = (
             True  # Gemini CLI before 0.26 runs no hook without this
         )
-        changed = True
-    if not ours_in(tool, groups, guard):
-        groups.append(new_entry(tool, guard))
         changed = True
     if not changed:
         ok("hook already registered in " + shown(lay["config"]))
         return True
     if dry:
         print(
-            "  would add one hook entry to "
+            "  would add the hook entry to "
             + shown(lay["config"])
             + ", keeping every other key, with a backup"
         )
@@ -315,42 +464,92 @@ def register(tool, lay, guard, dry):
     return True
 
 
+def register_kimi(lay, cmd, dry):
+    path = lay["config"]
+    text = ""
+    if os.path.exists(path):
+        if not os.access(path, os.W_OK):
+            fail(shown(path) + " is read-only. It was not changed.")
+            print(manual_block("kimi", lay, cmd))
+            return False
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    if KIMI_BEGIN in text:
+        ok("hook already registered in " + shown(path))
+        return True
+    if dry:
+        print(
+            "  would append one [[hooks]] block to "
+            + shown(path)
+            + ", keeping everything else, with a backup"
+        )
+        return True
+    sep = (
+        ""
+        if not text or text.endswith("\n\n")
+        else ("\n" if text.endswith("\n") else "\n\n")
+    )
+    write_atomic(path, text + sep + kimi_block(cmd))
+    ok(
+        "hook appended to "
+        + shown(path)
+        + " (a backup sits next to it when the file already existed)"
+    )
+    return True
+
+
 def unregister(tool, lay, guard):
-    if tool == "opencode":
+    cmd = hook_cmd(tool, guard)
+    style = SPECS[tool]["style"]
+    if style == "plugin":
         for path in (lay["config"], legacy_plugin(lay)):
             if os.path.exists(path):
                 os.remove(path)
         return True
     if not os.path.exists(lay["config"]):
         return True
+    if style == "toml":
+        with open(lay["config"], encoding="utf-8") as f:
+            text = f.read()
+        if KIMI_BEGIN not in text:
+            return True
+        pattern = r"\n?" + re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?"
+        write_atomic(
+            lay["config"], re.sub(pattern, "\n", text, flags=re.S).rstrip("\n") + "\n"
+        )
+        return True
     data = load_json(lay["config"])
     if data is None:
         return False
-    hooks = data.get("hooks")
-    key = entry_key(tool)
-    if (
-        not isinstance(hooks, dict)
-        or not isinstance(hooks.get(key), list)
-        or not ours_in(tool, hooks[key], guard)
-    ):
+    box = data.get("hooks") if lay["wrap"] else data
+    if not isinstance(box, dict):
         return True
-    groups = hooks[key]
-    if tool in ("codex", "gemini"):
-        kept = []
-        for g in groups:
-            had = any(is_ours(h, guard) for h in g.get("hooks", []))
-            g["hooks"] = [h for h in g.get("hooks", []) if not is_ours(h, guard)]
-            if g["hooks"] or not had:
-                kept.append(g)
-    else:
-        kept = [g for g in groups if not is_ours(g, guard)]
-    if kept:
-        hooks[key] = kept
-    else:
-        hooks.pop(key)
-    if not hooks:
+    changed = False
+    for ev, st in events(tool):
+        groups = box.get(ev)
+        if not isinstance(groups, list) or not ours_in(st, groups, cmd, guard):
+            continue
+        if st == "nested":
+            kept = []
+            for g in groups:
+                had = any(is_ours(h, cmd, guard) for h in g.get("hooks", []))
+                g["hooks"] = [
+                    h for h in g.get("hooks", []) if not is_ours(h, cmd, guard)
+                ]
+                if g["hooks"] or not had:
+                    kept.append(g)
+        else:
+            kept = [g for g in groups if not is_ours(g, cmd, guard)]
+        if kept:
+            box[ev] = kept
+        else:
+            box.pop(ev)
+        changed = True
+    if not changed:
+        return True
+    if lay["wrap"] and not box:
         data.pop("hooks")
-    if tool == "copilot" and set(data) <= {"version"}:
+    if tool in ("copilot", "copilot-repo", "grok") and set(data) <= {"version"}:
         os.remove(lay["config"])
         return True
     write_atomic(lay["config"], json.dumps(data, indent=2, ensure_ascii=False) + "\n")
@@ -366,27 +565,28 @@ def read_owners():
 
 
 def copy_payload(tool, lay, guard):
-    sk = skill_dir()
-    os.makedirs(sk, exist_ok=True)
-    shutil.copy2(
-        os.path.join(REPO, "agent-os", "skill", "SKILL.md"),
-        os.path.join(sk, "SKILL.md"),
-    )
-    shutil.copy2(
-        os.path.join(REPO, ".citation-allowlist"),
-        os.path.join(sk, ".citation-allowlist"),
-    )
-    if os.path.exists(os.path.join(REPO, "VERSION")):
-        shutil.copy2(os.path.join(REPO, "VERSION"), os.path.join(sk, "VERSION"))
-    for d in PAYLOAD_DIRS:
-        shutil.rmtree(os.path.join(sk, d), ignore_errors=True)
-        shutil.copytree(
-            os.path.join(REPO, d),
-            os.path.join(sk, d),
-            ignore=shutil.ignore_patterns("__pycache__"),
+    if tool != "copilot-repo":
+        sk = skill_dir()
+        os.makedirs(sk, exist_ok=True)
+        shutil.copy2(
+            os.path.join(REPO, "agent-os", "skill", "SKILL.md"),
+            os.path.join(sk, "SKILL.md"),
         )
-    with open(os.path.join(sk, ".installed-by"), "w", encoding="utf-8") as f:
-        f.write("\n".join(sorted(read_owners() | {tool})) + "\n")
+        shutil.copy2(
+            os.path.join(REPO, ".citation-allowlist"),
+            os.path.join(sk, ".citation-allowlist"),
+        )
+        if os.path.exists(os.path.join(REPO, "VERSION")):
+            shutil.copy2(os.path.join(REPO, "VERSION"), os.path.join(sk, "VERSION"))
+        for d in PAYLOAD_DIRS:
+            shutil.rmtree(os.path.join(sk, d), ignore_errors=True)
+            shutil.copytree(
+                os.path.join(REPO, d),
+                os.path.join(sk, d),
+                ignore=shutil.ignore_patterns("__pycache__"),
+            )
+        with open(os.path.join(sk, ".installed-by"), "w", encoding="utf-8") as f:
+            f.write("\n".join(sorted(read_owners() | {tool})) + "\n")
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -394,10 +594,11 @@ def copy_payload(tool, lay, guard):
         os.makedirs(os.path.dirname(lay["command"]), exist_ok=True)
         with open(lay["command"], "w", encoding="utf-8") as f:
             f.write(command_text(tool, guard))
-    ok("guard, skill and command copied")
+    ok("guard copied" if tool == "copilot-repo" else "guard, skill and command copied")
 
 
-def payload_for(tool, command, cwd):
+def payload_for(tool, style, command, cwd):
+    """The exact JSON each tool sends its hook, from each vendor's hook reference."""
     if tool == "gemini":
         return {
             "hook_event_name": "BeforeTool",
@@ -405,17 +606,63 @@ def payload_for(tool, command, cwd):
             "tool_input": {"command": command},
             "cwd": cwd,
         }
+    if tool == "qwen":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "run_shell_command",
+            "tool_input": {"command": command},
+            "cwd": cwd,
+        }
+    if tool == "grok":
+        return {
+            "hookEventName": "PreToolUse",
+            "toolName": "Bash",
+            "toolInput": {"command": command},
+            "cwd": cwd,
+        }
+    if tool == "droid":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Execute",
+            "tool_input": {"command": command},
+            "cwd": cwd,
+        }
+    if tool == "auggie":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "launch-process",
+            "tool_input": {"command": command},
+            "workspace_roots": [cwd],
+        }
     if tool == "cursor":
         return {
             "hook_event_name": "beforeShellExecution",
             "command": command,
             "cwd": cwd,
         }
-    if tool == "copilot":
+    if tool == "windsurf":
+        return {
+            "agent_action_name": "pre_run_command",
+            "tool_info": {"command_line": command, "cwd": cwd},
+        }
+    if style == "copilot":
         return {
             "toolName": "bash",
             "toolArgs": json.dumps({"command": command}),
             "cwd": cwd,
+        }
+    if style == "vscode":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "runInTerminal",
+            "tool_input": {"command": command},
+            "cwd": cwd,
+        }
+    if tool == "kimi":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
         }
     return {
         "hook_event_name": "PreToolUse",
@@ -441,7 +688,7 @@ def run_hook(cmd_line, payload, cwd):
     env = {
         k: v
         for k, v in os.environ.items()
-        if k not in ("CLAUDE_PROJECT_DIR", "GEMINI_PROJECT_DIR")
+        if k not in ("CLAUDE_PROJECT_DIR", "GEMINI_PROJECT_DIR", "AUGMENT_PROJECT_DIR")
     }
     r = subprocess.run(
         ["bash", "-c", cmd_line],
@@ -474,30 +721,31 @@ def run_plugin(plugin, command, cwd):
     return r.returncode
 
 
-def verify(tool, lay, guard):
-    print("\nChecking the " + tool + " install.")
+def verify(tool, lay, guard, repo_dir):
+    print("\nChecking the " + SPECS[tool]["name"] + " install.")
     if os.path.isfile(guard):
         ok("guard present at " + shown(guard))
     else:
         fail("guard missing at " + shown(guard))
-    sk = skill_dir()
-    need = (
-        "SKILL.md",
-        "data/rejection-patterns.json",
-        "data/regulatory-deadlines.json",
-        "docs/PRE-SUBMISSION-CHECKLIST.md",
-        "scripts/deadline-checker.py",
-        "scripts/validate-privacy-manifest.py",
-        ".citation-allowlist",
-    )
-    missing = [p for p in need if not os.path.exists(os.path.join(sk, p))]
-    if missing:
-        fail("skill payload is missing " + " ".join(missing))
-    else:
-        ok("skill payload complete at " + shown(sk))
-    if os.path.isfile(os.path.join(sk, "VERSION")):
-        with open(os.path.join(sk, "VERSION")) as f:
-            ok("version " + f.read().strip())
+    if tool != "copilot-repo":
+        sk = skill_dir()
+        need = (
+            "SKILL.md",
+            "data/rejection-patterns.json",
+            "data/regulatory-deadlines.json",
+            "docs/PRE-SUBMISSION-CHECKLIST.md",
+            "scripts/deadline-checker.py",
+            "scripts/validate-privacy-manifest.py",
+            ".citation-allowlist",
+        )
+        missing = [p for p in need if not os.path.exists(os.path.join(sk, p))]
+        if missing:
+            fail("skill payload is missing " + " ".join(missing))
+        else:
+            ok("skill payload complete at " + shown(sk))
+        if os.path.isfile(os.path.join(sk, "VERSION")):
+            with open(os.path.join(sk, "VERSION")) as f:
+                ok("version " + f.read().strip())
     if lay["command"]:
         if os.path.isfile(lay["command"]):
             ok("audit command at " + shown(lay["command"]))
@@ -505,33 +753,32 @@ def verify(tool, lay, guard):
             fail("audit command missing at " + shown(lay["command"]))
     app = sample_app()
     try:
-        if tool == "opencode":
+        style = SPECS[tool]["style"]
+        if style == "plugin":
             check_plugin(lay, app)
+        elif style == "toml":
+            check_kimi(lay, guard, app)
         else:
-            check_hook(tool, lay, guard, app)
+            check_hooks(tool, lay, guard, app, repo_dir)
     finally:
         shutil.rmtree(app, ignore_errors=True)
     print("")
     if PROBLEMS:
+        extra = " --repo " + repo_dir if repo_dir else ""
         print(
             str(len(PROBLEMS))
             + " problem(s) above. Fix them, then run. bash "
             + os.path.join(REPO, "scripts", "install.sh")
             + " --tool "
             + tool
+            + extra
             + " doctor"
         )
         return 1
     print("Install verified.")
-    print("Check your app now.   bash " + shown(guard) + ' "/path/to/your/app"')
-    tips = {
-        "codex": "Open Codex and run /hooks once to approve the new hook. Codex runs no new or changed hook until you do.",
-        "gemini": "Restart Gemini CLI so it loads the hook. Skills need Gemini CLI 0.24 or later, the hook works from 0.22.",
-        "opencode": "Restart OpenCode so it loads the plugin.",
-        "cursor": "Restart Cursor so it loads ~/.cursor/hooks.json.",
-        "copilot": "Start a new Copilot CLI session so it loads the hook.",
-    }
-    print(tips[tool])
+    if tool != "copilot-repo":
+        print("Check your app now.   bash " + shown(guard) + ' "/path/to/your/app"')
+    print(AFTER[tool])
     return 0
 
 
@@ -556,41 +803,82 @@ def check_plugin(lay, app):
         fail("the plugin stopped an ordinary command")
 
 
-def check_hook(tool, lay, guard, app):
-    data = load_json(lay["config"]) or {}
-    hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
-    groups = hooks.get(entry_key(tool))
-    found = ours_in(tool, groups, guard) if isinstance(groups, list) else []
-    if not found:
-        fail("no hook entry for the guard in " + shown(lay["config"]))
+def check_kimi(lay, guard, app):
+    try:
+        with open(lay["config"], encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        text = ""
+    if KIMI_BEGIN not in text:
+        fail("no hook block for the guard in " + shown(lay["config"]))
         return
-    ok("hook registered in " + shown(lay["config"]))
+    try:
+        import tomllib
+
+        tomllib.loads(text)
+        ok(
+            "hook registered in "
+            + shown(lay["config"])
+            + ", and the file still parses as TOML"
+        )
+    except ImportError:
+        ok("hook registered in " + shown(lay["config"]))
+    except Exception:
+        fail(shown(lay["config"]) + " no longer parses as TOML")
+        return
+    prove(hook_cmd("kimi", guard), "kimi", "toml", app, app)
+
+
+def check_hooks(tool, lay, guard, app, repo_dir):
+    cmd = hook_cmd(tool, guard)
+    data = load_json(lay["config"]) or {}
+    box = data.get("hooks") if lay["wrap"] else data
+    box = box if isinstance(box, dict) else {}
+    found_any = False
+    for ev, st in events(tool):
+        groups = box.get(ev)
+        found = ours_in(st, groups, cmd, guard) if isinstance(groups, list) else []
+        if not found:
+            fail("no " + ev + " hook entry for the guard in " + shown(lay["config"]))
+            continue
+        found_any = True
+        line = found[0].get("command") or found[0].get("bash")
+        prove(line, tool, st, app, repo_dir or "/")
+    if found_any:
+        ok("hook registered in " + shown(lay["config"]))
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:
         fail(
             "tools.enableHooks is not true in "
             + shown(lay["config"])
             + ", so Gemini CLI before 0.26 runs no hook"
         )
-    line = found[0].get("command") or found[0].get("bash")
-    rc, _ = run_hook(line, payload_for(tool, SUBMIT, app), "/")
+
+
+def prove(line, tool, style, app, run_dir):
+    """Feeds a submit command and an ordinary one to the registered command, in the tool's own payload shape."""
+    label = {"vscode": " for VS Code", "copilot": " for Copilot"}.get(style, "")
+    rc, _ = run_hook(line, payload_for(tool, style, SUBMIT, app), run_dir)
     if rc == 2:
         ok(
-            "the registered command blocks a submit command in "
-            + tool
-            + "'s own payload shape"
+            "the registered command blocks a submit command in this tool's own payload shape"
+            + label
         )
     else:
         fail(
-            "the registered command did not block a submit command (exit "
+            "the registered command did not block a submit command"
+            + label
+            + " (exit "
             + str(rc)
             + ", expected 2)"
         )
-    rc, out = run_hook(line, payload_for(tool, "ls -la", app), "/")
+    rc, out = run_hook(line, payload_for(tool, style, "ls -la", app), run_dir)
     if rc == 0 and not out:
-        ok("the registered command stays silent on an ordinary command")
+        ok("the registered command stays silent on an ordinary command" + label)
     else:
         fail(
-            "the registered command reacted to an ordinary command (exit "
+            "the registered command reacted to an ordinary command"
+            + label
+            + " (exit "
             + str(rc)
             + ")"
         )
@@ -600,7 +888,7 @@ def uninstall(tool, lay, guard, dry):
     if dry:
         print(
             "Dry run. Would remove the guard, the command and the hook entry for "
-            + tool
+            + SPECS[tool]["name"]
             + "."
         )
         return 0
@@ -608,22 +896,29 @@ def uninstall(tool, lay, guard, dry):
     for p in (guard, lay["command"]):
         if p and os.path.exists(p):
             os.remove(p)
-    owners = read_owners() - {tool}
-    if owners:
-        with open(
-            os.path.join(skill_dir(), ".installed-by"), "w", encoding="utf-8"
-        ) as f:
-            f.write("\n".join(sorted(owners)) + "\n")
-        print(
-            "Removed the "
-            + tool
-            + " guard and hook. The shared skill stays for "
-            + ", ".join(sorted(owners))
-            + "."
-        )
+    if tool == "copilot-repo":
+        print("Removed the guard and the hook from the repository.")
     else:
-        shutil.rmtree(skill_dir(), ignore_errors=True)
-        print("Removed the " + tool + " guard, hook and the shared skill.")
+        owners = read_owners() - {tool}
+        if owners:
+            with open(
+                os.path.join(skill_dir(), ".installed-by"), "w", encoding="utf-8"
+            ) as f:
+                f.write("\n".join(sorted(owners)) + "\n")
+            print(
+                "Removed the "
+                + SPECS[tool]["name"]
+                + " guard and hook. The shared skill stays for "
+                + ", ".join(sorted(owners))
+                + "."
+            )
+        else:
+            shutil.rmtree(skill_dir(), ignore_errors=True)
+            print(
+                "Removed the "
+                + SPECS[tool]["name"]
+                + " guard, hook and the shared skill."
+            )
     if not done:
         print(
             "Could not edit "
@@ -637,13 +932,21 @@ def uninstall(tool, lay, guard, dry):
 
 
 def main(argv):
+    dry = "--dry-run" in argv
     args = [a for a in argv if a != "--dry-run"]
-    dry = len(args) != len(argv)
+    repo_dir = None
+    if "--repo" in args:
+        i = args.index("--repo")
+        if i + 1 >= len(args):
+            print("--repo needs a folder.", file=sys.stderr)
+            return 2
+        repo_dir = os.path.abspath(args[i + 1])
+        del args[i : i + 2]
     if not args or args[0] not in TOOLS:
         print(
             "Usage. install_harness.py <"
             + "|".join(TOOLS)
-            + "> [install|doctor|uninstall] [--dry-run]",
+            + "> [install|doctor|uninstall] [--dry-run] [--repo DIR]",
             file=sys.stderr,
         )
         return 2
@@ -652,26 +955,33 @@ def main(argv):
     if mode not in ("install", "doctor", "uninstall"):
         print("Unknown mode. " + mode, file=sys.stderr)
         return 2
-    lay = layout(tool)
+    if tool == "copilot-repo" and (not repo_dir or not os.path.isdir(repo_dir)):
+        print(
+            "copilot-repo installs into your app's repository. Pass --repo with that folder.",
+            file=sys.stderr,
+        )
+        return 2
+    lay = layout(tool, repo_dir)
     guard = os.path.join(lay["hooks"], GUARD_NAME)
     if mode == "doctor":
-        return verify(tool, lay, guard)
+        return verify(tool, lay, guard, repo_dir)
     if mode == "uninstall":
         return uninstall(tool, lay, guard, dry)
     if dry:
         print("Dry run. Nothing is written.")
         print("  would copy the guard to " + shown(guard))
-        print("  would copy the skill to " + shown(skill_dir()))
+        if tool != "copilot-repo":
+            print("  would copy the skill to " + shown(skill_dir()))
         if lay["command"]:
             print("  would write the audit command to " + shown(lay["command"]))
         register(tool, lay, guard, True)
         return 0
-    print("Installing the App Store Compliance Playbook for " + tool)
+    print("Installing the App Store Compliance Playbook for " + SPECS[tool]["name"])
     copy_payload(tool, lay, guard)
     if not register(tool, lay, guard, False):
-        verify(tool, lay, guard)
+        verify(tool, lay, guard, repo_dir)
         return 1
-    return verify(tool, lay, guard)
+    return verify(tool, lay, guard, repo_dir)
 
 
 if __name__ == "__main__":
