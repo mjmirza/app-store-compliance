@@ -4,6 +4,13 @@ This playbook stands on the shoulders of the open source community. The patterns
 
 If you maintain one of these and want the wording changed or a link corrected, open an issue.
 
+## People who contributed
+
+| Person | Contribution |
+|---|---|
+| Omar Albeik ([@omaralbeik](https://github.com/omaralbeik)) | Corrected the Syria entry in the sanctions section ([#967](https://github.com/mjmirza/app-store-compliance/pull/967), landed in [#1001](https://github.com/mjmirza/app-store-compliance/pull/1001)) |
+| Akash Sharma ([@akash5852](https://github.com/akash5852)) | Fixed vendor folder platform detection in the guard and added privacy manifest validation ([#596](https://github.com/mjmirza/app-store-compliance/pull/596)) |
+
 ## Repositories we learned from
 
 | Project | Author | License | What we adopted |

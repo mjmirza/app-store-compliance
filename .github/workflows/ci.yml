@@ -46,6 +46,11 @@ jobs:
       - name: Release audit test
         run: bash scripts/release-audit-test.sh
 
+      - name: Privacy manifest validator and citation verifier tests
+        run: |
+          bash scripts/validate-privacy-manifest-test.sh
+          bash scripts/verify-citations-test.sh
+
       - name: Timeline and deadline checker tests
         run: |
           python3 scripts/test-generate-timeline.py

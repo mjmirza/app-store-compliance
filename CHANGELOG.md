@@ -4,6 +4,10 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Thanks
+
+- Omar Albeik ([@omaralbeik](https://github.com/omaralbeik)) found that the sanctions section still listed Syria as an embargoed territory after the OFAC program ended, and opened [#967](https://github.com/mjmirza/app-store-compliance/pull/967) with the correction. His fix landed in [#1001](https://github.com/mjmirza/app-store-compliance/pull/1001), where he is a co-author. Developers shipping to Syria now get the rules that actually apply instead of a block that no longer exists.
+
 ### Changed
 
 - The default branch is now `main`. The CI trigger, the README badge and SECURITY.md follow it, and the bot branch ruleset excludes whichever branch is the default.
