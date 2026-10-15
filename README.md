@@ -47,7 +47,7 @@ Replace only `/path/to/your/app`, with the folder that holds your Xcode project 
 |---|---|---|
 | `BLOCKED.` | A critical rejection risk was found | Fix each `[CRITICAL]` line using the `fix.` line under it, then run the same command again |
 | `CLEAR.` | No critical risk in your code | Do the account and listing checks in [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) |
-| `NOT CHECKED.` | No iOS or Android project was found in that folder. Run by hand this exits 1. As a hook it lets the command through | Point it at the right folder. Expo apps run `npx expo prebuild` first |
+| `NOT CHECKED.` | No iOS or Android project was found in that folder, or the guard could not write its scan files. Run by hand this exits 1. As a hook it lets the command through | Point it at the right folder, and check the temp folder is writable. A managed Expo app with no native folders still gets its `app.json` or `app.config` read for purpose strings, the privacy manifest and Android permissions. Run `npx expo prebuild` to cover the native code too |
 
 ## What you get
 

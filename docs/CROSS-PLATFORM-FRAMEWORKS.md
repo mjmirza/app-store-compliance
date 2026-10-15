@@ -139,15 +139,16 @@ These are limits, not bugs waiting for a fix. Plan around them.
   disclosure for bundled SDKs, WebView-controlled data collection, cleartext
   traffic, and mixed-content/debug flags are real, framework-relevant risks this
   guard does not yet check.
-- **The PrivacyInfo.xcprivacy presence check is both too loose and too strict.**
-  It accepts a manifest found anywhere, including inside `node_modules` or
-  `Pods`, which does not prove an APP-LEVEL manifest exists. It also has no
-  Expo-managed-workflow awareness (`expo.ios.privacyManifests` in `app.json`
-  can be valid with no `ios/PrivacyInfo.xcprivacy` on disk yet, since EAS
-  generates the native project remotely at build time).
-- **Expo Continuous Native Generation (CNG) is not modeled.** A managed Expo
-  project legitimately has no committed `ios/`/`android/` folder; treating that
-  as "no iOS target" is not always correct.
+- **The PrivacyInfo.xcprivacy check reads the app's own manifest only.**
+  A manifest under `Pods`, `Carthage`, `node_modules`, SwiftPM `.build` or
+  checkouts, `SourcePackages` or Flutter `.symlinks` does not count. A managed
+  Expo app passes with `expo.ios.privacyManifests` in its app config, since EAS
+  generates the native project at build time.
+- **Expo Continuous Native Generation (CNG) is modeled for config only.** A
+  managed Expo project with no committed `ios/` or `android/` folder has its
+  `app.json` or `app.config` read for camera and location purpose strings,
+  `ios.privacyManifests` and the sensitive `android.permissions` entries. Its
+  native code is still NOT CHECKED until `npx expo prebuild` runs.
 - **Two frameworks have no coverage.** NativeScript and legacy Xamarin.Forms
   are not detected. Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform
   are, see the section above for what each one still cannot see.
