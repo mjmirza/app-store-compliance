@@ -98,6 +98,14 @@ for fn in (mon.strip_html, ai.clean_html_text):
     t = time.time()
     fn("<!--" * 100000)
     assert time.time() - t < 1.0, fn.__name__
+    assert fn('<a title="<!--">App Review Guidelines changed</a>') == "App Review Guidelines changed", fn.__name__
+    for ending in ("<!-->", "<!--->", "<!--x--!>"):
+        assert fn(ending + "Privacy manifests") == "Privacy manifests", (fn.__name__, ending)
+    assert fn("Kept <!-- never closed") == "Kept", fn.__name__
+    for hostile in (('<a "' + "<!--") * 50000, ("<!--x-->" + '<b "') * 40000, ("<a '" + '"') * 60000):
+        t = time.time()
+        fn(hostile)
+        assert time.time() - t < 1.0, (fn.__name__, hostile[:12])
 PY
 # Issue 833. Keywords match whole words on the visible text, not substrings of HTML.
 T="$(mktemp -d)"

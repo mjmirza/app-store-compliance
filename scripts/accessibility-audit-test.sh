@@ -519,6 +519,24 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_role" "$ISSUE_DIR/role_clean"
+cat << 'EOF' > "$ISSUE_DIR/icon_role/Role.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(role: .destructive) { delete() } label: { Image(systemName: "trash") }
+    }
+}
+EOF
+cat << 'EOF' > "$ISSUE_DIR/role_clean/Role.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(role: .destructive) { let i = Image(systemName: "trash"); use(i) } label: { Text("Delete") }
+    }
+}
+EOF
+
 mkdir -p "$ISSUE_DIR/icon_bad4"
 cat << 'EOF' > "$ISSUE_DIR/icon_bad4/InterpComment.swift"
 import SwiftUI
@@ -561,6 +579,20 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_role" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ]; then
+  ok "#834 a role Button reads its label: closure, not its action"
+else
+  bad "#834 a role Button with an icon label was missed. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/role_clean" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 an Image inside the action does not flag a Button with a Text label"
+else
+  bad "#834 an Image in the action flagged a Text-labelled Button. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_bad4" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ]; then

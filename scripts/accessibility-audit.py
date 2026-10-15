@@ -317,6 +317,14 @@ def find_icon_only_buttons(code):
                 if lend == -1:
                     continue
                 label, i = code[j:lend], lend
+                k = _skip_ws(code, i)
+                lab = re.match(r"label\s*:\s*\{", code[k : k + 64])
+                if lab:  # the trailing closure was the action, the label follows it
+                    start = k + lab.end() - 1
+                    lend = _match_close(code, start, "{", "}")
+                    if lend == -1:
+                        continue
+                    label, i = code[start:lend], lend
         elif i < len(code) and code[i] == "{":
             end = _match_close(code, i, "{", "}")
             if end == -1:
