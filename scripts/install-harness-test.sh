@@ -12,7 +12,7 @@ INSTALL="$PWD/scripts/install.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() { H="$WORK/h$RANDOM$RANDOM"; mkdir -p "$H"; }
-run()   { env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+run()   { env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
 cfg() {
   case "$1" in
     codex) echo "$H/.codex/hooks.json" ;;
@@ -217,6 +217,20 @@ OUT="$(run --tool all)"; RC=$?
   && ok "--tool all installs into the found tools only" || { bad "--tool all installs into the found tools only (rc=$RC)"; echo "$OUT" | head -5; }
 fresh; OUT="$(run --tool all)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "No supported AI coding tool" && ok "--tool all with no tool says so" || bad "--tool all with no tool says so (rc=$RC)"
+
+# 8b Qwen reads $QWEN_HOME/settings.json when QWEN_HOME is set, so install, doctor, uninstall and --tool all follow it
+fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
+qrun() { env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR QWEN_HOME="$Q" HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+OUT="$(qrun --tool qwen)"; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if any("guard.sh" in h["command"] for g in d["hooks"]["PreToolUse"] for h in g["hooks"]) else 1)' "$Q/settings.json" 2>/dev/null && [ "$RC" -eq 0 ] && [ ! -e "$H/.qwen/settings.json" ] \
+  && ok "qwen installs into \$QWEN_HOME/settings.json" || bad "qwen installs into \$QWEN_HOME/settings.json (rc=$RC)"
+qrun --tool qwen doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "qwen doctor checks \$QWEN_HOME" || bad "qwen doctor checks \$QWEN_HOME (rc=$RC)"
+qrun --tool qwen uninstall >/dev/null
+! grep -q "app-store-compliance-guard.sh" "$Q/settings.json" 2>/dev/null && ok "qwen uninstall edits \$QWEN_HOME/settings.json" || bad "qwen uninstall edits \$QWEN_HOME/settings.json"
+fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
+OUT="$(qrun --tool all --dry-run)"; RC=$?
+echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds qwen through \$QWEN_HOME" || bad "--tool all finds qwen through \$QWEN_HOME (rc=$RC)"
 
 # 9 a home folder with an apostrophe still verifies
 H="$WORK/O'Reilly home"; mkdir -p "$H"

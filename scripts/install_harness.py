@@ -96,6 +96,16 @@ def home():
     return h
 
 
+def qwen_dir():
+    """Qwen Code's global folder. QWEN_HOME wins, with a leading tilde expanded, as Qwen's own Storage does."""
+    v = os.environ.get("QWEN_HOME")
+    if not v:
+        return os.path.join(home(), ".qwen")
+    if v == "~" or v.startswith("~/") or v.startswith("~\\"):
+        v = os.path.join(home(), v[2:])
+    return os.path.abspath(v)
+
+
 def skill_dir():
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
@@ -139,7 +149,7 @@ def layout(tool, repo_dir=None):
         "codex": os.environ.get("CODEX_HOME") or os.path.join(h, ".codex"),
         "gemini": os.path.join(h, ".gemini"),
         "grok": os.path.join(h, ".grok"),
-        "qwen": os.path.join(h, ".qwen"),
+        "qwen": qwen_dir(),
         "auggie": os.path.join(h, ".augment"),
         "cursor": os.path.join(h, ".cursor"),
         "copilot": os.path.join(h, ".copilot"),
