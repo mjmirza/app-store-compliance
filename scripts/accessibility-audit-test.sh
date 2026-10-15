@@ -527,7 +527,7 @@ struct V: View {
     let title = "Pause"
     var body: some View {
         Button(title) { icon = Image(systemName: "pause") }
-        (Button(action: {}) { Image(systemName: "trash") }).accessibilityLabel("Delete")
+        ((Button(action: {}) { Image(systemName: "trash") })).accessibilityLabel("Delete")
         Button(action: {}) { Image(systemName: "a") } . accessibilityLabel("A")
         Button(action: {}) { Image(systemName: "b") }
         #if DEBUG

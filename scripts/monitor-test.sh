@@ -133,6 +133,13 @@ rt = '<rss><channel><item><title>New &lt;generative AI&gt; rules</title><descrip
 fx = pathlib.Path(tmp, "x.xml"); fx.write_text(rt)
 x = ai.parse_rss_feed(fx.as_uri())
 assert x[0]["title"] == "New <generative AI> rules", x
+amp = '<rss><channel><item><title>Tax &amp;amp; price updates</title><description>x</description></item></channel></rss>'
+fq = pathlib.Path(tmp, "q.xml"); fq.write_text(amp)
+assert ai.parse_rss_feed(fq.as_uri())[0]["title"] == "Tax & price updates"
+spec2 = importlib.util.spec_from_file_location("mon2", os.path.join(d, "monitor.py"))
+mon = importlib.util.module_from_spec(spec2)
+spec2.loader.exec_module(mon)
+assert "In-App Purchase policies" in mon.match_announcement_to_tracks({"title": "Policy changes for <StoreKit>", "description": ""}), "an RSS title lost its literal text"
 assert x[0]["description"] == "artificialintelligence", x
 for fn in (ai.clean_html_text,):
     assert fn("<p>Hello</p><p>World</p>") == "Hello World", fn

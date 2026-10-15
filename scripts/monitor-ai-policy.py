@@ -79,8 +79,8 @@ def _feed_text(child, atom, field):
     """Atom text is plain unless type says html or xhtml (RFC 4287 3.1.1, 4.1.3).
     An RSS title is plain text, an RSS description is HTML."""
     plain = re.sub(r"\s+", " ", child.text or "").strip()
-    if not atom:
-        return plain if field == "title" else clean_html_text(child.text or "")
+    if not atom:  # an RSS title is text with entities, never markup to strip
+        return html.unescape(plain) if field == "title" else clean_html_text(child.text or "")
     kind = (child.get("type") or "text").split(";")[0].strip().lower()
     if kind == "xhtml" or kind.endswith("+xml") and "xhtml" in kind:
         return re.sub(r"\s+", " ", _xhtml_text(child)).strip()

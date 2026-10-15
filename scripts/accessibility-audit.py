@@ -411,11 +411,13 @@ def find_icon_only_buttons(code):
         if not _any_in(img_hits, label[0], label[1]) or _any_in(named_hits, label[0], label[1]):
             continue  # the whole label counts, see the documented limit in README.md
         mods, end = _modifier_chain(code, i, pairs)
-        while True:  # (Button { ... }).modifier reads through the parentheses
+        start = m.start()
+        while True:  # ((Button { ... })).modifier reads through every wrapping parenthesis
             j = _skip_ws(code, end)
             o = closer.get(j)
-            if o is None or code[o + 1 : m.start()].strip():
+            if o is None or code[o + 1 : start].strip():
                 break
+            start = o
             more, end = _modifier_chain(code, j + 1, pairs)
             mods += more
         if any(_labels_button(code, name, args) for name, args in mods):

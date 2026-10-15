@@ -712,7 +712,7 @@ def match_announcement_to_tracks(announcement):
     Returns a list of matched track names.
     """
     matched = []
-    title = strip_html(announcement.get("title", "")).lower()
+    title = re.sub(r"\s+", " ", html.unescape(announcement.get("title", ""))).lower()  # RSS title is text
     desc = strip_html(announcement.get("description", "")).lower()
     combined = f"{title} {desc}"
 
