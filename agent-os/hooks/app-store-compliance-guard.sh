@@ -609,7 +609,9 @@ if [ "$IS_IOS" -eq 1 ]; then
   MANIFEST_VALIDATOR=""
   for candidate in \
     "$(dirname "$0")/../../scripts/validate-privacy-manifest.py" \
-    "${HOME:-}/.claude/skills/app-store-compliance/scripts/validate-privacy-manifest.py"; do
+    "$(dirname "$0")/../skills/app-store-compliance/scripts/validate-privacy-manifest.py" \
+    "${HOME:-}/.claude/skills/app-store-compliance/scripts/validate-privacy-manifest.py" \
+    "${HOME:-}/.agents/skills/app-store-compliance/scripts/validate-privacy-manifest.py"; do
     [ -f "$candidate" ] && { MANIFEST_VALIDATOR="$candidate"; break; }
   done
   if [ -n "$MANIFEST_VALIDATOR" ] && command -v python3 >/dev/null 2>&1; then
@@ -1006,7 +1008,7 @@ fi
 print_deadlines() {
   local hd py="" c plats=""
   hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  for c in "$hd/../../scripts/deadline-checker.py" "$hd/../skills/app-store-compliance/scripts/deadline-checker.py"; do
+  for c in "$hd/../../scripts/deadline-checker.py" "$hd/../skills/app-store-compliance/scripts/deadline-checker.py" "${HOME:-}/.agents/skills/app-store-compliance/scripts/deadline-checker.py"; do
     if [ -f "$c" ]; then py="$c"; break; fi
   done
   [ -n "$py" ] || return 0

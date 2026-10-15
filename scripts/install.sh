@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One command setup for Claude Code. Installs the guard, the skill and the slash command, registers
-# the hook, then proves the guard blocks a bad app. Usage: install.sh [install|doctor|uninstall] [--dry-run]
+# One command setup for Claude Code, Codex, Gemini CLI, OpenCode, Cursor and Copilot CLI. Installs the guard,
+# skill and command, registers the hook, then proves it blocks a bad app. Run with --help for usage.
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,16 +26,57 @@ else
   HOOK_CMD="bash '$(printf '%s' "$GUARD" | sed "s/'/'\\\\''/g")'"
 fi
 
-MODE="install"; DRY=0
-for arg in "$@"; do
-  case "$arg" in
-    install|doctor|uninstall) MODE="$arg" ;;
+MODE="install"; DRY=0; TOOL="claude"
+USAGE="Usage. install.sh [install|doctor|uninstall] [--tool claude|codex|gemini|opencode|cursor|copilot|all] [--dry-run] [--version]"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    install|doctor|uninstall) MODE="$1" ;;
     --dry-run) DRY=1 ;;
     -h|--help) MODE="help" ;;
     --version) MODE="version" ;;
-    *) echo "Unknown argument. $arg" >&2; echo "Usage. install.sh [install|doctor|uninstall] [--dry-run]" >&2; exit 2 ;;
+    --tool=*) TOOL="${1#--tool=}" ;;
+    --tool) [ "$#" -ge 2 ] || { echo "--tool needs a name." >&2; echo "$USAGE" >&2; exit 2; }; TOOL="$2"; shift ;;
+    *) echo "Unknown argument. $1" >&2; echo "$USAGE" >&2; exit 2 ;;
   esac
+  shift
 done
+case "$TOOL" in
+  claude|codex|gemini|opencode|cursor|copilot|all) ;;
+  *) echo "Unknown tool. $TOOL" >&2; echo "$USAGE" >&2; exit 2 ;;
+esac
+
+# Every other tool is installed by install_harness.py, which merges that tool's own config file.
+run_harness() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is needed to install for $1. Install python3, or follow the manual steps in the README." >&2
+    return 1
+  fi
+  local extra=""; [ "$DRY" -eq 1 ] && extra="--dry-run"
+  # shellcheck disable=SC2086
+  python3 "$REPO/scripts/install_harness.py" "$1" "$MODE" $extra
+}
+if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; then
+  found=""; rc_all=0
+  [ -d "$CONF" ] && found="claude"
+  [ -d "${CODEX_HOME:-${HOME:-}/.codex}" ] && found="$found codex"
+  [ -d "${HOME:-}/.gemini" ] && found="$found gemini"
+  [ -d "${XDG_CONFIG_HOME:-${HOME:-}/.config}/opencode" ] && found="$found opencode"
+  [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
+  [ -d "${HOME:-}/.copilot" ] && found="$found copilot"
+  [ -z "$found" ] && { echo "No supported AI coding tool found in your home folder. Pass --tool with one name."; exit 1; }
+  echo "Found.$found"
+  for t in $found; do
+    echo ""; echo "== $t =="
+    flags=("$MODE"); [ "$DRY" -eq 1 ] && flags+=(--dry-run)
+    bash "$0" --tool "$t" "${flags[@]}" || rc_all=1
+  done
+  echo ""
+  if [ "$rc_all" -eq 0 ]; then echo "All tools done."; else echo "At least one tool reported a problem above."; fi
+  exit "$rc_all"
+fi
+if [ "$TOOL" != "claude" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; then
+  run_harness "$TOOL"; exit $?
+fi
 
 have() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }
 say()  { printf '%s\n' "$*"; }
@@ -333,7 +374,7 @@ do_uninstall() {
 
 case "$MODE" in
   version) printf 'app-store-compliance %s\n' "$(cat "$REPO/VERSION" 2>/dev/null || echo unknown)" ;;
-  help) say "Usage. install.sh [install|doctor|uninstall] [--dry-run] [--version]"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
+  help) say "$USAGE"; say "  --tool     the AI coding tool to install into, claude by default. all installs into every one found"; say "  install    copy the guard, skill and slash command, register the hook, verify (default)"; say "  doctor     verify an existing install, change nothing"; say "  uninstall  remove everything install added"; say "Set CLAUDE_CONFIG_DIR to target a config folder other than ~/.claude." ;;
   install) do_install ;;
   doctor) verify ;;
   uninstall) do_uninstall ;;
