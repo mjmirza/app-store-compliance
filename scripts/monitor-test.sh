@@ -106,6 +106,13 @@ for fn in (mon.strip_html, ai.clean_html_text):
         t = time.time()
         fn(hostile)
         assert time.time() - t < 1.0, (fn.__name__, hostile[:12])
+    for markup in ("<svg><text><![CDATA[Privacy manifests]]></text></svg>", "<textarea><!--</textarea>Privacy manifests", '<!x ">Privacy manifests">', "<TITLE>Privacy manifests</title>", "<![CDATA[<b>Privacy manifests</b>]]>"):
+        assert "Privacy manifests" in fn(markup), (fn.__name__, markup, fn(markup))
+    assert "<b>" not in fn("<![CDATA[<b>Privacy manifests</b>]]>"), fn.__name__
+    for hostile in ("<textarea>" * 50000, "<![CDATA[" * 50000, "<!x" * 100000, "<title a='" * 40000, "<![CDATA[<!--" * 40000):
+        t = time.time()
+        fn(hostile)
+        assert time.time() - t < 1.0, (fn.__name__, hostile[:12])
 PY
 # Issue 833. Keywords match whole words on the visible text, not substrings of HTML.
 T="$(mktemp -d)"

@@ -7,16 +7,8 @@ import argparse
 
 # List of directory names to ignore during scan
 IGNORE_DIRS = {
-    "node_modules",
-    "Pods",
-    ".git",
-    "build",
-    "DerivedData",
-    "vendor",
-    ".dart_tool",
-    "Carthage",
-    "androidTest",
-    "__tests__",
+    "node_modules", "Pods", ".git", "build", "DerivedData", "vendor",
+    ".dart_tool", "Carthage", "androidTest", "__tests__"
 }
 
 # Mapping of rule IDs to their detail
@@ -25,64 +17,63 @@ RULE_META = {
         "platform": "apple",
         "severity": "medium",
         "title": "VoiceOver support missing or incomplete",
-        "fix": "Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned.",
+        "fix": "Ensure all interactive components and decorative or informative images have correct accessibility labels, hints, and traits assigned."
     },
     "APPLE-ACCESSIBILITY-DYNAMICTYPE": {
         "platform": "apple",
         "severity": "medium",
         "title": "Dynamic Type support missing or overridden",
-        "fix": "Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled.",
+        "fix": "Use preferredFont(forTextStyle:) in UIKit and system/relative font styles in SwiftUI, ensuring adjustsFontForContentSizeCategory is enabled."
     },
     "APPLE-ACCESSIBILITY-REDUCEMOTION": {
         "platform": "apple",
         "severity": "medium",
         "title": "Reduce Motion accessibility setting ignored",
-        "fix": "Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user.",
+        "fix": "Check the Reduce Motion system status and disable or simplify non-essential animations when requested by the user."
     },
     "APPLE-ACCESSIBILITY-COLORCONTRAST": {
         "platform": "apple",
         "severity": "medium",
         "title": "Color Contrast and system settings ignored",
-        "fix": "Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically.",
+        "fix": "Use dynamic or system colors that automatically adapt, or monitor isDarkerSystemColorsEnabled to adjust contrast dynamically."
     },
     "APPLE-ACCESSIBILITY-HAPTICS": {
         "platform": "apple",
         "severity": "low",
         "title": "Haptic feedback absent on interactions (advisory, not required by WCAG 2.2 or EN 301 549)",
-        "fix": "Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback.",
+        "fix": "Add haptic feedback to buttons, toggles, and swipe actions using UIImpactFeedbackGenerator or selection feedback."
     },
     "APPLE-ACCESSIBILITY-KEYBOARD": {
         "platform": "apple",
         "severity": "medium",
         "title": "Keyboard navigation and focus state support missing",
-        "fix": "Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI.",
+        "fix": "Support physical keyboard navigation by utilizing keyCommands in UIKit or focusable() and @FocusState in SwiftUI."
     },
     "ANDROID-ACCESSIBILITY-TALKBACK": {
         "platform": "google",
         "severity": "medium",
         "title": "TalkBack support missing or disabled",
-        "fix": "Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly.",
+        "fix": "Provide meaningful contentDescription values for all informative images and interactive views, and ensure importantForAccessibility is set correctly."
     },
     "ANDROID-ACCESSIBILITY-FONTSCALING": {
         "platform": "google",
         "severity": "medium",
         "title": "Font scaling disabled due to dp text sizing",
-        "fix": "Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly.",
+        "fix": "Always define text sizes in sp (scale-independent pixels) rather than dp to allow the system font scaling to work correctly."
     },
     "ANDROID-ACCESSIBILITY-HIGHCONTRAST": {
         "platform": "google",
         "severity": "medium",
         "title": "Hardcoded colors ignoring high contrast settings",
-        "fix": "Reference semantic colors or color resources so the app automatically respects high contrast themes.",
+        "fix": "Reference semantic colors or color resources so the app automatically respects high contrast themes."
     },
     "ANDROID-ACCESSIBILITY-SCANNER": {
         "platform": "google",
         "severity": "medium",
         "title": "Touch target sizes below 48dp",
-        "fix": "Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight.",
-    },
+        "fix": "Ensure all interactive elements have a minimum touch target area of 48dp x 48dp by using padding, minWidth, and minHeight."
+    }
 }
-
 
 def scan_files(directory):
     ios_files = []
@@ -100,36 +91,42 @@ def scan_files(directory):
     return ios_files, android_files
 
 
+def _string_frame(content, q, hashes):
+    multi = content.startswith('"""', q)
+    return ("s", multi, ('"""' if multi else '"') + "#" * hashes, "\\" + "#" * hashes)
+
+
 def _skip_string(content, q, hashes):
     """For the string opening at q, return (body start, body end, offset after it).
-    Escapes and interpolation are a backslash plus the delimiter's hashes."""
+    An explicit stack walks nested strings and interpolations, so no depth can overflow."""
     n = len(content)
-    multi = content.startswith('"""', q)
-    opener = 3 if multi else 1
-    close = ('"""' if multi else '"') + "#" * hashes
-    esc = "\\" + "#" * hashes
-    j = q + opener
+    body_start = q + (3 if content.startswith('"""', q) else 1)
+    stack, j = [_string_frame(content, q, hashes)], body_start
     while j < n:
-        if content.startswith(esc, j):
-            k = j + len(esc)
-            j = (
-                _skip_interpolation(content, k)
-                if k < n and content[k] == "("
-                else k + 1
-            )
+        frame = stack[-1]
+        if frame[0] == "s":
+            _, multi, close, esc = frame
+            if content.startswith(esc, j):
+                k = j + len(esc)
+                if k < n and content[k] == "(":
+                    stack.append(["i", 0])
+                    j = k
+                else:
+                    j = k + 1
+                continue
+            if not multi and content[j] == "\n":
+                stack.pop()  # an unterminated single-line string ends at the newline
+                if not stack:
+                    return body_start, j, j
+                continue
+            if content.startswith(close, j):
+                stack.pop()
+                if not stack:
+                    return body_start, j, j + len(close)
+                j += len(close)
+                continue
+            j += 1
             continue
-        if not multi and content[j] == "\n":
-            return q + opener, j, j
-        if content.startswith(close, j):
-            return q + opener, j, j + len(close)
-        j += 1
-    return q + opener, n, n
-
-
-def _skip_interpolation(content, k):
-    """Offset just past the parenthesis matching content[k], stepping over nested strings."""
-    n, depth, j = len(content), 0, k
-    while j < n:
         c = content[j]
         if content.startswith("//", j):
             nl = content.find("\n", j)
@@ -146,22 +143,24 @@ def _skip_interpolation(content, k):
                     j += 1
             continue
         if c == '"' or c == "#":
-            hashes = 0
-            while j + hashes < n and content[j + hashes] == "#":
-                hashes += 1
-            if j + hashes < n and content[j + hashes] == '"':
-                j = _skip_string(content, j + hashes, hashes)[2]
+            h = 0
+            while j + h < n and content[j + h] == "#":
+                h += 1
+            if j + h < n and content[j + h] == '"':
+                inner = _string_frame(content, j + h, h)
+                stack.append(inner)
+                j = j + h + (3 if inner[1] else 1)
                 continue
-            j += max(hashes, 1)
+            j += max(h, 1)
             continue
         if c == "(":
-            depth += 1
+            frame[1] += 1
         elif c == ")":
-            depth -= 1
-            if depth == 0:
-                return j + 1
+            frame[1] -= 1
+            if frame[1] == 0:
+                stack.pop()
         j += 1
-    return n
+    return body_start, n, n
 
 
 def swift_code_only(content):
@@ -210,18 +209,16 @@ def swift_code_only(content):
     return "".join(out)
 
 
-def _match_close(text, start, open_ch, close_ch):
-    """Index just past the bracket matching text[start] in string-blanked code. -1 if unbalanced."""
-    depth = 0
-    for i in range(start, len(text)):
-        c = text[i]
-        if c == open_ch:
-            depth += 1
-        elif c == close_ch:
-            depth -= 1
-            if depth == 0:
-                return i + 1
-    return -1
+def _bracket_pairs(code):
+    """Map each opening bracket to the offset just past its match, per bracket type, in one pass."""
+    pairs, stacks = {}, {"(": [], "[": [], "{": []}
+    opener = {")": "(", "]": "[", "}": "{"}
+    for i, ch in enumerate(code):
+        if ch in stacks:
+            stacks[ch].append(i)
+        elif ch in opener and stacks[opener[ch]]:
+            pairs[stacks[opener[ch]].pop()] = i + 1
+    return pairs
 
 
 def _skip_ws(text, i):
@@ -230,23 +227,29 @@ def _skip_ws(text, i):
     return i
 
 
-def _top_level_args(code, start, end):
-    """(start, end) offsets of each comma-separated argument at depth 0 between start and end."""
-    parts, depth, a = [], 0, start
-    for k in range(start, end):
+def _top_level_args(code, start, end, pairs):
+    """(start, end) offsets of each comma-separated argument at depth 0 between start and end.
+    Nested brackets are jumped over through pairs, so enclosing calls never rescan them."""
+    parts, depth, a, k = [], 0, start, start
+    while k < end:
         ch = code[k]
         if ch in "([{":
+            close = pairs.get(k, -1)
+            if depth == 0 and 0 < close <= end:
+                k = close
+                continue
             depth += 1
         elif ch in ")]}":
             depth -= 1
         elif ch == "," and depth == 0:
             parts.append((a, k))
             a = k + 1
+        k += 1
     parts.append((a, end))
     return parts
 
 
-def _modifier_chain(code, i):
+def _modifier_chain(code, i, pairs):
     """Read the .modifier(...) chain that follows offset i. Returns (names with args, end offset)."""
     mods = []
     n = len(code)
@@ -265,13 +268,13 @@ def _modifier_chain(code, i):
         name, args = code[j + 1 : k], ""
         k2 = _skip_ws(code, k)
         if k2 < n and code[k2] == "(":
-            end = _match_close(code, k2, "(", ")")
+            end = pairs.get(k2, -1)
             if end == -1:
                 return mods, i
             args, k = code[k2:end], end
             k2 = _skip_ws(code, k)
         if k2 < n and code[k2] == "{":
-            end = _match_close(code, k2, "{", "}")
+            end = pairs.get(k2, -1)
             if end == -1:
                 return mods, i
             k = end
@@ -281,66 +284,100 @@ def _modifier_chain(code, i):
 
 IMAGE_SYMBOL = re.compile(r"\bImage\s*\(\s*systemName\s*:")
 NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
+TITLED_ARG = re.compile(r"\s*(#*\"|title\s*:)")
+LABEL_ARG = re.compile(r"\s*label\s*:")
+LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*\{")
+LOCAL_DECL = re.compile(r"\s*(let|var)\b")
+RETURN_STMT = re.compile(r"\s*return\b")
+
+
+def _any_in(hits, a, b):
+    k = bisect.bisect_left(hits, a)
+    return k < len(hits) and hits[k] < b
+
+
+def _label_view_ranges(code, lstart, lend, pairs):
+    """Statement ranges of the label closure that can produce its view.
+    Local let and var declarations are dropped, and after a return only the returned view counts."""
+    stmts, a, k = [], lstart + 1, lstart + 1
+    while k < lend - 1:
+        ch = code[k]
+        if ch in "([{" and 0 < pairs.get(k, -1) <= lend - 1:
+            k = pairs[k]
+            continue
+        if ch in ";\n":
+            stmts.append((a, k))
+            a = k + 1
+        k += 1
+    stmts.append((a, lend - 1))
+    stmts = [
+        (x, y)
+        for x, y in stmts
+        if code[x:y].strip() and not LOCAL_DECL.match(code, x, y)
+    ]
+    returns = [idx for idx, (x, y) in enumerate(stmts) if RETURN_STMT.match(code, x, y)]
+    return stmts[returns[-1] :] if returns else stmts
+
+
+def _label_closure_after(code, k, pairs):
+    """(start, end) of a label: { ... } closure beginning at or after k, or None."""
+    lab = LABEL_CLOSURE.match(code, k)
+    if not lab:
+        return None
+    start = lab.end() - 1
+    end = pairs.get(start, -1)
+    return None if end == -1 else (start, end)
 
 
 def find_icon_only_buttons(code):
     """Yield (offset, end) for SwiftUI Buttons whose only label is an Image(systemName:)
     with no accessibilityLabel on the label or on the Button's own modifier chain."""
+    pairs = _bracket_pairs(code)
+    img_hits = [m.start() for m in IMAGE_SYMBOL.finditer(code)]
+    named_hits = [m.start() for m in NAMED_CONTENT.finditer(code)]
     for m in re.finditer(r"(?<![A-Za-z0-9_.])Button\b", code):
         i = _skip_ws(code, m.end())
         label = None
         if i < len(code) and code[i] == "(":
-            end = _match_close(code, i, "(", ")")
+            end = pairs.get(i, -1)
             if end == -1:
                 continue
-            parts = _top_level_args(code, i + 1, end - 1)
-            if any(re.match(r"\s*(#*\"|title\s*:)", code[a:b]) for a, b in parts):
+            parts = _top_level_args(code, i + 1, end - 1, pairs)
+            if any(TITLED_ARG.match(code, a, b) for a, b in parts):
                 continue  # a titled button reads its title
             label_part = next(
-                ((a, b) for a, b in parts if re.match(r"\s*label\s*:", code[a:b])), None
+                ((a, b) for a, b in parts if LABEL_ARG.match(code, a, b)), None
             )
             if label_part:
-                lab = re.match(
-                    r"\s*label\s*:\s*\{", code[label_part[0] : label_part[1]]
-                )
-                if not lab:
+                label = _label_closure_after(code, label_part[0], pairs)
+                if not label or label[1] > label_part[1]:
                     continue  # a label view passed by name cannot be read here
-                start = label_part[0] + lab.end() - 1
-                lend = _match_close(code, start, "{", "}")
-                if lend == -1:
-                    continue
-                label = code[start:lend]
             i = end
             j = _skip_ws(code, i)
             if label is None and j < len(code) and code[j] == "{":
-                lend = _match_close(code, j, "{", "}")
+                lend = pairs.get(j, -1)
                 if lend == -1:
                     continue
-                label, i = code[j:lend], lend
-                k = _skip_ws(code, i)
-                lab = re.match(r"label\s*:\s*\{", code[k : k + 64])
-                if lab:  # the trailing closure was the action, the label follows it
-                    start = k + lab.end() - 1
-                    lend = _match_close(code, start, "{", "}")
-                    if lend == -1:
-                        continue
-                    label, i = code[start:lend], lend
+                label, i = (j, lend), lend
+                after = _label_closure_after(code, i, pairs)
+                if after:  # the trailing closure was the action, the label follows it
+                    label, i = after, after[1]
         elif i < len(code) and code[i] == "{":
-            end = _match_close(code, i, "{", "}")
+            end = pairs.get(i, -1)
             if end == -1:
                 continue
-            j = _skip_ws(code, end)
-            lab = re.match(r"label\s*:\s*\{", code[j : j + 64])
-            if not lab:
+            label = _label_closure_after(code, end, pairs)
+            if not label:
                 continue
-            start = j + lab.end() - 1
-            lend = _match_close(code, start, "{", "}")
-            if lend == -1:
-                continue
-            label, i = code[start:lend], lend
-        if not label or not IMAGE_SYMBOL.search(label) or NAMED_CONTENT.search(label):
+            i = label[1]
+        if not label:
             continue
-        mods, _ = _modifier_chain(code, i)
+        ranges = _label_view_ranges(code, label[0], label[1], pairs)
+        if not any(_any_in(img_hits, x, y) for x, y in ranges):
+            continue
+        if any(_any_in(named_hits, x, y) for x, y in ranges):
+            continue
+        mods, _ = _modifier_chain(code, i, pairs)
         if any(name == "accessibilityLabel" for name, _ in mods):
             continue
         if any(
@@ -349,8 +386,6 @@ def find_icon_only_buttons(code):
         ):
             continue
         yield m.start(), i
-
-
 def run_rule_scan(rule_id, ios_files, android_files):
     findings = []
 
@@ -373,27 +408,17 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Simple parsing check: does the immediate context (within 5 lines) have accessibility modifiers?
                 start_idx = match.start()
-                context = content[start_idx : start_idx + 300]
-                if not any(
-                    kw in context
-                    for kw in [
-                        "accessibilityLabel",
-                        "accessibilityIdentifier",
-                        "accessibilityHidden",
-                        "accessibilityElement",
-                    ]
-                ):
+                context = content[start_idx:start_idx + 300]
+                if not any(kw in context for kw in ["accessibilityLabel", "accessibilityIdentifier", "accessibilityHidden", "accessibilityElement"]):
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "SwiftUI Image used without accessibilityLabel or decorative initialization.",
-                            "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "SwiftUI Image used without accessibilityLabel or decorative initialization.",
+                        "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier."
+                    })
 
             code = swift_code_only(content)
             newlines = [k for k, ch in enumerate(code) if ch == "\n"]
@@ -411,24 +436,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
             # Look for UIButton / UIImageView declarations in UIKit swift without accessibility properties
             if re.search(r"\bUI(Button|ImageView)\b", code):
-                if not any(
-                    kw in content
-                    for kw in [
-                        "accessibilityLabel",
-                        "accessibilityIdentifier",
-                        "isAccessibilityElement",
-                    ]
-                ):
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": 1,
-                            "rule_id": rule_id,
-                            "match": "UIButton / UIImageView declaration",
-                            "message": "UIKit components found but no accessibility attributes (accessibilityLabel, isAccessibilityElement) are references in the file.",
-                            "fix": "Assign meaningful accessibilityLabel properties to interactive UIKit components.",
-                        }
-                    )
+                if not any(kw in content for kw in ["accessibilityLabel", "accessibilityIdentifier", "isAccessibilityElement"]):
+                    findings.append({
+                        "file": f,
+                        "line": 1,
+                        "rule_id": rule_id,
+                        "match": "UIButton / UIImageView declaration",
+                        "message": "UIKit components found but no accessibility attributes (accessibilityLabel, isAccessibilityElement) are references in the file.",
+                        "fix": "Assign meaningful accessibilityLabel properties to interactive UIKit components."
+                    })
 
     elif rule_id == "APPLE-ACCESSIBILITY-DYNAMICTYPE":
         # Check SwiftUI hardcoded system fonts, e.g. .font(.system(size: ...))
@@ -444,32 +460,28 @@ def run_rule_scan(rule_id, ios_files, android_files):
             for match in re.finditer(r"\.system\(size:\s*\d+", content):
                 start_idx = match.start()
                 line_no = content.count("\n", 0, start_idx) + 1
-                findings.append(
-                    {
-                        "file": f,
-                        "line": line_no,
-                        "rule_id": rule_id,
-                        "match": match.group(0),
-                        "message": "Hardcoded system font size detected which prevents Dynamic Type scaling.",
-                        "fix": "Use SwiftUI relative text styles like .font(.body) or wrap custom font sizes in dynamic-type scaled modifiers.",
-                    }
-                )
+                findings.append({
+                    "file": f,
+                    "line": line_no,
+                    "rule_id": rule_id,
+                    "match": match.group(0),
+                    "message": "Hardcoded system font size detected which prevents Dynamic Type scaling.",
+                    "fix": "Use SwiftUI relative text styles like .font(.body) or wrap custom font sizes in dynamic-type scaled modifiers."
+                })
 
             for match in re.finditer(r"UIFont\.systemFont\(ofSize:\s*\d+", content):
                 start_idx = match.start()
                 line_no = content.count("\n", 0, start_idx) + 1
                 # Check if adjustsFontForContentSizeCategory is present in the file
                 if "adjustsFontForContentSizeCategory" not in content:
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "Hardcoded UIFont used without adjusting for content size category.",
-                            "fix": "Use UIFont.preferredFont(forTextStyle:) and set adjustsFontForContentSizeCategory = true on your labels.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "Hardcoded UIFont used without adjusting for content size category.",
+                        "fix": "Use UIFont.preferredFont(forTextStyle:) and set adjustsFontForContentSizeCategory = true on your labels."
+                    })
 
     elif rule_id == "APPLE-ACCESSIBILITY-REDUCEMOTION":
         # Find transition, withAnimation or UIView.animate without checking reduce motion
@@ -482,20 +494,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 continue
 
             if "withAnimation" in content or "UIView.animate" in content:
-                if (
-                    "isReduceMotionEnabled" not in content
-                    and "accessibilityReduceMotion" not in content
-                ):
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": 1,
-                            "rule_id": rule_id,
-                            "match": "Animation usage",
-                            "message": "Animations used without checking Reduce Motion state.",
-                            "fix": "Check UIAccessibility.isReduceMotionEnabled or SwiftUI's accessibilityReduceMotion environment variable to disable or simplify animations.",
-                        }
-                    )
+                if "isReduceMotionEnabled" not in content and "accessibilityReduceMotion" not in content:
+                    findings.append({
+                        "file": f,
+                        "line": 1,
+                        "rule_id": rule_id,
+                        "match": "Animation usage",
+                        "message": "Animations used without checking Reduce Motion state.",
+                        "fix": "Check UIAccessibility.isReduceMotionEnabled or SwiftUI's accessibilityReduceMotion environment variable to disable or simplify animations."
+                    })
 
     elif rule_id == "APPLE-ACCESSIBILITY-COLORCONTRAST":
         # Find hardcoded UIColors or SwiftUI Colors without dynamic adaptivity or isDarkerSystemColorsEnabled
@@ -509,22 +516,17 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
             # Flag static CGColors or UIColors using hardcoded color specs without dynamic checking
             for match in re.finditer(r"UIColor\s*\(\s*red:\s*\d+", content):
-                if (
-                    "isDarkerSystemColorsEnabled" not in content
-                    and "darkerSystemColors" not in content
-                ):
+                if "isDarkerSystemColorsEnabled" not in content and "darkerSystemColors" not in content:
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "Static UIColor with raw RGB values does not support custom high-contrast modes.",
-                            "fix": "Utilize asset-catalog named dynamic colors or respect UIAccessibility.isDarkerSystemColorsEnabled.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "Static UIColor with raw RGB values does not support custom high-contrast modes.",
+                        "fix": "Utilize asset-catalog named dynamic colors or respect UIAccessibility.isDarkerSystemColorsEnabled."
+                    })
 
     elif rule_id == "APPLE-ACCESSIBILITY-HAPTICS":
         # Scan for interactive actions/handlers without feedback generator references
@@ -538,20 +540,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
             code = swift_code_only(content)
             if re.search(r"\.onTapGesture\b|(?<![A-Za-z0-9_])Button\s*[({]", code):
-                if not any(
-                    kw in content
-                    for kw in ["FeedbackGenerator", "CoreHaptics", "CHHapticEngine"]
-                ):
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": 1,
-                            "rule_id": rule_id,
-                            "match": "Interactive controls without haptics",
-                            "message": "Interactive taps or gestures used but no haptic feedback generator referenced.",
-                            "fix": "Incorporate UIImpactFeedbackGenerator or UISelectionFeedbackGenerator for interactive feedback.",
-                        }
-                    )
+                if not any(kw in content for kw in ["FeedbackGenerator", "CoreHaptics", "CHHapticEngine"]):
+                    findings.append({
+                        "file": f,
+                        "line": 1,
+                        "rule_id": rule_id,
+                        "match": "Interactive controls without haptics",
+                        "message": "Interactive taps or gestures used but no haptic feedback generator referenced.",
+                        "fix": "Incorporate UIImpactFeedbackGenerator or UISelectionFeedbackGenerator for interactive feedback."
+                    })
 
     elif rule_id == "APPLE-ACCESSIBILITY-KEYBOARD":
         # Scan for customized controls or keyboard handling missing proper focus or keyCommands
@@ -563,21 +560,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            if (
-                "focusable" in content
-                and "FocusState" not in content
-                and "focused" not in content
-            ):
-                findings.append(
-                    {
-                        "file": f,
-                        "line": 1,
-                        "rule_id": rule_id,
-                        "match": "focusable",
-                        "message": "Focusable elements used without focus state tracking.",
-                        "fix": "Use @FocusState to track and programmatically move keyboard focus for accessibility keyboard users.",
-                    }
-                )
+            if "focusable" in content and "FocusState" not in content and "focused" not in content:
+                findings.append({
+                    "file": f,
+                    "line": 1,
+                    "rule_id": rule_id,
+                    "match": "focusable",
+                    "message": "Focusable elements used without focus state tracking.",
+                    "fix": "Use @FocusState to track and programmatically move keyboard focus for accessibility keyboard users."
+                })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-TALKBACK":
         # Look for XML layout elements or Compose Image without contentDescription
@@ -592,18 +583,16 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
                     # Check if this element block (up to next >) has contentDescription
-                    elem_block = content[start_idx : content.find(">", start_idx) + 1]
+                    elem_block = content[start_idx:content.find(">", start_idx) + 1]
                     if "contentDescription" not in elem_block:
-                        findings.append(
-                            {
-                                "file": f,
-                                "line": line_no,
-                                "rule_id": rule_id,
-                                "match": elem_block.split("\n")[0],
-                                "message": "XML image view missing contentDescription attribute.",
-                                "fix": 'Add an android:contentDescription attribute with descriptive text, or set android:importantForAccessibility="no" if decorative.',
-                            }
-                        )
+                        findings.append({
+                            "file": f,
+                            "line": line_no,
+                            "rule_id": rule_id,
+                            "match": elem_block.split("\n")[0],
+                            "message": "XML image view missing contentDescription attribute.",
+                            "fix": "Add an android:contentDescription attribute with descriptive text, or set android:importantForAccessibility=\"no\" if decorative."
+                        })
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
@@ -615,16 +604,14 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     if "contentDescription" not in expr:
                         start_idx = match.start()
                         line_no = content.count("\n", 0, start_idx) + 1
-                        findings.append(
-                            {
-                                "file": f,
-                                "line": line_no,
-                                "rule_id": rule_id,
-                                "match": match.group(0),
-                                "message": "Compose Image element missing contentDescription parameter.",
-                                "fix": "Provide a descriptive contentDescription or pass null explicitly if decorative.",
-                            }
-                        )
+                        findings.append({
+                            "file": f,
+                            "line": line_no,
+                            "rule_id": rule_id,
+                            "match": match.group(0),
+                            "message": "Compose Image element missing contentDescription parameter.",
+                            "fix": "Provide a descriptive contentDescription or pass null explicitly if decorative."
+                        })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-FONTSCALING":
         # Search for XML textSize with dp units, or Compose fontSize with dp units
@@ -634,21 +621,17 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                for match in re.finditer(
-                    r"android:textSize\s*=\s*\"(\d+dp)\"", content
-                ):
+                for match in re.finditer(r"android:textSize\s*=\s*\"(\d+dp)\"", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": f"Text size specified in dp ({match.group(1)}) instead of sp.",
-                            "fix": "Change text size unit from dp to sp (scale-independent pixels) so font scaling is supported.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": f"Text size specified in dp ({match.group(1)}) instead of sp.",
+                        "fix": "Change text size unit from dp to sp (scale-independent pixels) so font scaling is supported."
+                    })
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
@@ -657,16 +640,14 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 for match in re.finditer(r"fontSize\s*=\s*(\d+)\.dp", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "Compose text fontSize specified in dp instead of sp.",
-                            "fix": "Change Jetpack Compose text font size unit to sp (e.g. 16.sp).",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "Compose text fontSize specified in dp instead of sp.",
+                        "fix": "Change Jetpack Compose text font size unit to sp (e.g. 16.sp)."
+                    })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-HIGHCONTRAST":
         # Scan for hardcoded background or text colors using hex code values directly in XML or Compose
@@ -676,42 +657,33 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                for match in re.finditer(
-                    r"android:(textColor|background)\s*=\s*\"(#[0-9A-Fa-f]{6,8})\"",
-                    content,
-                ):
+                for match in re.finditer(r"android:(textColor|background)\s*=\s*\"(#[0-9A-Fa-f]{6,8})\"", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": f"Hardcoded hex color value ({match.group(2)}) ignored high contrast theme settings.",
-                            "fix": "Use semantic theme references or color resources (e.g. ?attr/colorOnSurface) rather than static hex strings.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": f"Hardcoded hex color value ({match.group(2)}) ignored high contrast theme settings.",
+                        "fix": "Use semantic theme references or color resources (e.g. ?attr/colorOnSurface) rather than static hex strings."
+                    })
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
-                for match in re.finditer(
-                    r"Color\s*\(\s*0xFF[0-9A-Fa-f]{6}\s*\)", content
-                ):
+                for match in re.finditer(r"Color\s*\(\s*0xFF[0-9A-Fa-f]{6}\s*\)", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "Compose Color declared with hardcoded hex code.",
-                            "fix": "Reference semantic colors from your app Theme material colors scheme instead of hardcoded values.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "Compose Color declared with hardcoded hex code.",
+                        "fix": "Reference semantic colors from your app Theme material colors scheme instead of hardcoded values."
+                    })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
@@ -723,61 +695,41 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
                 # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
-                for match in re.finditer(
-                    r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"",
-                    content,
-                ):
-                    if (
-                        'layout_width="wrap_content"' not in content
-                        and 'layout_height="wrap_content"' not in content
-                    ):
+                for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
+                    if "layout_width=\"wrap_content\"" not in content and "layout_height=\"wrap_content\"" not in content:
                         start_idx = match.start()
                         line_no = content.count("\n", 0, start_idx) + 1
-                        findings.append(
-                            {
-                                "file": f,
-                                "line": line_no,
-                                "rule_id": rule_id,
-                                "match": match.group(0),
-                                "message": f"Component dimension ({match.group(0)}) is below the recommended 48dp touch target threshold.",
-                                "fix": "Increase interactive component width and height to at least 48dp or add layout padding.",
-                            }
-                        )
+                        findings.append({
+                            "file": f,
+                            "line": line_no,
+                            "rule_id": rule_id,
+                            "match": match.group(0),
+                            "message": f"Component dimension ({match.group(0)}) is below the recommended 48dp touch target threshold.",
+                            "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
+                        })
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()
                 except Exception:
                     continue
                 # Match clickable elements that may be too small
-                for match in re.finditer(
-                    r"\.size\s*\(\s*([1-3][0-9]|4[0-7]|[1-9])\.dp\s*\)", content
-                ):
+                for match in re.finditer(r"\.size\s*\(\s*([1-3][0-9]|4[0-7]|[1-9])\.dp\s*\)", content):
                     start_idx = match.start()
                     line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append(
-                        {
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": "Compose view size is below the recommended 48dp touch target threshold.",
-                            "fix": "Enlarge the touch target size of the clickable control to at least 48dp x 48dp.",
-                        }
-                    )
+                    findings.append({
+                        "file": f,
+                        "line": line_no,
+                        "rule_id": rule_id,
+                        "match": match.group(0),
+                        "message": "Compose view size is below the recommended 48dp touch target threshold.",
+                        "fix": "Enlarge the touch target size of the clickable control to at least 48dp x 48dp."
+                    })
 
     return findings
 
-
 def main():
-    parser = argparse.ArgumentParser(
-        description="Static continuous accessibility compliance auditor."
-    )
-    parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Root directory of the project to scan.",
-    )
+    parser = argparse.ArgumentParser(description="Static continuous accessibility compliance auditor.")
+    parser.add_argument("directory", nargs="?", default=".", help="Root directory of the project to scan.")
     parser.add_argument("--rule", help="Scan only a specific accessibility rule ID.")
     args = parser.parse_args()
 
@@ -846,7 +798,6 @@ def main():
 
     # Exit with 0 on advisory findings since accessibility represents medium store risk
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

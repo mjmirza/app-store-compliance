@@ -74,13 +74,16 @@ There are three EU distribution channels, all still involving Apple. the App Sto
 
 ### 2.2 External purchase links and alternative payments (HARD)
 
-- In June 2025 Apple consolidated the non-IAP options into a single "communication and promotion of offers" entitlement. The entitlement identifier is `com.apple.developer.storekit.external-purchase-link`, and the developer signs the StoreKit External Purchase Link Entitlement Addendum for EU Apps.
-- Every external link the user can tap, click, or scan MUST call the `ExternalPurchaseCustomLink` API to show a system-provided disclosure sheet stating the user will transact with the developer and not Apple.
-- No mixing on the same storefront. An app cannot offer In-App Purchase and promote external offers within the same app on the same App Store storefront and platform.
-- Reporting. external-purchase transactions are reported through the External Purchase Server API monthly, within 15 calendar days of Apple's fiscal-month end.
-- Lost capabilities for external purchases. no Report-a-Problem, no Family Sharing, no Ask-to-Buy, no Apple purchase history or subscription management.
+- From 1 October 2026 the terms sit in Attachment 14 of the Apple Developer Program License Agreement. The Alternative Terms Addendum for Apps in the EU and the StoreKit External Purchase Link Entitlement (EU) Addendum are phased out.
+- Combining is allowed. An app on EU storefronts may sell through Apple In-App Purchase, alternative payment processing within the app, out-of-app offers, or any combination of them.
+- Once a payment option or combination is chosen, it MUST be kept across all EU storefronts for 12 months.
+- When alternatives are offered alongside In-App Purchase, In-App Purchase MUST be presented at the same time and at least as prominently, payment flows may not discourage or disrupt it, and the App Store product page may not describe alternative payment options.
+- The entitlement is the StoreKit External Purchases or Offers Entitlement, key `com.apple.developer.storekit.custom-purchase-link.allowed-regions`, for apps on EU storefronts running iOS 26.2 or later (macOS, tvOS, visionOS and watchOS 26.6 or later).
+- Alternative payment processing in the app, and any out-of-app offer behind a link the user can tap, click, or scan, MUST use the `ExternalPurchaseCustomLink` API to show the system disclosure sheet stating the user will transact with the developer and not Apple.
+- Reporting. every alternative payment transaction, including refunds, renewals and transactions that did not result in a purchase, is reported monthly within 15 days after the end of the calendar month, through the External Purchase Server API for apps on OS 26.4 or later.
+- Transactions outside In-App Purchase do not appear in Report a Problem, Family Sharing, App Store purchase history, or subscription management, and Apple cannot help with their refunds.
 
-Source. [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/).
+Source, read 15 October 2026. [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/), [Apple apps in the EU](https://developer.apple.com/support/apps-in-the-eu/).
 
 ### 2.3 The EU fee model (unified terms from 1 October 2026, verified 5 September 2026)
 
@@ -105,10 +108,11 @@ The European Commission fined Apple 500,000,000 euro on 23 April 2025 for breach
 
 ### 2.6 What a compliance tool must CHECK for an EU app using DMA entitlements
 
-- The external-purchase entitlement identifier is declared when the app uses external offers.
-- Every external link the user can tap, click, or scan calls the `ExternalPurchaseCustomLink` disclosure sheet.
-- The app does NOT ship both StoreKit IAP and external-offer links on the same EU storefront.
-- External Purchase Server API reporting is wired (monthly, 15-day window).
+- The StoreKit External Purchases or Offers Entitlement is declared when the app offers alternative payments or out-of-app offers.
+- Alternative payment processing and every linked out-of-app offer call the `ExternalPurchaseCustomLink` disclosure sheet.
+- Where alternatives sit beside In-App Purchase, In-App Purchase is shown at the same time and at least as prominently, and the product page does not describe alternative payment options.
+- The chosen payment options stay in place across all EU storefronts for 12 months.
+- Monthly transaction reporting is wired (within 15 days of the calendar month end, External Purchase Server API on OS 26.4 or later).
 - Any non-App-Store build passed notarization.
 - A marketplace app uses MarketplaceKit, installs only from its own domain, and runs moderation, anti-fraud, and refund handling.
 - Entitlement-using code is gated to the minimum OS (iOS and iPadOS 17.4, macOS 14.4, visionOS 1.2, watchOS 10.4).
@@ -232,7 +236,7 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | DSA trader status | Trader or non-trader declared and verified before EU distribution | live since 17 Feb 2025 |
 | Age-rating questionnaire | Answered for every app, capabilities match behaviour | deadline 31 Jan 2026 |
 | European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, Annex V accessibility information published (Art. 13(2)) | live since 28 Jun 2025 |
-| DMA external purchase | Entitlement declared, disclosure sheet wired, no IAP mix, reporting wired | live |
+| DMA alternative payments | Entitlement declared, disclosure sheet wired, In-App Purchase shown alongside at equal prominence, options kept 12 months, reporting wired | live, Attachment 14 terms from 1 Oct 2026 |
 | Notarization | Any non-App-Store build notarized | live |
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
 | EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |

@@ -667,14 +667,34 @@ def scan_target_repo(repo_path, track_name, metadata):
     return affected_files, verdict
 
 
+_COMMENT = r"<!--(?:-?>|.*?--!?>|.*\Z)"
+_BOGUS = r"<(?:[!?]|/(?![A-Za-z]))[^>]*(?:>|\Z)"
+_TAG = r"""</?[A-Za-z](?:[^<>"']|"[^"]*"|'[^']*')*>"""
 HTML_MARKUP = re.compile(
-    r"""<!--(?:-?>|.*?--!?>|.*\Z)|<[A-Za-z/!?](?:[^<>"']|"[^"]*"|'[^']*')*>""", re.S
-)  # comments first so a browser-ended comment hides nothing extra, quoted attributes stay whole
+    _COMMENT
+    + r"|<!\[CDATA\[(.*?)(?:\]\]>|\Z)"
+    + r"""|<(textarea|title)\b(?:[^<>"']|"[^"]*"|'[^']*')*>(.*?)(?:</\2\s*>|\Z)"""
+    + "|"
+    + _BOGUS
+    + "|"
+    + _TAG,
+    re.S | re.I,
+)  # every branch ends at its terminator or at the end, so one left-to-right pass stays linear
+_CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I)
+
+
+def _visible_markup(m):
+    """CDATA and textarea or title content is visible text. Everything else is markup."""
+    if m.group(1) is not None:
+        return " " + _CDATA_MARKUP.sub(" ", m.group(1)) + " "
+    if m.group(3) is not None:
+        return " " + m.group(3) + " "
+    return " "
 
 
 def strip_html(text):
     """Feed descriptions carry HTML. Match on the visible text only."""
-    text = HTML_MARKUP.sub(" ", text or "")
+    text = HTML_MARKUP.sub(_visible_markup, text or "")
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 

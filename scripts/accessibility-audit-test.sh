@@ -519,6 +519,35 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_r6" "$ISSUE_DIR/clean_r6" "$ISSUE_DIR/deep_interp" "$ISSUE_DIR/nested_perf"
+cat << 'EOF' > "$ISSUE_DIR/icon_r6/R6.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(role: .destructive) { delete() } label: /* explanation explanation explanation explanation explanation explanation explanation */ { Image(systemName: "trash") }
+        Button { go() } label: { let discarded = Text("Delete"); return Image(systemName: "gear") }
+    }
+}
+EOF
+cat << 'EOF' > "$ISSUE_DIR/clean_r6/R6.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button { go() } label: { let discarded = Image(systemName: "trash"); return EmptyView() }
+    }
+}
+EOF
+python3 - "$ISSUE_DIR" << 'PY'
+import os, sys
+d = sys.argv[1]
+q = chr(34); bs = chr(92)
+with open(os.path.join(d, "deep_interp", "Deep.swift"), "w") as fh:
+    fh.write("let text = " + (q + bs + "(") * 3000 + q + "x" + q + (")" + q) * 3000 + "\n")
+n = 3000
+with open(os.path.join(d, "nested_perf", "Nested.swift"), "w") as fh:
+    fh.write("Button(action: {" * n + "work()" + ("}) { Image(systemName: " + q + "trash" + q + ") }") * n + "\n")
+PY
+
 mkdir -p "$ISSUE_DIR/icon_role" "$ISSUE_DIR/role_clean"
 cat << 'EOF' > "$ISSUE_DIR/icon_role/Role.swift"
 import SwiftUI
@@ -579,6 +608,37 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_r6" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
+  ok "#834 a long comment before label: and an unused local Text do not hide an icon label"
+else
+  bad "#834 a comment before label: or an unused local view hid an icon label. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/clean_r6" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#834 an unused local Image does not flag a label that returns another view"
+else
+  bad "#834 an unused local Image flagged the label. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$ISSUE_DIR/deep_interp" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "Traceback"; then
+  ok "#834 3000 levels of string interpolation scan without a crash"
+else
+  bad "#834 deep interpolation crashed the audit (rc=$RC). Output:"; echo "$OUT" | tail -3
+fi
+
+START=$(python3 -c 'import time; print(time.time())')
+OUT=$($AUDIT "$ISSUE_DIR/nested_perf" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); RC=$?
+ELAPSED=$(python3 -c "import time; print(round(time.time() - $START, 2))")
+COUNT=$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")
+if [ "$RC" -eq 0 ] && [ "$COUNT" -eq 3000 ] && python3 -c "import sys; sys.exit(0 if $ELAPSED < 3 else 1)"; then
+  ok "#834 3000 nested Buttons report all 3000 in under 3s (${ELAPSED}s)"
+else
+  bad "#834 nested Buttons were slow or miscounted (rc=$RC count=$COUNT ${ELAPSED}s)"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_role" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ]; then

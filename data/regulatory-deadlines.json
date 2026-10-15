@@ -83,7 +83,7 @@
       "id": "EU-DMA-EXTERNAL-PURCHASE",
       "jurisdiction": "European Union (EU)",
       "law": "EU Digital Markets Act (DMA)",
-      "requirement": "External purchase links and alternative payments (com.apple.developer.storekit.external-purchase-link entitlement, custom link sheet, CTC 5% reporting).",
+      "requirement": "Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase shown alongside at equal prominence, options kept 12 months, monthly transaction reporting).",
       "effective_date": "2024-03-07",
       "grace_period": "none",
       "mandatory_date": "2024-03-07",
