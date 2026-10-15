@@ -51,7 +51,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd","runInTerminal","run_in_terminal","run_terminal_command","run_terminal_cmd","monitor"] | any(. == $t)) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd","runInTerminal","run_in_terminal","run_terminal_command","run_terminal_cmd","monitor","execute_pwsh"] | any(. == $t)) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -61,7 +61,7 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd", "runInTerminal", "run_in_terminal", "run_terminal_command", "run_terminal_cmd", "monitor")
+SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd", "runInTerminal", "run_in_terminal", "run_terminal_command", "run_terminal_cmd", "monitor", "execute_pwsh")
 info = d.get("tool_info") if isinstance(d, dict) else None
 default = "shell" if isinstance(info, dict) and isinstance(info.get("command_line"), str) else "Bash"
 t = d.get("tool_name", d.get("toolName", default)) if isinstance(d, dict) else None
@@ -92,7 +92,7 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
   # A named tool that is not a shell stays quiet here too, the same list jq and python3 use.
   tn="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"(tool_name|toolName)"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
   if [ -n "$tn" ] && [ "$(printf '%s' "$STDIN_JSON" | grep -oE '"(tool_name|toolName)"[[:space:]]*:' | wc -l | tr -d ' ')" -eq 1 ]; then
-    case "$tn" in Bash|PowerShell|bash|powershell|run_shell_command|shell|Execute|launch-process|execute_bash|execute_cmd|runInTerminal|run_in_terminal|run_terminal_command|run_terminal_cmd|monitor) ;; *) return 0 ;; esac
+    case "$tn" in Bash|PowerShell|bash|powershell|run_shell_command|shell|Execute|launch-process|execute_bash|execute_cmd|runInTerminal|run_in_terminal|run_terminal_command|run_terminal_cmd|monitor|execute_pwsh) ;; *) return 0 ;; esac
   fi
   body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
   if [ -z "$body" ]; then
@@ -172,7 +172,7 @@ function blank(s,   o, i, n, c, w, prev, j, body) {
     if (c == sq || c == dq) {
       j=i+1; while (j <= n && substr(s, j, 1) != c) { if (c == dq && substr(s, j, 1) == "\\") j++; j++ }
       body=substr(s, i+1, j-i-1)
-      if (((w == "" && msgflag(prev)) || (w ~ /=$/ && msgflag(substr(w, 1, length(w)-1)))) && (c == sq || (index(body, "$") == 0 && index(body, bt) == 0))) {
+      if (j <= n && ((w == "" && msgflag(prev)) || (w ~ /=$/ && msgflag(substr(w, 1, length(w)-1)))) && (c == sq || (index(body, "$") == 0 && index(body, bt) == 0))) {
         o=o c c; w=w c c; i=j+1; continue }
       o=o substr(s, i, j-i+1); w=w substr(s, i, j-i+1); i=j+1; continue }
     o=o c; w=w c; i++ }
@@ -190,7 +190,8 @@ function seg(s,   t) {
     if (c == sq || c == dq) { q=c; cur=cur c; i++; continue }
     if (c == ";" || c == "|" || c == "&") { out=out seg(cur) c; cur=""; i++; continue }
     cur=cur c; i++ }
-  print out seg(cur) }
+  raw[NR]=l; msk[NR]=out seg(cur); if (q != "") open=1 }
+END { for (k=1; k<=NR; k++) print (open ? raw[k] : msk[k]) }
 INERT
   # Match raw with quotes and letter escapes stripped. Only a single simple line led by an inert text command
   # (echo, grep, cat) has quoted spans blanked, and a heredoc body is blanked unless an interpreter consumes it.
@@ -242,43 +243,52 @@ FASTFILES
   }
   submits() { set -- "$(fl_norm "$1")"; printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || printf '%s' "$1" | grep -qE 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
   # What a package script or a make target runs, one level deep, so a wrapped submit is still seen.
-  wrapper_body() {
+  runner_body() {  # $1 one command segment
     local name esc sub pj seg w prev mf targets mfiles
     local opts='([[:space:]]+--?[A-Za-z][A-Za-z-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*'
     local pre='.*(^|[^A-Za-z0-9_./-])'
-    name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}(turbo|lerna)${opts}[[:space:]]+run[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}nx${opts}[[:space:]]+run(-many)?[[:space:]]+([A-Za-z0-9_.@\/-]+:)?([A-Za-z0-9_.-]+).*/\6/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}pnpm${opts}[[:space:]]+([A-Za-z0-9:_.-]+).*/\4/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}yarn${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
+    name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspaces[[:space:]]+foreach${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(turbo|lerna)${opts}[[:space:]]+run[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+run(-many)?[[:space:]]+([A-Za-z0-9_.@\/-]+:)?([A-Za-z0-9_.][A-Za-z0-9_.-]*).*/\6/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+(run-many|affected)([[:space:]]+[^[:space:]]+)*[[:space:]]+(-t|--targets?)[=[:space:]]+([A-Za-z0-9_.-]+).*/\7/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(pnpm|bun|turbo)${opts}[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+([A-Za-z0-9:_.-]+).*/\4/p" | head -1)"
+    case "$name" in run|run-many|affected|exec|install|i|add|x|dlx) name="" ;; esac
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
     if [ -n "$name" ]; then
-      local sel sub all files pick s2 base f d
+      local sel sub all files pick s2 base f d pat scoped
       esc="$(printf '%s' "$name" | sed 's/\./\\./g')"
       # The package the runner names, or the folder it runs in. Unknown or none named means every package is read.
-      sel="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(yarn[[:space:]]+workspace|(^|[[:space:]])(--filter|-F|--workspace|-w))([=[:space:]]+)([^[:space:]]+).*/\5/p' | head -1)"
-      [ -z "$sel" ] && sel="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*nx[^;&|]*[[:space:]]run[[:space:]]+([A-Za-z0-9_.@\/-]+):.*/\1/p' | head -1)"
-      sub="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
+      local rseg="$1"
+      sel="$(printf '%s' "$rseg" | sed -nE 's/.*(yarn[[:space:]]+workspace|(^|[[:space:]])(--filter|-F|--workspace|-w))([=[:space:]]+)([^[:space:]]+).*/\5/p' | head -1)"
+      [ -z "$sel" ] && sel="$(printf '%s' "$rseg" | sed -nE 's/.*nx[^;&|]*[[:space:]]run[[:space:]]+([A-Za-z0-9_.@\/-]+):.*/\1/p' | head -1)"
+      sub="$(printf '%s' "$rseg" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
       case "$sub" in /*|*..*) sub="" ;; esac
-      all=0; printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|nx[^;&|]*run-many' && all=1
+      all=0; printf '%s' "$rseg" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|nx[^;&|]*run-many|[[:space:]](-r|--recursive|-ws|--workspaces|foreach)([[:space:]=]|$)' && all=1
       files="$(find "$DIR" -maxdepth 6 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build \) -prune \) -o \( -name package.json -o -name project.json \) -print 2>/dev/null | head -200)"
       if [ -n "$sub" ] && [ -f "$DIR/$sub/package.json" ]; then pick="$DIR/$sub/package.json"
       elif [ -n "$sel" ]; then
         s2="${sel#./}"; s2="${s2%/}"; base="${s2##*/}"
+        # bash 3.2 misreads a case pattern inside $( ), so the scope test sits out here.
+        scoped=0; pat="(@[^/\"]+/)?$base"
+        case "$s2" in @*/*) scoped=1; pat="$s2" ;; esac
         pick="$(printf '%s\n' "$files" | while IFS= read -r f; do
           [ -n "$f" ] || continue; d="$(dirname "$f")"
-          case "$d" in */"$s2"|*/"$base") echo "$f"; continue ;; esac
-          tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"(@[^/\"]+/)?$base\"" && echo "$f"
+          if [ "$scoped" -eq 0 ] && { [ "${d##*/}" = "$base" ] || [ "${d%/$s2}" != "$d" ]; }; then echo "$f"; continue; fi
+          tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"$pat\"" && echo "$f"
         done)"
         [ -z "$pick" ] && pick="$files"
       elif [ "$all" -eq 1 ]; then pick="$files"
       else pick="$DIR/package.json"; fi
+      pick="$(printf '%s\n%s' "$DIR/package.json" "$pick" | awk 'NF && !seen[$0]++')"
       printf '%s\n' "$pick" | while IFS= read -r pj; do
         [ -f "$pj" ] || continue
         tr -d '\n' < "$pj" 2>/dev/null | grep -oE "\"$esc\"[[:space:]]*:[[:space:]]*(\"([^\"\\\\]|\\\\.)*\"|\{[^}]*)"
       done
     fi
-    seg="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([^;&|]*).*/\2/p' | head -1)"
+    seg="$(printf '%s' "$1" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([^;&|]*).*/\2/p' | head -1)"
     if [ -n "$seg" ]; then
       targets=""; mfiles="Makefile makefile GNUmakefile"; prev=""
       set -f
@@ -295,6 +305,12 @@ FASTFILES
       done
       set +f
     fi
+  }
+  wrapper_body() {  # every runner and make segment, so a later web build never masks an earlier submit
+    local sg
+    printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n' | while IFS= read -r sg; do
+      [ -n "$sg" ] && runner_body "$sg"
+    done
   }
   # Cheap exit for the everyday command. Nothing below runs unless a submit tool or a wrapper is named.
   if ! printf '%s' "$CMD_MATCH" | grep -qiE "$SUBMIT_RE" \
@@ -340,11 +356,15 @@ if [ -n "$CMD" ]; then
   # Each submitting segment is classified on its own. Android only means every submit in the command is Android.
   SEG_SUBMITS=0; SEG_ALL_AND=1
   # Beside an Android submit only a known harmless command keeps it Android only. Anything else may upload to Apple.
-  SAFE_SEG_RE='^(cd|pushd|popd|echo|printf|export|unset|set|true|false|:|test|sleep|ls|pwd|mkdir|rm|cp|mv|cat|touch|tee|grep|head|tail|wc|date|clear|git)$'
+  SAFE_SEG_RE='^(cd|pushd|popd|echo|printf|export|unset|set|true|false|:|test|sleep|ls|pwd|mkdir|rm|cp|mv|cat|touch|tee|grep|head|tail|wc|date|clear)$'
+  SUBST=0; printf '%s' "$CMD" | grep -qE '\$\(|`|<\(|>\(' && SUBST=1
   while IFS= read -r SEG; do
     W1="$(printf '%s' "$SEG" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
     [ -n "$W1" ] || continue
-    if ! submits "$SEG"; then printf '%s' "$W1" | grep -qE "$SAFE_SEG_RE" || SEG_ALL_AND=0; continue; fi
+    if ! submits "$SEG"; then
+      { [ "$SUBST" -eq 0 ] && printf '%s' "$W1" | grep -qE "$SAFE_SEG_RE"; } || SEG_ALL_AND=0
+      continue
+    fi
     SEG_SUBMITS=$((SEG_SUBMITS+1))
     SEGN="$(fl_norm "$SEG")"
     { printf '%s' "$SEGN" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
@@ -397,7 +417,7 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
 }
 
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
-CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|/project\.ya?ml|/Project\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
+CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|\.ya?ml|/project\.json|/config\.xml|/Project\.swift|/Tuist/.*\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
   [ -s "$FILELIST" ] || return 1
   local out
@@ -410,10 +430,11 @@ SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
 # Source with comments dropped. Strings, Swift raw strings and #/regex/#, and Rust r".." stay text.
 # A /* opens a comment only at the start of a line, or after a separator when it closes on that line.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/\\\\\"" sq bt "]" }
-    FNR == 1 { blk=0; tq=""; tb=0; rr=""; rml=0; resc=""; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.swift$/); rs=(FILENAME ~ /\.rs$/) }
+    function flush(   k) { if (nb) { for (k=1; k<=nb; k++) print br[k]; nb=0 } }
+    FNR == 1 { flush(); blk=0; tq=""; tb=0; rr=""; rml=0; resc=""; pcont=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.swift$/); rs=(FILENAME ~ /\.rs$/); cs=(FILENAME ~ /\.cs$/) }
     { l=$0
-      if (!blk && tq == "" && !tb && rr == "" && l !~ fast) { print l; next }
-      n=length(l); o=""; q=""; i=1
+      if (!blk && tq == "" && !tb && rr == "" && l !~ fast) { pcont=0; print l; next }
+      n=length(l); o=""; q=""; i=1; sl=0
       while (i <= n) { c=substr(l, i, 1)
         if (blk) { if (c == "*" && substr(l, i+1, 1) == "/") { blk=0; i+=2 } else i++; continue }
         if (rr != "" && resc != "" && c == "\\" && substr(l, i+1, length(resc)) == resc) { o=o substr(l, i, 2+length(resc)); i+=2+length(resc); continue }
@@ -425,28 +446,40 @@ STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/
         if (sw && c == "#") { j=i; while (substr(l, j, 1) == "#") j++
           if (substr(l, j, 1) == dq) { h=substr(l, i, j-i); rml=(substr(l, j, 3) == dq dq dq); rr=(rml ? dq dq dq : dq) h; resc=h; o=o h (rml ? dq dq dq : dq); i=j+(rml ? 3 : 1); continue }
           if (substr(l, j, 1) == "/") { h=substr(l, i, j-i); rr="/" h; resc=""; rml=(j == n); o=o h "/"; i=j+1; continue } }
+        if (cs && c == "@" && (substr(l, i+1, 1) == dq || (substr(l, i+1, 1) == "$" && substr(l, i+2, 1) == dq))) { k=(substr(l, i+1, 1) == dq ? 1 : 2); rr=dq; resc=""; rml=1; o=o substr(l, i, k+1); i+=k+1; continue }
         if (rs && (c == "r" || (c == "b" && substr(l, i+1, 1) == "r")) && (i == 1 || substr(l, i-1, 1) !~ /[A-Za-z0-9_]/)) { k=(c == "b" ? i+2 : i+1); j=k; while (substr(l, j, 1) == "#") j++
           if (substr(l, j, 1) == dq) { h=substr(l, k, j-k); rr=dq h; resc=""; rml=1; o=o substr(l, i, j-i+1); i=j+1; continue } }
-        if (c == "/" && substr(l, i+1, 1) == "/" && (i == 1 || substr(l, i-1, 1) ~ /[ \t;{},)]/)) break
+        if (c == "/" && substr(l, i+1, 1) == "/" && (substr(l, 1, i-1) ~ /^[ \t]*$/ || (tc && !sl && substr(l, i-1, 1) ~ /[ \t;{},)]/))) break
         if (c == "/" && substr(l, i+1, 1) == "*") { pv=(i > 1 ? substr(l, i-1, 1) : "")
-          if (substr(l, 1, i-1) ~ /^[ \t]*$/ || (pv ~ /[ \t;{},)]/ && index(substr(l, i+2), "*/") > 0)) { blk=1; i+=2; continue } }
+          rest=substr(l, i+2); nq=gsub(dq, dq, rest)
+          if ((substr(l, 1, i-1) ~ /^[ \t]*$/ && !pcont && nq % 2 == 0) || (!sl && pv ~ /[ \t;{},)]/ && index(substr(l, i+2), "*/") > 0)) { blk=1; i+=2; continue } }
         if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
         if (c == bt && js) { tb=1; o=o c; i++; continue }
         if (c == dq || c == sq || c == bt) q=c
+        if (c == "/") sl=1
         o=o c; i++ }
+      pcont=(l ~ /\\$/)
       if (rr != "" && !rml) rr=""
-      print o }'
+      if (blk) { nb++; bo[nb]=o; br[nb]=$0; next }
+      if (nb) { for (k=1; k<=nb; k++) print bo[k]; nb=0 }
+      print o }
+    END { flush() }'
 build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
   CODE_OK=0
   : > "$FILELIST.code" 2>/dev/null || return 0
   : > "$FILELIST.impl" 2>/dev/null || return 0
-  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk "$STRIP_AWK" 2>/dev/null
-    grep -E '\.html$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { hc=0 } { l=$0; o=""
+  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk -v tc=1 "$STRIP_AWK" 2>/dev/null
+    grep -E '\.html$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'function flush(   k) { if (nh) { for (k=1; k<=nh; k++) print hr[k]; nh=0 } }
+      FNR == 1 { flush(); hc=0 } { l=$0; o=""
         while (l != "") { if (hc) { p=index(l, "-->"); if (p == 0) { l=""; break }; l=substr(l, p+3); hc=0; continue }
-          p=index(l, "<!--"); if (p == 0) { o=o l; break }; o=o substr(l, 1, p-1); l=substr(l, p+4); hc=1 }
-        print o }' 2>/dev/null
+          p=index(l, "<!--"); if (p == 0) { o=o l; break }
+          pre=substr(l, 1, p-1); if (o pre !~ /(^[ \t]*|>[ \t]*)$/) { o=o substr(l, 1, p+3); l=substr(l, p+4); continue }
+          o=o pre; l=substr(l, p+4); hc=1 }
+        if (hc) { nh++; ho[nh]=o; hr[nh]=$0; next }
+        if (nh) { for (k=1; k<=nh; k++) print ho[k]; nh=0 }
+        print o } END { flush() }' 2>/dev/null
     printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.impl" 2>/dev/null
-  { grep -vF "$BLOB_END" "$FILELIST.impl" 2>/dev/null
+  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk -v tc=0 "$STRIP_AWK" 2>/dev/null
     grep -vE "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIh -e '' 2>/dev/null
     printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.code" 2>/dev/null
   [ "$(tail -n 1 "$FILELIST.code" 2>/dev/null)" = "$BLOB_END" ] && [ "$(tail -n 1 "$FILELIST.impl" 2>/dev/null)" = "$BLOB_END" ] && CODE_OK=1
@@ -555,6 +588,7 @@ find_tree() {  # find "$DIR" <expr>, the whole tree as before, minus the nested 
   else find "$DIR" \( -type d \( -name '' "${NESTED_PRUNE[@]}" \) -prune \) -o "$@" 2>/dev/null; fi
 }
 FILELIST="$(mktemp 2>/dev/null)" || FILELIST=""
+{ [ -n "$FILELIST" ] && : > "$FILELIST" 2>/dev/null; } || FILELIST="/tmp/ascg.$$"
 # No scan buffer means no scan. Say so rather than end CLEAR on an empty file list.
 if [ -z "$FILELIST" ] || ! : > "$FILELIST" 2>/dev/null; then
   NOTE="NOT CHECKED. The guard could not create its scan buffer in ${TMPDIR:-/tmp}, so nothing was scanned. Point TMPDIR at a writable folder and run it again."
@@ -1205,9 +1239,14 @@ bare_native_apart() {  # $1 candidate dir below $DIR
   find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
     -o \( -name 'Info.plist' -o -name 'AndroidManifest.xml' \) -print 2>/dev/null | grep . >/dev/null || return 1
   # Only a shippable app splits off. a library module or a local native module stays with the app that uses it.
-  find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) -o -name '*.xcodeproj' -print 2>/dev/null | grep . >/dev/null \
+  find "$1" -maxdepth 5 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) -o -path '*.xcodeproj/project.pbxproj' -print 2>/dev/null \
+    | while IFS= read -r f; do grep -q 'com\.apple\.product-type\.application' "$f" 2>/dev/null || ! grep -q 'com\.apple\.product-type\.' "$f" 2>/dev/null && echo "$f"; done | grep . >/dev/null \
     || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
       | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
+  # A native host that embeds the root framework (brownfield) shares its dependencies, so it stays in the root scan.
+  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|import Capacitor' "$1" \
+    --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' --include='Podfile' --include='*.pbxproj' \
+    --exclude-dir=Pods --exclude-dir=node_modules --exclude-dir=build 2>/dev/null | grep . >/dev/null && return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.
   native_dir_has_project "$DIR/ios" || ! find "$1" -maxdepth 4 -name 'Info.plist' -not -path '*/Pods/*' 2>/dev/null | grep . >/dev/null || return 1
   native_dir_has_project "$DIR/android" || ! find "$1" -maxdepth 4 -name 'AndroidManifest.xml' -not -path '*/build/*' 2>/dev/null | grep . >/dev/null || return 1
@@ -1287,6 +1326,8 @@ emit_report() {  # $1 is the exit code about to be returned
 trap 'emit_report 2; exit 143' INT TERM HUP
 if [ -n "$STDIN_JSON" ]; then
   REPORT="$(mktemp 2>/dev/null)" || REPORT=""
+  # An unusable mktemp falls back to /tmp, as the scan buffer does, so the report still reaches stderr.
+  { [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; } || REPORT="/tmp/ascg-report.$$"
   if [ -n "$REPORT" ] && : >"$REPORT" 2>/dev/null; then exec 3>&1; exec >"$REPORT"; else REPORT=""; REPORT_DEGRADED=1; fi
   # Unbuffered, Cursor still needs a clean stdout, so the live report goes to stderr instead.
   if [ -z "$REPORT" ] && [ "$IS_CURSOR" -eq 1 ]; then exec 3>&1; exec 1>&2; CURSOR_FD=1; fi
