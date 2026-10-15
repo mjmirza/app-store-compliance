@@ -9,9 +9,13 @@ generated the app, on top of the native checks.
 
 | Framework | Detected by |
 |---|---|
-| Flutter | `pubspec.yaml` present within 3 levels of the project root |
-| React Native / Expo | `package.json` dependency on `react-native` or `expo` |
-| Ionic / Capacitor / Cordova | `package.json` dependency on `@capacitor/*`, `@ionic/*`, or `cordova-*`, OR a `capacitor.config.*` / `config.xml` file |
+| Flutter | `pubspec.yaml` present within 12 levels of the project root |
+| React Native / Expo | `package.json` within 12 levels with a dependency on `react-native` or `expo` |
+| Ionic / Capacitor / Cordova | `package.json` within 12 levels with a dependency on `@capacitor/*`, `@ionic/*`, or `cordova-*`, OR a `capacitor.config.*` / `config.xml` file within 12 levels |
+
+These depths come from the `find_app` calls in
+`agent-os/hooks/app-store-compliance-guard.sh`. Unity, .NET MAUI, Tauri mobile,
+and Kotlin Multiplatform are searched within 6 levels.
 
 A project can match more than one framework flag (a Capacitor app that also
 imports `expo` polyfills, for example); every matching check runs. Detection scans
@@ -147,9 +151,11 @@ These are limits, not bugs waiting for a fix. Plan around them.
 - **Two frameworks have no coverage.** NativeScript and legacy Xamarin.Forms
   are not detected. Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform
   are, see the section above for what each one still cannot see.
-- **The submission regex still misses a few real commands**
-  (`eas build` with no platform flag, ambiguous local `cap run` without a
-  release intent) and can overfire on non-release local dev commands.
+- **The submission regex errs toward firing.** `SUBMIT_RE` in
+  `agent-os/hooks/app-store-compliance-guard.sh` matches `eas build` with or
+  without a `--platform` flag, also when global flags come before the
+  subcommand. It also matches every `cap run` and `cap open`, so a local dev
+  run with no release intent still triggers the guard.
 
 These are logged, not hidden. Track them before treating this guard as complete
 coverage for a cross-platform team; the checks that exist are a real
