@@ -148,6 +148,14 @@ OUT="$(run --tool codex uninstall)"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); c=[h["command"] for g in d["hooks"]["PreToolUse"] for h in g["hooks"]]; sys.exit(0 if c==["bash ~/other.sh"] else 1)' "$H/.codex/hooks.json" \
   && ok "codex uninstall keeps the other hook" || bad "codex uninstall keeps the other hook"
 
+# 4b removing the most recently installed tool keeps the skill for the earlier one, in both orders
+for pair in "codex gemini" "gemini codex"; do
+  set -- $pair; fresh; run --tool "$1" >/dev/null; run --tool "$2" >/dev/null; run --tool "$2" uninstall >/dev/null
+  run --tool "$1" doctor >/dev/null; RC=$?
+  [ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && [ "$RC" -eq 0 ] && grep -qx "$1" "$H/.agents/skills/app-store-compliance/.installed-by" \
+    && ok "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes" || bad "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes (rc=$RC)"
+done
+
 # 5 a config that is not valid JSON, or repeats a key, is never rewritten
 for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"allow":["x"]}}'; do
   fresh; mkdir -p "$H/.codex"; printf '%s' "$body" > "$H/.codex/hooks.json"

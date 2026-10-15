@@ -564,6 +564,15 @@ def read_owners():
         return set()
 
 
+def write_owners(owners):
+    """Replaces .installed-by in one step, so a reader never sees it empty or half written."""
+    sk = skill_dir()
+    fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-owners-")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted(owners)) + "\n")
+    os.replace(tmp, os.path.join(sk, ".installed-by"))
+
+
 def copy_payload(tool, lay, guard):
     if tool != "copilot-repo":
         sk = skill_dir()
@@ -585,8 +594,7 @@ def copy_payload(tool, lay, guard):
                 os.path.join(sk, d),
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
-        with open(os.path.join(sk, ".installed-by"), "w", encoding="utf-8") as f:
-            f.write("\n".join(sorted(read_owners() | {tool})) + "\n")
+        write_owners(read_owners() | {tool})
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -901,10 +909,7 @@ def uninstall(tool, lay, guard, dry):
     else:
         owners = read_owners() - {tool}
         if owners:
-            with open(
-                os.path.join(skill_dir(), ".installed-by"), "w", encoding="utf-8"
-            ) as f:
-                f.write("\n".join(sorted(owners)) + "\n")
+            write_owners(owners)
             print(
                 "Removed the "
                 + SPECS[tool]["name"]
