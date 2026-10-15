@@ -2239,6 +2239,35 @@ rr_run "$D"
 rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx3-3 a mid-line block comment still satisfies nothing" || bad "cx3-3 a mid-line block comment still satisfies nothing (rc=$RC)"
 rm -rf "$D"
 
+# CX3b a /* inside a Swift raw string #"..."#, a multiline raw string, or any number of # is text, not a comment
+for src in 'let s = #"/* not a comment"#' 'let s = #"say "hi" /* not a comment"#' 'let s = #"\"/* not a comment"#' 'let s = ##"a "# /* not a comment"##' 'let s = #"""
+/* not a comment
+"""#' 'let s = ##"""
+"""# /* still inside
+"""##' 'let s = #"/*"#; let t = #"*/"#'; do
+  D="$(mk_rr_ios '' "import AVFoundation
+$src
+let camera = AVCaptureDevice.default(for: .video)")"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "cx3b raw string keeps the camera call. ${src%%$'\n'*}" || bad "cx3b raw string keeps the camera call. ${src%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+/* AVCaptureDevice */')"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "cx3b a real block comment naming AVCaptureDevice still raises nothing" || bad "cx3b a real block comment naming AVCaptureDevice still raises nothing (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+let s = #"raw"# /* AVCaptureDevice.default(for: .video) */')"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "cx3b a block comment after a closed raw string is still a comment" || bad "cx3b a block comment after a closed raw string is still a comment (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+let s = #"\"# // deleteAccount')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx3b a backslash in a raw string does not turn a trailing comment into code" || bad "cx3b a backslash in a raw string does not turn a trailing comment into code (rc=$RC)"
+rm -rf "$D"
+
 # CX4 a translation or config file never satisfies an implementation check
 D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
 mkdir -p "$D/App/en.lproj"; printf '/* TODO: deleteAccount */\n"title" = "deleteUser";\n' > "$D/App/en.lproj/InfoPlist.strings"

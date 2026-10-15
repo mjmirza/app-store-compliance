@@ -368,24 +368,28 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
 
 # Source with comment-only lines and trailing // comments blanked, so a comment never counts as code.
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
-# Source with comments dropped. Strings (one-line, triple-quoted, JS template) are kept, so a marker in one is text.
+# Source with comments dropped. Strings (one-line, triple-quoted, JS template, Swift or Rust raw #".."#) stay text.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/\\\\\"" sq bt "]" }
-    FNR == 1 { blk=0; tq=""; tb=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/) }
+    FNR == 1 { blk=0; tq=""; tb=0; rr=""; rml=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.(swift|rs)$/) }
     { l=$0
-      if (!blk && tq == "" && !tb && l !~ fast) { print l; next }
+      if (!blk && tq == "" && !tb && rr == "" && l !~ fast) { print l; next }
       n=length(l); o=""; q=""; i=1
       while (i <= n) { c=substr(l, i, 1)
         if (blk) { if (c == "*" && substr(l, i+1, 1) == "/") { blk=0; i+=2 } else i++; continue }
+        if (rr != "") { if (substr(l, i, length(rr)) == rr) { o=o rr; i+=length(rr); rr="" } else { o=o c; i++ }; continue }
         if (c == "\\") { o=o substr(l, i, 2); i+=2; continue }
         if (tq != "") { if (substr(l, i, 3) == tq) { o=o tq; tq=""; i+=3 } else { o=o c; i++ }; continue }
         if (tb) { if (c == bt) tb=0; o=o c; i++; continue }
         if (q != "") { if (c == q) q=""; o=o c; i++; continue }
+        if (sw && c == "#") { j=i; while (substr(l, j, 1) == "#") j++
+          if (substr(l, j, 1) == dq) { h=substr(l, i, j-i); rml=(substr(l, j, 3) == dq dq dq); rr=(rml ? dq dq dq : dq) h; o=o h (rml ? dq dq dq : dq); i=j+(rml ? 3 : 1); continue } }
         if (c == "/" && substr(l, i+1, 1) == "/") break
         if (c == "/" && substr(l, i+1, 1) == "*") { blk=1; i+=2; continue }
         if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
         if (c == bt && js) { tb=1; o=o c; i++; continue }
         if (c == dq || c == sq || c == bt) q=c
         o=o c; i++ }
+      if (rr != "" && !rml) rr=""
       print o }'
 build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
   CODE_OK=0
