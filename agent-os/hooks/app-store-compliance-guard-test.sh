@@ -2453,6 +2453,123 @@ rr_run "$D"
 rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "r3-M a managed Expo root keeps its account deletion finding beside a clean native child" || bad "r3-M a managed Expo root keeps its account deletion finding beside a clean native child (rc=$RC)"
 rm -rf "$D"
 
+# R4 round 4 review. each input is one where main scanned or reported, or a real submit went unchecked
+FL="fast""lane"
+GW="./gradle""w bundle""Release"
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+# R4-1 a git alias or any git global option other than -C keeps the whole command scanned
+rr_hook "git -c 'alias.ship=!f() { eval \"\$3\"; }; f' ship commit -m '$FL deliver'" "$D"
+[ "$RC" -eq 2 ] && ok "r4-1 a git alias that runs its argument is scanned" || bad "r4-1 a git alias that runs its argument is scanned (rc=$RC)"
+rr_hook "git -C . commit -m 'release notes for $FL deliver'" "$D"
+[ "$RC" -eq 0 ] && ok "r4-1b a plain git -C commit message stays text" || bad "r4-1b a plain git -C commit message stays text (rc=$RC)"
+# R4-2 only a known harmless command may sit beside an Android build and keep it Android only
+mkdir -p "$D/scripts"; printf 'import os\nos.system("%s deliver")\n' "$FL" > "$D/scripts/upload.py"
+printf '%s deliver\n' "$FL" > "$D/scripts/upload.sh"
+for c in "$GW && python3 scripts/upload.py" "$GW && node scripts/upload.js" "$GW && ruby scripts/upload.rb" "$GW && scripts/upload.sh" "$GW && ./upload" "$GW && deno run up.ts"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "r4-2 Apple checks stay on. $c" || bad "r4-2 Apple checks stay on. $c (rc=$RC)"
+done
+for c in "$GW && echo done" "cd android && $GW" "export X=1; $GW" "$GW; git status"; do
+  rr_hook "$c" "$D"
+  rr_has 'Command targets Android only' && ok "r4-2b stays Android only. $c" || bad "r4-2b stays Android only. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R4-3 an empty or project-less ios folder never counts as the root's own platform
+D="$(mktemp -d)"; mkdir -p "$D/src" "$D/ios" "$D/native/Legacy/Legacy.xcodeproj" "$D/native/Legacy/Legacy"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'export function signIn(){}\nexport function createAccount(){}\n' > "$D/src/auth.ts"
+printf 'X=1;\n' > "$D/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/native/Legacy/Legacy/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/native/Legacy/Legacy/PrivacyInfo.xcprivacy"
+printf 'let x = 1\n' > "$D/native/Legacy/Legacy/L.swift"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "r4-3 an empty ios folder does not split the native child off a managed Expo root" || bad "r4-3 an empty ios folder does not split the native child off a managed Expo root (rc=$RC)"
+rm -rf "$D"
+# R4-4 a // inside a JavaScript or Swift regex literal is not a comment
+for src in 'const pattern = /[//]/; const camera = "AVCaptureDevice";' 'const u = x.replace(/https?:\/\//, ""); const camera = "AVCaptureDevice";'; do
+  D="$(mk_rr_ios '' 'import AVFoundation')"
+  printf '%s\n' "$src" > "$D/App/bridge.js"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r4-4 the code after a regex survives. $src" || bad "r4-4 the code after a regex survives. $src (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+let x = 1 // AVCaptureDevice in a trailing comment
+// AVCaptureDevice on its own line')"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "r4-4b real line comments are still comments" || bad "r4-4b real line comments are still comments (rc=$RC)"
+rm -rf "$D"
+# R4-7 the no-parser fallback trusts a tool name only when the payload names exactly one
+D="$(mk_ios_bad)"
+NOP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOP/$b"; done
+OUT="$(printf '{"metadata":{"tool_name":"Read"},"tool_name":"Bash","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r4-7 a nested tool_name never hides a Bash submit without jq or python3" || bad "r4-7 a nested tool_name never hides a Bash submit without jq or python3 (rc=$RC)"
+rm -rf "$D" "$NOP"
+# R4-9 workspace runners resolve the selected package's script
+D="$(mktemp -d)"; mkdir -p "$D/apps/x/App"
+printf '{"name":"root","private":true,"workspaces":["apps/*"]}\n' > "$D/package.json"
+printf '{"name":"x","scripts":{"ship-it":"%s deliver"}}\n' "$FL" > "$D/apps/x/package.json"
+printf '{"name":"x","targets":{"ship-it":{"executor":"nx:run-commands","options":{"command":"%s deliver"}}}}\n' "$FL" > "$D/apps/x/project.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/x/App/Info.plist"; mkdir -p "$D/apps/x/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/x/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/x/App/A.swift"
+for c in "yarn workspace x ship-it" "pnpm --filter x ship-it" "pnpm --filter x run ship-it" "npm -w x run ship-it" "npm --prefix apps/x run ship-it" "turbo run ship-it" "npx turbo run ship-it --filter=x" "nx run x:ship-it" "npx nx run x:ship-it" "lerna run ship-it" "bun --filter x run ship-it"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r4-9 a workspace runner is scanned. $c" || bad "r4-9 a workspace runner is scanned. $c (rc=$RC)"
+done
+rr_hook "yarn workspace x lint" "$D"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "r4-9b a workspace runner with a harmless script stays quiet" || bad "r4-9b a workspace runner with a harmless script stays quiet (rc=$RC)"
+mkdir -p "$D/apps/web"; printf '{"name":"web","scripts":{"build":"next build"}}\n' > "$D/apps/web/package.json"
+printf '{"name":"x","scripts":{"ship-it":"%s deliver","build":"eas build -p ios"}}\n' "$FL" > "$D/apps/x/package.json"
+for c in "pnpm --filter web build" "yarn workspace web build" "npm --prefix apps/web run build" "npm -w web run build"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && ok "r4-9c a named web package never inherits the mobile package script. $c" || bad "r4-9c a named web package never inherits the mobile package script. $c (rc=$RC)"
+done
+rr_hook "pnpm --filter x build" "$D"
+[ "$RC" -eq 2 ] && ok "r4-9d the named mobile package build script is scanned" || bad "r4-9d the named mobile package build script is scanned (rc=$RC)"
+rm -rf "$D"
+
+# R4P the persona review on real monorepo layouts
+# R4P-1 a local Expo native module (an Android library) never becomes its own app
+D="$(mktemp -d)"; mkdir -p "$D/android/app/src/main" "$D/modules/pay/android/src/main/java"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '{"dependencies":{"expo":"52","react-native":"0.76"}}' > "$D/package.json"
+printf 'apply plugin: "com.android.application"\nandroid { defaultConfig { targetSdkVersion 36 } }\n' > "$D/android/app/build.gradle"
+printf '<manifest/>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf 'apply plugin: "com.android.library"\n' > "$D/modules/pay/android/build.gradle"
+printf '<manifest/>' > "$D/modules/pay/android/src/main/AndroidManifest.xml"
+printf 'import com.stripe.android.Stripe\n' > "$D/modules/pay/android/src/main/java/Pay.kt"
+rr_run "$D"
+! rr_has '^App\. ' && ok "r4p-1 a local native library module stays with the app that uses it" || bad "r4p-1 a local native library module stays with the app that uses it (rc=$RC)"
+rm -rf "$D"
+# R4P-2 a Tuist Project.swift purpose string counts as the key
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf 'let project = Project(name: "App", targets: [.target(name: "App", infoPlist: .extendingDefault(with: ["NSCameraUsageDescription": "Scan receipts to log expenses"]))])\n' > "$D/Project.swift"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "r4p-2 a camera key set in Tuist Project.swift counts" || bad "r4p-2 a camera key set in Tuist Project.swift counts (rc=$RC)"
+rm -rf "$D"
+# R4P-3 only a folder named exactly like demo or sample is a demo. resample and sample-store are real apps
+for name in resample sample-store; do
+  D="$(mktemp -d)"; mkdir -p "$D/ios/Main" "$D/apps/$name/Store.xcodeproj" "$D/apps/$name/Store"
+  printf '{"expo":{"name":"root"}}' > "$D/app.json"
+  printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Show nearby stores</string></dict></plist>' > "$D/ios/Main/Info.plist"
+  mkdir -p "$D/ios/Main.xcodeproj"; printf 'X=1;\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+  printf 'X=1;\n' > "$D/apps/$name/Store.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$D/apps/$name/Store/Info.plist"
+  printf 'import CoreLocation\nlet m = CLLocationManager()\n' > "$D/apps/$name/Store/S.swift"
+  rr_run "$D"
+  rr_has "^App\. $D/apps/$name$" && ok "r4p-3 apps/$name is scanned as its own app" || bad "r4p-3 apps/$name is scanned as its own app (rc=$RC)"
+  rm -rf "$D"
+done
+# R4P-4 a native StoreKit app needs a real restore call. a plugin's purchase list does not count
+D="$(mk_rr_ios '' 'import StoreKit
+let p: SKProduct? = nil
+func load() { getAvailablePurchases() }')"
+rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "r4p-4 a StoreKit app with only getAvailablePurchases still needs Restore Purchases" || bad "r4p-4 a StoreKit app with only getAvailablePurchases still needs Restore Purchases (rc=$RC)"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

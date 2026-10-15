@@ -91,7 +91,7 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
   local body ta tn
   # A named tool that is not a shell stays quiet here too, the same list jq and python3 use.
   tn="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"(tool_name|toolName)"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
-  if [ -n "$tn" ]; then
+  if [ -n "$tn" ] && [ "$(printf '%s' "$STDIN_JSON" | grep -oE '"(tool_name|toolName)"[[:space:]]*:' | wc -l | tr -d ' ')" -eq 1 ]; then
     case "$tn" in Bash|PowerShell|bash|powershell|run_shell_command|shell|Execute|launch-process|execute_bash|execute_cmd|runInTerminal|run_in_terminal|run_terminal_command|run_terminal_cmd|monitor) ;; *) return 0 ;; esac
   fi
   body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
@@ -181,7 +181,7 @@ function seg(s,   t) {
   if (index(s, "$(") || index(s, bt) || index(s, "<(") || index(s, ">(")) return s
   t=s; sub(/^[ \t({!]+/, "", t)
   while (t ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", t)
-  if (t ~ /^git([ \t]+[^ \t]+)*[ \t]+(commit|tag|notes)([ \t]|$)/ || t ~ /^gh[ \t]+(pr|issue)[ \t]+(create|comment|edit)([ \t]|$)/) return blank(s)
+  if (t ~ /^git([ \t]+-C[ \t]+[^ \t]+)?[ \t]+(commit|tag|notes)([ \t]|$)/ || t ~ /^gh[ \t]+(pr|issue)[ \t]+(create|comment|edit)([ \t]|$)/) return blank(s)
   return s }
 { l=$0; n=length(l); cur=""; out=""; q=""; i=1
   while (i <= n) { c=substr(l, i, 1)
@@ -245,14 +245,37 @@ FASTFILES
   wrapper_body() {
     local name esc sub pj seg w prev mf targets mfiles
     local opts='([[:space:]]+--?[A-Za-z][A-Za-z-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*'
-    name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])(npm|pnpm|bun)'"$opts"'[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p' | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])yarn'"$opts"'[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p' | head -1)"
+    local pre='.*(^|[^A-Za-z0-9_./-])'
+    name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?[[:space:]]+([A-Za-z0-9:_.-]+).*/\6/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}(turbo|lerna)${opts}[[:space:]]+run[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}nx${opts}[[:space:]]+run(-many)?[[:space:]]+([A-Za-z0-9_.@\/-]+:)?([A-Za-z0-9_.-]+).*/\6/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}pnpm${opts}[[:space:]]+([A-Za-z0-9:_.-]+).*/\4/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$CMD_MATCH" | sed -nE "s/${pre}yarn${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
     if [ -n "$name" ]; then
+      local sel sub all files pick s2 base f d
       esc="$(printf '%s' "$name" | sed 's/\./\\./g')"
+      # The package the runner names, or the folder it runs in. Unknown or none named means every package is read.
+      sel="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(yarn[[:space:]]+workspace|(^|[[:space:]])(--filter|-F|--workspace|-w))([=[:space:]]+)([^[:space:]]+).*/\5/p' | head -1)"
+      [ -z "$sel" ] && sel="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*nx[^;&|]*[[:space:]]run[[:space:]]+([A-Za-z0-9_.@\/-]+):.*/\1/p' | head -1)"
       sub="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
       case "$sub" in /*|*..*) sub="" ;; esac
-      for pj in "$DIR/package.json" ${sub:+"$DIR/$sub/package.json"}; do
-        [ -f "$pj" ] && grep -E "^[[:space:]]*\"$esc\"[[:space:]]*:" "$pj" 2>/dev/null | head -1
+      all=0; printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|nx[^;&|]*run-many' && all=1
+      files="$(find "$DIR" -maxdepth 6 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build \) -prune \) -o \( -name package.json -o -name project.json \) -print 2>/dev/null | head -200)"
+      if [ -n "$sub" ] && [ -f "$DIR/$sub/package.json" ]; then pick="$DIR/$sub/package.json"
+      elif [ -n "$sel" ]; then
+        s2="${sel#./}"; s2="${s2%/}"; base="${s2##*/}"
+        pick="$(printf '%s\n' "$files" | while IFS= read -r f; do
+          [ -n "$f" ] || continue; d="$(dirname "$f")"
+          case "$d" in */"$s2"|*/"$base") echo "$f"; continue ;; esac
+          tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"(@[^/\"]+/)?$base\"" && echo "$f"
+        done)"
+        [ -z "$pick" ] && pick="$files"
+      elif [ "$all" -eq 1 ]; then pick="$files"
+      else pick="$DIR/package.json"; fi
+      printf '%s\n' "$pick" | while IFS= read -r pj; do
+        [ -f "$pj" ] || continue
+        tr -d '\n' < "$pj" 2>/dev/null | grep -oE "\"$esc\"[[:space:]]*:[[:space:]]*(\"([^\"\\\\]|\\\\.)*\"|\{[^}]*)"
       done
     fi
     seg="$(printf '%s' "$CMD_MATCH" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([^;&|]*).*/\2/p' | head -1)"
@@ -275,7 +298,7 @@ FASTFILES
   }
   # Cheap exit for the everyday command. Nothing below runs unless a submit tool or a wrapper is named.
   if ! printf '%s' "$CMD_MATCH" | grep -qiE "$SUBMIT_RE" \
-    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make)[[:space:]]|gradlew?[[:space:]]+\$'; then
+    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make|turbo|nx|lerna)[[:space:]]|gradlew?[[:space:]]+\$'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-}"
@@ -316,12 +339,12 @@ IOS_TARGET_RE='\bios\b|\bipa\b|xcodebuild|altool|notarytool|transporter|fastlane
 if [ -n "$CMD" ]; then
   # Each submitting segment is classified on its own. Android only means every submit in the command is Android.
   SEG_SUBMITS=0; SEG_ALL_AND=1
-  # A wrapper (npm run, yarn, make, a script) may upload anywhere, so a command that runs one is never Android only.
-  WRAP_SEG_RE='(^|[[:space:]/])(npm|pnpm|bun|yarn|make|just|rake|npx|bunx)([[:space:]]|$)|(^|[[:space:]])(ba|z)?sh[[:space:]]+[^-[:space:]]|(^|[[:space:]])\.?\.?/[^[:space:]]*\.(sh|rb|py|js|mjs|ts)([[:space:]]|$)'
+  # Beside an Android submit only a known harmless command keeps it Android only. Anything else may upload to Apple.
+  SAFE_SEG_RE='^(cd|pushd|popd|echo|printf|export|unset|set|true|false|:|test|sleep|ls|pwd|mkdir|rm|cp|mv|cat|touch|tee|grep|head|tail|wc|date|clear|git)$'
   while IFS= read -r SEG; do
-    [ -n "$SEG" ] || continue
-    printf '%s' "$SEG" | grep -qE "$WRAP_SEG_RE" && SEG_ALL_AND=0
-    submits "$SEG" || continue
+    W1="$(printf '%s' "$SEG" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
+    [ -n "$W1" ] || continue
+    if ! submits "$SEG"; then printf '%s' "$W1" | grep -qE "$SAFE_SEG_RE" || SEG_ALL_AND=0; continue; fi
     SEG_SUBMITS=$((SEG_SUBMITS+1))
     SEGN="$(fl_norm "$SEG")"
     { printf '%s' "$SEGN" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
@@ -374,7 +397,7 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
 }
 
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
-CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|/project\.ya?ml|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
+CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|/project\.ya?ml|/Project\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
   [ -s "$FILELIST" ] || return 1
   local out
@@ -404,7 +427,7 @@ STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/
           if (substr(l, j, 1) == "/") { h=substr(l, i, j-i); rr="/" h; resc=""; rml=(j == n); o=o h "/"; i=j+1; continue } }
         if (rs && (c == "r" || (c == "b" && substr(l, i+1, 1) == "r")) && (i == 1 || substr(l, i-1, 1) !~ /[A-Za-z0-9_]/)) { k=(c == "b" ? i+2 : i+1); j=k; while (substr(l, j, 1) == "#") j++
           if (substr(l, j, 1) == dq) { h=substr(l, k, j-k); rr=dq h; resc=""; rml=1; o=o substr(l, i, j-i+1); i=j+1; continue } }
-        if (c == "/" && substr(l, i+1, 1) == "/") break
+        if (c == "/" && substr(l, i+1, 1) == "/" && (i == 1 || substr(l, i-1, 1) ~ /[ \t;{},)]/)) break
         if (c == "/" && substr(l, i+1, 1) == "*") { pv=(i > 1 ? substr(l, i-1, 1) : "")
           if (substr(l, 1, i-1) ~ /^[ \t]*$/ || (pv ~ /[ \t;{},)]/ && index(substr(l, i+2), "*/") > 0)) { blk=1; i+=2; continue } }
         if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
@@ -869,9 +892,11 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding medium "APPLE-MANIFEST-VALIDATOR-UNAVAILABLE" "Privacy manifests present but python3 or scripts/validate-privacy-manifest.py is missing, so their internals were not validated" "Install python3 and keep scripts/validate-privacy-manifest.py next to the guard, or run plutil -lint on each manifest by hand."
   fi
   [ "$IS_UNITY" -eq 1 ] || grep_has 'ITSAppUsesNonExemptEncryption' || finding high "APPLE-EXPORT-COMPLIANCE-MISSING" "ITSAppUsesNonExemptEncryption not set" "Set it in Info.plist or the build stalls in Missing Compliance and never reaches review."
-  # A framework app reaches StoreKit through a plugin, each with its own restore call.
+  # Native StoreKit keeps the original restore list. A plugin's own restore call only counts for a plugin app.
+  RESTORE_RE='restorePurchases|restoreCompletedTransactions|AppStore\.sync|Restore Purchases'
+  grep_has 'SKProduct|Product\.purchase|StoreKit' || RESTORE_RE="$RESTORE_RE|RestorePurchases|restoreTransactions|RestoreTransactions|getAvailablePurchases|queryPastPurchases"
   if grep_has "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"; then
-    grep_has 'restorePurchases|RestorePurchases|restoreCompletedTransactions|restoreTransactions|RestoreTransactions|getAvailablePurchases|queryPastPurchases|AppStore\.sync|Restore Purchases' || finding high "APPLE-RESTORE-PURCHASES-MISSING" "In-app purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"
+    grep_has "$RESTORE_RE" || finding high "APPLE-RESTORE-PURCHASES-MISSING" "In-app purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"
   fi
   if grep_has 'deleteAccount|delete account'; then
     grep_has 'mailto:|deactivate' && finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form." src 'mailto:|deactivate'
@@ -1175,15 +1200,17 @@ dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
 bare_native_apart() {  # $1 candidate dir below $DIR
   local rel="${1#"${DIR%/}"/}" f
   case "$rel" in ios|ios/*|android|android/*) return 1 ;; esac
-  # A demo, example, sample, or playground project ships with the repo, never to a store, so it stays in the root scan.
-  case "/$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')/" in
-    */*demo/*|*/*demos/*|*/*example/*|*/*examples/*|*/*sample/*|*/*samples/*|*/playground/*|*/playgrounds/*) return 1 ;;
-  esac
+  # A folder named exactly demo, example, sample, or playground (or plural) holds a repo demo, so it stays in the root scan.
+  printf '%s' "$rel" | tr '[:upper:]' '[:lower:]' | tr '/' '\n' | grep -qxE 'demos?|examples?|samples?|playgrounds?' && return 1
   find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
     -o \( -name 'Info.plist' -o -name 'AndroidManifest.xml' \) -print 2>/dev/null | grep . >/dev/null || return 1
+  # Only a shippable app splits off. a library module or a local native module stays with the app that uses it.
+  find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) -o -name '*.xcodeproj' -print 2>/dev/null | grep . >/dev/null \
+    || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
+      | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.
-  [ -d "$DIR/ios" ] || ! find "$1" -maxdepth 4 -name 'Info.plist' -not -path '*/Pods/*' 2>/dev/null | grep . >/dev/null || return 1
-  [ -d "$DIR/android" ] || ! find "$1" -maxdepth 4 -name 'AndroidManifest.xml' -not -path '*/build/*' 2>/dev/null | grep . >/dev/null || return 1
+  native_dir_has_project "$DIR/ios" || ! find "$1" -maxdepth 4 -name 'Info.plist' -not -path '*/Pods/*' 2>/dev/null | grep . >/dev/null || return 1
+  native_dir_has_project "$DIR/android" || ! find "$1" -maxdepth 4 -name 'AndroidManifest.xml' -not -path '*/build/*' 2>/dev/null | grep . >/dev/null || return 1
   for f in "$DIR"/settings.gradle "$DIR"/settings.gradle.kts "$DIR"/android/settings.gradle "$DIR"/android/settings.gradle.kts \
     "$DIR"/Podfile "$DIR"/ios/Podfile "$DIR"/*.xcworkspace/contents.xcworkspacedata "$DIR"/ios/*.xcworkspace/contents.xcworkspacedata; do
     [ -f "$f" ] && grep -qF -e "$rel" "$f" 2>/dev/null && return 1
