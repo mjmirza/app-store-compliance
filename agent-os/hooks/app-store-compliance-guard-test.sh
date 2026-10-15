@@ -1575,7 +1575,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ok "655-4 react-native as a dev dependency only never makes an app" || bad "655-4 react-native as a dev dependency only never makes an app (rc=$RC)"
 rm -rf "$D"
 
-# 656 documented limit, pinned. a bare Xcode project with its own Info.plist under a root Expo app stays part of the root scan
+# 656 a bare Xcode project in an examples folder under a root Expo app stays part of the root scan
 D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/examples/NativeDemo/Demo.xcodeproj" "$D/examples/NativeDemo/Demo"
 printf '{"expo":{"name":"root"}}' > "$D/app.json"
 printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
@@ -2373,6 +2373,84 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rm -f "$D/android/settings.gradle"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^App\. $D/libs/legacy$" && ok "i656-4 the same Android project with no shared build file is its own app" || bad "i656-4 the same Android project with no shared build file is its own app (rc=$RC)"
+rm -rf "$D"
+
+# R3 round 3 review. every input below is one where main scanned or reported, and the branch must too
+FL="fast""lane"
+# R3-1 a git message that sits inside a command substitution is never blanked
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "git commit -m safe \$(bash -c 'eval \"\$1\"' -m '$FL deliver')" "$D"
+[ "$RC" -eq 2 ] && rr_has 'Camera used without' && ok "r3-1 a submit inside a command substitution in a git commit is scanned" || bad "r3-1 a submit inside a command substitution in a git commit is scanned (rc=$RC)"
+BT='`'
+rr_hook "git commit -m safe ${BT}bash -c 'eval \"\$1\"' -m '$FL deliver'${BT}" "$D"
+[ "$RC" -eq 2 ] && ok "r3-1b a submit inside a backtick substitution in a git commit is scanned" || bad "r3-1b a submit inside a backtick substitution in a git commit is scanned (rc=$RC)"
+# R3-2 a wrapped Apple upload (npm run, make) keeps the Apple checks next to an Android build
+printf '{"scripts":{"submit-ios":"%s deliver","ship":"%s deliver"}}\n' "$FL" "$FL" > "$D/package.json"
+printf 'ship:\n\t%s deliver\n' "$FL" > "$D/Makefile"
+GW="./gradle""w bundle""Release"
+for c in "$GW && npm run submit-ios" "$GW && npm run ship" "$GW && make ship" "$GW && make ship-ios"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'Camera used without' && ! rr_has 'Command targets Android only' && ok "r3-2 Apple checks stay on. $c" || bad "r3-2 Apple checks stay on. $c (rc=$RC)"
+done
+rr_hook "$GW" "$D"
+rr_has 'Command targets Android only' && ok "r3-2b a plain Android build next to a package.json stays Android only" || bad "r3-2b a plain Android build next to a package.json stays Android only (rc=$RC)"
+rm -rf "$D"
+# R3-3 the comment stripper never drops compiled code after an escaped raw delimiter, a regex literal, or a Rust raw string
+for src in 'let text = #"""
+\#"""#
+/*
+"""#' 'let pattern = #/[/*]/#' 'let pattern = /[/*]/' 'let s = "a" + #"\#"/*"#'; do
+  D="$(mk_rr_ios '' "import AVFoundation
+$src
+let camera = AVCaptureDevice.default(for: .video)")"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r3-3 the camera call survives. ${src%%$'\n'*}" || bad "r3-3 the camera call survives. ${src%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+for rs in 'let s = r#"
+/*
+"#;' 'let p = r"C:\"; let q = "/*";' 'let b = br#"x"#; let q = r"\"; let t = "/*";'; do
+  D="$(mk_rr_ios '' 'import AVFoundation')"
+  printf '%s\nlet camera = "AVCaptureDevice";\n' "$rs" > "$D/App/lib.rs"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r3-3 a Rust raw string keeps the code after it. ${rs%%$'\n'*}" || bad "r3-3 a Rust raw string keeps the code after it. ${rs%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+/* a real
+   multiline AVCaptureDevice comment */')"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "r3-3b a real multiline block comment is still a comment" || bad "r3-3b a real multiline block comment is still a comment (rc=$RC)"
+rm -rf "$D"
+# R3-4 translation text never proves StoreKit or a restore control
+D="$(mk_rr_ios '' 'import Stripe')"
+mkdir -p "$D/App/en.lproj"; printf '"help" = "StoreKit";\n"restore" = "Restore Purchases";\n' > "$D/App/en.lproj/InfoPlist.strings"
+rr_run "$D"
+rr_has 'APPLE-3.1.1-EXTERNAL-PAYMENT' && [ "$RC" -eq 2 ] && ok "r3-4 StoreKit named only in InfoPlist.strings does not hide an external payment SDK" || bad "r3-4 StoreKit named only in InfoPlist.strings does not hide an external payment SDK (rc=$RC)"
+rm -rf "$D"
+# R3-8 the no-parser fallback stays quiet for a read tool, like jq and python3 do
+D="$(mk_ios_bad)"
+NOP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOP/$b"; done
+OUT="$(printf '{"tool_name":"Read","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "r3-8 a Read payload stays quiet without jq or python3" || bad "r3-8 a Read payload stays quiet without jq or python3 (rc=$RC bytes=${#OUT})"
+OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8b a Bash payload is still scanned without jq or python3" || bad "r3-8b a Bash payload is still scanned without jq or python3 (rc=$RC)"
+OUT="$(printf '{"toolName":"run_terminal_command","toolInput":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8c a Grok payload is still scanned without jq or python3" || bad "r3-8c a Grok payload is still scanned without jq or python3 (rc=$RC)"
+OUT="$(printf '{"tool_info":{"command_line":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8d a Windsurf payload with no tool name is still scanned without jq or python3" || bad "r3-8d a Windsurf payload with no tool name is still scanned without jq or python3 (rc=$RC)"
+rm -rf "$D" "$NOP"
+# R3-M a clean nested native project never takes the scan away from a managed Expo root with no native folder
+D="$(mktemp -d)"; mkdir -p "$D/src" "$D/native/Legacy/Legacy.xcodeproj" "$D/native/Legacy/Legacy"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'export function signIn(){}\nexport function createAccount(){}\n' > "$D/src/auth.ts"
+printf 'X=1;\n' > "$D/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/native/Legacy/Legacy/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/native/Legacy/Legacy/PrivacyInfo.xcprivacy"
+printf 'let x = 1\n' > "$D/native/Legacy/Legacy/L.swift"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "r3-M a managed Expo root keeps its account deletion finding beside a clean native child" || bad "r3-M a managed Expo root keeps its account deletion finding beside a clean native child (rc=$RC)"
 rm -rf "$D"
 
 echo ""

@@ -88,7 +88,12 @@ sys.stdout.buffer.write((c or "").encode("utf-8"))' 2>/dev/null)"; rc=$?
     [ "$rc" -eq 4 ] && return 0
   fi
   # No working tool. Prefer the command inside tool_input, then a Copilot toolArgs JSON string, then the first command key.
-  local body ta
+  local body ta tn
+  # A named tool that is not a shell stays quiet here too, the same list jq and python3 use.
+  tn="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"(tool_name|toolName)"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*:[[:space:]]*"//; s/"$//')"
+  if [ -n "$tn" ]; then
+    case "$tn" in Bash|PowerShell|bash|powershell|run_shell_command|shell|Execute|launch-process|execute_bash|execute_cmd|runInTerminal|run_in_terminal|run_terminal_command|run_terminal_cmd|monitor) ;; *) return 0 ;; esac
+  fi
   body="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"tool_input"[[:space:]]*:[[:space:]]*\{([^{}]|\{[^{}]*\})*"command"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1)"
   if [ -z "$body" ]; then
     ta="$(printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -oE '"toolArgs"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -1 | sed -E 's/^"toolArgs"[[:space:]]*:[[:space:]]*"//; s/"$//')"
@@ -155,7 +160,7 @@ if [ -n "$STDIN_JSON" ]; then
     END { if (cont) printf "%s\n", acc }' 2>/dev/null)"
   [ -z "$CMD" ] && exit 0
   # A commit, tag, note, or gh PR or issue message is text. Its quoted -m, --body, or --title value is blanked,
-  # unless it holds a $( or backtick substitution. Only inside that git or gh segment, never a later command's.
+  # Only inside that git or gh segment, never a later command's, and never when the segment holds any substitution.
   IFS= read -r -d '' INERT_AWK <<'INERT'
 BEGIN { sq=sprintf("%c", 39); dq="\""; bt=sprintf("%c", 96) }
 function msgflag(w) { return w ~ /^(-[A-Za-z]*m|--message|-b|--body|-t|--title)$/ }
@@ -173,6 +178,7 @@ function blank(s,   o, i, n, c, w, prev, j, body) {
     o=o c; w=w c; i++ }
   return o }
 function seg(s,   t) {
+  if (index(s, "$(") || index(s, bt) || index(s, "<(") || index(s, ">(")) return s
   t=s; sub(/^[ \t({!]+/, "", t)
   while (t ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", t)
   if (t ~ /^git([ \t]+[^ \t]+)*[ \t]+(commit|tag|notes)([ \t]|$)/ || t ~ /^gh[ \t]+(pr|issue)[ \t]+(create|comment|edit)([ \t]|$)/) return blank(s)
@@ -310,15 +316,21 @@ IOS_TARGET_RE='\bios\b|\bipa\b|xcodebuild|altool|notarytool|transporter|fastlane
 if [ -n "$CMD" ]; then
   # Each submitting segment is classified on its own. Android only means every submit in the command is Android.
   SEG_SUBMITS=0; SEG_ALL_AND=1
+  # A wrapper (npm run, yarn, make, a script) may upload anywhere, so a command that runs one is never Android only.
+  WRAP_SEG_RE='(^|[[:space:]/])(npm|pnpm|bun|yarn|make|just|rake|npx|bunx)([[:space:]]|$)|(^|[[:space:]])(ba|z)?sh[[:space:]]+[^-[:space:]]|(^|[[:space:]])\.?\.?/[^[:space:]]*\.(sh|rb|py|js|mjs|ts)([[:space:]]|$)'
   while IFS= read -r SEG; do
-    [ -n "$SEG" ] && submits "$SEG" || continue
+    [ -n "$SEG" ] || continue
+    printf '%s' "$SEG" | grep -qE "$WRAP_SEG_RE" && SEG_ALL_AND=0
+    submits "$SEG" || continue
     SEG_SUBMITS=$((SEG_SUBMITS+1))
     SEGN="$(fl_norm "$SEG")"
     { printf '%s' "$SEGN" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
   done <<SEGS
 $(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n')
 SEGS
-  if [ "$SEG_SUBMITS" -gt 0 ]; then
+  if printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
+    :   # an Apple word anywhere in the command keeps the Apple checks, as on main
+  elif [ "$SEG_SUBMITS" -gt 0 ]; then
     [ "$SEG_ALL_AND" -eq 1 ] && CMD_TARGET_ANDROID_ONLY=1
   # A wrapped submit (npm run, make) names no tool in the command itself, so the whole command decides, as before.
   elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
@@ -372,23 +384,29 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
 
 # Source with comment-only lines and trailing // comments blanked, so a comment never counts as code.
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
-# Source with comments dropped. Strings (one-line, triple-quoted, JS template, Swift or Rust raw #".."#) stay text.
+# Source with comments dropped. Strings, Swift raw strings and #/regex/#, and Rust r".." stay text.
+# A /* opens a comment only at the start of a line, or after a separator when it closes on that line.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96); dq="\""; fast="[/\\\\\"" sq bt "]" }
-    FNR == 1 { blk=0; tq=""; tb=0; rr=""; rml=0; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.(swift|rs)$/) }
+    FNR == 1 { blk=0; tq=""; tb=0; rr=""; rml=0; resc=""; js=(FILENAME ~ /\.(js|jsx|ts|tsx)$/); sw=(FILENAME ~ /\.swift$/); rs=(FILENAME ~ /\.rs$/) }
     { l=$0
       if (!blk && tq == "" && !tb && rr == "" && l !~ fast) { print l; next }
       n=length(l); o=""; q=""; i=1
       while (i <= n) { c=substr(l, i, 1)
         if (blk) { if (c == "*" && substr(l, i+1, 1) == "/") { blk=0; i+=2 } else i++; continue }
+        if (rr != "" && resc != "" && c == "\\" && substr(l, i+1, length(resc)) == resc) { o=o substr(l, i, 2+length(resc)); i+=2+length(resc); continue }
         if (rr != "") { if (substr(l, i, length(rr)) == rr) { o=o rr; i+=length(rr); rr="" } else { o=o c; i++ }; continue }
         if (c == "\\") { o=o substr(l, i, 2); i+=2; continue }
         if (tq != "") { if (substr(l, i, 3) == tq) { o=o tq; tq=""; i+=3 } else { o=o c; i++ }; continue }
         if (tb) { if (c == bt) tb=0; o=o c; i++; continue }
         if (q != "") { if (c == q) q=""; o=o c; i++; continue }
         if (sw && c == "#") { j=i; while (substr(l, j, 1) == "#") j++
-          if (substr(l, j, 1) == dq) { h=substr(l, i, j-i); rml=(substr(l, j, 3) == dq dq dq); rr=(rml ? dq dq dq : dq) h; o=o h (rml ? dq dq dq : dq); i=j+(rml ? 3 : 1); continue } }
+          if (substr(l, j, 1) == dq) { h=substr(l, i, j-i); rml=(substr(l, j, 3) == dq dq dq); rr=(rml ? dq dq dq : dq) h; resc=h; o=o h (rml ? dq dq dq : dq); i=j+(rml ? 3 : 1); continue }
+          if (substr(l, j, 1) == "/") { h=substr(l, i, j-i); rr="/" h; resc=""; rml=(j == n); o=o h "/"; i=j+1; continue } }
+        if (rs && (c == "r" || (c == "b" && substr(l, i+1, 1) == "r")) && (i == 1 || substr(l, i-1, 1) !~ /[A-Za-z0-9_]/)) { k=(c == "b" ? i+2 : i+1); j=k; while (substr(l, j, 1) == "#") j++
+          if (substr(l, j, 1) == dq) { h=substr(l, k, j-k); rr=dq h; resc=""; rml=1; o=o substr(l, i, j-i+1); i=j+1; continue } }
         if (c == "/" && substr(l, i+1, 1) == "/") break
-        if (c == "/" && substr(l, i+1, 1) == "*") { blk=1; i+=2; continue }
+        if (c == "/" && substr(l, i+1, 1) == "*") { pv=(i > 1 ? substr(l, i-1, 1) : "")
+          if (substr(l, 1, i-1) ~ /^[ \t]*$/ || (pv ~ /[ \t;{},)]/ && index(substr(l, i+2), "*/") > 0)) { blk=1; i+=2; continue } }
         if ((c == dq || c == sq) && substr(l, i, 3) == c c c) { tq=c c c; o=o tq; i+=3; continue }
         if (c == bt && js) { tb=1; o=o c; i++; continue }
         if (c == dq || c == sq || c == bt) q=c
@@ -544,7 +562,6 @@ find "$DIR" -mindepth 1 \
   -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
   -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
   -o -name '*.cs' -o -name '*.rs' -o -name '*.csproj' -o -name '*.xaml' -o -name '*.toml' \
-  -o -name 'InfoPlist.strings' \
   \) -print 2>/dev/null \
   > "$FILELIST" || : 2>/dev/null >> "$FILELIST" || SCAN_ERROR="the file list could not be written to $FILELIST"
 build_blob
@@ -1164,6 +1181,9 @@ bare_native_apart() {  # $1 candidate dir below $DIR
   esac
   find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
     -o \( -name 'Info.plist' -o -name 'AndroidManifest.xml' \) -print 2>/dev/null | grep . >/dev/null || return 1
+  # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.
+  [ -d "$DIR/ios" ] || ! find "$1" -maxdepth 4 -name 'Info.plist' -not -path '*/Pods/*' 2>/dev/null | grep . >/dev/null || return 1
+  [ -d "$DIR/android" ] || ! find "$1" -maxdepth 4 -name 'AndroidManifest.xml' -not -path '*/build/*' 2>/dev/null | grep . >/dev/null || return 1
   for f in "$DIR"/settings.gradle "$DIR"/settings.gradle.kts "$DIR"/android/settings.gradle "$DIR"/android/settings.gradle.kts \
     "$DIR"/Podfile "$DIR"/ios/Podfile "$DIR"/*.xcworkspace/contents.xcworkspacedata "$DIR"/ios/*.xcworkspace/contents.xcworkspacedata; do
     [ -f "$f" ] && grep -qF -e "$rel" "$f" 2>/dev/null && return 1
