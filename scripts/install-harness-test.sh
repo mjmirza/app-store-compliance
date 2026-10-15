@@ -100,6 +100,13 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["preTo
   && ok "copilot install adds the missing Windows handler without a duplicate" || bad "copilot install adds the missing Windows handler without a duplicate"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=d["hooks"]["PreToolUse"][0]; sys.exit(0 if g["matcher"]=="launch-process" and g["hooks"][0]["timeout"]==120000 else 1)' "$H/.augment/settings.json" \
   && ok "auggie uses launch-process and a millisecond timeout" || bad "auggie uses launch-process and a millisecond timeout"
+python3 -c 'import json,os,sys; c=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]; sys.exit(0 if c==sys.argv[2] and os.access(c,os.X_OK) and open(c).readline().startswith("#!") else 1)' "$H/.augment/settings.json" "$H/.augment/hooks/app-store-compliance-guard.sh" \
+  && ok "auggie registers the executable guard script path, as its docs require" || bad "auggie registers the executable guard script path, as its docs require"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=d["hooks"]["PreToolUse"][0]["hooks"][0]; h["command"]="bash "+h["command"]; json.dump(d,open(p,"w"))' "$H/.augment/settings.json"
+run --tool auggie doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "auggie doctor fails on a shell command string" || bad "auggie doctor fails on a shell command string (rc=$RC)"
+run --tool auggie >/dev/null; run --tool auggie doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count auggie)" = "1" ] && ok "auggie install replaces the shell string with the script path once" || bad "auggie install replaces the shell string with the script path once (rc=$RC entries=$(count auggie))"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["pre_run_command"][0]; sys.exit(0 if e["show_output"] is True else 1)' "$H/.codeium/windsurf/hooks.json" \
   && ok "windsurf shows the guard output to the user" || bad "windsurf shows the guard output to the user"
 

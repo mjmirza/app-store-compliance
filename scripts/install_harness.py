@@ -189,6 +189,8 @@ def hook_cmd(tool, guard):
         return (
             "bash ./.github/hooks/" + GUARD_NAME
         )  # the cloud agent runs it from the repository root
+    if tool == "auggie":
+        return guard  # Auggie runs a script path by its extension and shebang, never a shell string
     return "bash '" + guard.replace("'", "'\\''") + "'"
 
 
@@ -326,6 +328,10 @@ def dispatches(tool, style, group, h):
         return False
     if tool == "windsurf":
         return True
+    if tool == "auggie" and not (
+        str(h.get("command", "")).endswith(".sh") and os.access(str(h.get("command", "")), os.X_OK)
+    ):
+        return False
     if style == "copilot":
         ps = h.get("powershell")
         if not (isinstance(ps, str) and GUARD_NAME in ps and "exit $LASTEXITCODE" in ps):
@@ -804,21 +810,20 @@ def sample_app():
     return d
 
 
-def run_hook(cmd_line, payload, cwd):
+def run_hook(cmd_line, payload, cwd, tool=None):
     env = {
         k: v
         for k, v in os.environ.items()
         if k not in ("CLAUDE_PROJECT_DIR", "GEMINI_PROJECT_DIR", "AUGMENT_PROJECT_DIR")
     }
-    r = subprocess.run(
-        ["bash", "-c", cmd_line],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-        env=env,
-        timeout=180,
-    )
+    argv = [cmd_line] if tool == "auggie" else ["bash", "-c", cmd_line]
+    try:
+        r = subprocess.run(
+            argv, input=json.dumps(payload), capture_output=True, text=True,
+            cwd=cwd, env=env, timeout=180,
+        )
+    except OSError as e:
+        return 126, str(e)
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
@@ -993,7 +998,7 @@ def check_hooks(tool, lay, guard, app, repo_dir):
 def prove(line, tool, style, app, run_dir):
     """Feeds a submit command and an ordinary one to the registered command, in the tool's own payload shape."""
     label = {"vscode": " for VS Code", "copilot": " for Copilot"}.get(style, "")
-    rc, _ = run_hook(line, payload_for(tool, style, SUBMIT, app), run_dir)
+    rc, _ = run_hook(line, payload_for(tool, style, SUBMIT, app), run_dir, tool)
     if rc == 2:
         ok(
             "the registered command blocks a submit command in this tool's own payload shape"
@@ -1007,7 +1012,7 @@ def prove(line, tool, style, app, run_dir):
             + str(rc)
             + ", expected 2)"
         )
-    rc, out = run_hook(line, payload_for(tool, style, "ls -la", app), run_dir)
+    rc, out = run_hook(line, payload_for(tool, style, "ls -la", app), run_dir, tool)
     if rc == 0 and not out:
         ok("the registered command stays silent on an ordinary command" + label)
     else:
