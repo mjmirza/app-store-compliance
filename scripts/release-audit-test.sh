@@ -65,7 +65,7 @@ PYT
 W="$(mktemp -d)"
 SK="$W/c/skills/app-store-compliance"
 mkdir -p "$SK" "$W/c/hooks"
-cp -R data docs references templates scripts "$SK/"
+cp -R data docs references templates scripts VERSION "$SK/"
 cp agent-os/hooks/app-store-compliance-guard.sh "$W/c/hooks/"
 CL="$W/clean"; mkdir -p "$CL/en-US"
 printf 'Lumina Studio' > "$CL/en-US/name.txt"
