@@ -92,7 +92,7 @@ Thirty-eight deadlines were added and eight corrected. The full dated list is in
 ## 8. Unverified, deliberately not encoded
 
 - The exact day in September 2026 the social media declaration gate opened, the exact February and April 2027 days for Play technical quality and Restore Credentials, and the exact January 2027 day for the DMCCA regime. Tracked as the first of the month with the wording quoted.
-- The exact April 2027 day for the 27 SDK upload floor. Apple has named the month only. Tracked as 1 April 2027 with the wording quoted. The iPhone Duo asset upload date, which Apple gives only as later this year.
+- The exact April 2027 day for the 27 SDK upload floor. Apple has named the month only. Tracked as 1 April 2027 with the wording quoted. The iPhone Duo asset upload date, resolved on 5 October 2026 when Apple opened Duo submissions and screenshots and set April 2027 for Duo screenshots to become required ([Apple](https://developer.apple.com/news/?id=kkphp5qo)).
 - The global rollout date for Android developer verification beyond Brazil, Indonesia, Singapore, and Thailand. Google has not published it.
 - Whether the DOJ ADA interim final rule has been finalised, and whether the FTC AI-accuracy policy statement was adopted after 31 July 2026.
 - Japan APPI law number and the six-month penalty commencement, Korea mandatory certification (1 July 2027), Korea MyData expansion dates. secondary sources only.
