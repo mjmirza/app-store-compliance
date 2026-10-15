@@ -72,7 +72,8 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
   [ -d "${HOME:-}/.copilot" ] && found="$found copilot"
   [ -d "${HOME:-}/.grok" ] && found="$found grok"
-  [ -d "${HOME:-}/.qwen" ] && found="$found qwen"
+  QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*) QDIR="${HOME:-}${QDIR#\~}" ;; esac
+  [ -d "$QDIR" ] && found="$found qwen"
   [ -d "${HOME:-}/.kimi-code" ] && found="$found kimi"
   [ -d "${HOME:-}/.factory" ] && found="$found droid"
   [ -d "${HOME:-}/.augment" ] && found="$found auggie"
@@ -168,14 +169,21 @@ def ours(h):
     return c == cmd or any(c in ("bash " + s, "bash '" + s + "'", 'bash "' + s + '"') for s in spots)
 
 
-def fires(e, h):
+TOOLS = ["Bash"] + (["PowerShell"] if "PowerShell" in os.environ.get("ASC_MATCHER", "") else [])
+
+
+def hits(m, tool):
+    try:
+        return m in ("", "*") or re.fullmatch(m, tool) is not None
+    except re.error:
+        return False
+
+
+def fires(e, h, tools=("Bash",)):
     # Only an entry Claude Code would run for a Bash call counts. Wrong matcher or a commented name does not.
     m = e.get("matcher", "")
     c = str(h.get("command", "")).strip()
-    try:
-        on_bash = m in ("", "*") or re.fullmatch(m, "Bash") is not None
-    except re.error:
-        on_bash = False
+    on_bash = all(hits(m, t) for t in tools)
     runs = c.startswith("bash ") and "#" not in c and c.rstrip("'\"").endswith(name)
     return ours(h) and on_bash and runs and h.get("type", "command") == "command"
 
@@ -185,6 +193,19 @@ if action == "add":
     found = [h for e in pre for h in e.get("hooks", []) if fires(e, h)]
 else:
     found = [h for e in pre for h in e.get("hooks", []) if ours(h)]
+if action == "add" and found and len(TOOLS) > 1:
+    # On Windows an owned entry must also match PowerShell. A group holding only ours is widened in place,
+    # otherwise ours moves to its own group so another hook's matcher is never changed.
+    for e in list(pre):
+        mine = [h for h in e.get("hooks", []) if fires(e, h) and not fires(e, h, TOOLS)]
+        if not mine:
+            continue
+        if len(mine) == len(e.get("hooks", [])):
+            e["matcher"] = os.environ.get("ASC_MATCHER", "Bash")
+        else:
+            e["hooks"] = [h for h in e["hooks"] if h not in mine]
+            pre.append({"matcher": os.environ.get("ASC_MATCHER", "Bash"), "hooks": mine})
+        changed = True
 if action == "add":
     if found:
         for h in found:
@@ -239,13 +260,14 @@ PY
       [ "$(jq -c --stream . "$cur" 2>/dev/null | wc -l)" -eq "$(jq -c tostream "$cur" 2>/dev/null | wc -l)" ] || return 4
     fi
     local present=1
-    [ -n "$cur" ] && jq -e --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
+    [ -n "$cur" ] && jq -e --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     if [ "$action" = "add" ]; then
       [ "$present" -eq 0 ] && return 3
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
       if [ -n "$cur" ]; then cp -p "$cur" "$SETTINGS.bak-$(date +%Y%m%d-%H%M%S)"; else cur="/dev/null"; fi
       if [ "$cur" = "/dev/null" ]; then printf '{}' > "$tmp.in"; cur="$tmp.in"; fi
-      jq --arg c "$HOOK_CMD" --arg m "$MATCHER" '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 120}]}])' "$cur" > "$tmp" || { rm -f "$tmp" "$tmp.in"; return 4; }
+      # An owned entry on a narrower matcher is dropped first, so the widened one never duplicates it.
+      jq --arg c "$HOOK_CMD" --arg m "$MATCHER" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(.hooks |= map(select((.command? // "" | tostring | (. as $x | $x == $c or ([$g, $t] | any(. as $s | $x == "bash " + $s or $x == "bash \u0027" + $s + "\u0027" or $x == "bash \"" + $s + "\"")))) | not)) | select((.hooks | length) > 0))) + [{matcher: $m, hooks: [{type: "command", command: $c, timeout: 120}]}])' "$cur" > "$tmp" || { rm -f "$tmp" "$tmp.in"; return 4; }
       rm -f "$tmp.in"; mv "$tmp" "$SETTINGS"; return 0
     fi
     [ "$present" -ne 0 ] && return 3
@@ -261,7 +283,7 @@ PY
 registered_cmd() {
   [ -f "$SETTINGS" ] || return 0
   if have python3 -c pass; then
-    python3 -c 'import json,re,sys
+    python3 -c 'import json,os,re,sys
 try: d=json.load(open(sys.argv[1]))
 except Exception: sys.exit(0)
 hc=sys.argv[2]
@@ -270,7 +292,8 @@ n+=[h+s[2:] for s in list(n) if s.startswith("~/") for h in ("$HOME/","${HOME}/"
 for e in d.get("hooks",{}).get("PreToolUse",[]):
     if not isinstance(e,dict): continue
     m=e.get("matcher","")
-    try: ok=m in ("","*") or re.fullmatch(m,"Bash") is not None
+    tools=["Bash"]+(["PowerShell"] if "PowerShell" in os.environ.get("ASC_MATCHER","") else [])
+    try: ok=all(m in ("","*") or re.fullmatch(m,t) is not None for t in tools)
     except re.error: ok=False
     if not ok: continue
     for h in e.get("hooks",[]):
@@ -280,7 +303,7 @@ for e in d.get("hooks",{}).get("PreToolUse",[]):
     return 0
   fi
   if have jq -n true; then
-    jq -r --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == "Bash" or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
+    jq -r --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
     return 0
   fi
   grep -qF "$SHOWN/hooks/$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"

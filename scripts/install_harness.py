@@ -96,6 +96,16 @@ def home():
     return h
 
 
+def qwen_dir():
+    """Qwen Code's global folder. QWEN_HOME wins, with a leading tilde expanded, as Qwen's own Storage does."""
+    v = os.environ.get("QWEN_HOME")
+    if not v:
+        return os.path.join(home(), ".qwen")
+    if v == "~" or v.startswith("~/") or v.startswith("~\\"):
+        v = os.path.join(home(), v[2:])
+    return os.path.abspath(v)
+
+
 def skill_dir():
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
@@ -139,7 +149,7 @@ def layout(tool, repo_dir=None):
         "codex": os.environ.get("CODEX_HOME") or os.path.join(h, ".codex"),
         "gemini": os.path.join(h, ".gemini"),
         "grok": os.path.join(h, ".grok"),
-        "qwen": os.path.join(h, ".qwen"),
+        "qwen": qwen_dir(),
         "auggie": os.path.join(h, ".augment"),
         "cursor": os.path.join(h, ".cursor"),
         "copilot": os.path.join(h, ".copilot"),
@@ -189,7 +199,18 @@ def hook_cmd(tool, guard):
         return (
             "bash ./.github/hooks/" + GUARD_NAME
         )  # the cloud agent runs it from the repository root
+    if tool == "auggie":
+        return guard  # Auggie runs a script path by its extension and shebang, never a shell string
     return "bash '" + guard.replace("'", "'\\''") + "'"
+
+
+def ps_cmd(tool, guard):
+    """The Windows handler Copilot runs in PowerShell. It pipes the payload to bash and keeps the guard's exit code."""
+    target = "./.github/hooks/" + GUARD_NAME if tool == "copilot-repo" else guard
+    if tool != "copilot-repo" and shutil.which("cygpath"):
+        r = subprocess.run(["cygpath", "-m", guard], capture_output=True, text=True)
+        target = r.stdout.strip() or guard
+    return "$input | & bash '" + target.replace("'", "''") + "'; exit $LASTEXITCODE"
 
 
 def ok(msg):
@@ -261,12 +282,24 @@ def new_entry(tool, style, cmd):
             "hooks": [{"type": "command", "command": cmd, key: value}],
         }
     if style == "copilot":
-        return {"type": "command", "bash": cmd, "timeoutSec": 120}
+        return {
+            "type": "command",
+            "bash": cmd,
+            "powershell": ps_cmd(tool, guard_of(cmd)),
+            "timeoutSec": 120,
+        }
     if style == "vscode":
         return {"type": "command", "command": cmd, "timeout": 120}
     if tool == "windsurf":
         return {"command": cmd, "show_output": True}
     return {"command": cmd, "timeout": 120}
+
+
+def guard_of(cmd):
+    """The guard path inside a bash command line this installer wrote."""
+    if cmd.startswith("bash '") and cmd.endswith("'"):
+        return cmd[6:-1].replace("'\\''", "'")
+    return cmd[5:] if cmd.startswith("bash ") else cmd
 
 
 def is_ours(item, cmd, guard):
@@ -285,6 +318,67 @@ def ours_in(style, groups, cmd, guard):
             if is_ours(h, cmd, guard)
         ]
     return [g for g in groups if is_ours(g, cmd, guard)]
+
+
+def matcher_hits(m, name):
+    if m in (None, "", "*"):
+        return True
+    try:
+        return re.fullmatch(str(m), name) is not None
+    except re.error:
+        return False
+
+
+def dispatches(tool, style, group, h):
+    """True when the tool would run this handler for a shell call and give it time to finish."""
+    spec = SPECS[tool]
+    if style == "nested" and not matcher_hits(group.get("matcher"), spec["matcher"]):
+        return False
+    if style in ("nested", "copilot", "vscode") and h.get("type", "command") != "command":
+        return False
+    if tool == "windsurf":
+        return True
+    if tool == "auggie" and not (
+        str(h.get("command", "")).endswith(".sh") and os.access(str(h.get("command", "")), os.X_OK)
+    ):
+        return False
+    if style == "copilot":
+        ps = h.get("powershell")
+        if not (isinstance(ps, str) and GUARD_NAME in ps and "exit $LASTEXITCODE" in ps):
+            return False
+    key, want = {"nested": spec.get("timeout"), "copilot": ("timeoutSec", 120)}.get(
+        style
+    ) or ("timeout", 120)
+    t = h.get(key)
+    return isinstance(t, (int, float)) and not isinstance(t, bool) and t >= want
+
+
+def live_in(tool, style, groups, cmd, guard):
+    """Our handlers that would actually run, the ones doctor may certify."""
+    if style == "nested":
+        return [
+            h
+            for g in groups
+            for h in (g.get("hooks") if isinstance(g.get("hooks"), list) else [])
+            if is_ours(h, cmd, guard) and dispatches(tool, style, g, h)
+        ]
+    return [g for g in groups if is_ours(g, cmd, guard) and dispatches(tool, style, None, g)]
+
+
+def without_ours(style, groups, cmd, guard):
+    """The groups with every handler of ours removed, dropping a group only we filled."""
+    if style != "nested":
+        return [g for g in groups if not is_ours(g, cmd, guard)]
+    kept = []
+    for g in groups:
+        hs = g.get("hooks") if isinstance(g.get("hooks"), list) else []
+        mine = [h for h in hs if is_ours(h, cmd, guard)]
+        if mine:
+            g["hooks"] = [h for h in hs if not is_ours(h, cmd, guard)]
+            if not g["hooks"]:
+                continue
+        kept.append(g)
+    return kept
 
 
 def container(lay, data):
@@ -339,6 +433,39 @@ def kimi_block(cmd):
         )
         + "\n"
     )
+
+
+def kimi_entry(text):
+    """The [[hooks]] table inside our marked block, {} when it does not parse, None when absent."""
+    m = re.search(re.escape(KIMI_BEGIN) + r"\n(.*?)" + re.escape(KIMI_END), text, re.S)
+    if not m:
+        return None
+    try:
+        import tomllib
+
+        hooks = tomllib.loads(m.group(1)).get("hooks")
+        return hooks[0] if isinstance(hooks, list) and hooks and isinstance(hooks[0], dict) else {}
+    except ImportError:
+        out = {}
+        for line in m.group(1).splitlines():
+            k, eq, v = line.partition("=")
+            if eq:
+                try:
+                    out[k.strip()] = json.loads(v.strip())
+                except ValueError:
+                    return {}
+        return out
+    except Exception:
+        return {}
+
+
+def kimi_live(h):
+    """True when Kimi would run this handler before a shell command and give it time to finish."""
+    if not h or h.get("event") != "PreToolUse" or not isinstance(h.get("command"), str):
+        return False
+    t = h.get("timeout")
+    ok_time = isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 120
+    return ok_time and matcher_hits(h.get("matcher"), "Bash")
 
 
 def command_text(tool, guard):
@@ -437,7 +564,9 @@ def register(tool, lay, guard, dry):
             )
             print(manual_block(tool, lay, cmd))
             return False
-        if not ours_in(st, groups, cmd, guard):
+        if not live_in(tool, st, groups, cmd, guard):
+            # An entry of ours that would never run is replaced, never left beside the new one.
+            groups[:] = without_ours(st, groups, cmd, guard)
             groups.append(new_entry(tool, st, cmd))
             changed = True
     if tool == "gemini" and data["tools"].get("enableHooks") is not True:
@@ -475,7 +604,16 @@ def register_kimi(lay, cmd, dry):
         with open(path, encoding="utf-8") as f:
             text = f.read()
     if KIMI_BEGIN in text:
-        ok("hook already registered in " + shown(path))
+        h = kimi_entry(text)
+        if kimi_live(h) and h.get("command") == cmd:
+            ok("hook already registered in " + shown(path))
+            return True
+        if dry:
+            print("  would rewrite the guard block in " + shown(path) + ", with a backup")
+            return True
+        pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"\n?"
+        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd), text, count=1, flags=re.S))
+        ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
     if dry:
         print(
@@ -529,17 +667,7 @@ def unregister(tool, lay, guard):
         groups = box.get(ev)
         if not isinstance(groups, list) or not ours_in(st, groups, cmd, guard):
             continue
-        if st == "nested":
-            kept = []
-            for g in groups:
-                had = any(is_ours(h, cmd, guard) for h in g.get("hooks", []))
-                g["hooks"] = [
-                    h for h in g.get("hooks", []) if not is_ours(h, cmd, guard)
-                ]
-                if g["hooks"] or not had:
-                    kept.append(g)
-        else:
-            kept = [g for g in groups if not is_ours(g, cmd, guard)]
+        kept = without_ours(st, groups, cmd, guard)
         if kept:
             box[ev] = kept
         else:
@@ -564,6 +692,37 @@ def read_owners():
         return set()
 
 
+def write_owners(owners):
+    """Replaces .installed-by in one step, so a reader never sees it empty or half written."""
+    sk = skill_dir()
+    fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-owners-")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted(owners)) + "\n")
+    os.replace(tmp, os.path.join(sk, ".installed-by"))
+
+
+def read_guards():
+    """Each owning tool's installed guard path, so release-audit.py in the shared skill can find one."""
+    out = {}
+    try:
+        with open(os.path.join(skill_dir(), ".guards"), encoding="utf-8") as f:
+            for line in f:
+                t, tab, path = line.rstrip("\n").partition("\t")
+                if tab and t in TOOLS and path:
+                    out[t] = path
+    except OSError:
+        pass
+    return out
+
+
+def write_guards(guards):
+    sk = skill_dir()
+    fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-guards-")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("".join(t + "\t" + guards[t] + "\n" for t in sorted(guards)))
+    os.replace(tmp, os.path.join(sk, ".guards"))
+
+
 def copy_payload(tool, lay, guard):
     if tool != "copilot-repo":
         sk = skill_dir()
@@ -585,8 +744,8 @@ def copy_payload(tool, lay, guard):
                 os.path.join(sk, d),
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
-        with open(os.path.join(sk, ".installed-by"), "w", encoding="utf-8") as f:
-            f.write("\n".join(sorted(read_owners() | {tool})) + "\n")
+        write_owners(read_owners() | {tool})
+        write_guards(dict(read_guards(), **{tool: guard}))
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -684,21 +843,20 @@ def sample_app():
     return d
 
 
-def run_hook(cmd_line, payload, cwd):
+def run_hook(cmd_line, payload, cwd, tool=None):
     env = {
         k: v
         for k, v in os.environ.items()
         if k not in ("CLAUDE_PROJECT_DIR", "GEMINI_PROJECT_DIR", "AUGMENT_PROJECT_DIR")
     }
-    r = subprocess.run(
-        ["bash", "-c", cmd_line],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-        env=env,
-        timeout=180,
-    )
+    argv = [cmd_line] if tool == "auggie" else ["bash", "-c", cmd_line]
+    try:
+        r = subprocess.run(
+            argv, input=json.dumps(payload), capture_output=True, text=True,
+            cwd=cwd, env=env, timeout=180,
+        )
+    except OSError as e:
+        return 126, str(e)
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
@@ -826,7 +984,15 @@ def check_kimi(lay, guard, app):
     except Exception:
         fail(shown(lay["config"]) + " no longer parses as TOML")
         return
-    prove(hook_cmd("kimi", guard), "kimi", "toml", app, app)
+    h = kimi_entry(text)
+    if not kimi_live(h):
+        fail(
+            "the guard block in "
+            + shown(lay["config"])
+            + " would not run before a shell command. Check its event, matcher and timeout, or run install again"
+        )
+        return
+    prove(h["command"], "kimi", "toml", app, app)
 
 
 def check_hooks(tool, lay, guard, app, repo_dir):
@@ -837,13 +1003,21 @@ def check_hooks(tool, lay, guard, app, repo_dir):
     found_any = False
     for ev, st in events(tool):
         groups = box.get(ev)
-        found = ours_in(st, groups, cmd, guard) if isinstance(groups, list) else []
+        found = live_in(tool, st, groups, cmd, guard) if isinstance(groups, list) else []
         if not found:
-            fail("no " + ev + " hook entry for the guard in " + shown(lay["config"]))
+            if isinstance(groups, list) and ours_in(st, groups, cmd, guard):
+                fail(
+                    "the " + ev + " entry in " + shown(lay["config"])
+                    + " names the guard but would never run it. Check its matcher, type and timeout, or run install again"
+                )
+            else:
+                fail("no " + ev + " hook entry for the guard in " + shown(lay["config"]))
             continue
         found_any = True
         line = found[0].get("command") or found[0].get("bash")
         prove(line, tool, st, app, repo_dir or "/")
+        if st == "copilot":
+            prove_ps(found[0]["powershell"], tool, app, repo_dir or "/")
     if found_any:
         ok("hook registered in " + shown(lay["config"]))
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:
@@ -857,7 +1031,7 @@ def check_hooks(tool, lay, guard, app, repo_dir):
 def prove(line, tool, style, app, run_dir):
     """Feeds a submit command and an ordinary one to the registered command, in the tool's own payload shape."""
     label = {"vscode": " for VS Code", "copilot": " for Copilot"}.get(style, "")
-    rc, _ = run_hook(line, payload_for(tool, style, SUBMIT, app), run_dir)
+    rc, _ = run_hook(line, payload_for(tool, style, SUBMIT, app), run_dir, tool)
     if rc == 2:
         ok(
             "the registered command blocks a submit command in this tool's own payload shape"
@@ -871,7 +1045,7 @@ def prove(line, tool, style, app, run_dir):
             + str(rc)
             + ", expected 2)"
         )
-    rc, out = run_hook(line, payload_for(tool, style, "ls -la", app), run_dir)
+    rc, out = run_hook(line, payload_for(tool, style, "ls -la", app), run_dir, tool)
     if rc == 0 and not out:
         ok("the registered command stays silent on an ordinary command" + label)
     else:
@@ -882,6 +1056,23 @@ def prove(line, tool, style, app, run_dir):
             + str(rc)
             + ")"
         )
+
+
+def prove_ps(line, tool, app, run_dir):
+    """Runs the Windows handler in PowerShell when one is installed here, as Copilot does on Windows."""
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        ok("the Windows powershell handler is registered (PowerShell is not installed here to run it)")
+        return
+    r = subprocess.run(
+        [shell, "-NoProfile", "-NonInteractive", "-Command", line],
+        input=json.dumps(payload_for(tool, "copilot", SUBMIT, app)),
+        capture_output=True, text=True, cwd=run_dir, timeout=180,
+    )
+    if r.returncode == 2:
+        ok("the Windows powershell handler blocks a submit command")
+    else:
+        fail("the Windows powershell handler did not block a submit command (exit " + str(r.returncode) + ")")
 
 
 def uninstall(tool, lay, guard, dry):
@@ -901,10 +1092,8 @@ def uninstall(tool, lay, guard, dry):
     else:
         owners = read_owners() - {tool}
         if owners:
-            with open(
-                os.path.join(skill_dir(), ".installed-by"), "w", encoding="utf-8"
-            ) as f:
-                f.write("\n".join(sorted(owners)) + "\n")
+            write_owners(owners)
+            write_guards({t: p for t, p in read_guards().items() if t in owners})
             print(
                 "Removed the "
                 + SPECS[tool]["name"]

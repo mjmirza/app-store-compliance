@@ -92,6 +92,11 @@ printf 'Get the Android app today' > "$A/android/en-US/full_description.txt"
 printf '{"privacy_policy_url":"https://lumina.app/privacy","contact_email":"hi@lumina.app"}' > "$A/android/m.json"
 OUT="$($AUDIT "$A" 2>&1)"
 echo "$OUT" | grep -q 'over the 80 limit' && ! echo "$OUT" | grep -q 'CROSS-PLATFORM-REFERENCE' && ok "a fastlane android folder uses the Google rules" || bad "a fastlane android folder uses the Google rules"
+# Pointing at metadata/android itself, or at one of its locale folders, keeps the Google rules.
+OUT="$($AUDIT "$A/android" 2>&1)"
+echo "$OUT" | grep -q 'over the 80 limit' && ! echo "$OUT" | grep -q 'CROSS-PLATFORM-REFERENCE' && ok "the android folder given directly uses the Google rules" || bad "the android folder given directly uses the Google rules"
+OUT="$($AUDIT "$A/android/en-US" 2>&1)"
+echo "$OUT" | grep -q 'over the 80 limit' && ok "an android locale folder given directly uses the Google rules" || bad "an android locale folder given directly uses the Google rules"
 rm -rf "$A"
 
 echo ""

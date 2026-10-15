@@ -215,6 +215,25 @@ echo "$OUT" | grep -q "blocks a submit command run through PowerShell" && ok "do
 fresh; run >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash"] else 1)' "$C/settings.json" && ok "macOS and Linux keep the Bash matcher" || bad "macOS and Linux keep the Bash matcher"
 
+# 26 a Bash-only entry written by an older install on Windows is upgraded to Bash|PowerShell, and doctor checks the matcher
+fresh; run >/dev/null
+ASC_UNAME=MINGW64_NT-10.0 run doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "Windows doctor fails while the matcher covers only Bash" || bad "Windows doctor fails while the matcher covers only Bash (rc=$RC)"
+OUT="$(ASC_UNAME=MINGW64_NT-10.0 run)"; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash|PowerShell"] else 1)' "$C/settings.json" && [ "$(hooks)" = "1" ] && [ "$RC" -eq 0 ] \
+  && ok "a Windows reinstall upgrades the owned Bash matcher once" || bad "a Windows reinstall upgrades the owned Bash matcher once (rc=$RC entries=$(hooks))"
+ASC_UNAME=MINGW64_NT-10.0 run doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "Windows doctor passes after the upgrade" || bad "Windows doctor passes after the upgrade (rc=$RC)"
+if command -v jq >/dev/null 2>&1; then
+  fresh; run >/dev/null
+  SHIM="$(mktemp -d)"
+  for b in bash cp rm mkdir chmod cat grep sed awk find xargs tr head tail mktemp printf wc sort uniq cut dirname basename date cmp mv ls env plutil xmllint file od comm tee sleep expr touch jq; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$SHIM/$b"; done
+  OUT="$(ASC_UNAME=MINGW64_NT-10.0 PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash|PowerShell"] else 1)' "$C/settings.json" && [ "$(hooks)" = "1" ] && [ "$RC" -eq 0 ] \
+    && ok "with jq only a Windows reinstall upgrades the matcher once" || bad "with jq only a Windows reinstall upgrades the matcher once (rc=$RC entries=$(hooks))"
+  rm -rf "$SHIM"
+fi
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

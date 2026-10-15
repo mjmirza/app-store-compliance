@@ -12,7 +12,7 @@ INSTALL="$PWD/scripts/install.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() { H="$WORK/h$RANDOM$RANDOM"; mkdir -p "$H"; }
-run()   { env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+run()   { env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
 cfg() {
   case "$1" in
     codex) echo "$H/.codex/hooks.json" ;;
@@ -90,8 +90,23 @@ done
 fresh; run --tool copilot >/dev/null; run --tool auggie >/dev/null; run --tool windsurf >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a=d["hooks"]["preToolUse"][0]; b=d["hooks"]["PreToolUse"][0]; sys.exit(0 if d["version"]==1 and a["timeoutSec"]==120 and a["bash"].endswith("guard.sh'"'"'") and b["timeout"]==120 and b["command"]==a["bash"] else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
   && ok "copilot file carries the Copilot entry and the VS Code entry" || bad "copilot file carries the Copilot entry and the VS Code entry"
+python3 -c 'import json,sys; a=json.load(open(sys.argv[1]))["hooks"]["preToolUse"][0]; p=a.get("powershell",""); sys.exit(0 if p.startswith("$input | & bash ") and "app-store-compliance-guard.sh" in p and p.rstrip().endswith("exit $LASTEXITCODE") else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
+  && ok "copilot also carries a Windows powershell handler that pipes the payload to the guard and keeps its exit code" || bad "copilot also carries a Windows powershell handler that pipes the payload to the guard and keeps its exit code"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["preToolUse"][0].pop("powershell",None); json.dump(d,open(p,"w"))' "$H/.copilot/hooks/app-store-compliance.json"
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "copilot doctor fails when the Windows handler is missing" || bad "copilot doctor fails when the Windows handler is missing (rc=$RC)"
+run --tool copilot >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["preToolUse"]; sys.exit(0 if len(e)==1 and e[0].get("powershell") else 1)' "$H/.copilot/hooks/app-store-compliance.json" \
+  && ok "copilot install adds the missing Windows handler without a duplicate" || bad "copilot install adds the missing Windows handler without a duplicate"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=d["hooks"]["PreToolUse"][0]; sys.exit(0 if g["matcher"]=="launch-process" and g["hooks"][0]["timeout"]==120000 else 1)' "$H/.augment/settings.json" \
   && ok "auggie uses launch-process and a millisecond timeout" || bad "auggie uses launch-process and a millisecond timeout"
+python3 -c 'import json,os,sys; c=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"][0]["hooks"][0]["command"]; sys.exit(0 if c==sys.argv[2] and os.access(c,os.X_OK) and open(c).readline().startswith("#!") else 1)' "$H/.augment/settings.json" "$H/.augment/hooks/app-store-compliance-guard.sh" \
+  && ok "auggie registers the executable guard script path, as its docs require" || bad "auggie registers the executable guard script path, as its docs require"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=d["hooks"]["PreToolUse"][0]["hooks"][0]; h["command"]="bash "+h["command"]; json.dump(d,open(p,"w"))' "$H/.augment/settings.json"
+run --tool auggie doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "auggie doctor fails on a shell command string" || bad "auggie doctor fails on a shell command string (rc=$RC)"
+run --tool auggie >/dev/null; run --tool auggie doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count auggie)" = "1" ] && ok "auggie install replaces the shell string with the script path once" || bad "auggie install replaces the shell string with the script path once (rc=$RC entries=$(count auggie))"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["pre_run_command"][0]; sys.exit(0 if e["show_output"] is True else 1)' "$H/.codeium/windsurf/hooks.json" \
   && ok "windsurf shows the guard output to the user" || bad "windsurf shows the guard output to the user"
 
@@ -148,6 +163,35 @@ OUT="$(run --tool codex uninstall)"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); c=[h["command"] for g in d["hooks"]["PreToolUse"] for h in g["hooks"]]; sys.exit(0 if c==["bash ~/other.sh"] else 1)' "$H/.codex/hooks.json" \
   && ok "codex uninstall keeps the other hook" || bad "codex uninstall keeps the other hook"
 
+# 4b removing the most recently installed tool keeps the skill for the earlier one, in both orders
+for pair in "codex gemini" "gemini codex"; do
+  set -- $pair; fresh; run --tool "$1" >/dev/null; run --tool "$2" >/dev/null; run --tool "$2" uninstall >/dev/null
+  run --tool "$1" doctor >/dev/null; RC=$?
+  [ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && [ "$RC" -eq 0 ] && grep -qx "$1" "$H/.agents/skills/app-store-compliance/.installed-by" \
+    && ok "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes" || bad "uninstalling $2 after $1 keeps the shared skill and $1 doctor passes (rc=$RC)"
+done
+
+# 4c an entry that names the guard but would never dispatch is caught by doctor and repaired by install
+fresh; run --tool codex >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["PreToolUse"][0]["matcher"]="Read"; json.dump(d,open(p,"w"))' "$(cfg codex)"
+run --tool codex doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "codex doctor fails when the guard sits on the Read matcher" || bad "codex doctor fails when the guard sits on the Read matcher (rc=$RC)"
+run --tool codex >/dev/null; run --tool codex doctor >/dev/null; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); g=[g for g in d["hooks"]["PreToolUse"] if any("guard.sh" in h["command"] for h in g["hooks"])]; sys.exit(0 if [x["matcher"] for x in g]==["Bash"] else 1)' "$(cfg codex)" && [ "$RC" -eq 0 ] \
+  && ok "codex install moves the guard back onto Bash and doctor then passes" || bad "codex install moves the guard back onto Bash and doctor then passes (rc=$RC)"
+fresh; run --tool gemini >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=d["hooks"]["BeforeTool"][0]["hooks"][0]; h["type"]="prompt"; h.pop("timeout"); json.dump(d,open(p,"w"))' "$(cfg gemini)"
+run --tool gemini doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "gemini doctor fails on a wrong handler type and a missing timeout" || bad "gemini doctor fails on a wrong handler type and a missing timeout (rc=$RC)"
+run --tool gemini >/dev/null; run --tool gemini doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count gemini)" = "1" ] && ok "gemini install repairs the handler once" || bad "gemini install repairs the handler once (rc=$RC entries=$(count gemini))"
+fresh; run --tool kimi >/dev/null
+python3 -c 'import sys; p=sys.argv[1]; t=open(p).read(); i=t.index("command = "); j=t.index("\n",i); open(p,"w").write(t[:i]+"command = \"bash /no/such/app-store-compliance-guard.sh\""+t[j:])' "$(cfg kimi)"
+run --tool kimi doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "kimi doctor tests the command actually registered in config.toml" || bad "kimi doctor tests the command actually registered in config.toml (rc=$RC)"
+run --tool kimi >/dev/null; run --tool kimi doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count kimi)" = "1" ] && ok "kimi install rewrites a broken block once" || bad "kimi install rewrites a broken block once (rc=$RC entries=$(count kimi))"
+
 # 5 a config that is not valid JSON, or repeats a key, is never rewritten
 for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"allow":["x"]}}'; do
   fresh; mkdir -p "$H/.codex"; printf '%s' "$body" > "$H/.codex/hooks.json"
@@ -161,6 +205,15 @@ APP="$WORK/app$RANDOM"; mkdir -p "$APP/App"; printf '<plist><dict></dict></plist
 OUT="$(env HOME="$H" bash "$H/.codex/hooks/app-store-compliance-guard.sh" "$APP" 2>&1)"
 echo "$OUT" | grep -q "Regulatory Compliance Deadline Status" && ok "the codex guard finds the deadline list in ~/.agents/skills" || bad "the codex guard finds the deadline list in ~/.agents/skills"
 
+# 6b release-audit.py run from the shared skill finds the guard installed under the tool's own folder
+fresh; run --tool codex >/dev/null
+OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
+echo "$OUT" | grep -qF "Guard. $H/.codex/hooks/app-store-compliance-guard.sh" && ok "release-audit in the shared skill finds the codex guard" || { bad "release-audit in the shared skill finds the codex guard"; echo "$OUT" | grep -i guard | head -3; }
+run --tool gemini >/dev/null; run --tool codex uninstall >/dev/null
+OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
+echo "$OUT" | grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
+rm -rf "$APP"
+
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
 fresh; run --tool gemini >/dev/null; run --tool opencode >/dev/null
 python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); sys.exit(0 if d["description"] and "{{args}}" in d["prompt"] else 1)' "$H/.gemini/commands/app-store-audit.toml" && ok "the gemini command is valid TOML with {{args}}" || bad "the gemini command is valid TOML with {{args}}"
@@ -173,6 +226,20 @@ OUT="$(run --tool all)"; RC=$?
   && ok "--tool all installs into the found tools only" || { bad "--tool all installs into the found tools only (rc=$RC)"; echo "$OUT" | head -5; }
 fresh; OUT="$(run --tool all)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "No supported AI coding tool" && ok "--tool all with no tool says so" || bad "--tool all with no tool says so (rc=$RC)"
+
+# 8b Qwen reads $QWEN_HOME/settings.json when QWEN_HOME is set, so install, doctor, uninstall and --tool all follow it
+fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
+qrun() { env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR QWEN_HOME="$Q" HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+OUT="$(qrun --tool qwen)"; RC=$?
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if any("guard.sh" in h["command"] for g in d["hooks"]["PreToolUse"] for h in g["hooks"]) else 1)' "$Q/settings.json" 2>/dev/null && [ "$RC" -eq 0 ] && [ ! -e "$H/.qwen/settings.json" ] \
+  && ok "qwen installs into \$QWEN_HOME/settings.json" || bad "qwen installs into \$QWEN_HOME/settings.json (rc=$RC)"
+qrun --tool qwen doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "qwen doctor checks \$QWEN_HOME" || bad "qwen doctor checks \$QWEN_HOME (rc=$RC)"
+qrun --tool qwen uninstall >/dev/null
+! grep -q "app-store-compliance-guard.sh" "$Q/settings.json" 2>/dev/null && ok "qwen uninstall edits \$QWEN_HOME/settings.json" || bad "qwen uninstall edits \$QWEN_HOME/settings.json"
+fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
+OUT="$(qrun --tool all --dry-run)"; RC=$?
+echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds qwen through \$QWEN_HOME" || bad "--tool all finds qwen through \$QWEN_HOME (rc=$RC)"
 
 # 9 a home folder with an apostrophe still verifies
 H="$WORK/O'Reilly home"; mkdir -p "$H"
