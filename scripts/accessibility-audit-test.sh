@@ -904,6 +904,60 @@ else
 fi
 rm -rf "$ISSUE_DIR" 2>/dev/null || true
 
+# Issue #1000. Edge cases from the October review.
+I1000_DIR=$(mktemp -d "/tmp/access_issue1000_XXXXXX")
+mkdir -p "$I1000_DIR/paren_label" "$I1000_DIR/comment_image" "$I1000_DIR/code_image"
+cat << 'EOF' > "$I1000_DIR/paren_label/P.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: {}, label: ({ Image(systemName: "trash") }))
+        Button(action: {}, label: (({ Image(systemName: "gear") })))
+        Button(action: {}, label: ({ Image(systemName: "star") })).accessibilityLabel("Star")
+    }
+}
+EOF
+cat << 'EOF' > "$I1000_DIR/comment_image/C.swift"
+import SwiftUI
+// Example: Image("logo")
+/* Another example, Image("banner") */
+struct V: View {
+    var body: some View {
+        Text("Hello")
+    }
+}
+EOF
+cat << 'EOF' > "$I1000_DIR/code_image/D.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Image("logo") // accessibilityLabel is still missing here
+    }
+}
+EOF
+
+OUT=$($AUDIT "$I1000_DIR/paren_label" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
+  ok "#1000 a label closure wrapped in parentheses is read, so the icon-only Button is reported"
+else
+  bad "#1000 a parenthesised label closure was not read. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$I1000_DIR/comment_image" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#1000 an Image inside a comment is not reported as a VoiceOver finding"
+else
+  bad "#1000 the Image rule read a comment. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$I1000_DIR/code_image" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q 'Image("logo")'; then
+  ok "#1000 a real Image in code is still reported even when a comment names accessibilityLabel"
+else
+  bad "#1000 a real unlabelled Image in code was not reported. Output:"; echo "$OUT"
+fi
+rm -rf "$I1000_DIR" 2>/dev/null || true
+
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
