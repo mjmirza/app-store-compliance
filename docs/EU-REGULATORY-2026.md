@@ -143,9 +143,9 @@ A microenterprise with fewer than 10 employees AND annual turnover or balance-sh
 - The EAA is met through the harmonised standard EN 301 549. WCAG is the underlying guidelines set.
 - EN 301 549 version 3.2.1 is built on WCAG 2.1 Level AA and adds roughly 64 requirements beyond WCAG, in particular Chapter 11 for non-web software and mobile apps. A WCAG-only audit does NOT satisfy EN 301 549 Chapter 11.
 - EN 301 549 version 4.1.1, expected in 2026, moves to WCAG 2.2.
-- An accessibility statement is required (EN 301 549 Annex B and C). A missing or inaccurate statement can be a separate penalty in some Member States.
+- Service providers must publish accessibility information. Directive (EU) 2019/882 Article 13(2). "Service providers shall prepare the necessary information in accordance with Annex V and shall explain how the services meet the applicable accessibility requirements. The information shall be made available to the public in written and oral format, including in a manner which is accessible to persons with disabilities." Annex V point 1 places it "in the general terms and conditions, or equivalent document", with a general description of the service, an explanation of its operation, and how the Annex I requirements are met. The Directive never uses the term "accessibility statement", which is the Directive (EU) 2016/2102 Article 7 term for public sector bodies. EN 301 549 V3.2.1 Annex B (informative) and Annex C (normative, determination of conformance) carry no such duty. the standard only names an accessibility statement as an example of product information in clause 12.1.1 NOTE 3. A missing or inaccurate notice can be a separate penalty in some Member States.
 
-Sources. [Deque EN 301 549](https://www.deque.com/en-301-549-compliance/), [EN 301 549 Chapter 11 for mobile apps](https://auditsu.com/resources/en-301-549-chapter-11-mobile-apps).
+Sources. [Directive (EU) 2019/882, Article 13 and Annex V](https://eur-lex.europa.eu/eli/dir/2019/882/oj), [ETSI EN 301 549 V3.2.1](https://www.etsi.org/deliver/etsi_en/301500_301599/301549/03.02.01_60/en_301549v030201p.pdf), [Directive (EU) 2016/2102 Article 7](https://eur-lex.europa.eu/eli/dir/2016/2102/oj), [Deque EN 301 549](https://www.deque.com/en-301-549-compliance/), [EN 301 549 Chapter 11 for mobile apps](https://auditsu.com/resources/en-301-549-chapter-11-mobile-apps).
 
 ### 4.4 Penalties
 
@@ -157,7 +157,7 @@ Penalties are set per Member State. Germany, administrative fines up to 100,000 
 - Dynamic Type. system font scaling supported, no fixed layout that breaks at larger text.
 - Color contrast at WCAG 2.1 AA (4.5 to 1 for text, 3 to 1 for large text and UI), no information carried by color alone.
 - Reduce Motion honored, logical focus order, adequate touch-target size.
-- An accessibility statement published and reachable.
+- Annex V accessibility information (how the service meets the Annex I requirements) published in the terms and conditions or an equivalent document, accessible and reachable (Directive (EU) 2019/882 Article 13(2)).
 - A flag that WCAG-only coverage leaves an EN 301 549 Chapter 11 gap.
 
 These map onto the Apple accessibility discipline the setup already carries (Dynamic Type, VoiceOver, contrast, Reduce Motion). The difference the EAA adds is that this is now a legal requirement with fines, not only a quality bar.
@@ -231,7 +231,7 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | Third-party-AI consent (Apple 5.1.2(i)) | A consent modal naming the AI provider and data types, shown before data leaves the device | live since 13 Nov 2025 |
 | DSA trader status | Trader or non-trader declared and verified before EU distribution | live since 17 Feb 2025 |
 | Age-rating questionnaire | Answered for every app, capabilities match behaviour | deadline 31 Jan 2026 |
-| European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, accessibility statement published | live since 28 Jun 2025 |
+| European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, Annex V accessibility information published (Art. 13(2)) | live since 28 Jun 2025 |
 | DMA external purchase | Entitlement declared, disclosure sheet wired, no IAP mix, reporting wired | live |
 | Notarization | Any non-App-Store build notarized | live |
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |

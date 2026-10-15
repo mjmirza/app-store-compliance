@@ -109,7 +109,7 @@
       "id": "EU-EAA-ACCESSIBILITY",
       "jurisdiction": "European Union (EU)",
       "law": "European Accessibility Act (EAA), Directive (EU) 2019/882",
-      "requirement": "Harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA mobile accessibility compliance and published accessibility statement.",
+      "requirement": "Harmonised standard EN 301 549 Chapter 11 / WCAG 2.1 AA mobile accessibility compliance and Annex V accessibility information published in the terms and conditions or an equivalent document (Article 13(2)).",
       "effective_date": "2022-06-28",
       "grace_period": "36 months",
       "mandatory_date": "2025-06-28",
