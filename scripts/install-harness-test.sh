@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests install.sh --tool for Codex, Gemini CLI, OpenCode, Cursor and Copilot CLI in a throwaway HOME.
+# Tests install.sh --tool for every supported tool other than Claude Code, in a throwaway HOME.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 

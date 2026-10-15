@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command setup for Claude Code, Codex, Gemini CLI, OpenCode, Cursor and Copilot CLI. Installs the guard,
+# One command setup for Claude Code and, with --tool, eleven other AI coding tools. Installs the guard,
 # skill and command, registers the hook, then proves it blocks a bad app. Run with --help for usage.
 set -uo pipefail
 
