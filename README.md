@@ -90,7 +90,7 @@ bash ~/repositories/app-store-compliance/scripts/install.sh --tool all
 | Augment Auggie | `install.sh --tool auggie` | Hook, skill | Start a new Auggie session |
 | Windsurf | `install.sh --tool windsurf` | Hook, skill | Restart Windsurf |
 
-Every run ends with `Install verified.` only after it has fed a submit command to the hook exactly as that tool would, in that tool's own format, and seen it blocked. If you see a `FAIL` line instead, fix that line and run the same command with `doctor` added.
+Every run ends with `Install verified.` only after it has fed a submit command to the hook in that tool's own payload format and seen it blocked. For OpenCode that check runs the plugin under node, so without node the run says `Installed, but not fully verified.` instead. If you see a `FAIL` line instead, fix that line and run the same command with `doctor` added.
 
 What it writes, so you can check it.
 
@@ -107,7 +107,7 @@ Each of these was checked against its own documentation. Where a tool can block 
 
 | Tool | What to do |
 |---|---|
-| Kiro CLI | Its docs do not yet say how a hook blocks a command. Run the guard by hand before a submit, and add the instruction from step 4 of the paste block below to `~/.kiro/steering/` |
+| Kiro CLI | Kiro blocks a tool call when a `PreToolUse` command hook exits non-zero, and the guard already reads Kiro's `execute_bash` and `execute_pwsh` payloads. Its docs do not yet confirm how the payload reaches the command or give a full hook file, so the installer does not wire it. Run the guard by hand before a submit, and add the instruction from step 4 of the paste block below to `~/.kiro/steering/` |
 | Cline | Hooks run on macOS and Linux only, from an executable file `~/.cline/hooks/PreToolUse` that answers `{"cancel":true}`. Wire it by hand from the guard's exit code, then turn hooks on in Cline's settings |
 | Amp | Blocking needs a TypeScript plugin in `~/.config/amp/plugins/`. Not installed automatically yet. Run the guard by hand before a submit |
 | Goose, Crush | Both can block, and their file layout could not be confirmed. Run the guard by hand before a submit |
@@ -127,7 +127,7 @@ Steps:
 1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance.
 2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Factory Droid, Auggie, or Windsurf) and run the installer for it, showing me the full output.
    bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|droid|auggie|windsurf>
-   It must end with "Install verified." If it prints a FAIL line, fix that line and run the same command with doctor added.
+   It must end with "Install verified." (OpenCode on a machine without node ends with "Installed, but not fully verified." instead, install node and run doctor.) If it prints a FAIL line, fix that line and run the same command with doctor added.
    If you are none of these, tell me so and stop. Do not wire the hook by hand.
 3. Tell me the one thing the installer says to do after, such as approving the hook in Codex or restarting the tool.
 4. Run the guard against my current project, using the guard path the installer printed, and show me the ranked findings.
@@ -415,7 +415,7 @@ python3 scripts/deadline-checker.py
 | `scripts/monitor-security.py` | Monitors 17 mobile security requirements, matching real API symbols in your code |
 | `scripts/generate-timeline.py` | Compiles a chronological regulatory timeline from the deadline database |
 | `scripts/monitor.py` | Monitors 25 Apple developer requirements tracks, maps announcements to tracks, identifies affected files, generates migration tasks, estimates release impact, and drafts pull requests |
-| `scripts/*-test.sh`, `scripts/test-*.py` | One test suite per script (guard, monitors, audits, deadline checker, timeline, citation verifier, metadata audit). CI runs every one of them on every push |
+| `scripts/*-test.sh`, `scripts/test-*.py` | One test suite per script (guard, monitors, audits, deadline checker, timeline, citation verifier, metadata audit). CI runs every one of them on every push to main and on every pull request |
 | `scripts/monitor-regulatory.py` | The Regulatory Intelligence Agent. tracks EU/UK/US/CA/AU/SG regulatory developments through a source trust hierarchy classifier |
 | `scripts/monitor-android.py` | Android and Google Play requirements compliance monitor |
 | `scripts/monitor-ai-policy.py` | Platform-specific generative AI policy monitor (Apple and Google) |

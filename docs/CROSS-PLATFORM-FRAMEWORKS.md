@@ -108,7 +108,7 @@ Three behaviours to know.
 - A Unity project is scanned for both stores when it is run by hand. As a hook the `-buildTarget` value picks the store.
 - A Unity project holds no Xcode or Gradle project until it is exported, so the export compliance check and the R8 check stay silent and the report says so. Scan the exported project too.
 - A Kotlin Multiplatform project is scanned as one app, so shared code in `commonMain` counts for both the iOS and the Android checks.
-- A bare Xcode or Android project under a root Expo, React Native, Flutter, or Capacitor app is scanned as its own app when it has its own `Info.plist` or `AndroidManifest.xml` and no root build file names its path (`settings.gradle`, a `Podfile`, or an `.xcworkspace`). It counts as an app only with an `.xcodeproj` or an Android application module, so a library or a local native module stays with the app that uses it. A project in a folder named exactly `demo`, `example`, `sample`, or `playground` (or the plural) is treated as a repo demo and stays part of the root scan. A nested project splits off only when the root has its own project for that platform, so a managed Expo root with no native project keeps scanning the nested project and keeps its iOS checks. A native root app never splits off a nested project (issue #656).
+- A bare Xcode or Android project under a root Expo, React Native, Flutter, or Capacitor app is scanned as its own app when it has its own `Info.plist` or `AndroidManifest.xml` and no root build file names its path (`settings.gradle`, a `Podfile`, or an `.xcworkspace`). It counts as an app only with an `.xcodeproj` that builds an application (or names no product type) or an Android application module, so a library, a framework or a local native module stays with the app that uses it. A native host that embeds the root framework (React Native, Expo, Flutter or Capacitor code in its sources, Podfile or Gradle files) is a brownfield host and stays in the root scan, so the root's framework checks still cover it. A project in a folder named exactly `demo`, `example`, `sample`, or `playground` (or the plural) is treated as a repo demo and stays part of the root scan. A nested project splits off only when the root has its own project for that platform, so a managed Expo root with no native project keeps scanning the nested project and keeps its iOS checks. A native root app never splits off a nested project (issue #656).
 
 ## What stays out of reach
 
@@ -123,6 +123,8 @@ These are limits, not bugs waiting for a fix. Plan around them.
 - **Rust naming.** The sign-in and account-deletion patterns look for camelCase names such as `signIn`. A Rust function named `sign_in` does not trigger them.
 - **Frameworks not detected.** NativeScript and legacy Xamarin.Forms projects.
 - **More than one Xcode target.** Targets are read as one body of source, so an app extension can satisfy, or trigger, a finding for the main app. A watchOS-only or visionOS-only workspace is treated as iOS.
+- **Pooled or split layouts that remain coarse (inherited from 1.0).** A single nested managed Expo app is read through the root's config only, shared packages and a brownfield host's source outside the scanned root are not followed, every native target in one root is pooled, and two .NET MAUI or Unity apps in one repo are scanned as one.
+- **Workspace runners.** A package script is followed one level deep, so a root script that runs `turbo run build`, which in turn runs a mobile package's submit, is not seen. A selector the guard cannot resolve (a pnpm graph selector such as `web...` or `{apps/web}`, a lerna `--scope`) reads every package, which can block a web-only build in a repo that also holds a mobile app. Run the web build without the wrapper, or set `APP_STORE_GUARD_OK=1` once.
 - **Store console state.** The guard cannot see App Store Connect or Play Console, so the age rating, social media declaration, and closed testing items are reminders, not proof of a problem.
 
 ## Known gaps (found by Codex and Qwen adversarial review, not yet fixed)
@@ -135,7 +137,8 @@ These are limits, not bugs waiting for a fix. Plan around them.
   `<!-- <widget ...> -->` or a look-alike tag like `<widgetConfig>` still counts
   as Cordova evidence. Low severity, no realistic false negative on a real
   Cordova project, though not a hard proof either.
-- **Android-side framework checks are absent.** Every check in this doc is
+- **Android-side framework checks are thin.** Apart from the Android
+  permissions array a managed Expo app config declares, every check in this doc is
   Apple-side. Flutter/RN/Ionic apps also ship to Google Play, where Data Safety
   disclosure for bundled SDKs, WebView-controlled data collection, cleartext
   traffic, and mixed-content/debug flags are real, framework-relevant risks this
