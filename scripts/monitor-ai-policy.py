@@ -16,7 +16,7 @@ def clean_html_text(raw_text):
     """Strips raw HTML tags, unescapes entities, and collapses whitespace."""
     if not raw_text:
         return ""
-    text = re.sub(r"<[^<>]*>", " ", raw_text)
+    text = re.sub(r"""<[A-Za-z/!?](?:[^<>"']|"[^"]*"|'[^']*')*>""", " ", raw_text)  # quoted attributes may hold <, and it stays linear
     text = html.unescape(text)
     return re.sub(r"\s+", " ", text).strip()
 

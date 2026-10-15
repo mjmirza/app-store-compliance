@@ -89,6 +89,10 @@ for fn in (mon.strip_html, ai.clean_html_text):
     fn("<" * 200000)
     assert time.time() - t < 1.0, fn.__name__
     assert fn("<p>a</p> <b>b</b>") == "a b"
+    assert fn('<a href="https://developer.example/llm/att" title="x < y">Read notes</a>') == "Read notes", fn.__name__
+    t = time.time()
+    fn('<a "' * 50000)
+    assert time.time() - t < 1.0, fn.__name__
 PY
 # Issue 833. Keywords match whole words on the visible text, not substrings of HTML.
 T="$(mktemp -d)"

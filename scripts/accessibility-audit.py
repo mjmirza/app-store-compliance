@@ -131,6 +131,20 @@ def _skip_interpolation(content, k):
     n, depth, j = len(content), 0, k
     while j < n:
         c = content[j]
+        if content.startswith("//", j):
+            nl = content.find("\n", j)
+            j = n if nl == -1 else nl
+            continue
+        if content.startswith("/*", j):
+            level, j = 1, j + 2
+            while j < n and level:
+                if content.startswith("/*", j):
+                    level, j = level + 1, j + 2
+                elif content.startswith("*/", j):
+                    level, j = level - 1, j + 2
+                else:
+                    j += 1
+            continue
         if c == '"' or c == "#":
             hashes = 0
             while j + hashes < n and content[j + hashes] == "#":
@@ -321,7 +335,10 @@ def find_icon_only_buttons(code):
         mods, _ = _modifier_chain(code, i)
         if any(name == "accessibilityLabel" for name, _ in mods):
             continue
-        if any(name == "accessibilityHidden" and re.fullmatch(r"\(\s*true\s*\)", args) for name, args in mods):
+        if any(
+            name == "accessibilityHidden" and re.fullmatch(r"\(\s*true\s*\)", args)
+            for name, args in mods
+        ):
             continue
         yield m.start(), i
 

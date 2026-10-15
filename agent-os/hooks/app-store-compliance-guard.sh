@@ -894,7 +894,7 @@ dir_has_app_marker() {  # $1 dir. 0 when an app marker sits at its top level
   return 1
 }
 app_roots() {  # prints the roots, one per line, only when two or more distinct apps exist. the project root itself may be one of them
-  local m d r k t keep=() atroot=0 ROOT_REAL nl=$'\n' seen=$'\n'
+  local m d r k t x keep=() seen=() atroot=0 ROOT_REAL
   ROOT_REAL="$(cd "$DIR" 2>/dev/null && pwd -P)" || ROOT_REAL="${DIR%/}"
   {
     find_app 12 -name 'app.json' -o -name 'app.config.js' -o -name 'app.config.ts' -o -name 'app.config.mjs' -o -name 'app.config.cjs' \
@@ -925,8 +925,8 @@ app_roots() {  # prints the roots, one per line, only when two or more distinct 
       # A linked app is never inside another root's scan, find does not descend it, so it is always its own root.
       if [ -L "${r%/}" ]; then
         t="$(cd "$r" 2>/dev/null && pwd -P)" || continue
-        case "$seen" in *"$nl$t$nl"*) continue ;; esac   # two links to one app scan it once, even with spaces in a path
-        seen="$seen$t$nl"
+        for x in ${seen[@]+"${seen[@]}"}; do [ "$x" = "$t" ] && continue 2; done   # two links to one app scan it once
+        seen+=("$t")
       else
         for k in ${keep[@]+"${keep[@]}"}; do case "$r/" in "$k"/*) continue 2 ;; esac; done
         [ "$atroot" -eq 1 ] && ! has_framework_marker "$r" && continue

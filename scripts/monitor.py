@@ -669,7 +669,7 @@ def scan_target_repo(repo_path, track_name, metadata):
 
 def strip_html(text):
     """Feed descriptions carry HTML. Match on the visible text only."""
-    text = re.sub(r"<[^<>]*>", " ", text or "")
+    text = re.sub(r"""<[A-Za-z/!?](?:[^<>"']|"[^"]*"|'[^']*')*>""", " ", text or "")  # quoted attributes may hold <, and it stays linear
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 

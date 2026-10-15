@@ -519,6 +519,18 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_bad4"
+cat << 'EOF' > "$ISSUE_DIR/icon_bad4/InterpComment.swift"
+import SwiftUI
+func f(_ n: Int) -> Int { n }
+let a = "Value \(f(/* ( " */ 1))"
+struct V: View {
+    var body: some View {
+        Button(action: {}) { Image(systemName: "trash") }
+    }
+}
+EOF
+
 mkdir -p "$ISSUE_DIR/icon_bad3" "$ISSUE_DIR/lexer_clean2"
 cat << 'EOF' > "$ISSUE_DIR/icon_bad3/Nested.swift"
 import SwiftUI
@@ -549,6 +561,13 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_bad4" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ]; then
+  ok "#834 a comment inside string interpolation does not hide the code after it"
+else
+  bad "#834 a comment inside interpolation swallowed the rest of the file. Output:"; echo "$OUT"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_bad3" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 3 ]; then
