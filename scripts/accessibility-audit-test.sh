@@ -519,6 +519,29 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/regex_lit" "$ISSUE_DIR/chain_perf" "$ISSUE_DIR/mod_perf"
+cat << 'EOF' > "$ISSUE_DIR/regex_lit/Regex.swift"
+import SwiftUI
+let re = #/[Button(action: {}) { Image(systemName: "trash") }]/#
+let s = "count \(#/ // ) " /#.description)"
+struct V: View {
+    var body: some View {
+        Button(action: {}) { Image(systemName: "gear") }
+    }
+}
+EOF
+python3 - "$ISSUE_DIR" << 'PY'
+import os, sys
+d = sys.argv[1]
+q = chr(34); nl = chr(10)
+chain = "let v0 = Image(systemName: " + q + "trash" + q + ")" + nl + "".join("let v%d = v%d" % (k, k - 1) + nl for k in range(1, 3200))
+with open(os.path.join(d, "chain_perf", "Chain.swift"), "w") as fh:
+    fh.write("Button(action: {}) {" + nl + chain + "return v3199" + nl + "}" + nl)
+n = 32000
+with open(os.path.join(d, "mod_perf", "Mods.swift"), "w") as fh:
+    fh.write(("Button(action: {}) { Image(systemName: " + q + "trash" + q + ") }.overlay(") * n + "EmptyView()" + ")" * n + nl)
+PY
+
 mkdir -p "$ISSUE_DIR/icon_r7" "$ISSUE_DIR/nested_labels"
 cat << 'EOF' > "$ISSUE_DIR/icon_r7/R7.swift"
 import SwiftUI
@@ -627,11 +650,31 @@ with open(sys.argv[1], "w") as f:
         f.write(block % i)
 PY
 
-OUT=$($AUDIT "$ISSUE_DIR/icon_r7" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
-if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
-  ok "#834 a returned local icon and an icon returned before a stray Text are both flagged"
+OUT=$($AUDIT "$ISSUE_DIR/regex_lit" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q "Regex.swift:6)"; then
+  ok "#834 a Button inside a #/regex/# literal is ignored, inside interpolation too, and the real Button after it is found"
 else
-  bad "#834 a returned local icon or an icon before unreachable code was missed. Output:"; echo "$OUT"
+  bad "#834 a regex literal was read as code, or hid the real Button. Output:"; echo "$OUT"
+fi
+
+for CASE in chain_perf:1:"3200 chained local bindings" mod_perf:32000:"32000 Buttons nested in modifiers"; do
+  DIRN="${CASE%%:*}"; REST="${CASE#*:}"; WANT="${REST%%:*}"; NAME="${REST#*:}"
+  START=$(python3 -c 'import time; print(time.time())')
+  OUT=$($AUDIT "$ISSUE_DIR/$DIRN" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); RC=$?
+  ELAPSED=$(python3 -c "import time; print(round(time.time() - $START, 2))")
+  COUNT=$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")
+  if [ "$RC" -eq 0 ] && [ "$COUNT" -eq "$WANT" ] && python3 -c "import sys; sys.exit(0 if $ELAPSED < 5 else 1)"; then
+    ok "#834 $NAME report $WANT finding(s) in under 5s (${ELAPSED}s)"
+  else
+    bad "#834 $NAME were slow or miscounted (rc=$RC count=$COUNT want=$WANT ${ELAPSED}s)"
+  fi
+done
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_r7" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "R7.swift:4)" && ! echo "$OUT" | grep -q "R7.swift:5)"; then
+  ok "#834 a returned local icon is flagged, and (documented limit) a Text anywhere in the label counts, even after a return"
+else
+  bad "#834 whole-label behaviour changed for a returned local or a Text after return. Output:"; echo "$OUT"
 fi
 
 START=$(python3 -c 'import time; print(time.time())')
@@ -644,17 +687,17 @@ else
 fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_r6" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
-if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
-  ok "#834 a long comment before label: and an unused local Text do not hide an icon label"
+if echo "$OUT" | grep -q "R6.swift:4)" && ! echo "$OUT" | grep -q "R6.swift:5)"; then
+  ok "#834 a long comment before label: does not hide an icon label, and (documented limit) an unused local Text counts as a label"
 else
-  bad "#834 a comment before label: or an unused local view hid an icon label. Output:"; echo "$OUT"
+  bad "#834 a comment before label: hid an icon label, or whole-label behaviour changed. Output:"; echo "$OUT"
 fi
 
 OUT=$($AUDIT "$ISSUE_DIR/clean_r6" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
-if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
-  ok "#834 an unused local Image does not flag a label that returns another view"
+if echo "$OUT" | grep -q "R6.swift:4)"; then
+  ok "#834 (documented limit) an unused local Image in a label is still reported as a possible icon-only Button"
 else
-  bad "#834 an unused local Image flagged the label. Output:"; echo "$OUT"
+  bad "#834 whole-label behaviour changed for an unused local Image. Output:"; echo "$OUT"
 fi
 
 OUT=$($AUDIT "$ISSUE_DIR/deep_interp" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); RC=$?

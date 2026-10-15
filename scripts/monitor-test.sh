@@ -112,6 +112,8 @@ for fn in (mon.strip_html, ai.clean_html_text):
     assert "Privacy" not in fn('<textarea-x><a href="Privacy manifests">Read notes</a></textarea-x>'), fn.__name__
     assert "Privacy manifests" in fn("<textarea-x>Privacy <b>manifests</b></textarea-x>"), fn.__name__
     assert fn("<textarea>Privacy</textarea/><!-- hidden -->Next") == "Privacy Next", fn.__name__
+    assert "Privacy manifests" in fn("<textarea>Kept</textarea" + chr(160) + "><!-- Privacy manifests -->Next"), fn.__name__
+    assert "Privacy" not in fn("<t" + chr(305) + "tle><a href=\"Privacy manifests\">Read notes</a></t" + chr(305) + "tle>"), fn.__name__
     for hostile in ("<textarea>" * 50000, "<![CDATA[" * 50000, "<!x" * 100000, "<title a='" * 40000, "<![CDATA[<!--" * 40000):
         t = time.time()
         fn(hostile)

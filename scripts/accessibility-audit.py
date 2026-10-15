@@ -151,6 +151,10 @@ def _skip_string(content, q, hashes):
                 stack.append(inner)
                 j = j + h + (3 if inner[1] else 1)
                 continue
+            if h and j + h < n and content[j + h] == "/":
+                end = content.find("/" + "#" * h, j + h + 1)
+                j = n if end == -1 else end + 1 + h
+                continue
             j += max(h, 1)
             continue
         if c == "(":
@@ -198,6 +202,13 @@ def swift_code_only(content):
             while i + hashes < n and content[i + hashes] == "#":
                 hashes += 1
             q = i + hashes
+            if hashes and q < n and content[q] == "/":
+                close = "/" + "#" * hashes
+                end = content.find(close, q + 1)
+                end = n if end == -1 else end
+                blank(q + 1, end)
+                i = min(n, end + len(close))
+                continue
             if q >= n or content[q] != '"':
                 i += max(hashes, 1)
                 continue
@@ -265,13 +276,13 @@ def _modifier_chain(code, i, pairs):
         k = j + 1
         while k < n and (code[k].isalnum() or code[k] == "_"):
             k += 1
-        name, args = code[j + 1 : k], ""
+        name, args = code[j + 1 : k], None
         k2 = _skip_ws(code, k)
         if k2 < n and code[k2] == "(":
             end = pairs.get(k2, -1)
             if end == -1:
                 return mods, i
-            args, k = code[k2:end], end
+            args, k = (k2, end), end
             k2 = _skip_ws(code, k)
         if k2 < n and code[k2] == "{":
             end = pairs.get(k2, -1)
@@ -287,53 +298,12 @@ NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
 TITLED_ARG = re.compile(r"\s*(#*\"|title\s*:)")
 LABEL_ARG = re.compile(r"\s*label\s*:")
 LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*\{")
-LOCAL_DECL = re.compile(r"\s*(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)")
-NON_SPACE = re.compile(r"\S")
-RETURN_STMT = re.compile(r"\s*return\b")
+HIDDEN_TRUE = re.compile(r"\(\s*true\s*\)")
 
 
 def _any_in(hits, a, b):
     k = bisect.bisect_left(hits, a)
     return k < len(hits) and hits[k] < b
-
-
-def _label_view_ranges(code, lstart, lend, pairs):
-    """Statement ranges of the label closure that can produce its view.
-    After a return only that statement counts, and a local let or var counts only when the view uses it."""
-    stmts, a, k = [], lstart + 1, lstart + 1
-    while k < lend - 1:
-        ch = code[k]
-        if ch in "([{" and 0 < pairs.get(k, -1) <= lend - 1:
-            k = pairs[k]
-            continue
-        if ch in ";\n":
-            stmts.append((a, k))
-            a = k + 1
-        k += 1
-    stmts.append((a, lend - 1))
-    stmts = [(x, y) for x, y in stmts if NON_SPACE.search(code, x, y)]
-    decls = {}
-    views = []
-    for x, y in stmts:
-        d = LOCAL_DECL.match(code, x, y)
-        if d:
-            decls[(x, y)] = d.group(1)
-        elif RETURN_STMT.match(code, x, y):
-            views = [(x, y)]
-            break
-        else:
-            views.append((x, y))
-    kept, pending = list(views), dict(decls)
-    changed = True
-    while changed and pending:
-        changed = False
-        for rng, name in list(pending.items()):
-            used = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
-            if any(used.search(code, x, y) for x, y in kept):
-                kept.append(rng)
-                del pending[rng]
-                changed = True
-    return kept
 
 
 def _label_closure_after(code, k, pairs):
@@ -394,16 +364,13 @@ def find_icon_only_buttons(code):
             i = label[1]
         if not label:
             continue
-        ranges = _label_view_ranges(code, label[0], label[1], pairs)
-        if not any(_any_in(img_hits, x, y) for x, y in ranges):
-            continue
-        if any(_any_in(named_hits, x, y) for x, y in ranges):
-            continue
+        if not _any_in(img_hits, label[0], label[1]) or _any_in(named_hits, label[0], label[1]):
+            continue  # the whole label counts, see the documented limit in README.md
         mods, _ = _modifier_chain(code, i, pairs)
         if any(name == "accessibilityLabel" for name, _ in mods):
             continue
         if any(
-            name == "accessibilityHidden" and re.fullmatch(r"\(\s*true\s*\)", args)
+            name == "accessibilityHidden" and args and HIDDEN_TRUE.fullmatch(code, *args)
             for name, args in mods
         ):
             continue
@@ -451,7 +418,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "line": bisect.bisect_right(newlines, offset) + 1,
                         "rule_id": rule_id,
                         "match": content[offset : _line_end(content, offset, end)].strip(),
-                        "message": "Icon-only Button whose label is an Image(systemName:) has no accessibilityLabel, so VoiceOver reads the symbol name.",
+                        "message": "Possible icon-only Button. Its label shows an Image(systemName:) with no Text, Label or accessibilityLabel, so VoiceOver may read the symbol name.",
                         "fix": 'Add .accessibilityLabel("...") to the Button, or use Label("Title", systemImage: ...) / Button("Title", systemImage: ...).',
                     }
                 )

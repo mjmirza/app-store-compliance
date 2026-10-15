@@ -673,14 +673,14 @@ _TAG = r"""</?[A-Za-z](?:[^<>"']|"[^"]*"|'[^']*')*>"""
 HTML_MARKUP = re.compile(
     _COMMENT
     + r"|<!\[CDATA\[(.*?)(?:\]\]>|\Z)"
-    + r"""|<(textarea|title)(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>(.*?)(?:</\2(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>|\Z)"""
+    + r"""|<(textarea|title)(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>(.*?)(?:</\2(?=[\t\n\f\r />])(?:[^<>"']|"[^"]*"|'[^']*')*>|\Z)"""
     + "|"
     + _BOGUS
     + "|"
     + _TAG,
-    re.S | re.I,
+    re.S | re.I | re.A,
 )  # every branch ends at its terminator or at the end, so one left-to-right pass stays linear
-_CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I)
+_CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I | re.A)
 
 
 def _visible_markup(m):
