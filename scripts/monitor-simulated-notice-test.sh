@@ -14,6 +14,7 @@ MONITORS = {
     "monitor-android": (True, "Google Play target API level and Play Billing Library update"),
     "monitor-security": (True, None),  # Android security bulletins publish no RSS feed
     "monitor-privacy": (True, "Privacy manifest and App Tracking Transparency requirement"),
+    "monitor-standards": (True, "ISO 27001 Information Security Management Standard Revision"),
 }
 LIVE_ITEM = lambda text: {
     "id": "LIVE-TEST-ITEM", "title": text, "description": text,
