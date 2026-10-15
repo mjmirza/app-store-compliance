@@ -1911,7 +1911,11 @@ shapes = {
   "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
   "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
   "copilot-obj": {"toolName": "bash", "toolArgs": {"command": cmd}, "cwd": cwd},
-  "grok": {"hookEventName": "PreToolUse", "toolName": "Bash", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok": {"hookEventName": "PreToolUse", "toolName": "run_terminal_command", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-cmd": {"hookEventName": "PreToolUse", "toolName": "run_terminal_cmd", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-monitor": {"hookEventName": "PreToolUse", "toolName": "monitor", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-bash": {"hookEventName": "PreToolUse", "toolName": "bash", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-readfile": {"hookEventName": "PreToolUse", "toolName": "read_file", "toolInput": {"command": cmd, "path": "x"}, "cwd": cwd},
   "droid": {"hook_event_name": "PreToolUse", "tool_name": "Execute", "tool_input": {"command": cmd}, "cwd": cwd},
   "auggie": {"hook_event_name": "PreToolUse", "tool_name": "launch-process", "tool_input": {"command": cmd}, "workspace_roots": [cwd]},
   "windsurf": {"agent_action_name": "pre_run_command", "tool_info": {"command_line": cmd, "cwd": cwd}},
@@ -1929,11 +1933,11 @@ print(json.dumps(shapes[kind]))' "$1" "$2" "$3"; }
 SUB="fastlane deliver"
 for tier in "$PATH" "$NOJQ"; do
   tn="${tier##*/}"; [ "$tier" = "$PATH" ] && tn=jq
-  for kind in codex gemini cursor copilot-str copilot-obj opencode grok droid auggie windsurf vscode kiro goose; do
+  for kind in codex gemini cursor copilot-str copilot-obj opencode grok grok-cmd grok-monitor grok-bash droid auggie windsurf vscode kiro goose; do
     RC="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
     [ "$RC" = "2" ] && ok "h-$kind blocks a submit command and scans the payload cwd (tier=$tn)" || bad "h-$kind blocks a submit command and scans the payload cwd (tier=$tn rc=$RC)"
   done
-  for kind in write gemini-write copilot-edit grok-read windsurf-read; do
+  for kind in write gemini-write copilot-edit grok-read grok-readfile windsurf-read; do
     OUT="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" 2>&1 )"; RC=$?
     [ "$RC" = "0" ] && [ -z "$OUT" ] && ok "h-$kind a non-shell tool stays silent (tier=$tn)" || bad "h-$kind a non-shell tool stays silent (tier=$tn rc=$RC)"
   done

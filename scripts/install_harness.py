@@ -41,7 +41,9 @@ SPECS = {
         "name": "Grok",
         "style": "nested",
         "event": "PreToolUse",
-        "matcher": "Bash",
+        "matcher": "Bash|run_terminal_command|run_terminal_cmd|bash|monitor",
+        # Grok Build's shell tools. A matcher must cover all of them, so an old Bash-only entry is repaired.
+        "tools": ("run_terminal_command", "run_terminal_cmd", "bash", "monitor"),
         "timeout": ("timeout", 120),
     },
     "qwen": {
@@ -332,7 +334,9 @@ def matcher_hits(m, name):
 def dispatches(tool, style, group, h):
     """True when the tool would run this handler for a shell call and give it time to finish."""
     spec = SPECS[tool]
-    if style == "nested" and not matcher_hits(group.get("matcher"), spec["matcher"]):
+    if style == "nested" and not all(
+        matcher_hits(group.get("matcher"), t) for t in spec.get("tools", (spec["matcher"],))
+    ):
         return False
     if style in ("nested", "copilot", "vscode") and h.get("type", "command") != "command":
         return False
@@ -775,7 +779,7 @@ def payload_for(tool, style, command, cwd):
     if tool == "grok":
         return {
             "hookEventName": "PreToolUse",
-            "toolName": "Bash",
+            "toolName": "run_terminal_command",
             "toolInput": {"command": command},
             "cwd": cwd,
         }

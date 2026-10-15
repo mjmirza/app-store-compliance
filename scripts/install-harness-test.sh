@@ -110,6 +110,23 @@ run --tool auggie >/dev/null; run --tool auggie doctor >/dev/null; RC=$?
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=d["hooks"]["pre_run_command"][0]; sys.exit(0 if e["show_output"] is True else 1)' "$H/.codeium/windsurf/hooks.json" \
   && ok "windsurf shows the guard output to the user" || bad "windsurf shows the guard output to the user"
 
+# 2b2 Grok runs its shell through run_terminal_command, run_terminal_cmd, bash and monitor, in a camelCase payload
+fresh; run --tool grok >/dev/null
+python3 -c 'import json,re,sys; m=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"][0]["matcher"]; sys.exit(0 if m=="Bash|run_terminal_command|run_terminal_cmd|bash|monitor" and all(re.fullmatch(m,t) for t in ("run_terminal_command","run_terminal_cmd","bash","monitor")) else 1)' "$(cfg grok)" \
+  && ok "grok matcher covers every Grok shell tool" || bad "grok matcher covers every Grok shell tool"
+GLOG="$WORK/grok-payload$RANDOM.json"; GG="$(gdir grok)/app-store-compliance-guard.sh"; cp "$GG" "$WORK/grok-guard.bak"
+printf '#!/usr/bin/env bash\ncat > "%s"\ngrep -q deliver "%s" && exit 2\nexit 0\n' "$GLOG" "$GLOG" > "$GG"
+run --tool grok doctor >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("toolName")=="run_terminal_command" and d.get("hookEventName")=="PreToolUse" and "command" in d.get("toolInput",{}) else 1)' "$GLOG" 2>/dev/null \
+  && ok "grok doctor feeds a run_terminal_command payload" || bad "grok doctor feeds a run_terminal_command payload"
+cp "$WORK/grok-guard.bak" "$GG"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooks"]["PreToolUse"][0]["matcher"]="Bash"; json.dump(d,open(p,"w"))' "$(cfg grok)"
+run --tool grok doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "grok doctor fails on an old Bash-only matcher" || bad "grok doctor fails on an old Bash-only matcher (rc=$RC)"
+run --tool grok >/dev/null; run --tool grok doctor >/dev/null; RC=$?
+python3 -c 'import json,sys; g=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]; sys.exit(0 if [x["matcher"] for x in g]==["Bash|run_terminal_command|run_terminal_cmd|bash|monitor"] else 1)' "$(cfg grok)" && [ "$RC" -eq 0 ] && [ "$(count grok)" = "1" ] \
+  && ok "grok install repairs a Bash-only matcher once and doctor then passes" || bad "grok install repairs a Bash-only matcher once and doctor then passes (rc=$RC entries=$(count grok))"
+
 # 2c Droid keeps using settings.json when its hooks live there, and never shadows them with a new hooks.json
 fresh; mkdir -p "$H/.factory"
 printf '{"model":"x","hooks":{"PostToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"fmt"}]}]}}' > "$H/.factory/settings.json"

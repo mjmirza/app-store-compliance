@@ -51,7 +51,7 @@ tool_ok() { command -v "$1" >/dev/null 2>&1 && "$@" >/dev/null 2>&1; }   # prese
 payload_command() {
   local out
   if tool_ok jq -n true; then
-    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd","runInTerminal","run_in_terminal"] | any(. == $t)) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
+    out="$(printf '%s' "$STDIN_JSON" | jq -rs 'if length != 1 then empty else .[0] | if type != "object" then empty else (.tool_name? // .toolName? // (if (.tool_info.command_line? | type) == "string" then "shell" else "Bash" end)) as $t | if (($t | type) != "string") or ((["Bash","PowerShell","bash","powershell","run_shell_command","shell","Execute","launch-process","execute_bash","execute_cmd","runInTerminal","run_in_terminal","run_terminal_command","run_terminal_cmd","monitor"] | any(. == $t)) | not) then empty else ((.tool_input.command? | strings) // (.toolInput.command? | strings) // (.toolArgs? | if type == "string" then (try fromjson catch null) else . end | if type == "object" then (.command? | strings) else empty end) // (.tool_info.command_line? | strings) // (.command? | strings) // empty) end end end' 2>/dev/null)" && { printf '%s' "$out"; return 0; }
   fi
   if tool_ok python3 -c pass; then
     out="$(printf '%s' "$STDIN_JSON" | python3 -c '
@@ -61,7 +61,7 @@ try:
 except Exception:
     sys.exit(4)
 c = None
-SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd", "runInTerminal", "run_in_terminal")
+SHELLS = ("Bash", "PowerShell", "bash", "powershell", "run_shell_command", "shell", "Execute", "launch-process", "execute_bash", "execute_cmd", "runInTerminal", "run_in_terminal", "run_terminal_command", "run_terminal_cmd", "monitor")
 info = d.get("tool_info") if isinstance(d, dict) else None
 default = "shell" if isinstance(info, dict) and isinstance(info.get("command_line"), str) else "Bash"
 t = d.get("tool_name", d.get("toolName", default)) if isinstance(d, dict) else None
@@ -143,7 +143,7 @@ sys.stdout.write(c or "")' 2>/dev/null
 }
 
 if [ -n "$STDIN_JSON" ]; then
-  # Only a shell tool call (Bash, PowerShell, run_shell_command, shell) carries a shell command. The jq and python3 tiers check the top-level tool_name.
+  # Only a shell tool call (Bash, run_shell_command, Grok run_terminal_command, and kin) carries a shell command. The jq and python3 tiers check the top-level tool_name.
   # The no-tools tier cannot tell a top-level key from a nested one, so it scans rather than skips.
   CMD="$(payload_command 2>/dev/null | tr -d '\000')"
   # Fold a backslash-newline continuation (odd trailing backslashes) into one space. Bare newlines stay,
