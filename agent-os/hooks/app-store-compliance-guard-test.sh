@@ -1628,6 +1628,13 @@ ln -s "$EXT" "$D/apps/one"; ln -s "$EXT" "$D/apps/two"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$(echo "$OUT" | grep -cE "^App\. $D/apps/(one|two)$")" -eq 1 ] && [ "$RC" -eq 2 ] && ok "657-7 two links to one app scan it once" || bad "657-7 two links to one app scan it once (rc=$RC sections=$(echo "$OUT" | grep -cE '^App\. '))"
 rm -rf "$D" "$EXT"
+for EXCL in vendor build node_modules; do
+  D="$(mktemp -d)"; EXT="$(mk_ios_bad)"; mkdir -p "$EXT/App.xcodeproj"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
+  ln -s "$EXT" "$D/$EXCL"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+  ! echo "$OUT" | grep -q "^App\. $D/$EXCL$" && [ "$RC" -ne 2 ] && ok "657-8 an app linked as $EXCL stays excluded like a real $EXCL folder" || bad "657-8 an app linked as $EXCL stays excluded like a real $EXCL folder (rc=$RC)"
+  rm -rf "$D" "$EXT"
+done
 # links that point back into the tree, above it, or at themselves must not hang the scan or become apps
 D="$(mk_ios_bad)"; mkdir -p "$D/apps/a"
 ln -s "$D" "$D/apps/a/up"; ln -s . "$D/apps/here"; ln -s loop "$D/apps/loop"; ln -s "$(dirname "$D")" "$D/apps/parent"

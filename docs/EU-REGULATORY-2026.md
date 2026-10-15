@@ -77,13 +77,15 @@ There are three EU distribution channels, all still involving Apple. the App Sto
 - From 1 October 2026 the terms sit in Attachment 14 of the Apple Developer Program License Agreement. The Alternative Terms Addendum for Apps in the EU and the StoreKit External Purchase Link Entitlement (EU) Addendum are phased out.
 - Combining is allowed. An app on EU storefronts may sell through Apple In-App Purchase, alternative payment processing within the app, out-of-app offers, or any combination of them.
 - Once a payment option or combination is chosen, it MUST be kept across all EU storefronts for 12 months.
-- When alternatives are offered alongside In-App Purchase, In-App Purchase MUST be presented at the same time and at least as prominently, payment flows may not discourage or disrupt it, and the App Store product page may not describe alternative payment options.
-- The entitlement is the StoreKit External Purchases or Offers Entitlement, key `com.apple.developer.storekit.custom-purchase-link.allowed-regions`, for apps on EU storefronts running iOS 26.2 or later (macOS, tvOS, visionOS and watchOS 26.6 or later).
+- When alternatives are offered alongside In-App Purchase, In-App Purchase MUST be presented at the same time and at least as prominently, with Apple-provided artwork on a black or white background, payment flows may not discourage or disrupt it, and the App Store product page may not describe alternative payment options.
+- An app that offers only alternative payment options MUST give users a genuine choice of alternative payment processing within the app, viewable and selectable on the same screen as any out-of-app offers. An app subject to Guideline 3.1.3(b) Multiplatform Services must offer In-App Purchase or alternative processing within the app.
+- Child safety. An app in the Kids category places alternative payment flows behind a parental gate and cannot offer an out-of-app purchase on a website. For users under 13, alternative payments sit behind a parental gate and out-of-app offers are not permitted. For users 13 to 17, both alternative processing and out-of-app offers sit behind a parental gate. Where an EU storefront sets a higher age for parental consent, the same protections apply at that age instead of 13, for example under 16 and 16 to 17.
+- The entitlement is the StoreKit External Purchases or Offers Entitlement, key `com.apple.developer.storekit.custom-purchase-link.allowed-regions`, an array of the ISO country codes where the app offers alternatives. It works on EU storefronts on iOS and iPadOS 26.2 or later and macOS, tvOS, visionOS and watchOS 26.6 or later. Supporting earlier versions needs Apple's agreement.
 - Alternative payment processing in the app, and any out-of-app offer behind a link the user can tap, click, or scan, MUST use the `ExternalPurchaseCustomLink` API to show the system disclosure sheet stating the user will transact with the developer and not Apple.
 - Reporting. every alternative payment transaction, including refunds, renewals and transactions that did not result in a purchase, is reported monthly within 15 days after the end of the calendar month, through the External Purchase Server API for apps on OS 26.4 or later.
 - Transactions outside In-App Purchase do not appear in Report a Problem, Family Sharing, App Store purchase history, or subscription management, and Apple cannot help with their refunds.
 
-Source, read 15 October 2026. [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/), [Apple apps in the EU](https://developer.apple.com/support/apps-in-the-eu/).
+Source, read 15 October 2026. [Apple payment options on the App Store in the EU](https://developer.apple.com/support/payment-options-on-the-app-store-in-the-eu/), [Apple communication and promotion of offers in the EU](https://developer.apple.com/support/communication-and-promotion-of-offers-on-the-app-store-in-the-eu/), [Apple apps in the EU, child safety protections](https://developer.apple.com/support/apps-in-the-eu/#child-safety-protections-for-alternative-payments-on-the-app-store).
 
 ### 2.3 The EU fee model (unified terms from 1 October 2026, verified 5 September 2026)
 
@@ -110,12 +112,15 @@ The European Commission fined Apple 500,000,000 euro on 23 April 2025 for breach
 
 - The StoreKit External Purchases or Offers Entitlement is declared when the app offers alternative payments or out-of-app offers.
 - Alternative payment processing and every linked out-of-app offer call the `ExternalPurchaseCustomLink` disclosure sheet.
-- Where alternatives sit beside In-App Purchase, In-App Purchase is shown at the same time and at least as prominently, and the product page does not describe alternative payment options.
+- If the app offers In-App Purchase, it is shown at the same time as any alternative and at least as prominently, and the product page does not describe alternative payment options.
+- If the app offers only alternatives, alternative processing within the app is selectable on the same screen as any out-of-app offer.
+- Kids category apps and users under the storefront's parental-consent age see alternative processing only behind a parental gate and see no out-of-app offers. Older minors see both only behind a parental gate.
 - The chosen payment options stay in place across all EU storefronts for 12 months.
 - Monthly transaction reporting is wired (within 15 days of the calendar month end, External Purchase Server API on OS 26.4 or later).
 - Any non-App-Store build passed notarization.
 - A marketplace app uses MarketplaceKit, installs only from its own domain, and runs moderation, anti-fraud, and refund handling.
-- Entitlement-using code is gated to the minimum OS (iOS and iPadOS 17.4, macOS 14.4, visionOS 1.2, watchOS 10.4).
+- Payment entitlement code is gated to iOS and iPadOS 26.2, and macOS, tvOS, visionOS and watchOS 26.6, unless Apple has agreed to earlier versions.
+- Other DMA entitlement code is gated to its own minimum OS (iOS and iPadOS 17.4, macOS 14.4, visionOS 1.2, watchOS 10.4).
 - Browser-engine and HCE features carry their entitlements and are region-gated to EU or EEA.
 
 ## 3. EU Digital Services Act, trader status (HARD)
@@ -236,7 +241,7 @@ These are Apple App Review and App Store Connect changes, layered on top of the 
 | DSA trader status | Trader or non-trader declared and verified before EU distribution | live since 17 Feb 2025 |
 | Age-rating questionnaire | Answered for every app, capabilities match behaviour | deadline 31 Jan 2026 |
 | European Accessibility Act | EN 301 549 and WCAG 2.1 AA met, Annex V accessibility information published (Art. 13(2)) | live since 28 Jun 2025 |
-| DMA alternative payments | Entitlement declared, disclosure sheet wired, In-App Purchase shown alongside at equal prominence, options kept 12 months, reporting wired | live, Attachment 14 terms from 1 Oct 2026 |
+| DMA alternative payments | Entitlement declared, disclosure sheet wired, In-App Purchase at equal prominence when offered, minors behind parental gates, options kept 12 months, reporting wired | live, Attachment 14 terms from 1 Oct 2026 |
 | Notarization | Any non-App-Store build notarized | live |
 | Xcode 26 SDK | Build with Xcode 26 and the iOS 26 SDK | deadline 28 Apr 2026 |
 | EU e-Evidence Package | Legal representative designated and 8-hour emergency response protocol established | 18 Aug 2026 |

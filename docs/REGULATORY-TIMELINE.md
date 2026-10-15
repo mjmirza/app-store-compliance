@@ -1,7 +1,7 @@
 # Global Regulatory Compliance Timeline
 
 This document compiles every registered global regulatory deadline tracking regional, national, and platform requirements.
-Last compiled: 2026-10-15 11:56:00 UTC
+Last compiled: 2026-10-15 12:12:32 UTC
 
 ## Active and Approaching Compliance Warnings
 
@@ -12,7 +12,7 @@ Last compiled: 2026-10-15 11:56:00 UTC
 | CRITICAL | Illinois (USA State) | Biometric Information Privacy Act (BIPA), 740 ILCS 14 | Written notice and release before collecting biometric identifiers, public retention schedule, destruction within 3 years, and no sale. | 2008-06-01 | none | 2008-06-01 | 2008-06-01 | 6710 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md |
 | HIGH | United Kingdom (UK) | ICO Age Appropriate Design Code (Children's Code) | High privacy by default, data minimisation, geolocation off, profiling off by default, and a mandatory DPIA. | 2020-09-02 | 12 months | 2021-09-02 | 2021-09-02 | 1869 days | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md |
 | HIGH | South Korea | Telecommunications Business Act | Approved billing providers, 26% commission, com.apple.developer.storekit.external-purchase entitlement, South Korea-only binary, modal sheet, reporting. | 2022-03-15 | none | 2022-03-15 | 2022-03-15 | 1675 days | docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md |
-| HIGH | European Union (EU) | EU Digital Markets Act (DMA) | Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase shown alongside at equal prominence, options kept 12 months, monthly transaction reporting). | 2024-03-07 | none | 2024-03-07 | 2024-03-07 | 952 days | docs/EU-REGULATORY-2026.md section 2 |
+| HIGH | European Union (EU) | EU Digital Markets Act (DMA) | Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase at equal prominence when offered, parental gates for minors, options kept 12 months, monthly transaction reporting). | 2024-03-07 | none | 2024-03-07 | 2024-03-07 | 952 days | docs/EU-REGULATORY-2026.md section 2 |
 | CRITICAL | China | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | 2023-09-01 | 7 months | 2024-03-31 | 2024-03-31 | 928 days | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
 | HIGH | United States (Federal) | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | 2024-06-25 | none | 2024-06-25 | 2024-06-25 | 842 days | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
 | HIGH | European Union (EU) | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | 2023-06-12 | 18 months | 2024-12-13 | 2024-12-13 | 671 days | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
@@ -93,7 +93,7 @@ Last compiled: 2026-10-15 11:56:00 UTC
 | 2008-06-01 | Biometric Information Privacy Act (BIPA), 740 ILCS 14 | Written notice and release before collecting biometric identifiers, public retention schedule, destruction within 3 years, and no sale. | Illinois (USA State) | 2008-06-01 | none | 2008-06-01 | CRITICAL | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md |
 | 2021-09-02 | ICO Age Appropriate Design Code (Children's Code) | High privacy by default, data minimisation, geolocation off, profiling off by default, and a mandatory DPIA. | United Kingdom (UK) | 2020-09-02 | 12 months | 2021-09-02 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md |
 | 2022-03-15 | Telecommunications Business Act | Approved billing providers, 26% commission, com.apple.developer.storekit.external-purchase entitlement, South Korea-only binary, modal sheet, reporting. | South Korea | 2022-03-15 | none | 2022-03-15 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md |
-| 2024-03-07 | EU Digital Markets Act (DMA) | Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase shown alongside at equal prominence, options kept 12 months, monthly transaction reporting). | European Union (EU) | 2024-03-07 | none | 2024-03-07 | HIGH | docs/EU-REGULATORY-2026.md section 2 |
+| 2024-03-07 | EU Digital Markets Act (DMA) | Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase at equal prominence when offered, parental gates for minors, options kept 12 months, monthly transaction reporting). | European Union (EU) | 2024-03-07 | none | 2024-03-07 | HIGH | docs/EU-REGULATORY-2026.md section 2 |
 | 2024-03-31 | Mobile App Filing with the MIIT (ICP Extension) | Mandatory Chinese MIIT app filing, local partner/entity, real-name, PIPL privacy, data localization, Banhao license for games. | China | 2023-09-01 | 7 months | 2024-03-31 | CRITICAL | docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md |
 | 2024-06-25 | FTC Health Breach Notification Rule, 16 CFR Part 318 | 2024 Final Rule compliance (unauthorized sharing of health/sensitive data with advertisers treated as breach, mandatory 60-day notice). | United States (Federal) | 2024-06-25 | none | 2024-06-25 | HIGH | docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md |
 | 2024-12-13 | General Product Safety Regulation (GPSR), Regulation (EU) 2023/988 | Display manufacturer identity, electronic and postal contact details, and product safety warnings on the online interface for consumer products. | European Union (EU) | 2023-06-12 | 18 months | 2024-12-13 | HIGH | docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md |
@@ -227,7 +227,7 @@ Last compiled: 2026-10-15 11:56:00 UTC
 
 - **Jurisdiction:** European Union (EU)
 - **Law:** EU Digital Markets Act (DMA)
-- **Requirement:** Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase shown alongside at equal prominence, options kept 12 months, monthly transaction reporting).
+- **Requirement:** Alternative payments and out-of-app offers (StoreKit External Purchases or Offers Entitlement, ExternalPurchaseCustomLink disclosure sheet, In-App Purchase at equal prominence when offered, parental gates for minors, options kept 12 months, monthly transaction reporting).
 - **Effective Date:** 2024-03-07
 - **Grace Period:** none
 - **Mandatory Date:** 2024-03-07

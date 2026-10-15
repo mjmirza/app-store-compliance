@@ -869,6 +869,7 @@ linked_app_dir() {  # $1 a symlink below the root (issue #657). 0 when it points
   # One level only. the target is read with plain find, which never follows a further link, so a cycle cannot loop.
   local t f
   case "${1##*/}" in ios|android) return 1 ;; esac   # a linked platform folder is not followed, see the documented limits
+  case "${1##*/}" in node_modules|Pods|.git|build|dist|DerivedData|vendor|.dart_tool|Carthage|.pub-cache) return 1 ;; esac   # same names find_app prunes
   [ -d "$1" ] || return 1
   t="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
   case "$t/" in "$ROOT_REAL"/*) return 1 ;; esac   # back into the tree, or the tree itself

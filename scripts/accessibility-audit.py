@@ -287,7 +287,8 @@ NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
 TITLED_ARG = re.compile(r"\s*(#*\"|title\s*:)")
 LABEL_ARG = re.compile(r"\s*label\s*:")
 LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*\{")
-LOCAL_DECL = re.compile(r"\s*(let|var)\b")
+LOCAL_DECL = re.compile(r"\s*(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)")
+NON_SPACE = re.compile(r"\S")
 RETURN_STMT = re.compile(r"\s*return\b")
 
 
@@ -298,7 +299,7 @@ def _any_in(hits, a, b):
 
 def _label_view_ranges(code, lstart, lend, pairs):
     """Statement ranges of the label closure that can produce its view.
-    Local let and var declarations are dropped, and after a return only the returned view counts."""
+    After a return only that statement counts, and a local let or var counts only when the view uses it."""
     stmts, a, k = [], lstart + 1, lstart + 1
     while k < lend - 1:
         ch = code[k]
@@ -310,13 +311,29 @@ def _label_view_ranges(code, lstart, lend, pairs):
             a = k + 1
         k += 1
     stmts.append((a, lend - 1))
-    stmts = [
-        (x, y)
-        for x, y in stmts
-        if code[x:y].strip() and not LOCAL_DECL.match(code, x, y)
-    ]
-    returns = [idx for idx, (x, y) in enumerate(stmts) if RETURN_STMT.match(code, x, y)]
-    return stmts[returns[-1] :] if returns else stmts
+    stmts = [(x, y) for x, y in stmts if NON_SPACE.search(code, x, y)]
+    decls = {}
+    views = []
+    for x, y in stmts:
+        d = LOCAL_DECL.match(code, x, y)
+        if d:
+            decls[(x, y)] = d.group(1)
+        elif RETURN_STMT.match(code, x, y):
+            views = [(x, y)]
+            break
+        else:
+            views.append((x, y))
+    kept, pending = list(views), dict(decls)
+    changed = True
+    while changed and pending:
+        changed = False
+        for rng, name in list(pending.items()):
+            used = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
+            if any(used.search(code, x, y) for x, y in kept):
+                kept.append(rng)
+                del pending[rng]
+                changed = True
+    return kept
 
 
 def _label_closure_after(code, k, pairs):
@@ -327,6 +344,11 @@ def _label_closure_after(code, k, pairs):
     start = lab.end() - 1
     end = pairs.get(start, -1)
     return None if end == -1 else (start, end)
+
+
+def _line_end(text, start, end):
+    nl = text.find("\n", start, end)
+    return end if nl == -1 else nl
 
 
 def find_icon_only_buttons(code):
@@ -428,7 +450,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "file": f,
                         "line": bisect.bisect_right(newlines, offset) + 1,
                         "rule_id": rule_id,
-                        "match": content[offset:end].split("\n")[0].strip(),
+                        "match": content[offset : _line_end(content, offset, end)].strip(),
                         "message": "Icon-only Button whose label is an Image(systemName:) has no accessibilityLabel, so VoiceOver reads the symbol name.",
                         "fix": 'Add .accessibilityLabel("...") to the Button, or use Label("Title", systemImage: ...) / Button("Title", systemImage: ...).',
                     }

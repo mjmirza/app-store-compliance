@@ -519,6 +519,24 @@ struct V: View {
 }
 EOF
 
+mkdir -p "$ISSUE_DIR/icon_r7" "$ISSUE_DIR/nested_labels"
+cat << 'EOF' > "$ISSUE_DIR/icon_r7/R7.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: {}) { let icon = Image(systemName: "trash"); return icon }
+        Button(action: {}) { return Image(systemName: "gear"); Text("Unused") }
+    }
+}
+EOF
+python3 - "$ISSUE_DIR" << 'PY'
+import os, sys
+q = chr(34)
+n = 16000
+with open(os.path.join(sys.argv[1], "nested_labels", "Labels.swift"), "w") as fh:
+    fh.write(("Button(action: {}) {" + chr(10)) * n + "Image(systemName: " + q + "trash" + q + ")" + (chr(10) + "}") * n + chr(10))
+PY
+
 mkdir -p "$ISSUE_DIR/icon_r6" "$ISSUE_DIR/clean_r6" "$ISSUE_DIR/deep_interp" "$ISSUE_DIR/nested_perf"
 cat << 'EOF' > "$ISSUE_DIR/icon_r6/R6.swift"
 import SwiftUI
@@ -608,6 +626,22 @@ with open(sys.argv[1], "w") as f:
     for i in range(16000):
         f.write(block % i)
 PY
+
+OUT=$($AUDIT "$ISSUE_DIR/icon_r7" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
+  ok "#834 a returned local icon and an icon returned before a stray Text are both flagged"
+else
+  bad "#834 a returned local icon or an icon before unreachable code was missed. Output:"; echo "$OUT"
+fi
+
+START=$(python3 -c 'import time; print(time.time())')
+OUT=$($AUDIT "$ISSUE_DIR/nested_labels" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1); RC=$?
+ELAPSED=$(python3 -c "import time; print(round(time.time() - $START, 2))")
+if [ "$RC" -eq 0 ] && python3 -c "import sys; sys.exit(0 if $ELAPSED < 3 else 1)"; then
+  ok "#834 16000 nested Button labels scan in under 3s (${ELAPSED}s)"
+else
+  bad "#834 nested labels were slow (rc=$RC ${ELAPSED}s)"
+fi
 
 OUT=$($AUDIT "$ISSUE_DIR/icon_r6" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then

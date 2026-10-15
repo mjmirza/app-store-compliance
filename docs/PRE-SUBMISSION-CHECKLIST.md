@@ -96,7 +96,8 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 - [ ] No prohibited AI practice ships (manipulation, banned emotion inference, biometric categorisation) (Article 5, live since 2 February 2025).
 - [ ] Personal data shared with a third-party AI has a consent modal naming the provider and data types, shown before data leaves the device (Apple Guideline 5.1.2(i), 13 November 2025).
 - [ ] The app meets EN 301 549 and WCAG 2.1 AA and publishes its Annex V accessibility information in the terms and conditions or an equivalent document (European Accessibility Act, Directive (EU) 2019/882 Article 13(2), in force 28 June 2025). VoiceOver labels, Dynamic Type, contrast, and Reduce Motion are covered.
-- [ ] If the app offers alternative payments or out-of-app offers in the EU, the StoreKit External Purchases or Offers Entitlement is declared, the disclosure sheet is wired, In-App Purchase is shown at the same time and at least as prominently, the chosen options stay in place for 12 months, and monthly reporting is wired (DMA, Attachment 14 terms from 1 October 2026).
+- [ ] If the app offers alternative payments or out-of-app offers in the EU, the StoreKit External Purchases or Offers Entitlement is declared, the disclosure sheet is wired, In-App Purchase (when offered) is shown at the same time and at least as prominently, the chosen options stay in place for 12 months, and monthly reporting is wired (DMA, Attachment 14 terms from 1 October 2026).
+- [ ] Minors are protected on EU alternative payments. Kids category apps and users under the storefront's parental-consent age (13, or higher where set) get alternative processing only behind a parental gate and no out-of-app offers. Older minors get both only behind a parental gate.
 
 ## Global specific (USA and other markets, if the app reaches those users)
 

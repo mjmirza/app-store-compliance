@@ -109,6 +109,9 @@ for fn in (mon.strip_html, ai.clean_html_text):
     for markup in ("<svg><text><![CDATA[Privacy manifests]]></text></svg>", "<textarea><!--</textarea>Privacy manifests", '<!x ">Privacy manifests">', "<TITLE>Privacy manifests</title>", "<![CDATA[<b>Privacy manifests</b>]]>"):
         assert "Privacy manifests" in fn(markup), (fn.__name__, markup, fn(markup))
     assert "<b>" not in fn("<![CDATA[<b>Privacy manifests</b>]]>"), fn.__name__
+    assert "Privacy" not in fn('<textarea-x><a href="Privacy manifests">Read notes</a></textarea-x>'), fn.__name__
+    assert "Privacy manifests" in fn("<textarea-x>Privacy <b>manifests</b></textarea-x>"), fn.__name__
+    assert fn("<textarea>Privacy</textarea/><!-- hidden -->Next") == "Privacy Next", fn.__name__
     for hostile in ("<textarea>" * 50000, "<![CDATA[" * 50000, "<!x" * 100000, "<title a='" * 40000, "<![CDATA[<!--" * 40000):
         t = time.time()
         fn(hostile)

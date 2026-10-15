@@ -330,7 +330,7 @@ python3 scripts/deadline-checker.py
 | The guard does not fire in Claude Code | Restart Claude Code once, then run `install.sh doctor` |
 | `verify-citations.py` seems stuck | It checks about 300 links over the network and prints at the end. Give it a few minutes |
 | A demo or example app inside your app is scanned with it | A nested Xcode or Android project under a React Native, Expo, Flutter, or Capacitor root stays part of the root's scan, because nothing tells a demo from a shipping app. To scan the nested app alone, point the guard at its folder |
-| `accessibility-audit.py` says Clean | It is a static scan. It computes no contrast ratio for icons and other non-text elements and does not check focus order in custom controls. Test those with VoiceOver, TalkBack, and Accessibility Inspector |
+| `accessibility-audit.py` says Clean | It is a static scan. It computes no contrast ratio for icons and other non-text elements and does not check focus order in custom controls. It reads a Button label without running the code, so a Text inside a stack in the label counts as a label even when it is never shown. Test those with VoiceOver, TalkBack, and Accessibility Inspector |
 
 ## Words used here
 
