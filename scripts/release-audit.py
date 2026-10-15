@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Runs metadata/guard scans against a target project and compiles a release-readiness report.
-Exit 2 on a critical or high finding, 3 when a scan failed or did not check the app, 0 otherwise."""
+"""Release readiness audit. Usage. release-audit.py <app-dir> [--metadata <pulled-listing-dir>]
+Exit 0 clear, 2 blocked on a critical or high finding, 3 incomplete scan, 1 bad input."""
 
 import os
 import sys
@@ -11,6 +11,7 @@ import re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUARD_NAME = "app-store-compliance-guard.sh"
 BLOCKING = ("critical", "high")
+LISTING_HINT = "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>."
 
 # 13 Required areas
 REQUIRED_AREAS = [
@@ -355,12 +356,22 @@ def find_affected_files(target_dir, patterns_dict):
 
 
 def main():
-    target_dir = ROOT
-    if len(sys.argv) > 1:
-        if not os.path.isdir(sys.argv[1]):
-            print(f"release-audit. '{sys.argv[1]}' is not a directory.", file=sys.stderr)
+    args = sys.argv[1:]
+    meta_dir = None
+    if "--metadata" in args:
+        i = args.index("--metadata")
+        meta_dir = args[i + 1] if i + 1 < len(args) else ""
+        del args[i:i + 2]
+        if not os.path.isdir(meta_dir):
+            print(f"release-audit. --metadata '{meta_dir}' is not a directory.", file=sys.stderr)
             return 1
-        target_dir = os.path.abspath(sys.argv[1])
+        meta_dir = os.path.abspath(meta_dir)
+    target_dir = ROOT
+    if args:
+        if not os.path.isdir(args[0]):
+            print(f"release-audit. '{args[0]}' is not a directory.", file=sys.stderr)
+            return 1
+        target_dir = os.path.abspath(args[0])
 
     guard_path, guard_missing = resolve_guard()
     if not guard_path:
@@ -371,6 +382,7 @@ def main():
     print("== Starting Release Readiness Compliance Audit ==")
     print(f"Target Directory: {target_dir}")
     print(f"Guard. {guard_path}")
+    print(f"Store listing. {meta_dir or target_dir + ' (pass --metadata to audit a pulled listing)'}")
     print("")
 
     # --- Step 1. Run Internal Validation and Test Engines ---
@@ -415,14 +427,18 @@ def main():
     # Run metadata-audit.py
     # If en-US metadata exists, use it, otherwise let it run with default empty metadata scan
     meta_code, meta_out, meta_err = run_command(
-        ["python3", "scripts/metadata-audit.py", target_dir]
+        ["python3", "scripts/metadata-audit.py", meta_dir or target_dir]
     )
 
     patterns_dict = load_patterns()
     findings = parse_findings(guard_out + "\n" + meta_out)
 
     problems = scan_problems("compliance guard", guard_code, guard_out, guard_err)
-    problems += scan_problems("metadata audit", meta_code, meta_out, meta_err)
+    listing_missing = meta_dir is None and "Nothing was audited" in meta_out + meta_err
+    if listing_missing:
+        problems.append(LISTING_HINT)
+    else:
+        problems += scan_problems("metadata audit", meta_code, meta_out, meta_err)
     if guard_code == 2 and not any(f["severity"] == "critical" for f in parse_findings(guard_out)):
         problems.append("compliance guard exited 2 but reported no critical finding")
     if problems:
@@ -434,6 +450,9 @@ def main():
             if name in " ".join(problems):
                 for ln in tail(err) or tail(out):
                     print(f"    {name}. {ln}")
+        if listing_missing:
+            seen = next((ln.strip() for ln in (meta_out + meta_err).splitlines() if "Nothing was audited" in ln), "")
+            print(f"    metadata audit. {seen}")
         print("")
 
     # Programmatically scan for affected files

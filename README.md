@@ -277,7 +277,7 @@ cd ~/repositories/app-store-compliance
 python3 scripts/monitor-regulatory.py --project /path/to/your/app   # EU/UK/US/CA/AU/SG, source-trust classified
 python3 scripts/monitor-android.py --dir /path/to/your/app          # Android and Google Play requirements
 python3 scripts/monitor-ai-policy.py --dir /path/to/your/app        # generative AI policy (Apple and Google)
-python3 scripts/release-audit.py /path/to/your/app                  # release readiness compliance audit
+python3 scripts/release-audit.py /path/to/your/app --metadata ./metadata   # release readiness compliance audit
 python3 scripts/accessibility-audit.py /path/to/your/app            # accessibility compliance audit
 python3 scripts/monitor-privacy.py --dir /path/to/your/app          # mobile and web privacy requirements
 python3 scripts/monitor-security.py --dir /path/to/your/app         # 17 mobile security requirements
@@ -292,7 +292,7 @@ What to expect, measured on 30 September 2026.
 | `monitor-regulatory.py` | About 95 lines | No |
 | `monitor-android.py`, `monitor-ai-policy.py` | About 205 and 95 lines | Only with `--output-docs <path>` or `--pr-output <path>` |
 | `monitor-privacy.py`, `monitor-security.py` | About 27 lines each | Only with `--output-docs <path>` or `--pr-output <path>` |
-| `release-audit.py` | About two minutes. It checks the playbook itself first, then your app | `RELEASE-READINESS-REPORT.md` in your app folder |
+| `release-audit.py` | About two minutes. It checks the playbook itself first, then your app. Pass `--metadata <dir>` with your pulled listing. Exit 0 is clear, 2 is blocked on a critical or high finding, 3 is incomplete because a scan failed or the listing was not audited | `RELEASE-READINESS-REPORT.md` in your app folder |
 | `generate-timeline.py` | The open deadlines, then one completion line | Rewrites `docs/REGULATORY-TIMELINE.md` in the playbook folder |
 | `deadline-checker.py` | About 175 lines of detail. Add `--brief` for one line per open deadline | No |
 
@@ -385,11 +385,11 @@ python3 scripts/deadline-checker.py
 | `scripts/monitor-android.py` | Android and Google Play requirements compliance monitor |
 | `scripts/monitor-ai-policy.py` | Platform-specific generative AI policy monitor (Apple and Google) |
 | `scripts/deadline-checker.py` | Prints every regulatory deadline inside a rolling 90-day window, timezone-aware. Runs automatically as part of the guard |
-| `scripts/release-audit.py` | Release readiness compliance audit engine, writes `RELEASE-READINESS-REPORT.md` into the audited project |
+| `scripts/release-audit.py` | Release readiness compliance audit engine, writes `RELEASE-READINESS-REPORT.md` into the audited project. Runs the guard and the listing audit, and `--metadata <dir>` points the listing audit at a pulled metadata folder. Exit 0 is clear. Exit 2 is blocked on a critical or high finding. Exit 3 is incomplete, a scan failed or did not check the app |
 | `scripts/accessibility-audit.py` | Continuous accessibility compliance audit (VoiceOver, Dynamic Type, Reduce Motion, contrast, TalkBack, touch targets). Runnable standalone, deliberately not wired into the guard hook |
 | `scripts/validate.py` | Validates that `data/rejection-patterns.json`, `data/detection-recipes.json`, and `data/regulatory-deadlines.json` stay internally consistent. Runs in CI |
 | `scripts/generate-references.py` | Regenerates `references/` from the pattern and recipe data, so the reference tree never drifts from the taxonomy |
-| `scripts/metadata-audit.py` | Audits the live store listing (name, subtitle, keywords, description, URLs) against the metadata rejection rules, with a propose and re validate loop. A large share of rejections live in the listing, not the code |
+| `scripts/metadata-audit.py` | Audits the live store listing (name, subtitle, keywords, description, URLs) against the metadata rejection rules, with a propose and re validate loop. Every locale folder is audited on its own and each finding names its locale. `--platform google` applies the Google Play limits and rules, and a fastlane `android` folder gets them automatically. It checks that every URL is a real http or https address, that an Apple listing has a support URL, and that a Google listing has a contact email. A large share of rejections live in the listing, not the code |
 | `scripts/pull-metadata.sh` | Pulls the live App Store Connect listing into a metadata directory via the asc CLI, with the Play API path documented |
 | `references/` | A structured, AI loadable reference tree. Rules by category (metadata, privacy, payments, design, performance, entitlements, safety, Android) and guidelines by app type, each with a detection command, generated from the taxonomy. Load the slices that match the task |
 | `templates/REVIEW-NOTES-TEMPLATE.md` | A fill in the blanks App Store review notes template, the six sections that clear most 2.1 rejections |

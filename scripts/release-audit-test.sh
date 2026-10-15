@@ -97,6 +97,20 @@ OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" 
 
 OUT="$(APP_STORE_GUARD_PATH="$W/no-such-guard.sh" python3 scripts/release-audit.py "$CL" 2>&1)"; RC=$?
 [ "$RC" -ne 0 ] && echo "$OUT" | grep -q "guard not found" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing guard is reported before any scan" || bad "a missing guard is reported before any scan (rc=$RC)"
+# --metadata points the listing audit at a pulled metadata folder instead of the app folder.
+MD="$W/pulled"; mkdir -p "$MD/en-US"
+printf 'Lumina Studio' > "$MD/en-US/name.txt"
+printf 'A focused editor with layers and presets.' > "$MD/en-US/description.txt"
+printf '{"privacy_policy_url":"https://lumina.app/privacy","support_url":"https://lumina.app/support"}' > "$MD/m.json"
+OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" --metadata "$MD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "a clean pulled listing passed with --metadata reaches CLEAR" || bad "a clean pulled listing passed with --metadata reaches CLEAR (rc=$RC)"
+
+OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && echo "$OUT" | grep -q "Overall Status: INCOMPLETE" && echo "$OUT" | grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
+
+OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" --metadata "$W/no-such-dir" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing --metadata folder is rejected before any scan" || bad "a missing --metadata folder is rejected before any scan (rc=$RC)"
+
 rm -rf "$W"
 
 echo "release-audit-test: $PASS passed, $FAIL failed"
