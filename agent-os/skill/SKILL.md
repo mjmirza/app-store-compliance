@@ -73,10 +73,16 @@ Run the guard against the project root. Use the copy the install put in your too
 | OpenCode | `~/.config/opencode/hooks/app-store-compliance-guard.sh` |
 | Cursor | `~/.cursor/hooks/app-store-compliance-guard.sh` |
 | Copilot CLI | `~/.copilot/hooks/app-store-compliance-guard.sh` |
+| Grok | `~/.grok/hooks/app-store-compliance-guard.sh` |
+| Qwen Code | `~/.qwen/hooks/app-store-compliance-guard.sh`, or under `$QWEN_HOME` when set |
+| Kimi Code | `~/.kimi-code/hooks/app-store-compliance-guard.sh` |
+| Factory Droid | `~/.factory/hooks/app-store-compliance-guard.sh` |
+| Auggie | `~/.augment/hooks/app-store-compliance-guard.sh` |
+| Windsurf | `~/.codeium/windsurf/hooks/app-store-compliance-guard.sh` |
 | From a checkout | `~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh` |
 
 ```
-bash ~/.claude/hooks/app-store-compliance-guard.sh "/path/to/app/project"
+bash <guard path from the table> "/path/to/app/project"
 ```
 
 The `scripts/` paths in this skill are relative to this skill's own folder.

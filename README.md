@@ -125,8 +125,8 @@ Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-sto
 
 Steps:
 1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance.
-2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, or Copilot CLI) and run the installer for it, showing me the full output.
-   bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot>
+2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Factory Droid, Auggie, or Windsurf) and run the installer for it, showing me the full output.
+   bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|droid|auggie|windsurf>
    It must end with "Install verified." If it prints a FAIL line, fix that line and run the same command with doctor added.
    If you are none of these, tell me so and stop. Do not wire the hook by hand.
 3. Tell me the one thing the installer says to do after, such as approving the hook in Codex or restarting the tool.
@@ -362,9 +362,9 @@ python3 scripts/deadline-checker.py
 | The guard does not fire in Claude Code | Restart Claude Code once, then run `install.sh doctor` |
 | The guard does not fire in Codex | Run `/hooks` in Codex and approve the app-store-compliance hook. Codex runs no new or changed hook until you approve it. Then run `install.sh --tool codex doctor` |
 | The guard does not fire in Gemini CLI | Restart Gemini CLI. Check that `tools.enableHooks` is true in `~/.gemini/settings.json`. Then run `install.sh --tool gemini doctor` |
-| The install for Codex, Gemini, OpenCode, Cursor or Copilot says python3 is needed | Install python3, then run the same command again |
+| The install for any tool other than Claude Code says python3 is needed | Install python3, then run the same command again |
 | `verify-citations.py` seems stuck | It checks about 300 links over the network and prints at the end. Give it a few minutes |
-| A demo or example app inside your app is scanned with it | A nested Xcode or Android project under a React Native, Expo, Flutter, or Capacitor root stays part of the root's scan, because nothing tells a demo from a shipping app. To scan the nested app alone, point the guard at its folder |
+| A demo or example app inside your app is scanned with it | A nested Xcode or Android project in a folder named like demo, example, sample, or playground stays part of the root's scan. Any other nested project with its own Info.plist or AndroidManifest.xml, that no root build file names, is scanned as its own app when the root has a folder for that platform. To scan a nested app alone, point the guard at its folder |
 | `accessibility-audit.py` says Clean | It is a static scan. It computes no contrast ratio for icons and other non-text elements and does not check focus order in custom controls. It reads a Button label without running the code, so anything written inside the label counts, shown or not. A Text, a Label, or the word accessibilityLabel anywhere in it hides a possible icon-only Button, and an Image(systemName:) that is never shown can still raise one. Regex literals are skipped only in the #/.../# form, not bare /.../. Test those with VoiceOver, TalkBack, and Accessibility Inspector |
 
 ## Words used here
