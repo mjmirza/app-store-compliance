@@ -495,9 +495,10 @@ def _fields_from(entries, aliases, conflicts=None):
                 continue
             name = os.path.basename(path)
             if canon in fields and fields[canon] != v:
+                keep_old = len(v) <= len(fields[canon])
                 if conflicts is not None:
-                    conflicts.append((canon, src[canon], name))
-                if len(v) <= len(fields[canon]):
+                    conflicts.append((canon, src[canon], name, v if keep_old else fields[canon]))
+                if keep_old:
                     continue
             fields[canon], src[canon] = v, name
     return fields
@@ -620,13 +621,20 @@ def main():
             f"Locale {label} ({plat}). Fields audited. {', '.join(sorted(fields.keys()))}"
         )
         unit = audit_fields(fields, check_urls=check_urls, platform=plat)
-        for canon, a, b in clash:
+        seen = {(f["severity"], f["rule"], f["field"], f["message"]) for f in unit}
+        for canon, a, b, alt in clash:
+            # The value that was not kept is audited too, so a conflict never hides a rejection risk.
+            for f in audit_fields({**fields, canon: alt}, check_urls=check_urls, platform=plat):
+                key = (f["severity"], f["rule"], f["field"], f["message"])
+                if key not in seen:
+                    seen.add(key)
+                    unit.append(f)
             add(
                 unit,
                 "medium",
                 "BOTH-METADATA-DECORATION",
                 canon,
-                f"{canon} has conflicting values in {a} and {b}, the longest was audited",
+                f"{canon} has conflicting values in {a} and {b}, both were audited",
                 f"Keep one file for {canon} so the store gets the value you audited",
             )
         for f in unit:

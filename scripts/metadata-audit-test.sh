@@ -139,5 +139,13 @@ OUT="$($AUDIT "$E/missing" 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ok "a missing metadata folder exits 1" || bad "a missing metadata folder exits 1 (rc=$RC)"
 rm -rf "$E"
 
+# two equal-length names, the risky one still audited
+EQ="$(mktemp -d)"; mkdir -p "$EQ/en-US"
+printf 'Android' > "$EQ/en-US/title.txt"; printf 'Journal' > "$EQ/en-US/name.txt"
+printf 'https://journal.test/privacy' > "$EQ/en-US/privacy_url.txt"; printf 'https://journal.test/help' > "$EQ/en-US/support_url.txt"
+OUT="$($AUDIT "$EQ" 2>&1)"
+echo "$OUT" | grep -q 'CROSS-PLATFORM' && ok "an equal-length conflicting name is audited too" || bad "an equal-length conflicting name is audited too"
+rm -rf "$EQ"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
