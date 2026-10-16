@@ -298,6 +298,18 @@ console.log((await run("fast" + "lane deliver")) + " " + (await run("f\\ast" + "
 ' "$(cfg opencode)" "$H" 2>/dev/null)"
   [ "$RES" = "thrown thrown thrown allowed" ] && ok "opencode refuses a submit when the guard cannot run and allows other commands" || bad "opencode refuses a submit when the guard cannot run and allows other commands (got $RES)"
 else ok "opencode guard-failure check skipped, node not installed"; fi
+# 8j OpenCode loads both plugin folders, and a call is still checked once
+fresh; mkdir -p "$H/.config/opencode"; run --tool opencode >/dev/null
+printf '#!/usr/bin/env bash\necho x >> "%s/count"\nexit 0\n' "$H" > "$(gdir opencode)/app-store-compliance-guard.sh"
+if command -v node >/dev/null 2>&1; then
+  node --input-type=module -e '
+const a = await (await import(process.argv[1])).AppStoreCompliance({ directory: process.argv[3] });
+const b = await (await import(process.argv[2])).AppStoreCompliance({ directory: process.argv[3] });
+const out = { args: { command: "ls" } };
+await a["tool.execute.before"]({ tool: "bash" }, out); await b["tool.execute.before"]({ tool: "bash" }, out);
+' "$(cfg opencode)" "$H/.config/opencode/plugin/app-store-compliance.js" "$H" 2>/dev/null
+  [ "$(wc -l < "$H/count" | tr -d ' ')" = "1" ] && ok "opencode checks a call once with both plugin folders loaded" || bad "opencode checks a call once with both plugin folders loaded ($(wc -l < "$H/count" 2>/dev/null))"
+else ok "opencode double-load check skipped, node not installed"; fi
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(ls "$H/.kimi-code" | grep -c bak)"; OUT="$(run --tool kimi)"; N2="$(ls "$H/.kimi-code" | grep -c bak)"

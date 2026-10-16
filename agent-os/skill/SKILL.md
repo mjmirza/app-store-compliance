@@ -43,7 +43,7 @@ python3 scripts/metadata-audit.py ./metadata/android --platform google   # Googl
 python3 scripts/release-audit.py /path/to/app --metadata ./metadata     # full gate, exit 0 clear, 2 blocked, 3 incomplete
 ```
 
-The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and broken URLs. It audits every locale folder on its own and names the locale in each finding. It flags a URL that is not a real http or https address, an Apple listing with no support URL, a Google listing with no contact email, and a subscription with no real Terms or EULA link. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
+The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and malformed URLs (pass `--check-urls` to also test that each URL loads). It audits every locale folder on its own and names the locale in each finding. It flags a URL that is not a real http or https address, an Apple listing with no support URL, a Google listing with no contact email, and a subscription with no real Terms or EULA link. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
 
 The release audit blocks on any critical or high finding with exit 2. It exits 3 when a scan failed or the listing was not audited, so pass `--metadata` with your pulled listing.
 

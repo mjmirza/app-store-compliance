@@ -404,6 +404,10 @@ def plugin_source(guard):
         '    if (input.tool !== "bash") return;\n'
         "    const command = output && output.args ? output.args.command : undefined;\n"
         '    if (typeof command !== "string") return;\n'
+        "    // OpenCode loads both plugin folders, so a call one copy already checked is skipped by the other.\n"
+        "    const seen = (globalThis.__appStoreComplianceSeen ||= new WeakSet());\n"
+        "    if (seen.has(output)) return;\n"
+        "    seen.add(output);\n"
         '    const r = spawnSync("bash", [' + json.dumps(guard) + "], {\n"
         '      input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: directory }),\n'
         '      encoding: "utf8", timeout: 120000, cwd: directory,\n'

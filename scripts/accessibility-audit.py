@@ -182,7 +182,7 @@ def _regex_close(content, start, hashes):
 
 
 def swift_code_lines(content):
-    """Comments blanked line by line with no string state, so a misread quote never hides a later line.
+    """Only whole comment lines blanked, with no string state, so a misread quote never hides any code.
     Offsets and newlines are kept."""
     out = []
     for line in content.split("\n"):
@@ -190,8 +190,7 @@ def swift_code_lines(content):
         if t.startswith("//") or t.startswith("/*") or t.startswith("*"):
             out.append(" " * len(line))
             continue
-        m = re.search(r"[ \t;{},)]//", line)
-        out.append(line[: m.start() + 1] + " " * (len(line) - m.start() - 1) if m else line)
+        out.append(line)
     return "\n".join(out)
 
 

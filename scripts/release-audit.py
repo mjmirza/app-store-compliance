@@ -431,7 +431,7 @@ def main():
     guard_code, guard_out, guard_err = run_command(["bash", guard_path, target_dir])
 
     # Run metadata-audit.py
-    # If en-US metadata exists, use it, otherwise let it run with default empty metadata scan
+    # The pulled listing from --metadata when given, otherwise the app folder itself
     meta_code, meta_out, meta_err = run_command(
         ["python3", "scripts/metadata-audit.py", meta_dir or target_dir]
     )
