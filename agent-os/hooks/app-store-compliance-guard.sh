@@ -388,6 +388,15 @@ SEGS
   elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
     CMD_TARGET_ANDROID_ONLY=1
   fi
+  # An Android word inside a quoted argument is text, not a platform flag, so it never turns the Apple checks off.
+  if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ]; then
+    CMD_NOQ="$(printf '%s' "$CMD" | awk -v sq="'" '{ o=""; n=length($0); i=1
+      while (i <= n) { c=substr($0, i, 1)
+        if (c == sq || c == "\"") { j=i+1; while (j <= n && substr($0, j, 1) != c) { if (c == "\"" && substr($0, j, 1) == "\\") j++; j++ }; o=o " "; i=j+1; continue }
+        o=o c; i++ }
+      print o }')"
+    printf '%s' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
+  fi
 fi
 CMD_TARGET_IOS_ONLY=0
 if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \

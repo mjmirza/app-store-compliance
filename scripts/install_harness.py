@@ -119,6 +119,16 @@ def kimi_dir():
     return os.path.abspath(v)
 
 
+def copilot_dir():
+    """Copilot CLI's user folder. COPILOT_HOME wins, as the hooks reference describes."""
+    v = os.environ.get("COPILOT_HOME")
+    if not v:
+        return os.path.join(home(), ".copilot")
+    if v == "~" or v.startswith("~/") or v.startswith("~\\"):
+        v = os.path.join(home(), v[2:])
+    return os.path.abspath(v)
+
+
 def skill_dir():
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
@@ -165,7 +175,7 @@ def layout(tool, repo_dir=None):
         "qwen": qwen_dir(),
         "auggie": os.path.join(h, ".augment"),
         "cursor": os.path.join(h, ".cursor"),
-        "copilot": os.path.join(h, ".copilot"),
+        "copilot": copilot_dir(),
         "windsurf": os.path.join(h, ".codeium", "windsurf"),
         "kimi": kimi_dir(),
     }
@@ -350,6 +360,8 @@ def dispatches(tool, style, group, h):
     ):
         return False
     if style in ("nested", "copilot", "vscode") and h.get("type", "command") != "command":
+        return False
+    if h.get("async") not in (None, False):
         return False
     if tool == "windsurf":
         return True
@@ -617,6 +629,35 @@ def register(tool, lay, guard, dry):
     return True
 
 
+KIMI_KEY = r"""(?:hooks|"hooks"|'hooks')"""
+
+
+def kimi_hooks_taken(text):
+    """True when the file already defines hooks as a key or a table, which a [[hooks]] block cannot join."""
+    t = text.replace("\r", "")
+    return bool(
+        re.search(r"^[ \t]*" + KIMI_KEY + r"[ \t]*[=.]", t, re.M)
+        or re.search(r"^[ \t]*\[[ \t]*" + KIMI_KEY + r"[ \t]*[\].]", t, re.M)
+    )
+
+
+def toml_still_valid(before, after):
+    """False when a file that parsed before no longer parses. True when no TOML parser is available."""
+    try:
+        import tomllib
+    except ImportError:
+        return True
+    try:
+        tomllib.loads(before)
+    except Exception:
+        return True
+    try:
+        tomllib.loads(after)
+    except Exception:
+        return False
+    return True
+
+
 def register_kimi(lay, cmd, dry):
     path = lay["config"]
     text = ""
@@ -640,7 +681,7 @@ def register_kimi(lay, cmd, dry):
         write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S), newline="")
         ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
-    if re.search(r"^[ \t]*hooks[ \t]*=", text, re.M) or re.search(r"^[ \t]*\[[ \t]*hooks[ \t]*\][ \t]*(#.*)?$", text, re.M):
+    if kimi_hooks_taken(text):
         fail(shown(path) + " defines hooks inline, so a [[hooks]] block cannot be added. It was not changed.")
         print(manual_block("kimi", lay, cmd))
         return False
@@ -652,6 +693,10 @@ def register_kimi(lay, cmd, dry):
         )
         return True
     sep = "" if not text or text.endswith(nl + nl) else (nl if text.endswith(nl) else nl + nl)
+    if not toml_still_valid(text, text + sep + kimi_block(cmd).replace("\n", nl)):
+        fail(shown(path) + " would not stay valid TOML with a [[hooks]] block. It was not changed.")
+        print(manual_block("kimi", lay, cmd))
+        return False
     write_atomic(path, text + sep + kimi_block(cmd).replace("\n", nl), newline="")
     os.makedirs(lay["hooks"], exist_ok=True)
     with open(os.path.join(lay["hooks"], KIMI_SEP_FILE), "w", encoding="utf-8") as f:

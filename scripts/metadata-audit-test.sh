@@ -158,6 +158,18 @@ printf 'https://j.test/privacy' > "$XC/en-US/privacy_url.txt"; printf 'https://j
 OUT="$($AUDIT "$XC" 2>&1)"
 echo "$OUT" | grep -q 'APPLE-3.1.2-MISLEADING-PRICING' && ok "a risky pairing across two conflicting fields is audited" || bad "a risky pairing across two conflicting fields is audited"
 rm -rf "$XC"
+# a repeated command line field wins over an older alias for the same field, as on origin/main
+OUT="$($AUDIT --name Android --title Journal --name Android --privacy_url https://j.test/p --support_url https://j.test/help 2>&1)"
+echo "$OUT" | grep -q 'CROSS-PLATFORM' && ok "the last --name wins over an older --title alias" || bad "the last --name wins over an older --title alias"
+
+# a locale value overrides a conflict between two parent files, so the overridden values raise nothing
+OV="$(mktemp -d)"; mkdir -p "$OV/en-US"
+printf '{"privacy_url":"broken"}' > "$OV/a.json"
+printf '{"privacy_url":"https://common.test/privacy"}' > "$OV/b.json"
+printf '{"name":"Journal","privacy_url":"https://j.test/privacy","support_url":"https://j.test/help"}' > "$OV/en-US/metadata.json"
+OUT="$($AUDIT "$OV" 2>&1)"
+! echo "$OUT" | grep -q 'INVALID-METADATA-URL' && ok "a locale value overrides a parent conflict" || bad "a locale value overrides a parent conflict"
+rm -rf "$OV"
 
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

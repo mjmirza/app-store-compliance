@@ -12,7 +12,7 @@ INSTALL="$PWD/scripts/install.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() { H="$WORK/h$RANDOM$RANDOM"; mkdir -p "$H"; }
-run()   { env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+run()   { env -u QWEN_HOME -u KIMI_CODE_HOME -u COPILOT_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
 cfg() {
   case "$1" in
     codex) echo "$H/.codex/hooks.json" ;;
@@ -172,6 +172,25 @@ cp "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml"
 OUT="$(run --tool kimi)"; RC=$?
 [ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml" && echo "$OUT" | grep -q "\[\[hooks\]\]" && ok "kimi refuses an inline hooks array and changes nothing" || bad "kimi refuses an inline hooks array and changes nothing (rc=$RC)"
 
+# 2d4 an async handler runs in the background and cannot block, so doctor fails and install repairs it
+fresh; run --tool qwen >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [h.__setitem__("async", True) for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]]; json.dump(d, open(p,"w"))' "$(cfg qwen)"
+run --tool qwen doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "qwen doctor fails on an async guard handler" || bad "qwen doctor fails on an async guard handler (rc=$RC)"
+run --tool qwen >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
+  && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# 2d5 COPILOT_HOME moves Copilot's user hooks folder, so the hook goes where Copilot reads it
+fresh; mkdir -p "$H/cop"
+OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" COPILOT_HOME="$H/cop" bash "$INSTALL" --tool copilot 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -f "$H/cop/hooks/app-store-compliance.json" ] && [ ! -e "$H/.copilot" ] && ok "copilot follows COPILOT_HOME" || bad "copilot follows COPILOT_HOME (rc=$RC)"
+# 2d6 a CRLF [hooks] table and a quoted hooks key are refused too, and the file is left as it was
+for body in '[hooks]\r\nx = 1\r\n' '"hooks" = []\n'; do
+  fresh; mkdir -p "$H/.kimi-code"; printf "$body" > "$H/.kimi-code/config.toml"; cp "$H/.kimi-code/config.toml" "$WORK/kimi-k.toml"
+  run --tool kimi >/dev/null; RC=$?
+  [ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-k.toml" && ok "kimi refuses an existing hooks key and changes nothing ($body)" || bad "kimi refuses an existing hooks key and changes nothing ($body) (rc=$RC)"
+done
+
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
 OUT="$(run --tool copilot-repo)"; RC=$?
@@ -330,7 +349,7 @@ run --tool kimi >/dev/null; N1="$(ls "$H/.kimi-code" | grep -c bak)"; OUT="$(run
 # 8i without node the OpenCode install never says verified
 fresh; mkdir -p "$H/.config/opencode"
 NONODE="$WORK/nonode$RANDOM"; mkdir -p "$NONODE"; for b in bash sh python3 grep sed awk cat cp mv rm mkdir chmod dirname basename tr head tail find date ls env printf mktemp uname cmp wc sort; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
-OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
+OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u COPILOT_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
 echo "$OUT" | grep -q 'not fully verified' && ! echo "$OUT" | grep -q '^Install verified' && ok "opencode without node says not fully verified" || bad "opencode without node says not fully verified"
 # 8g a non-Claude doctor says when the checkout is newer than the install
 fresh; mkdir -p "$H/.codex"; run --tool codex >/dev/null; printf '1.0.0' > "$H/.agents/skills/app-store-compliance/VERSION"

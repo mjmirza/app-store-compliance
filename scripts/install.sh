@@ -70,7 +70,8 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${HOME:-}/.gemini" ] && found="$found gemini"
   [ -d "${XDG_CONFIG_HOME:-${HOME:-}/.config}/opencode" ] && found="$found opencode"
   [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
-  [ -d "${HOME:-}/.copilot" ] && found="$found copilot"
+  CDIR="${COPILOT_HOME:-${HOME:-}/.copilot}"; case "$CDIR" in "~"|"~/"*|"~\\"*) CDIR="${CDIR#\~}"; CDIR="${HOME:-}/${CDIR#?}" ;; esac
+  [ -d "$CDIR" ] && found="$found copilot"
   [ -d "${HOME:-}/.grok" ] && found="$found grok"
   QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*|"~\\"*) QDIR="${QDIR#\~}"; QDIR="${HOME:-}/${QDIR#?}" ;; esac
   [ -d "$QDIR" ] && found="$found qwen"

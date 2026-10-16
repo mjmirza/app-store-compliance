@@ -529,10 +529,14 @@ def load_locales(d, platform=None):
         )
         if has_children and not (set(own) - set(URL_FIELDS) - {"contact_email"}):
             continue
-        merged = {}
+        merged, inherited = {}, []
         for a in sorted((o for o in rels if _is_below(rel, o)), key=len):
-            merged.update(_fields_from(groups[a], aliases, clash))
+            near = []
+            got = _fields_from(groups[a], aliases, near)
+            inherited = [c for c in inherited if c[0] not in got] + near
+            merged.update(got)
         merged.update(own)
+        clash += [c for c in inherited if c[0] not in own]
         label = rel if rel != "." else (os.path.basename(os.path.abspath(d)) or d)
         units.append((label, plat, merged, sorted(set(clash))))
     return units
@@ -566,13 +570,13 @@ def main():
             )
             return 1
 
-    raw = {}
+    raw = []
     d = None
     i = 0
     while i < len(args):
         a = args[i]
         if a.startswith("--"):
-            raw[a[2:]] = args[i + 1] if i + 1 < len(args) else ""
+            raw.append((a[2:], args[i + 1] if i + 1 < len(args) else ""))
             i += 2
         elif os.path.isdir(a) or d is None:
             d = a
@@ -589,13 +593,17 @@ def main():
 
     def cli_fields(plat):
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
-        return {aliases.get(k, k): v for k, v in raw.items()}
+        out = {}
+        for k, v in raw:
+            out[aliases.get(k, k)] = v
+        return out
 
     units = []
     if d:
         for label, plat, f, clash in load_locales(d, platform):
-            f.update(cli_fields(plat))
-            units.append((label, plat, f, clash))
+            cli = cli_fields(plat)
+            f.update(cli)
+            units.append((label, plat, f, [c for c in clash if c[0] not in cli]))
     if not units and raw:
         plat = platform or "apple"
         units.append(("command line", plat, cli_fields(plat), []))
@@ -630,6 +638,9 @@ def main():
             if alt not in options[canon]:
                 options[canon].append(alt)
         names = sorted(options)
+        total = 1
+        for n in names:
+            total *= len(options[n])
         for combo in itertools.islice(itertools.product(*(options[n] for n in names)), 1, 4096):
             for f in audit_fields({**fields, **dict(zip(names, combo))}, check_urls=check_urls, platform=plat):
                 key = (f["severity"], f["rule"], f["field"], f["message"])
@@ -642,7 +653,8 @@ def main():
                 "medium",
                 "BOTH-METADATA-DECORATION",
                 canon,
-                f"{canon} has conflicting values in {a} and {b}, both were audited",
+                f"{canon} has conflicting values in {a} and {b}, both were audited"
+                + ("" if total <= 4096 else f" (the first 4096 of {total} value combinations)"),
                 f"Keep one file for {canon} so the store gets the value you audited",
             )
         for f in unit:

@@ -2871,6 +2871,24 @@ printf '%s\n' "signIn();" "const s = ' /* '; deleteAccount(); const end = ' */ '
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r11-4 quoted block markers keep the deletion between them" || bad "r11-4 quoted block markers keep the deletion between them (rc=$RC)"
 rm -rf "$D"
+# R12 Codex round 11
+# R12-1 an Android word inside a quoted lane parameter is text, so an iOS lane keeps the Apple checks
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+rr_hook "$FL beta notes:\"test -p android\"" "$D"
+rr_has 'NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r12-1 a quoted -p android in a lane parameter keeps the Apple checks" || bad "r12-1 a quoted -p android in a lane parameter keeps the Apple checks (rc=$RC)"
+rr_hook "$FL beta notes:'flutter build appbundle'" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r12-1 a single-quoted Android build in a parameter keeps the Apple checks" || bad "r12-1 a single-quoted Android build in a parameter keeps the Apple checks (rc=$RC)"
+rm -rf "$D"
+# R12-1b a plain Android release command still stays Android only
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "./gradlew bundleRelease" "$D"
+! rr_has 'NSCameraUsageDescription' && ok "r12-1b a plain Android build still skips the Apple checks" || bad "r12-1b a plain Android build still skips the Apple checks (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

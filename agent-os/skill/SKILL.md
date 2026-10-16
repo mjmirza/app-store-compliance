@@ -72,10 +72,10 @@ Run the guard against the project root. Use the copy the install put in your too
 | Gemini CLI | `~/.gemini/hooks/app-store-compliance-guard.sh` |
 | OpenCode | `~/.config/opencode/hooks/app-store-compliance-guard.sh` |
 | Cursor | `~/.cursor/hooks/app-store-compliance-guard.sh` |
-| Copilot CLI | `~/.copilot/hooks/app-store-compliance-guard.sh` |
+| Copilot CLI | `~/.copilot/hooks/app-store-compliance-guard.sh`, or under `$COPILOT_HOME` when set |
 | Grok | `~/.grok/hooks/app-store-compliance-guard.sh` |
 | Qwen Code | `~/.qwen/hooks/app-store-compliance-guard.sh`, or under `$QWEN_HOME` when set |
-| Kimi Code | `~/.kimi-code/hooks/app-store-compliance-guard.sh` |
+| Kimi Code | `~/.kimi-code/hooks/app-store-compliance-guard.sh`, or under `$KIMI_CODE_HOME` when set |
 | Factory Droid | `~/.factory/hooks/app-store-compliance-guard.sh` |
 | Auggie | `~/.augment/hooks/app-store-compliance-guard.sh` |
 | Windsurf | `~/.codeium/windsurf/hooks/app-store-compliance-guard.sh` |
