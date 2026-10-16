@@ -2421,7 +2421,7 @@ D="$(mk_rr_ios '' 'import AVFoundation
 /* a real
  * multiline AVCaptureDevice comment */')"
 rr_run "$D"
-! rr_has 'Camera used without' && ok "r3-3b a block comment led by * on each line is still a comment" || bad "r3-3b a block comment led by * on each line is still a comment (rc=$RC)"
+rr_has 'Camera used without' && ok "r3-3b a mention inside a block comment counts as a trigger, as in 1.0.0" || bad "r3-3b a mention inside a block comment counts as a trigger, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_rr_ios '' 'import AVFoundation
 /* an unmarked line inside a block counts as code, as in 1.0.0
@@ -2652,7 +2652,7 @@ D="$(mk_rr_ios '' 'import Foundation
 */
 let s = "x"')"
 rr_hook "$FL deliver" "$D"
-! rr_has 'NSCameraUsageDescription' && ok "r6-3 a closed block comment still hides a camera mention" || bad "r6-3 a closed block comment still hides a camera mention (rc=$RC)"
+rr_has 'NSCameraUsageDescription' && ok "r6-3 a camera mention in a block comment counts, as in 1.0.0" || bad "r6-3 a camera mention in a block comment counts, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 # R7 Codex round 6
 # R7-1 a C# verbatim string, a Rust string holding /*, and a mid-line // never hide a camera call
@@ -2786,6 +2786,42 @@ printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
 printf '#import <Cordova/CDV.h>\nUIWebView *webView;\n' > "$D/Native/Host.m"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r9-4 a Cordova host keeps the Ionic checks" || bad "r9-4 a Cordova host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R10 Codex round 9
+# R10-1 only a line led by // is left out of the triggers. a spaced pointer write and code after a closing */ count
+for src in '* out = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' ' */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];'; do
+  D="$(mk_rr_ios '' 'let s = "x"')"
+  printf '%s\n' "$src" > "$D/App/R.m"
+  rr_hook "$FL deliver" "$D"
+  [ "$RC" -eq 2 ] && ok "r10-1 the camera call counts. $src" || bad "r10-1 the camera call counts. $src (rc=$RC)"
+  rm -rf "$D"
+done
+# R10-2 runner text inside an argument never hides the outer npm script
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/web"
+printf '{"name":"root","scripts":{"ship":"eas submit -p ios"}}' > "$D/package.json"
+printf '{"name":"web","scripts":{"args":"printf x"}}' > "$D/apps/web/package.json"
+rr_hook "npm run ship -- --path=\"yarn workspace web args.ipa\"" "$D"
+[ "$RC" -eq 2 ] && ok "r10-2 runner text in an argument never hides the npm script" || bad "r10-2 runner text in an argument never hides the npm script (rc=$RC)"
+rm -rf "$D"
+# R10-3 a Swift host that imports Cordova stays in the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import Cordova\nclass AppDelegate: CDVAppDelegate { var legacy: UIWebView? }\n' > "$D/Native/AppDelegate.swift"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r10-3 a Swift Cordova host keeps the Ionic checks" || bad "r10-3 a Swift Cordova host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R10-4 a // inside a single-quoted string keeps the deletion after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' "const s = ' // x '; deleteAccount();" > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r10-4 a // in a single-quoted string keeps the deletion" || bad "r10-4 a // in a single-quoted string keeps the deletion (rc=$RC)"
 rm -rf "$D"
 # R7-6 a purpose key in an XcodeGen include, an Nx project.json, a Tuist helper or a Cordova config.xml counts
 for f in targets/App.yml project.json Tuist/ProjectDescriptionHelpers/Info.swift config.xml; do

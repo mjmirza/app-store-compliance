@@ -247,9 +247,9 @@ FASTFILES
     local name esc sub pj seg w prev mf targets mfiles
     local opts='([[:space:]]+--?[A-Za-z][A-Za-z-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*'
     local pre='.*(^|[^A-Za-z0-9_./-])'
-    name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
+    name="$(printf '%s' "$1" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?${opts}[[:space:]]+([A-Za-z0-9:_.][A-Za-z0-9:_.-]*).*/\8/p" | head -1)"
+    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspace[[:space:]]+[^[:space:]]+[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\3/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}yarn[[:space:]]+workspaces[[:space:]]+foreach${opts}[[:space:]]+(run[[:space:]]+)?([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
-    [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(npm|pnpm|bun)${opts}[[:space:]]+run(-script)?${opts}[[:space:]]+([A-Za-z0-9:_.][A-Za-z0-9:_.-]*).*/\8/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}(turbo|lerna)${opts}[[:space:]]+run[[:space:]]+([A-Za-z0-9:_.-]+).*/\5/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+run(-many)?[[:space:]]+([A-Za-z0-9_.@\/-]+:)?([A-Za-z0-9_.][A-Za-z0-9_.-]*).*/\6/p" | head -1)"
     [ -z "$name" ] && name="$(printf '%s' "$1" | sed -nE "s/${pre}nx${opts}[[:space:]]+(run-many|affected)([[:space:]]+[^[:space:]]+)*[[:space:]]+(-t|--targets?)[=[:space:]]+([A-Za-z0-9_.-]+).*/\7/p" | head -1)"
@@ -435,18 +435,20 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
 }
 
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
-# Source with comments dropped, line by line and without string state, so a misread quote can never hide a later line.
-# A line led by //, /*, * or */ is a comment. tc=1 (the implementation buffer) also drops a trailing // or a closed /* */.
-STRIP_AWK='function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
+# Comments dropped line by line, with no string state, so a misread quote can never hide a later line.
+# tc=0 (triggers) drops only a line led by //. tc=1 (implementation) also drops block comment lines and trailing comments.
+STRIP_AWK='BEGIN { sq=sprintf("%c", 39) }
+    function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
     { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
       t=l; sub(/^[ \t]+/, "", t)
       if (substr(t, 1, 2) == "//") { print ""; next }
+      if (!tc) { print l; next }
       if (substr(t, 1, 2) == "*/" || t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
       if (substr(t, 1, 2) == "/*") { r=t; sub(/[ \t]+$/, "", r); j=index(substr(r, 3), "*/")
         if (j == 0 || j + 3 == length(r)) { print ""; next } }
       if (tc) {
         while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) l=substr(l, 1, o-1) substr(l, o+c+3)
-        if (index(l, "//") && (o=opener(l, "//")) > 0 && substr(l, o+2) !~ /<\/|\/>/) { pre=substr(l, 1, o-1); nq=gsub(/[\"`]/, "", pre); if (nq % 2 == 0) l=substr(l, 1, o-1) } }
+        if (index(l, "//") && (o=opener(l, "//")) > 0 && substr(l, o+2) !~ /<\/|\/>/) { pre=substr(l, 1, o-1); p2=pre; nq=gsub(/[\"`]/, "", pre); ns=gsub(sq, "", p2); if (nq % 2 == 0 && ns % 2 == 0) l=substr(l, 1, o-1) } }
       print l }'
 build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
   CODE_OK=0
@@ -1228,7 +1230,7 @@ bare_native_apart() {  # $1 candidate dir below $DIR
     || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
       | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
   # A native host that embeds the root framework (brownfield) shares its dependencies, so it stays in the root scan.
-  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|CDVViewController|CDVPlugin' "$1" \
+  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|import Cordova|CDVViewController|CDVPlugin|CDVAppDelegate|import Flutter' "$1" \
     --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' --include='Podfile' --include='*.pbxproj' \
     --exclude-dir=Pods --exclude-dir=node_modules --exclude-dir=build 2>/dev/null | grep . >/dev/null && return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.
