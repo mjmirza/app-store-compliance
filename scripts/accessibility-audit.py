@@ -185,17 +185,20 @@ def swift_code_lines(content):
     """Only whole comment lines blanked, with no string state, so a misread quote never hides any code.
     Offsets and newlines are kept."""
     out = []
+    in_block = False
     for line in content.split("\n"):
         t = line.lstrip(" \t")
-        if t.startswith("//"):
+        if not in_block and t.startswith("//"):
             out.append(" " * len(line))
             continue
-        if t.startswith("/*") or t.startswith("*"):
-            # only the leading block comment is blanked, the code after its */ still counts
-            end = line.find("*/", len(line) - len(t) + (2 if t.startswith("/*") else 0))
+        if in_block or t.startswith("/*"):
+            # only a block comment opened at a line start is blanked, a line led by * outside one is code
+            end = line.find("*/", len(line) - len(t) + (0 if in_block else 2))
             if end == -1:
+                in_block = True
                 out.append(" " * len(line))
             else:
+                in_block = False
                 out.append(" " * (end + 2) + line[end + 2:])
             continue
         out.append(line)

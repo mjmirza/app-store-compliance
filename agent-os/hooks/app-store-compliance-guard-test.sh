@@ -2968,6 +2968,24 @@ printf '<widget id="com.acme.native"/>\n' > "$D/Native/config.xml"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r15-2 a framework marker in a split native app still counts for the root" || bad "r15-2 a framework marker in a split native app still counts for the root (rc=$RC)"
 rm -rf "$D"
+# R16 Codex round 15
+# R16-1 a wrapped Apple submit never borrows an Android flag from an echo beside it
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf '{"name":"r","scripts":{"ship":"%s deliver"}}' "$FL" > "$D/package.json"
+for c in "npm run ship; echo --platform android" "npm run ship && echo build apk"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r16-1 a wrapped Apple submit keeps the Apple checks. $c" || bad "r16-1 a wrapped Apple submit keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R16-2 a wrapped submit that names Android itself stays Android only
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+BR="bundle""Release"
+printf '{"name":"r","scripts":{"ship":"./gradlew %s"}}' "$BR" > "$D/package.json"
+rr_hook "npm run ship -- --platform android" "$D"
+rr_has 'Command targets Android only' && ok "r16-2 a wrapped submit naming Android itself stays Android only" || bad "r16-2 a wrapped submit naming Android itself stays Android only (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

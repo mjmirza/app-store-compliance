@@ -400,15 +400,16 @@ SEGS
         if (c == ";" || c == "&" || c == "|" || c == "(" || c == ")") { print k sep b; k=""; b=""; i++; continue }
         k=k c; b=b c; i++ }
       print k sep b }')"
-    NQ_SUB=0; NQ_AND=1
+    NQ_SUB=0; NQ_AND=1; NQ_WRAP=0; NQ_WRAP_AND=1
     while IFS="$NQ_SEP" read -r NQK NQB; do
       NQW="$(printf '%s' "$NQK" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
       [ -n "$NQW" ] || continue
       if submits "$NQK"; then
         NQ_SUB=$((NQ_SUB+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
-      else
-        printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE" || NQ_AND=0
+      elif ! printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE"; then
+        NQ_AND=0; NQ_WRAP=$((NQ_WRAP+1))
+        printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_WRAP_AND=0
       fi
     done <<NQSEGS
 $CMD_PAIRS
@@ -416,7 +417,8 @@ NQSEGS
     if [ "$SEG_SUBMITS" -gt 0 ]; then
       [ "$NQ_SUB" -gt 0 ] && [ "$NQ_AND" -eq 1 ] || CMD_TARGET_ANDROID_ONLY=0
     else
-      printf '%s\n' "$CMD_PAIRS" | awk -F "$NQ_SEP" '{ print $2 }' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
+      # A wrapped submit is Android only when every command that is not harmless names Android itself, never an echo beside it.
+      [ "$NQ_WRAP" -gt 0 ] && [ "$NQ_WRAP_AND" -eq 1 ] || CMD_TARGET_ANDROID_ONLY=0
     fi
   fi
 fi

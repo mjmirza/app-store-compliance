@@ -365,6 +365,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
         links = re.findall(
             r"https?://[^\s)\"']+|(?:www\.)?apple\.com/legal/[^\s)\"']+",
             fields.get("description", ""),
+            re.IGNORECASE,
         )
         # Apple reads the link in the description itself, so promotional text or a terms_url field never replaces it.
         has_terms = any(is_terms_url(u) for u in links) and ("terms" in desc or "eula" in desc)

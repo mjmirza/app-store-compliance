@@ -977,6 +977,12 @@ printf '%s\n' 'import SwiftUI' '/* comment */ let r = /"/; let image = Image("he
 OUT=$($AUDIT "$R10_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image between two block comments is still reported"; else bad "an Image between two block comments was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R10_DIR" 2>/dev/null || true
+# A Swift continuation line led by * (multiplication) is code, never a comment line
+R16_DIR="$(mktemp -d)"; mkdir -p "$R16_DIR/app"
+printf '%s\n' 'import SwiftUI' 'func score(_ p: Regex<Substring>) -> Double { 0.25 }' 'struct Demo: View {' '    var body: some View {' '        Color.red.opacity(2' '            * score(/"/)).overlay(Image("hero"))' '    }' '}' > "$R16_DIR/app/V.swift"
+OUT=$($AUDIT "$R16_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image on a line led by * is still reported"; else bad "an Image on a line led by * was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R16_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

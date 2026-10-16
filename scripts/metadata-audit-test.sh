@@ -179,5 +179,13 @@ printf 'journal' > "$DF/en-US/keywords.txt"
 OUT="$($AUDIT "$DF" 2>&1)"
 echo "$OUT" | grep -q 'KEYWORD-FORMAT' && ! echo "$OUT" | grep -q 'MISSING-PRIVACY' && ok "a locale inherits the default folder" || bad "a locale inherits the default folder"
 rm -rf "$DF"
+# A URL scheme is case-insensitive, so an upper case HTTPS terms link counts
+UC="$(mktemp -d)"; mkdir -p "$UC/en-US"
+printf 'Journal' > "$UC/en-US/name.txt"
+printf 'https://j.test/privacy' > "$UC/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$UC/en-US/support_url.txt"
+printf 'Monthly subscription. Terms of Use. HTTPS://journal.test/terms' > "$UC/en-US/description.txt"
+OUT="$($AUDIT "$UC" 2>&1)"
+! echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "an upper case HTTPS terms link counts" || bad "an upper case HTTPS terms link counts"
+rm -rf "$UC"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
