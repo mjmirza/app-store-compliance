@@ -180,6 +180,26 @@ run --tool qwen doctor >/dev/null; RC=$?
 run --tool qwen >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
   && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# Copilot rejects a hooks file whose version is not 1, and runs a handler only for the tools its matcher names
+fresh; mkdir -p "$(dirname "$(cfg copilot)")"; printf '{"version":0}\n' > "$(cfg copilot)"
+run --tool copilot >/dev/null
+python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("version") == 1 else 1)' "$(cfg copilot)" \
+  && ok "copilot install repairs a bad version" || bad "copilot install repairs a bad version"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["version"]=0; json.dump(d, open(p,"w"))' "$(cfg copilot)"
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "copilot doctor fails on a bad version" || bad "copilot doctor fails on a bad version (rc=$RC)"
+fresh; run --tool copilot >/dev/null
+python3 -c 'import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+for ev in d.get("hooks", {}).values():
+    for h in ev:
+        if "guard" in json.dumps(h): h["matcher"] = "^view$"
+json.dump(d, open(p,"w"))' "$(cfg copilot)"
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "copilot doctor fails on a handler whose matcher skips the shell" || bad "copilot doctor fails on a handler whose matcher skips the shell (rc=$RC)"
+run --tool copilot >/dev/null
+run --tool copilot doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "copilot install repairs a handler whose matcher skips the shell" || bad "copilot install repairs a handler whose matcher skips the shell (rc=$RC)"
 # Kimi refuses a timeout over 600 and any key beyond event, matcher, command and timeout
 for broken in 's/^timeout = 120$/timeout = 601/' 's/^timeout = 120$/timeout = 120\nasync = true/'; do
   fresh; run --tool kimi >/dev/null

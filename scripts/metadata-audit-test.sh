@@ -221,5 +221,18 @@ printf 'https://j.test/privacy' > "$DF2/en-US/privacy_url.txt"; printf 'https://
 OUT="$($AUDIT "$DF2" 2>&1)"
 ! echo "$OUT" | grep -q 'MISSING-PRIVACY' && ! echo "$OUT" | grep -q 'MISSING-SUPPORT' && ok "default/ is not audited as a listing beside real locales" || bad "default/ is not audited as a listing beside real locales"
 rm -rf "$DF2"
+# fastlane's default folder wins over a file further up, and the global review notes win over a locale's
+DP="$(mktemp -d)"; mkdir -p "$DP/default" "$DP/en-US"
+printf 'Journal' > "$DP/name.txt"; printf 'https://j.test/privacy' > "$DP/privacy_url.txt"; printf 'https://j.test/help' > "$DP/support_url.txt"
+printf 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' > "$DP/default/name.txt"; printf 'writing' > "$DP/en-US/keywords.txt"
+OUT="$($AUDIT "$DP" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && ok "the default folder's overlong name is audited over a root name" || bad "the default folder's overlong name is audited over a root name"
+rm -rf "$DP"
+GN="$(mktemp -d)"; mkdir -p "$GN/review_information" "$GN/en-US"
+printf 'TODO add a working review account.' > "$GN/review_information/notes.txt"; printf 'Sign in.' > "$GN/en-US/review_notes.txt"
+printf 'Journal' > "$GN/en-US/name.txt"; printf 'https://j.test/privacy' > "$GN/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$GN/en-US/support_url.txt"
+OUT="$($AUDIT "$GN" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "the global review notes are audited over a locale's notes" || bad "the global review notes are audited over a locale's notes"
+rm -rf "$GN"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

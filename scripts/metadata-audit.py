@@ -547,19 +547,20 @@ def load_locales(d, platform=None):
         if has_children and not (set(own) - set(URL_FIELDS) - {"contact_email"}):
             continue
         merged, inherited = {}, []
-        # fastlane fills a locale from a sibling default folder first, then the parent folders, then the locale itself
+        for a in sorted((o for o in rels if _is_below(rel, o)), key=len):
+            near = []
+            got = _fields_from(groups[a], aliases, near)
+            inherited = [c for c in inherited if c[0] not in got] + near
+            merged.update(got)
+        # fastlane fills a locale from its default folder, which wins over a file further up, and both values are audited
         sib = os.path.join(os.path.dirname(rel), "default") if rel != "." else None
         if sib and sib.startswith("." + os.sep):
             sib = sib[2:]
         if sib and sib != rel and sib in groups and os.path.basename(rel) != "default":
             near = []
             got = _fields_from(groups[sib], aliases, near)
-            inherited = near
-            merged.update(got)
-        for a in sorted((o for o in rels if _is_below(rel, o)), key=len):
-            near = []
-            got = _fields_from(groups[a], aliases, near)
-            inherited = [c for c in inherited if c[0] not in got] + near
+            up = [(k, "default", "parent folder", merged[k]) for k, v in got.items() if k in merged and merged[k] != v]
+            inherited = [c for c in inherited if c[0] not in got] + near + up
             merged.update(got)
         merged.update(own)
         clash += [c for c in inherited if c[0] not in own]
@@ -573,7 +574,8 @@ def load_locales(d, platform=None):
             units.append((os.path.join(parent, "review_information") if parent else "review_information", platform or "apple", fields, []))
         else:
             label, plat, merged, clash = units[home]
-            units[home] = (label, plat, {**fields, **merged}, clash)
+            extra = [(k, "review_information", "locale", merged[k]) for k, v in fields.items() if k in merged and merged[k] != v]
+            units[home] = (label, plat, {**merged, **fields}, sorted(set(list(clash) + extra)))
     return units
 
 

@@ -3074,6 +3074,28 @@ printf '%s\n' 'signIn(); const s = "quote: \" // string"; function deleteAccount
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r22-1 an escaped quote never hides a deletion after it" || bad "r22-1 an escaped quote never hides a deletion after it (rc=$RC)"
 rm -rf "$D"
+# R23 Codex round 21
+# R23-1 the pooled pass keeps a critical finding that shares its id with a high one already listed
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/android/app/src/main" "$D/androidRelease/src/main"
+printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/ios/Info.plist"
+printf 'import Photos\nlet lib = PHPhotoLibrary.shared()\n' > "$D/Photo.swift"
+printf "include ':app'\n" > "$D/android/settings.gradle"
+printf "plugins { id 'com.android.application' }\n" > "$D/android/app/build.gradle"
+printf '<manifest package="a.b"/>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf "plugins { id 'com.android.application' }\n" > "$D/androidRelease/build.gradle"
+printf '<manifest package="a.c"/>' > "$D/androidRelease/src/main/AndroidManifest.xml"
+printf 'import AVFoundation\nlet dev = AVCaptureDevice.default(for: .video)\n' > "$D/androidRelease/Camera.swift"
+rr_hook "xcodebuild -project ios/Main.xcodeproj archive" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r23-1 the pooled pass keeps a critical finding beside a high one with the same id" || bad "r23-1 the pooled pass keeps a critical finding beside a high one with the same id (rc=$RC)"
+rm -rf "$D"
+# R23-2 a quote inside a JS regex literal never hides a deletion after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const r = /"/; const s = " // "; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r23-2 a quote in a regex literal never hides a deletion" || bad "r23-2 a quote in a regex literal never hides a deletion (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

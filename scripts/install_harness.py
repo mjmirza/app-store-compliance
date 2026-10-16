@@ -366,6 +366,9 @@ def dispatches(tool, style, group, h):
         return False
     if h.get("async") not in (None, False):
         return False
+    shell_tools = {"copilot": ("bash", "powershell"), "vscode": ("runInTerminal", "run_in_terminal")}.get(style)
+    if shell_tools and "matcher" in h and not all(matcher_hits(h.get("matcher"), t) for t in shell_tools):
+        return False
     if tool == "windsurf":
         return True
     if tool == "auggie" and not (
@@ -592,6 +595,8 @@ def register(tool, lay, guard, dry):
         return False
     if tool in ("cursor", "copilot", "copilot-repo"):
         data.setdefault("version", 1)
+    if tool in ("copilot", "copilot-repo") and data.get("version") != 1:
+        data["version"] = 1
     if tool == "gemini" and not isinstance(data.setdefault("tools", {}), dict):
         fail(
             shown(lay["config"])
@@ -1131,6 +1136,8 @@ def check_hooks(tool, lay, guard, app, repo_dir):
             prove_ps(found[0]["powershell"], tool, app, repo_dir or "/")
     if found_any:
         ok("hook registered in " + shown(lay["config"]))
+    if tool in ("copilot", "copilot-repo") and data.get("version") != 1:
+        fail("version is not 1 in " + shown(lay["config"]) + ", so Copilot rejects the whole hooks file")
     if tool in ("qwen", "copilot", "copilot-repo") and data.get("disableAllHooks") is True:
         fail("disableAllHooks is true in " + shown(lay["config"]) + ", so the tool runs no hook, the guard included")
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:
