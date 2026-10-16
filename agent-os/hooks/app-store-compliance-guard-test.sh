@@ -3067,6 +3067,13 @@ printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "
 rr_hook "pnpm --filter '!@acme/docs' run ship" "$D"
 [ "$RC" -eq 2 ] && ok "r21-1 an exclusion-only pnpm filter still finds the submitting package" || bad "r21-1 an exclusion-only pnpm filter still finds the submitting package (rc=$RC)"
 rm -rf "$D"
+# R22 Codex round 20
+# R22-1 an escaped quote inside a string never hides a deletion written after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const s = "quote: \" // string"; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r22-1 an escaped quote never hides a deletion after it" || bad "r22-1 an escaped quote never hides a deletion after it (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

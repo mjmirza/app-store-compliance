@@ -506,8 +506,11 @@ def kimi_live(h):
     """True when Kimi would run this handler before a shell command and give it time to finish."""
     if not h or h.get("event") != "PreToolUse" or not isinstance(h.get("command"), str):
         return False
+    # Kimi accepts only these four keys and an integer timeout up to 600, and refuses the whole config otherwise
+    if set(h) - {"event", "matcher", "command", "timeout"}:
+        return False
     t = h.get("timeout")
-    ok_time = isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 120
+    ok_time = isinstance(t, int) and not isinstance(t, bool) and 120 <= t <= 600
     return ok_time and matcher_hits(h.get("matcher"), "Bash")
 
 
@@ -1128,6 +1131,8 @@ def check_hooks(tool, lay, guard, app, repo_dir):
             prove_ps(found[0]["powershell"], tool, app, repo_dir or "/")
     if found_any:
         ok("hook registered in " + shown(lay["config"]))
+    if tool in ("qwen", "copilot", "copilot-repo") and data.get("disableAllHooks") is True:
+        fail("disableAllHooks is true in " + shown(lay["config"]) + ", so the tool runs no hook, the guard included")
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:
         fail(
             "tools.enableHooks is not true in "

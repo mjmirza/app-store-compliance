@@ -180,6 +180,23 @@ run --tool qwen doctor >/dev/null; RC=$?
 run --tool qwen >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
   && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# Kimi refuses a timeout over 600 and any key beyond event, matcher, command and timeout
+for broken in 's/^timeout = 120$/timeout = 601/' 's/^timeout = 120$/timeout = 120\nasync = true/'; do
+  fresh; run --tool kimi >/dev/null
+  python3 -c 'import re,sys; p=sys.argv[1]; s=open(p).read(); a,b=sys.argv[2][2:-1].split("/"); open(p,"w").write(re.sub(a, b.replace(chr(92)+"n", chr(10)), s, flags=re.M))' "$(cfg kimi)" "$broken"
+  run --tool kimi doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "kimi doctor fails on a hook Kimi refuses. $broken" || bad "kimi doctor fails on a hook Kimi refuses. $broken (rc=$RC)"
+  run --tool kimi >/dev/null
+  python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); hs=[h for h in d.get("hooks",[]) if "guard.sh" in h.get("command","")]; sys.exit(0 if hs and all(set(h) <= {"event","matcher","command","timeout"} and h["timeout"] == 120 for h in hs) else 1)' "$(cfg kimi)" \
+    && ok "kimi install repairs the hook. $broken" || bad "kimi install repairs the hook. $broken"
+done
+# Qwen and Copilot run no hook at all when disableAllHooks is true, so doctor must say so
+for t in qwen copilot; do
+  fresh; run --tool $t >/dev/null
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["disableAllHooks"]=True; json.dump(d, open(p,"w"))' "$(cfg $t)"
+  run --tool $t doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "$t doctor fails when disableAllHooks is true" || bad "$t doctor fails when disableAllHooks is true (rc=$RC)"
+done
 # Qwen needs the type on every handler, and reads a timeout of 1000 or more as milliseconds
 for broken in 'h.pop("type", None)' 'h.__setitem__("timeout", 1000)'; do
   fresh; run --tool qwen >/dev/null

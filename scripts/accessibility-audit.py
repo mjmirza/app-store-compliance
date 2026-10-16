@@ -193,7 +193,11 @@ def swift_code_lines(content):
             # a comment line is blanked before its quotes are counted, so a quote in a comment never opens a string
             out.append(" " * len(line))
             continue
-        quotes = re.sub(chr(92) * 2 + '#*"', "", line).count('"""')
+        code = re.sub(chr(92) * 2 + '#*"', "", line)
+        cut = code.find("//")
+        if cut != -1 and code[:cut].count('"') % 2 == 0:
+            code = code[:cut]  # quotes after an inline // comment never open a string
+        quotes = code.count('"""')
         if not in_block and (in_text or quotes % 2):
             # a multiline string line is kept as is, so a /* or // inside one never blanks the code after it
             if quotes % 2:
@@ -202,6 +206,11 @@ def swift_code_lines(content):
             continue
         if not in_block and t.startswith("//"):
             out.append(" " * len(line))
+            continue
+        if in_block and not (t.startswith("*") or "*/" in line):
+            # a block comment goes on only through lines that look like comment lines, any other line is code
+            in_block = False
+            out.append(line)
             continue
         if in_block or t.startswith("/*"):
             # only a block comment opened at a line start is blanked, a line led by * outside one is code

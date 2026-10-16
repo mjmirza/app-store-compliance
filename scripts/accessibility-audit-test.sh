@@ -1007,6 +1007,12 @@ printf '%s\n' 'import SwiftUI' '// """' 'let example = """' '/*' '"""' 'let rege
 OUT=$($AUDIT "$R21_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a comment holding a triple quote is still reported"; else bad "an Image after a comment holding a triple quote was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R21_DIR" 2>/dev/null || true
+# A triple quote after an inline // comment never opens a string
+R22_DIR="$(mktemp -d)"; mkdir -p "$R22_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let n = 1 // """' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R22_DIR/app/V.swift"
+OUT=$($AUDIT "$R22_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after an inline comment holding a triple quote is still reported"; else bad "an Image after an inline comment holding a triple quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R22_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
