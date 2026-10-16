@@ -510,6 +510,9 @@ def _is_below(child, parent):
     return child != parent and (parent == "." or child.startswith(parent + os.sep))
 
 
+NON_LOCALE_DIRS = {"review_information", "trade_representative_contact_information"}
+
+
 def load_locales(d, platform=None):
     """One audit unit per locale folder, each audited on its own.
     Files in a parent folder fill gaps in every locale below it.
@@ -518,6 +521,9 @@ def load_locales(d, platform=None):
     rels = sorted(groups)
     units = []
     for rel in rels:
+        # fastlane keeps app review and trade contact details in these folders, they are not store listings
+        if os.path.basename(rel) in NON_LOCALE_DIRS:
+            continue
         plat = platform or group_platform(rel, d)
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
         clash = []

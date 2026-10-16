@@ -2986,6 +2986,28 @@ printf '{"name":"r","scripts":{"ship":"./gradlew %s"}}' "$BR" > "$D/package.json
 rr_hook "npm run ship -- --platform android" "$D"
 rr_has 'Command targets Android only' && ok "r16-2 a wrapped submit naming Android itself stays Android only" || bad "r16-2 a wrapped submit naming Android itself stays Android only (rc=$RC)"
 rm -rf "$D"
+# R17 Codex round 16
+# R17-1 a submit quoted inside bash -c never takes an Android word from the outer arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+rr_hook "bash -c '$FL beta' --platform android" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r17-1 a submit inside bash -c keeps the Apple checks beside outer Android arguments" || bad "r17-1 a submit inside bash -c keeps the Apple checks beside outer Android arguments (rc=$RC)"
+rm -rf "$D"
+# R17-2 evidence split between the root and a split native app still counts, scanned as one as in 1.0.0
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/Shared" "$D/Native/Native.xcodeproj"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'let title = "Monthly subscription"\n' > "$D/Shared/Pricing.swift"
+printf 'let cancel = "Call us to cancel"\n' > "$D/Native/Cancel.swift"
+rr_run "$D"
+rr_has 'BOTH-SUBSCRIPTION-HARD-CANCEL' && ok "r17-2 evidence split across a split native app still counts" || bad "r17-2 evidence split across a split native app still counts (rc=$RC)"
+[ "$(printf '%s' "$OUT" | grep -c 'BOTH-SUBSCRIPTION-HARD-CANCEL')" -le 1 ] && ok "r17-2b the pooled pass never lists a finding twice" || bad "r17-2b the pooled pass never lists a finding twice"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

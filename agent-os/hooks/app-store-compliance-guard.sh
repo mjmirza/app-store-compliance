@@ -407,6 +407,8 @@ SEGS
       if submits "$NQK"; then
         NQ_SUB=$((NQ_SUB+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
+        # the outer arguments of bash -c, sh -c or eval never reach the quoted command, so they name no target
+        printf '%s' "$NQW" | grep -qE '^(bash|sh|zsh|dash|ksh|fish|eval|command|exec)$' && NQ_AND=0
       elif ! printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE"; then
         NQ_AND=0; NQ_WRAP=$((NQ_WRAP+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_WRAP_AND=0
@@ -572,9 +574,11 @@ hit_file() {
 }
 
 # Findings are held and printed by flush_findings, critical first (issue #842).
-F_CRIT=(); F_HIGH=(); F_MED=()
+F_CRIT=(); F_HIGH=(); F_MED=(); FOUND_IDS=""; POOL_PASS=0
 finding() {  # severity id title fix [src|manifest regex]. The optional pair names the file that triggered it.
   local t w=""
+  case "$FOUND_IDS" in *"|$2|"*) [ "$POOL_PASS" -eq 1 ] && return 0 ;; esac
+  FOUND_IDS="$FOUND_IDS|$2|"
   [ -n "${5:-}" ] && w="$(hit_file "$5" "${6:-}")"
   case "$1" in
     critical) CRIT=$((CRIT+1)); t="  [CRITICAL] $2  $3" ;;
@@ -1400,6 +1404,7 @@ if [ -n "$ROOTS" ]; then
     done <<EOF3
 $ROOTS
 EOF3
+    POOL_PRUNE=(${NESTED_PRUNE[@]+"${NESTED_PRUNE[@]}"})
     if [ -n "$SPLIT_NATIVE" ]; then
       SAVE_DIR="$DIR"; SAVE_IOS="${IS_IOS:-0}"; SAVE_AND="${IS_AND:-0}"; DIR="$PROJECT_ROOT"; detect_frameworks; DIR="$SAVE_DIR"; IS_IOS="$SAVE_IOS"; IS_AND="$SAVE_AND"
       [ "$IS_FLUTTER" -eq 1 ] && POOL_FW="$POOL_FW flutter"; [ "$IS_RN" -eq 1 ] && POOL_FW="$POOL_FW rn"
@@ -1435,6 +1440,17 @@ EOF2
   done <<EOF
 $ROOTS
 EOF
+  # A split native app and the root it left are also scanned as one, as in 1.0.0, so evidence that spans
+  # both (a shared source file and the split app) still counts. Only findings not listed above are added.
+  if [ -n "$SPLIT_NATIVE" ]; then
+    NESTED_PRUNE=(${POOL_PRUNE[@]+"${POOL_PRUNE[@]}"}); INHERIT_FW=""; DIR="$PROJECT_ROOT"; POOL_PASS=1
+    scan_tree >/dev/null
+    POOL_PASS=0
+    if [ "$(( ${#F_CRIT[@]} + ${#F_HIGH[@]} + ${#F_MED[@]} ))" -gt 0 ]; then
+      echo "App. $PROJECT_ROOT with its split native apps, scanned as one as in 1.0.0"
+      flush_findings
+    fi
+  fi
 else
   scan_tree
   flush_findings

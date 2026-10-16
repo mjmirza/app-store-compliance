@@ -187,5 +187,13 @@ printf 'Monthly subscription. Terms of Use. HTTPS://journal.test/terms' > "$UC/e
 OUT="$($AUDIT "$UC" 2>&1)"
 ! echo "$OUT" | grep -q 'MISLEADING-PRICING' && ok "an upper case HTTPS terms link counts" || bad "an upper case HTTPS terms link counts"
 rm -rf "$UC"
+# fastlane review_information holds app review notes, it is not a locale needing its own URLs
+RV="$(mktemp -d)"; mkdir -p "$RV/en-US" "$RV/review_information"
+printf 'Journal' > "$RV/en-US/name.txt"
+printf 'https://j.test/privacy' > "$RV/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$RV/en-US/support_url.txt"
+printf 'Use demo account to sign in.' > "$RV/review_information/notes.txt"
+OUT="$($AUDIT "$RV" 2>&1)"
+! echo "$OUT" | grep -q 'review_information' && ok "review_information is not audited as a locale" || bad "review_information is not audited as a locale"
+rm -rf "$RV"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

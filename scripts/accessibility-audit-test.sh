@@ -983,6 +983,12 @@ printf '%s\n' 'import SwiftUI' 'func score(_ p: Regex<Substring>) -> Double { 0.
 OUT=$($AUDIT "$R16_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image on a line led by * is still reported"; else bad "an Image on a line led by * was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R16_DIR" 2>/dev/null || true
+# A /* inside a Swift multiline string never blanks the code after the string
+R17_DIR="$(mktemp -d)"; mkdir -p "$R17_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R17_DIR/app/V.swift"
+OUT=$($AUDIT "$R17_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a multiline string holding /* is still reported"; else bad "an Image after a multiline string holding /* was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R17_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

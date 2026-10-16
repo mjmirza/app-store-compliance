@@ -186,8 +186,15 @@ def swift_code_lines(content):
     Offsets and newlines are kept."""
     out = []
     in_block = False
+    in_text = False
     for line in content.split("\n"):
         t = line.lstrip(" \t")
+        if not in_block and (in_text or line.count('"""') % 2):
+            # a multiline string line is kept as is, so a /* or // inside one never blanks the code after it
+            if line.count('"""') % 2:
+                in_text = not in_text
+            out.append(line)
+            continue
         if not in_block and t.startswith("//"):
             out.append(" " * len(line))
             continue
