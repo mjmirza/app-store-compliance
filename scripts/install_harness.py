@@ -361,6 +361,9 @@ def dispatches(tool, style, group, h):
         return False
     if style in ("nested", "copilot", "vscode") and h.get("type", "command") != "command":
         return False
+    # Qwen requires the type, and reads a command timeout of 1000 or more as milliseconds
+    if tool == "qwen" and h.get("type") != "command":
+        return False
     if h.get("async") not in (None, False):
         return False
     if tool == "windsurf":
@@ -377,7 +380,11 @@ def dispatches(tool, style, group, h):
         style
     ) or ("timeout", 120)
     t = h.get(key)
-    return isinstance(t, (int, float)) and not isinstance(t, bool) and t >= want
+    if not isinstance(t, (int, float)) or isinstance(t, bool):
+        return False
+    if tool == "qwen" and t >= 1000:
+        t = t / 1000
+    return t >= want
 
 
 def live_in(tool, style, groups, cmd, guard):

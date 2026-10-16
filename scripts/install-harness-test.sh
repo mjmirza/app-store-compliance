@@ -180,6 +180,16 @@ run --tool qwen doctor >/dev/null; RC=$?
 run --tool qwen >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
   && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# Qwen needs the type on every handler, and reads a timeout of 1000 or more as milliseconds
+for broken in 'h.pop("type", None)' 'h.__setitem__("timeout", 1000)'; do
+  fresh; run --tool qwen >/dev/null
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [exec(sys.argv[2], {"h": h}) for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]]; json.dump(d, open(p,"w"))' "$(cfg qwen)" "$broken"
+  run --tool qwen doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "qwen doctor fails on a handler Qwen would not run in time. $broken" || bad "qwen doctor fails on a handler Qwen would not run in time. $broken (rc=$RC)"
+  run --tool qwen >/dev/null
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); hs=[h for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]]; sys.exit(0 if hs and all(h.get("type") == "command" and 120 <= h.get("timeout", 0) < 1000 for h in hs) else 1)' "$(cfg qwen)" \
+    && ok "qwen install repairs the handler. $broken" || bad "qwen install repairs the handler. $broken"
+done
 # 2d5 COPILOT_HOME moves Copilot's user hooks folder, so the hook goes where Copilot reads it
 fresh; mkdir -p "$H/cop"
 OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" COPILOT_HOME="$H/cop" bash "$INSTALL" --tool copilot 2>&1)"; RC=$?

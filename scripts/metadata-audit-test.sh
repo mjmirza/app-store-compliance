@@ -195,5 +195,13 @@ printf 'Use demo account to sign in.' > "$RV/review_information/notes.txt"
 OUT="$($AUDIT "$RV" 2>&1)"
 ! echo "$OUT" | grep -q 'review_information' && ok "review_information is not audited as a locale" || bad "review_information is not audited as a locale"
 rm -rf "$RV"
+# review notes are still audited for their content, once, with the first listing
+RN="$(mktemp -d)"; mkdir -p "$RN/en-US" "$RN/review_information"
+printf 'Journal' > "$RN/en-US/name.txt"
+printf 'https://j.test/privacy' > "$RN/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$RN/en-US/support_url.txt"
+printf 'TODO add a working review account.' > "$RN/review_information/notes.txt"
+OUT="$($AUDIT "$RN" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "a placeholder in the review notes is still found" || bad "a placeholder in the review notes is still found"
+rm -rf "$RN"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -293,7 +293,7 @@ SELS
       pick="$(printf '%s\n%s' "$DIR/package.json" "$pick" | awk 'NF && !seen[$0]++')"
       printf '%s\n' "$pick" | while IFS= read -r pj; do
         [ -f "$pj" ] || continue
-        tr -d '\n' < "$pj" 2>/dev/null | grep -oE "\"$esc\"[[:space:]]*:[[:space:]]*(\"([^\"\\\\]|\\\\.)*\"|\{[^}]*)"
+        tr -d '\n' < "$pj" 2>/dev/null | grep -oE "\"$esc\"[[:space:]]*:[[:space:]]*(\"([^\"\\\\]|\\\\.)*\"|\{([^{}]|\{([^{}]|\{[^{}]*\})*\})*)"
       done
     fi
     seg="$(printf '%s' "$1" | sed -nE 's/.*(^|[^A-Za-z0-9_.\/-])make[[:space:]]+([^;&|]*).*/\2/p' | head -1)"
@@ -408,7 +408,7 @@ SEGS
         NQ_SUB=$((NQ_SUB+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
         # the outer arguments of bash -c, sh -c or eval never reach the quoted command, so they name no target
-        printf '%s' "$NQW" | grep -qE '^(bash|sh|zsh|dash|ksh|fish|eval|command|exec)$' && NQ_AND=0
+        printf '%s' "$NQB" | grep -qE '(^|[[:space:]/])(bash|sh|zsh|dash|ksh|fish|eval)([[:space:]]|$)' && NQ_AND=0
       elif ! printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE"; then
         NQ_AND=0; NQ_WRAP=$((NQ_WRAP+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_WRAP_AND=0

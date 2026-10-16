@@ -3008,6 +3008,26 @@ rr_run "$D"
 rr_has 'BOTH-SUBSCRIPTION-HARD-CANCEL' && ok "r17-2 evidence split across a split native app still counts" || bad "r17-2 evidence split across a split native app still counts (rc=$RC)"
 [ "$(printf '%s' "$OUT" | grep -c 'BOTH-SUBSCRIPTION-HARD-CANCEL')" -le 1 ] && ok "r17-2b the pooled pass never lists a finding twice" || bad "r17-2b the pooled pass never lists a finding twice"
 rm -rf "$D"
+# R18 Codex round 17
+# R18-1 a submit quoted inside any shell, by path or behind env or sudo, never takes the outer Android arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "/bin/bash -c '$FL beta' --platform android" "env bash -c '$FL beta' --platform android" "sudo sh -c '$FL beta' --platform android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r18-1 a quoted submit keeps the Apple checks. $c" || bad "r18-1 a quoted submit keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R18-2 an Nx target whose options carry an env object still names its submit command
+D="$(mktemp -d)"; mkdir -p "$D/apps/x/App"
+printf '{"name":"root","private":true,"workspaces":["apps/*"]}\n' > "$D/package.json"
+printf '{"name":"x","targets":{"ship":{"executor":"nx:run-commands","options":{"env":{"NODE_ENV":"production"},"command":"%s deliver"}}}}\n' "$FL" > "$D/apps/x/project.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/x/App/Info.plist"; mkdir -p "$D/apps/x/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/x/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/x/App/A.swift"
+rr_hook "nx run x:ship" "$D"
+[ "$RC" -eq 2 ] && ok "r18-2 an Nx target with an env object is still a submit" || bad "r18-2 an Nx target with an env object is still a submit (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
