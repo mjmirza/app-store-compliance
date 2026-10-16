@@ -2748,6 +2748,45 @@ for c in "nx ship mobile" "nx affected --target=ship" "bun run --filter @acme/mo
   [ "$RC" -eq 2 ] && ok "r8-5 scanned. $c" || bad "r8-5 scanned. $c (rc=$RC)"
 done
 rm -rf "$D"
+# R9 Codex round 8
+# R9-1 a pointer write led by * and a line with code after a leading /* note */ are code
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'void f(void **out) {' '*out = (__bridge void *)[AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' '}' > "$D/App/P.m"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r9-1a a pointer write led by * is code" || bad "r9-1a a pointer write led by * is code (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' '/* note */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo]; NSString *s = @"*/";' > "$D/App/Q.m"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r9-1b code after a leading /* note */ counts" || bad "r9-1b code after a leading /* note */ counts (rc=$RC)"
+rm -rf "$D"
+# R9-2 a // inside a string never hides the deletion call after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' 'const s = " // x "; deleteAccount();' > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r9-2 a // inside a string keeps the deletion after it" || bad "r9-2 a // inside a string keeps the deletion after it (rc=$RC)"
+rm -rf "$D"
+# R9-3 a runner inside $( ) never masks the outer submit script
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/web"
+printf '{"name":"root","scripts":{"ship":"eas submit -p ios"}}' > "$D/package.json"
+printf '{"name":"web","scripts":{"args":"printf x"}}' > "$D/apps/web/package.json"
+rr_hook "npm run ship -- \"\$(yarn workspace web args)\"" "$D"
+[ "$RC" -eq 2 ] && ok "r9-3 a nested runner never masks the outer submit" || bad "r9-3 a nested runner never masks the outer submit (rc=$RC)"
+rm -rf "$D"
+# R9-4 a native host that imports Cordova under a Capacitor root is brownfield and keeps the Ionic checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0","cordova-plugin-x":"1.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '#import <Cordova/CDV.h>\nUIWebView *webView;\n' > "$D/Native/Host.m"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r9-4 a Cordova host keeps the Ionic checks" || bad "r9-4 a Cordova host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
 # R7-6 a purpose key in an XcodeGen include, an Nx project.json, a Tuist helper or a Cordova config.xml counts
 for f in targets/App.yml project.json Tuist/ProjectDescriptionHelpers/Info.swift config.xml; do
   D="$(mk_rr_ios '' 'import AVFoundation
