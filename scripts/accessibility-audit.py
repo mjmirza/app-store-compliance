@@ -189,7 +189,7 @@ def swift_code_lines(content):
     in_text = False
     for line in content.split("\n"):
         t = line.lstrip(" \t")
-        quotes = line.replace(chr(92) + '"', "").count('"""')
+        quotes = re.sub(chr(92) * 2 + '#*"', "", line).count('"""')
         if not in_block and (in_text or quotes % 2):
             # a multiline string line is kept as is, so a /* or // inside one never blanks the code after it
             if quotes % 2:

@@ -409,6 +409,8 @@ SEGS
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
         # the outer arguments of bash -c, sh -c or eval never reach the quoted command, so they name no target
         printf '%s' "$NQB" | grep -qE '(^|[[:space:]/])(bash|sh|zsh|dash|ksh|fish|eval)([[:space:]]|$)' && NQ_AND=0
+        # a submit seen only inside quotes runs in another program (python -c, ruby -e), which never passes it the outer arguments
+        submits "$NQB" || NQ_AND=0
       elif ! printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE"; then
         NQ_AND=0; NQ_WRAP=$((NQ_WRAP+1))
         printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_WRAP_AND=0
@@ -482,7 +484,8 @@ STRIP_AWK='BEGIN { sq=sprintf("%c", 39) }
     { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
       t=l; sub(/^[ \t]+/, "", t)
       if (substr(t, 1, 2) == "//") { print ""; next }
-      if (substr(t, 1, 2) == "*/" || t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
+      if (substr(t, 1, 2) == "*/") { print substr(t, 3); next }
+      if (t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
       if (substr(t, 1, 2) == "/*") { r=t; sub(/[ \t]+$/, "", r); j=index(substr(r, 3), "*/")
         if (j == 0 || j + 3 == length(r)) { print ""; next } }
       if (tc) {

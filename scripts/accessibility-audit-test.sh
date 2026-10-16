@@ -995,6 +995,12 @@ printf '%s\n' 'import SwiftUI' 'let example = """' '\"""' '/*' '"""' 'let regex 
 OUT=$($AUDIT "$R18_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a string holding an escaped triple quote is still reported"; else bad "an Image after a string holding an escaped triple quote was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R18_DIR" 2>/dev/null || true
+# A Swift raw multiline string with an escaped delimiter inside never closes early
+R20_DIR="$(mktemp -d)"; mkdir -p "$R20_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let example = #"""' '\#"""' '/*' '"""#' 'let regex = /"/; let image = Image("hero")' > "$R20_DIR/app/V.swift"
+OUT=$($AUDIT "$R20_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a raw multiline string is still reported"; else bad "an Image after a raw multiline string was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R20_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -3037,6 +3037,24 @@ let dev = AVCaptureDevice.default(for: .video)')"
   [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "r19 bash 3.2 reads an Android submit as Android only" || bad "r19 bash 3.2 reads an Android submit as Android only (rc=$RC)"
   rm -rf "$D"
 fi
+# R20 Codex round 18
+# R20-1 a submit inside python -c or ruby -e never takes the outer Android arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "python3 -c '__import__(\"os\").system(\"$FL beta\")' --platform android" "ruby -e 'system(\"$FL beta\")' --platform android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r20-1 a submit inside another program keeps the Apple checks. $c" || bad "r20-1 a submit inside another program keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R20-2 code after a closing block comment on the same line still counts
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+/* Account settings action.
+ */ func deleteAccount() { removeCurrentUserAndData() }')"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r20-2 a deletion after a closing block comment still counts" || bad "r20-2 a deletion after a closing block comment still counts (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -203,5 +203,15 @@ printf 'TODO add a working review account.' > "$RN/review_information/notes.txt"
 OUT="$($AUDIT "$RN" 2>&1)"
 echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "a placeholder in the review notes is still found" || bad "a placeholder in the review notes is still found"
 rm -rf "$RN"
+# each app's review notes are audited with that app, never overwritten by another app's notes
+TA="$(mktemp -d)"
+for a in app-a app-b; do mkdir -p "$TA/$a/metadata/en-US" "$TA/$a/metadata/review_information"
+  printf 'Journal' > "$TA/$a/metadata/en-US/name.txt"
+  printf 'https://j.test/privacy' > "$TA/$a/metadata/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$TA/$a/metadata/en-US/support_url.txt"; done
+printf 'TODO add a working review account.' > "$TA/app-a/metadata/review_information/notes.txt"
+printf 'Sign in with the supplied account.' > "$TA/app-b/metadata/review_information/notes.txt"
+OUT="$($AUDIT "$TA" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "one app's review notes never hide another app's placeholder" || bad "one app's review notes never hide another app's placeholder"
+rm -rf "$TA"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

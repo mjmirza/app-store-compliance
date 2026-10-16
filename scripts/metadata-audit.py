@@ -520,11 +520,12 @@ def load_locales(d, platform=None):
     groups = _read_group_files(d)
     rels = sorted(groups)
     units = []
+    unit_rels = []
     app_level = {}
     for rel in rels:
         # fastlane keeps app review and trade contact details in these folders, they are not store listings
         if os.path.basename(rel) in NON_LOCALE_DIRS:
-            app_level.update(_fields_from(groups[rel], ALIASES))
+            app_level.setdefault(os.path.dirname(rel), {}).update(_fields_from(groups[rel], ALIASES))
             continue
         plat = platform or group_platform(rel, d)
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
@@ -557,12 +558,15 @@ def load_locales(d, platform=None):
         clash += [c for c in inherited if c[0] not in own]
         label = rel if rel != "." else (os.path.basename(os.path.abspath(d)) or d)
         units.append((label, plat, merged, sorted(set(clash))))
-    # the review notes are app level, so they are audited once with the first listing, never as a listing of their own
-    if app_level and units:
-        label, plat, merged, clash = units[0]
-        units[0] = (label, plat, {**app_level, **merged}, clash)
-    elif app_level:
-        units.append(("review_information", platform or "apple", app_level, []))
+        unit_rels.append(rel)
+    # review notes belong to their own app, so each app's notes are audited once with that app's first listing
+    for parent, fields in sorted(app_level.items()):
+        home = next((i for i, r in enumerate(unit_rels) if parent in ("", ".") or r == parent or _is_below(r, parent)), None)
+        if home is None:
+            units.append((os.path.join(parent, "review_information") if parent else "review_information", platform or "apple", fields, []))
+        else:
+            label, plat, merged, clash = units[home]
+            units[home] = (label, plat, {**fields, **merged}, clash)
     return units
 
 
