@@ -366,6 +366,11 @@ def dispatches(tool, style, group, h):
         return False
     if h.get("async") not in (None, False):
         return False
+    if tool == "cursor" and (
+        h.get("type", "command") != "command"
+        or not all(matcher_hits(h.get("matcher"), c) for c in ("fastlane deliver", "eas submit --platform ios", "xcrun altool --upload-app"))
+    ):
+        return False
     shell_tools = {"copilot": ("bash", "powershell"), "vscode": ("runInTerminal", "run_in_terminal")}.get(style)
     if shell_tools and "matcher" in h and not all(matcher_hits(h.get("matcher"), t) for t in shell_tools):
         return False
@@ -595,6 +600,9 @@ def register(tool, lay, guard, dry):
         return False
     fixed = False
     if tool in ("cursor", "copilot", "copilot-repo") and "version" not in data:
+        data["version"] = 1
+        fixed = True
+    if tool == "cursor" and not (type(data.get("version")) is int and data.get("version") >= 1):
         data["version"] = 1
         fixed = True
     # Copilot rejects the whole hooks file unless version is the number 1, and true is not 1
@@ -1142,6 +1150,8 @@ def check_hooks(tool, lay, guard, app, repo_dir):
         ok("hook registered in " + shown(lay["config"]))
     if tool in ("copilot", "copilot-repo") and not (type(data.get("version")) is int and data.get("version") == 1):
         fail("version is not 1 in " + shown(lay["config"]) + ", so Copilot rejects the whole hooks file")
+    if tool == "cursor" and not (type(data.get("version")) is int and data.get("version") >= 1):
+        fail("version is not a positive whole number in " + shown(lay["config"]) + ", so Cursor rejects the hooks file")
     hc = data.get("hooksConfig")
     if tool == "gemini" and isinstance(hc, dict) and hc.get("enabled") is False:
         fail("hooksConfig.enabled is false in " + shown(lay["config"]) + ", so Gemini CLI runs no hook, the guard included")

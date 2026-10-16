@@ -180,6 +180,24 @@ run --tool qwen doctor >/dev/null; RC=$?
 run --tool qwen >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
   && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# Cursor runs a handler only when its type is command and its matcher takes the submit command, and needs a positive whole number version
+for broken in 'h.__setitem__("matcher", "^git status$")' 'h.__setitem__("type", "prompt")'; do
+  fresh; run --tool cursor >/dev/null
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [exec(sys.argv[2], {"h": h}) for ev in d["hooks"].values() for h in ev if "guard" in json.dumps(h)]; json.dump(d, open(p,"w"))' "$(cfg cursor)" "$broken"
+  run --tool cursor doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "cursor doctor fails on a handler that never runs the guard. $broken" || bad "cursor doctor fails on a handler that never runs the guard. $broken (rc=$RC)"
+  run --tool cursor >/dev/null; run --tool cursor doctor >/dev/null; RC=$?
+  [ "$RC" -eq 0 ] && ok "cursor install repairs the handler. $broken" || bad "cursor install repairs the handler. $broken (rc=$RC)"
+done
+for v in 0 true; do
+  fresh; run --tool cursor >/dev/null
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["version"]=json.loads(sys.argv[2]); json.dump(d, open(p,"w"))' "$(cfg cursor)" "$v"
+  run --tool cursor doctor >/dev/null; RC=$?
+  [ "$RC" -eq 1 ] && ok "cursor doctor fails on version $v" || bad "cursor doctor fails on version $v (rc=$RC)"
+  run --tool cursor >/dev/null
+  python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get("version"); sys.exit(0 if type(v) is int and v >= 1 else 1)' "$(cfg cursor)" \
+    && ok "cursor install repairs version $v" || bad "cursor install repairs version $v"
+done
 # Copilot needs version to be the number 1, true is not 1, and a version repair is written even when the handlers are fine
 fresh; mkdir -p "$(dirname "$(cfg copilot)")"; printf '{"version":true}\n' > "$(cfg copilot)"
 run --tool copilot >/dev/null

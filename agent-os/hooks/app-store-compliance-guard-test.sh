@@ -3103,6 +3103,22 @@ printf '%s\n' 'signIn(); const r = /" /; const s = " // "; function deleteAccoun
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r24-1 a regex literal with a space never hides a deletion" || bad "r24-1 a regex literal with a space never hides a deletion (rc=$RC)"
 rm -rf "$D"
+# R25 Codex round 23
+# R25-1 removing an inline comment never joins two words into deletion evidence
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'extern void sendSignup(void);' 'void createAccount(void) { sendSignup(); }' 'typedef int account;' 'account /* cache */deletion = 0;' > "$D/App/Account.m"
+rr_run "$D"
+rr_has 'NO-ACCOUNT-DELETION' && ok "r25-1 a removed comment never manufactures deletion evidence" || bad "r25-1 a removed comment never manufactures deletion evidence (rc=$RC)"
+rm -rf "$D"
+# R25-2 a regex literal after && or return never hides a deletion after it
+for js in 'signIn(); const r = true && /"/; const s = " // "; function deleteAccount() { return api.deleteUser(); }' \
+          'signIn(); function f() { return /"/; } const s = " // "; function deleteAccount() { return api.deleteUser(); }'; do
+  D="$(mk_rr_ios '' 'let ready = true')"
+  printf '%s\n' "$js" > "$D/App/account.js"
+  rr_run "$D"
+  ! rr_has 'NO-ACCOUNT-DELETION' && ok "r25-2 a regex literal after an operator never hides a deletion" || bad "r25-2 a regex literal after an operator never hides a deletion (rc=$RC)"
+  rm -rf "$D"
+done
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
