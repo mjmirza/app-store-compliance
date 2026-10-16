@@ -191,6 +191,18 @@ for body in '[hooks]\r\nx = 1\r\n' '"hooks" = []\n'; do
   [ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-k.toml" && ok "kimi refuses an existing hooks key and changes nothing ($body)" || bad "kimi refuses an existing hooks key and changes nothing ($body) (rc=$RC)"
 done
 
+# 2d7 an escaped hooks key is refused even where Python has no TOML parser
+NOTOML="$WORK/notoml"; mkdir -p "$NOTOML"; printf 'raise ImportError("no tomllib here")\n' > "$NOTOML/tomllib.py"
+fresh; mkdir -p "$H/.kimi-code"; printf '"ho\\u006fks" = []\n' > "$H/.kimi-code/config.toml"; cp "$H/.kimi-code/config.toml" "$WORK/kimi-esc.toml"
+PYTHONPATH="$NOTOML" run --tool kimi >/dev/null; RC=$?
+[ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-esc.toml" && ok "kimi refuses an escaped hooks key without a TOML parser" || bad "kimi refuses an escaped hooks key without a TOML parser (rc=$RC)"
+# 2d8 repairing our marked block never turns a valid file invalid
+fresh; mkdir -p "$H/.kimi-code"
+printf 'hooks = []\n# >>> app-store-compliance guard >>>\n# old disabled hook\n# <<< app-store-compliance guard <<<\n' > "$H/.kimi-code/config.toml"
+cp "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml"
+run --tool kimi >/dev/null; RC=$?
+[ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml" && ok "kimi refuses a block repair that would break the file" || bad "kimi refuses a block repair that would break the file (rc=$RC)"
+
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
 OUT="$(run --tool copilot-repo)"; RC=$?

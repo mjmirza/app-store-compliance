@@ -215,6 +215,9 @@ if action == "add":
             if not isinstance(t, (int, float)) or t < 120:
                 h["timeout"] = 120
                 changed = True
+            if h.get("async") not in (None, False):
+                h.pop("async", None)
+                changed = True
     else:
         pre.append(
             {"matcher": os.environ.get("ASC_MATCHER", "Bash"), "hooks": [{"type": "command", "command": cmd, "timeout": 120}]}
@@ -262,7 +265,7 @@ PY
       [ "$(jq -c --stream . "$cur" 2>/dev/null | wc -l)" -eq "$(jq -c tostream "$cur" 2>/dev/null | wc -l)" ] || return 4
     fi
     local present=1
-    [ -n "$cur" ] && jq -e --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]?.command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
+    [ -n "$cur" ] && jq -e --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and ((.async // false) == false)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     if [ "$action" = "add" ]; then
       [ "$present" -eq 0 ] && return 3
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
@@ -304,13 +307,14 @@ for e in d.get("hooks",{}).get("PreToolUse",[]):
         if not isinstance(h,dict) or h.get("type","command")!="command": continue
         t=h.get("timeout",600)
         if isinstance(t,bool) or not isinstance(t,(int,float)) or t<30: continue
+        if h.get("async") not in (None,False): continue
         c=str(h.get("command",""))
         if (c.strip()==hc or any(c.strip() in ("bash " + s, "bash \"" + s + "\"", "bash \u0027" + s + "\u0027") for s in n)) and "#" not in c and c.strip().startswith("bash "):
             print(c); sys.exit(0)' "$SETTINGS" "$HOOK_CMD" "$GUARD" "$SHOWN/hooks/$GUARD_NAME" 2>/dev/null
     return 0
   fi
   if have jq -n true; then
-    jq -r --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and (.type // "command") == "command" and (((.timeout // 600) | numbers) >= 30)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
+    jq -r --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and (.type // "command") == "command" and ((.async // false) == false) and (((.timeout // 600) | numbers) >= 30)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | first // empty' "$SETTINGS" 2>/dev/null
     return 0
   fi
   grep -qF "$SHOWN/hooks/$GUARD_NAME" "$SETTINGS" 2>/dev/null && printf '%s\n' "$HOOK_CMD"

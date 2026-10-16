@@ -244,6 +244,24 @@ if command -v jq >/dev/null 2>&1; then
   rm -rf "$SHIM"
 fi
 
+# an async guard runs in the background and cannot block, so doctor fails and install repairs it, with python3 and with jq only
+mkasync() { python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [h.__setitem__("async", True) for e in d["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.sh" in h["command"]]; json.dump(d, open(p,"w"))' "$C/settings.json"; }
+noasync() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for e in d["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.sh" in h["command"]) else 1)' "$C/settings.json"; }
+fresh; run >/dev/null; mkasync
+run doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "doctor fails on an async guard hook" || bad "doctor fails on an async guard hook (rc=$RC)"
+run >/dev/null; noasync && [ "$(hooks)" = "1" ] && ok "install repairs an async guard hook" || bad "install repairs an async guard hook"
+if command -v jq >/dev/null 2>&1; then
+  fresh; run >/dev/null; mkasync
+  JQS="$(mktemp -d)"
+  for b in bash cp rm mkdir chmod cat grep sed awk find xargs tr head tail mktemp printf wc sort uniq cut dirname basename date cmp mv ls env jq plutil xmllint; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$JQS/$b"; done
+  PATH="$JQS" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" doctor >/dev/null 2>&1; RC=$?
+  [ "$RC" -eq 1 ] && ok "jq-only doctor fails on an async guard hook" || bad "jq-only doctor fails on an async guard hook (rc=$RC)"
+  PATH="$JQS" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" >/dev/null 2>&1
+  noasync && [ "$(hooks)" = "1" ] && ok "jq-only install repairs an async guard hook" || bad "jq-only install repairs an async guard hook"
+  rm -rf "$JQS"
+fi
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

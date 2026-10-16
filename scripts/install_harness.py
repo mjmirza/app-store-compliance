@@ -638,6 +638,7 @@ def kimi_hooks_taken(text):
     return bool(
         re.search(r"^[ \t]*" + KIMI_KEY + r"[ \t]*[=.]", t, re.M)
         or re.search(r"^[ \t]*\[[ \t]*" + KIMI_KEY + r"[ \t]*[\].]", t, re.M)
+        or re.search(r'^[ \t]*\[?[ \t]*"[^"\n]*\\[uU]', t, re.M)
     )
 
 
@@ -678,7 +679,12 @@ def register_kimi(lay, cmd, dry):
             print("  would rewrite the guard block in " + shown(path) + ", with a backup")
             return True
         pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?"
-        write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S), newline="")
+        repaired = re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S)
+        if kimi_hooks_taken(re.sub(pattern, "", text, count=1, flags=re.S)) or not toml_still_valid(text, repaired):
+            fail(shown(path) + " defines hooks another way, so the guard block cannot be repaired. It was not changed.")
+            print(manual_block("kimi", lay, cmd))
+            return False
+        write_atomic(path, repaired, newline="")
         ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
     if kimi_hooks_taken(text):

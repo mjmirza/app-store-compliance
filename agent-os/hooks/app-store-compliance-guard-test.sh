@@ -2889,6 +2889,33 @@ let dev = AVCaptureDevice.default(for: .video)')"
 rr_hook "./gradlew bundleRelease" "$D"
 ! rr_has 'NSCameraUsageDescription' && ok "r12-1b a plain Android build still skips the Apple checks" || bad "r12-1b a plain Android build still skips the Apple checks (rc=$RC)"
 rm -rf "$D"
+# R13 Codex round 12
+# R13-1 a harmless echo, a comment or a second line naming Android never vouches for an iOS lane
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "$FL beta notes:\"test -p android\"; echo -p android" "$FL beta notes:\"test -p android\" # -p android" "$FL beta notes:\"x -p android\" && ./gradlew bundleRelease"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r13-1 the iOS lane keeps the Apple checks. $c" || bad "r13-1 the iOS lane keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R13-2 a host using React's surface view, or an Android React activity, stays in the root scan
+for host in 'import React
+let v = RCTSurfaceHostingProxyRootView(bridge: b, moduleName: "x")' 'class MainActivity : ReactActivity() {}'; do
+  D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/ios/App" "$D/Native/Host.xcodeproj"
+  printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+  printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+  printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Host.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+  printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+  printf '%s\n' "$host" > "$D/Native/Host.swift"
+  printf 'AsyncStorage.getItem("theme");\n' > "$D/Native/Feature.ts"
+  rr_run "$D"
+  rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*}" || bad "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -388,14 +388,27 @@ SEGS
   elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
     CMD_TARGET_ANDROID_ONLY=1
   fi
-  # An Android word inside a quoted argument is text, not a platform flag, so it never turns the Apple checks off.
+  # Quoted text and a # comment are not flags. With them blanked, every segment that still submits must name Android itself.
   if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ]; then
     CMD_NOQ="$(printf '%s' "$CMD" | awk -v sq="'" '{ o=""; n=length($0); i=1
       while (i <= n) { c=substr($0, i, 1)
+        if (c == "#" && (i == 1 || substr($0, i-1, 1) ~ /[ \t]/)) break
         if (c == sq || c == "\"") { j=i+1; while (j <= n && substr($0, j, 1) != c) { if (c == "\"" && substr($0, j, 1) == "\\") j++; j++ }; o=o " "; i=j+1; continue }
         o=o c; i++ }
       print o }')"
-    printf '%s' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
+    NQ_SUB=0; NQ_AND=1
+    while IFS= read -r NQS; do
+      [ -n "$NQS" ] && submits "$NQS" || continue
+      NQ_SUB=$((NQ_SUB+1))
+      printf '%s' "$NQS" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
+    done <<NQSEGS
+$(printf '%s\n' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n')
+NQSEGS
+    if [ "$SEG_SUBMITS" -gt 0 ]; then
+      [ "$NQ_SUB" -gt 0 ] && [ "$NQ_AND" -eq 1 ] || CMD_TARGET_ANDROID_ONLY=0
+    else
+      printf '%s' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
+    fi
   fi
 fi
 CMD_TARGET_IOS_ONLY=0
@@ -1238,7 +1251,7 @@ bare_native_apart() {  # $1 candidate dir below $DIR
     || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
       | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
   # A native host that embeds the root framework (brownfield) shares its dependencies, so it stays in the root scan.
-  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|RCTAppDelegate|RCTDefaultReactNativeFactoryDelegate|ReactNativeDelegate|ExpoAppDelegate|ExpoReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|import Cordova|CDVViewController|CDVPlugin|CDVAppDelegate|import Flutter' "$1" \
+  grep -rlsE 'RCTBridge|RCTRootView|RCTSurfaceHostingProxyRootView|RCTSurfaceHostingView|RCTReactNativeFactory|RCTAppDelegate|import React$|import React_|ReactActivity|ReactNativeHost|ReactApplication|ReactInstanceManager|DefaultReactNativeHost|RCTDefaultReactNativeFactoryDelegate|ReactNativeDelegate|ExpoAppDelegate|ExpoReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|import Cordova|CDVViewController|CDVPlugin|CDVAppDelegate|import Flutter' "$1" \
     --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' --include='Podfile' --include='*.pbxproj' \
     --exclude-dir=Pods --exclude-dir=node_modules --exclude-dir=build 2>/dev/null | grep . >/dev/null && return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.
