@@ -203,6 +203,17 @@ cp "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml"
 run --tool kimi >/dev/null; RC=$?
 [ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml" && ok "kimi refuses a block repair that would break the file" || bad "kimi refuses a block repair that would break the file (rc=$RC)"
 
+# 2d9 a Windows path in the Gemini audit command still gives valid TOML
+python3 -c '
+import sys, tomllib
+sys.path.insert(0, "scripts")
+import install_harness as h
+b = chr(92)
+h.shown = lambda p: "~" + b + ".gemini" + b + "hooks" + b + "app-store-compliance-guard.sh"
+t = tomllib.loads(h.command_text("gemini", "x"))
+sys.exit(0 if (b + ".gemini" + b) in t["prompt"] else 1)
+' 2>/dev/null && ok "gemini audit command stays valid TOML with a Windows path" || bad "gemini audit command stays valid TOML with a Windows path"
+
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
 OUT="$(run --tool copilot-repo)"; RC=$?

@@ -2916,6 +2916,33 @@ let v = RCTSurfaceHostingProxyRootView(bridge: b, moduleName: "x")' 'class MainA
   rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*}" || bad "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*} (rc=$RC)"
   rm -rf "$D"
 done
+# R14 Codex round 13
+# R14-1 a quoted lane name, a quoted variable or a quoted fastlane still counts as an iOS submit beside an Android one
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+EA="eas"" submit"
+for c in "$FL \"beta\" notes:\"test -p android\"; $EA -p android" "$FL \"\$LANE\" notes:x; $EA -p android" "\"$FL\" beta; $EA -p android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r14-1 the iOS submit keeps the Apple checks. $c" || bad "r14-1 the iOS submit keeps the Apple checks. $c (rc=$RC)"
+done
+rr_hook "$EA -p android && echo done" "$D"
+! rr_has 'NSCameraUsageDescription' && ok "r14-1b a plain Android submit with a harmless echo stays Android only" || bad "r14-1b a plain Android submit with a harmless echo stays Android only (rc=$RC)"
+rm -rf "$D"
+# R14-2 a native app split off a framework root keeps that root's framework checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/ios/App" "$D/Native/Legacy.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/Native/Legacy.swift"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r14-2 a split native app keeps the root framework checks" || bad "r14-2 a split native app keeps the root framework checks (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -187,8 +187,16 @@ def swift_code_lines(content):
     out = []
     for line in content.split("\n"):
         t = line.lstrip(" \t")
-        if t.startswith("//") or t.startswith("/*") or t.startswith("*"):
+        if t.startswith("//"):
             out.append(" " * len(line))
+            continue
+        if t.startswith("/*") or t.startswith("*"):
+            # a block comment that closes on this line hides only itself, the code after */ still counts
+            end = line.rfind("*/")
+            if end == -1:
+                out.append(" " * len(line))
+            else:
+                out.append(" " * (end + 2) + line[end + 2:])
             continue
         out.append(line)
     return "\n".join(out)

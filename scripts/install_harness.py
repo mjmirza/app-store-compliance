@@ -518,7 +518,7 @@ def command_text(tool, guard):
     head, _, body = md.partition("\n---\n")
     desc = head.split("description:", 1)[-1].strip()
     body = (
-        body.replace('"""', "'''")
+        body.replace('\\', '\\\\').replace('"""', "'''")
         + "\n\nThe target project is {{args}}. When it is empty, use the current folder.\n"
     )
     return "description = " + json.dumps(desc) + '\nprompt = """\n' + body + '"""\n'

@@ -965,6 +965,12 @@ OUT=$($AUDIT "$R8_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("logo")'; then ok "an Image after a Swift regex holding a quote is still reported"; else bad "an Image after a Swift regex holding a quote was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R8_DIR" 2>/dev/null || true
 
+# A closed block comment at the start of a line never hides the code after it
+R9_DIR="$(mktemp -d)"; mkdir -p "$R9_DIR/app"
+printf '%s\n' 'import SwiftUI' '/* comment */ let r = /"/; let image = Image("hero")' > "$R9_DIR/app/V.swift"
+OUT=$($AUDIT "$R9_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a closed block comment and a regex is still reported"; else bad "an Image after a closed block comment and a regex was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R9_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -262,6 +262,24 @@ if command -v jq >/dev/null 2>&1; then
   rm -rf "$JQS"
 fi
 
+# a jq-only install repairs an owned hook whose timeout is too short or whose type is not a command
+if command -v jq >/dev/null 2>&1; then
+  for fix in 'h["timeout"]=1' 'h["type"]="prompt"'; do
+    fresh; run >/dev/null
+    python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p))
+for e in d["hooks"]["PreToolUse"]:
+    for h in e["hooks"]:
+        if "guard.sh" in h["command"]: '"$fix"'
+json.dump(d, open(p,"w"))' "$C/settings.json"
+    JQS="$(mktemp -d)"
+    for b in bash cp rm mkdir chmod cat grep sed awk find xargs tr head tail mktemp printf wc sort uniq cut dirname basename date cmp mv ls env jq plutil xmllint; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$JQS/$b"; done
+    PATH="$JQS" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" >/dev/null 2>&1
+    python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); hs=[h for e in d["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.sh" in h["command"]]; sys.exit(0 if len(hs)==1 and hs[0].get("type","command")=="command" and hs[0].get("timeout",600)>=120 else 1)' "$C/settings.json" \
+      && ok "jq-only install repairs an owned hook ($fix)" || bad "jq-only install repairs an owned hook ($fix)"
+    rm -rf "$JQS"
+  done
+fi
+
 echo ""
 echo "install-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

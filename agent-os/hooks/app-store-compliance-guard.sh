@@ -388,26 +388,35 @@ SEGS
   elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
     CMD_TARGET_ANDROID_ONLY=1
   fi
-  # Quoted text and a # comment are not flags. With them blanked, every segment that still submits must name Android itself.
+  # Each command in the line is read twice, quoted text kept and quoted text blanked, # comments dropped. A submit is found
+  # in the kept text, its Android word only in the blanked text, and anything that is neither a submit nor harmless keeps Apple.
   if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ]; then
-    CMD_NOQ="$(printf '%s' "$CMD" | awk -v sq="'" '{ o=""; n=length($0); i=1
+    NQ_SEP="$(printf '\001')"
+    CMD_PAIRS="$(printf '%s' "$CMD" | awk -v sq="'" -v sep="$NQ_SEP" '{ k=""; b=""; n=length($0); i=1
       while (i <= n) { c=substr($0, i, 1)
         if (c == "#" && (i == 1 || substr($0, i-1, 1) ~ /[ \t]/)) break
-        if (c == sq || c == "\"") { j=i+1; while (j <= n && substr($0, j, 1) != c) { if (c == "\"" && substr($0, j, 1) == "\\") j++; j++ }; o=o " "; i=j+1; continue }
-        o=o c; i++ }
-      print o }')"
+        if (c == sq || c == "\"") { j=i+1; while (j <= n && substr($0, j, 1) != c) { if (c == "\"" && substr($0, j, 1) == "\\") j++; j++ }
+          k=k substr($0, i+1, j-i-1); b=b " "; i=j+1; continue }
+        if (c == ";" || c == "&" || c == "|" || c == "(" || c == ")") { print k sep b; k=""; b=""; i++; continue }
+        k=k c; b=b c; i++ }
+      print k sep b }')"
     NQ_SUB=0; NQ_AND=1
-    while IFS= read -r NQS; do
-      [ -n "$NQS" ] && submits "$NQS" || continue
-      NQ_SUB=$((NQ_SUB+1))
-      printf '%s' "$NQS" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
+    while IFS="$NQ_SEP" read -r NQK NQB; do
+      NQW="$(printf '%s' "$NQK" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
+      [ -n "$NQW" ] || continue
+      if submits "$NQK"; then
+        NQ_SUB=$((NQ_SUB+1))
+        printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
+      else
+        printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE" || NQ_AND=0
+      fi
     done <<NQSEGS
-$(printf '%s\n' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n')
+$CMD_PAIRS
 NQSEGS
     if [ "$SEG_SUBMITS" -gt 0 ]; then
       [ "$NQ_SUB" -gt 0 ] && [ "$NQ_AND" -eq 1 ] || CMD_TARGET_ANDROID_ONLY=0
     else
-      printf '%s' "$CMD_NOQ" | tr ';&|()' '\n\n\n\n\n' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
+      printf '%s\n' "$CMD_PAIRS" | awk -F "$NQ_SEP" '{ print $2 }' | grep -qiE "$AND_TARGET_RE" || CMD_TARGET_ANDROID_ONLY=0
     fi
   fi
 fi
@@ -670,6 +679,10 @@ find_app 6 -name 'tauri.conf.json' -o -name 'tauri.conf.json5' -o -name 'Tauri.t
 while IFS= read -r g; do
   grep -qE 'kotlin\("multiplatform"\)|org\.jetbrains\.kotlin\.multiplatform|kotlinMultiplatform' "$g" 2>/dev/null && { IS_KMP=1; break; }
 done < <(find_app 6 -name 'build.gradle.kts' -o -name 'build.gradle' -o -name 'libs.versions.toml')
+# A native app split off a framework root keeps that root's framework checks, as when both were scanned together (#656).
+for fw in ${INHERIT_FW:-}; do
+  case "$fw" in flutter) IS_FLUTTER=1 ;; rn) IS_RN=1 ;; ionic) IS_IONIC=1 ;; unity) IS_UNITY=1 ;; maui) IS_MAUI=1 ;; tauri) IS_TAURI=1 ;; kmp) IS_KMP=1 ;; esac
+done
 # Unity holds no Xcode or Gradle project until export. The build target names the store, with none named both are scanned.
 if [ "$IS_UNITY" -eq 1 ]; then
   case "$(printf '%s' "${CMD:-}" | grep -oiE -e '-buildtarget[[:space:]]+(ios|android)' | head -1 | tr '[:upper:]' '[:lower:]')" in
@@ -1362,7 +1375,15 @@ if [ -n "$ROOTS" ]; then
   PROJECT_ROOT="${DIR%/}"
   echo "Apps. $(printf '%s\n' "$ROOTS" | grep -c .) app roots, each scanned on its own"
   echo ""
+  # The project root goes first, so a native app split off it can inherit its framework checks.
+  ROOTS="$(printf '%s\n' "$ROOTS" | awk -v r="$PROJECT_ROOT" '{ k=$0; sub(/\/$/, "", k) } k == r { print; next } { o=o $0 "\n" } END { printf "%s", o }')"
+  ROOT_FW=""
   while IFS= read -r ROOT; do
+    [ -n "$ROOT" ] || continue
+    INHERIT_FW=""
+    if [ "${ROOT%/}" != "$PROJECT_ROOT" ] && [ -n "$ROOT_FW" ] && ! has_framework_marker "$ROOT" && (DIR="$PROJECT_ROOT"; bare_native_apart "$ROOT"); then
+      INHERIT_FW="$ROOT_FW"
+    fi
     NESTED_PRUNE=()
     if [ "${ROOT%/}" = "$PROJECT_ROOT" ]; then
       while IFS= read -r OTHER; do [ "${OTHER%/}" != "$PROJECT_ROOT" ] && NESTED_PRUNE+=(-o -path "$(printf '%s' "$OTHER" | sed 's/[][*?\\]/\\&/g')"); done <<EOF2
@@ -1373,6 +1394,13 @@ EOF2
     [ -L "${DIR%/}" ] && DIR="$(cd "$DIR" 2>/dev/null && pwd -P)"   # a linked app (issue #657) is walked through its target
     echo "App. $ROOT"
     scan_tree
+    if [ "${ROOT%/}" = "$PROJECT_ROOT" ]; then
+      ROOT_FW=""
+      [ "$IS_FLUTTER" -eq 1 ] && ROOT_FW="$ROOT_FW flutter"; [ "$IS_RN" -eq 1 ] && ROOT_FW="$ROOT_FW rn"
+      [ "$IS_IONIC" -eq 1 ] && ROOT_FW="$ROOT_FW ionic"; [ "$IS_UNITY" -eq 1 ] && ROOT_FW="$ROOT_FW unity"
+      [ "$IS_MAUI" -eq 1 ] && ROOT_FW="$ROOT_FW maui"; [ "$IS_TAURI" -eq 1 ] && ROOT_FW="$ROOT_FW tauri"
+      [ "$IS_KMP" -eq 1 ] && ROOT_FW="$ROOT_FW kmp"
+    fi
     flush_findings
     # One scannable sibling must not speak for a root the store checks never ran on.
     # The project root scanned only beside a linked app, with no marker and nothing found, is not an app (#657).

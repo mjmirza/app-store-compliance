@@ -265,7 +265,7 @@ PY
       [ "$(jq -c --stream . "$cur" 2>/dev/null | wc -l)" -eq "$(jq -c tostream "$cur" 2>/dev/null | wc -l)" ] || return 4
     fi
     local present=1
-    [ -n "$cur" ] && jq -e --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and ((.async // false) == false)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
+    [ -n "$cur" ] && jq -e --arg m "$MATCHER" --arg hc "$HOOK_CMD" --arg g "$GUARD" --arg t "$SHOWN/hooks/$GUARD_NAME" '[.hooks.PreToolUse[]? | select((.matcher // "") == $m or (.matcher // "") == "" or .matcher == "*") | .hooks[]? | select(type == "object" and ((.async // false) == false) and ((.type // "command") == "command") and (((.timeout // 600) | numbers) >= 120)) | .command? // "" | tostring | select(startswith("bash ") and (. as $c | $c == $hc or ([$g, $t] | any(. as $s | $c == "bash " + $s or $c == "bash \u0027" + $s + "\u0027" or $c == "bash \"" + $s + "\""))) and (contains("#") | not))] | length > 0' "$cur" >/dev/null 2>&1 && present=0
     if [ "$action" = "add" ]; then
       [ "$present" -eq 0 ] && return 3
       mkdir -p "$CONF"; tmp="$(mktemp "$CONF/.settings-XXXXXX")" || return 4
