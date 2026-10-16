@@ -12,7 +12,7 @@ INSTALL="$PWD/scripts/install.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 fresh() { H="$WORK/h$RANDOM$RANDOM"; mkdir -p "$H"; }
-run()   { env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
+run()   { env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR HOME="$H" bash "$INSTALL" "$@" 2>&1; }
 cfg() {
   case "$1" in
     codex) echo "$H/.codex/hooks.json" ;;
@@ -158,6 +158,19 @@ for tail in "" "\n" "\n\n\n"; do
   run --tool kimi >/dev/null; run --tool kimi uninstall >/dev/null
   cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml" && ok "kimi uninstall keeps the original trailing newlines (${#tail} chars)" || bad "kimi uninstall keeps the original trailing newlines (${#tail} chars)"
 done
+
+# 2d2 KIMI_CODE_HOME moves Kimi's whole data folder, so the hook goes where Kimi reads it
+fresh; mkdir -p "$H/kimi-custom"; printf 'default_model = "k2"\n' > "$H/kimi-custom/config.toml"
+OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" KIMI_CODE_HOME="$H/kimi-custom" bash "$INSTALL" --tool kimi 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && grep -q "app-store-compliance-guard.sh" "$H/kimi-custom/config.toml" && [ ! -e "$H/.kimi-code/config.toml" ] && ok "kimi follows KIMI_CODE_HOME" || bad "kimi follows KIMI_CODE_HOME (rc=$RC)"
+OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" KIMI_CODE_HOME="$H/kimi-custom" bash "$INSTALL" --tool all 2>&1)"
+echo "$OUT" | grep -q "== kimi ==" && ok "auto discovery finds Kimi under KIMI_CODE_HOME" || bad "auto discovery finds Kimi under KIMI_CODE_HOME"
+# 2d3 an inline hooks array cannot take a [[hooks]] block, so the file is left as it was and the block is shown
+fresh; mkdir -p "$H/.kimi-code"
+printf 'hooks = [{event = "PreToolUse", matcher = "^Bash$", command = "bash /other/check.sh", timeout = 120}]\ndefault_model = "k2"\n' > "$H/.kimi-code/config.toml"
+cp "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml"
+OUT="$(run --tool kimi)"; RC=$?
+[ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml" && echo "$OUT" | grep -q "\[\[hooks\]\]" && ok "kimi refuses an inline hooks array and changes nothing" || bad "kimi refuses an inline hooks array and changes nothing (rc=$RC)"
 
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
@@ -317,7 +330,7 @@ run --tool kimi >/dev/null; N1="$(ls "$H/.kimi-code" | grep -c bak)"; OUT="$(run
 # 8i without node the OpenCode install never says verified
 fresh; mkdir -p "$H/.config/opencode"
 NONODE="$WORK/nonode$RANDOM"; mkdir -p "$NONODE"; for b in bash sh python3 grep sed awk cat cp mv rm mkdir chmod dirname basename tr head tail find date ls env printf mktemp uname cmp wc sort; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
-OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
+OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
 echo "$OUT" | grep -q 'not fully verified' && ! echo "$OUT" | grep -q '^Install verified' && ok "opencode without node says not fully verified" || bad "opencode without node says not fully verified"
 # 8g a non-Claude doctor says when the checkout is newer than the install
 fresh; mkdir -p "$H/.codex"; run --tool codex >/dev/null; printf '1.0.0' > "$H/.agents/skills/app-store-compliance/VERSION"

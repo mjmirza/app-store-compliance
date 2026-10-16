@@ -109,6 +109,16 @@ def qwen_dir():
     return os.path.abspath(v)
 
 
+def kimi_dir():
+    """Kimi Code's data folder. KIMI_CODE_HOME wins, with a leading tilde expanded, as its docs describe."""
+    v = os.environ.get("KIMI_CODE_HOME")
+    if not v:
+        return os.path.join(home(), ".kimi-code")
+    if v == "~" or v.startswith("~/") or v.startswith("~\\"):
+        v = os.path.join(home(), v[2:])
+    return os.path.abspath(v)
+
+
 def skill_dir():
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
@@ -157,7 +167,7 @@ def layout(tool, repo_dir=None):
         "cursor": os.path.join(h, ".cursor"),
         "copilot": os.path.join(h, ".copilot"),
         "windsurf": os.path.join(h, ".codeium", "windsurf"),
-        "kimi": os.path.join(h, ".kimi-code"),
+        "kimi": kimi_dir(),
     }
     base = bases[tool]
     configs = {
@@ -630,6 +640,10 @@ def register_kimi(lay, cmd, dry):
         write_atomic(path, re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S), newline="")
         ok("guard block repaired in " + shown(path) + " (a backup sits next to it)")
         return True
+    if re.search(r"^[ \t]*hooks[ \t]*=", text, re.M) or re.search(r"^[ \t]*\[[ \t]*hooks[ \t]*\][ \t]*(#.*)?$", text, re.M):
+        fail(shown(path) + " defines hooks inline, so a [[hooks]] block cannot be added. It was not changed.")
+        print(manual_block("kimi", lay, cmd))
+        return False
     if dry:
         print(
             "  would append one [[hooks]] block to "

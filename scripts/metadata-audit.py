@@ -28,6 +28,7 @@ A folder named android in the path is audited with the Google rules unless
 Exit codes: 0 clean or advisory, 1 the directory held nothing to audit, 2 a critical finding.
 """
 
+import itertools
 import os
 import sys
 import re
@@ -622,13 +623,20 @@ def main():
         )
         unit = audit_fields(fields, check_urls=check_urls, platform=plat)
         seen = {(f["severity"], f["rule"], f["field"], f["message"]) for f in unit}
+        # Every combination of the conflicting values is audited, so no pairing across fields hides a rejection risk.
+        options = {}
         for canon, a, b, alt in clash:
-            # The value that was not kept is audited too, so a conflict never hides a rejection risk.
-            for f in audit_fields({**fields, canon: alt}, check_urls=check_urls, platform=plat):
+            options.setdefault(canon, [fields.get(canon)])
+            if alt not in options[canon]:
+                options[canon].append(alt)
+        names = sorted(options)
+        for combo in itertools.islice(itertools.product(*(options[n] for n in names)), 1, 4096):
+            for f in audit_fields({**fields, **dict(zip(names, combo))}, check_urls=check_urls, platform=plat):
                 key = (f["severity"], f["rule"], f["field"], f["message"])
                 if key not in seen:
                     seen.add(key)
                     unit.append(f)
+        for canon, a, b, alt in clash:
             add(
                 unit,
                 "medium",

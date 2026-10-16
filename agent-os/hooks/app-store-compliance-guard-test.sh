@@ -2010,12 +2010,12 @@ rr_run "$D"
 rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding" || bad "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding (rc=$RC)"
 rm -rf "$D"
 
-# A02c a permission API named only in a comment is not a use, and the system photo picker needs no permission
+# A02c a permission API named in a comment counts, as in 1.0.0. the system photo picker needs no permission
 D="$(mk_rr_ios '' 'class A {}
 // TODO maybe use AVCaptureDevice and CLLocationManager later
 /* CNContactStore() */')"
 rr_run "$D"
-! rr_has 'MISSING-USAGE-DESCRIPTION' && ok "rr-A02-6 a camera, location or contacts API named only in comments raises nothing" || bad "rr-A02-6 a camera, location or contacts API named only in comments raises nothing (rc=$RC)"
+rr_has 'MISSING-USAGE-DESCRIPTION' && ok "rr-A02-6 a permission API named only in comments still counts, as in 1.0.0" || bad "rr-A02-6 a permission API named only in comments still counts, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_rr_ios '' 'import PhotosUI
 let picker = PHPickerViewController(configuration: PHPickerConfiguration())')"
@@ -2264,7 +2264,7 @@ done
 D="$(mk_rr_ios '' 'import AVFoundation
 /* AVCaptureDevice */')"
 rr_run "$D"
-! rr_has 'Camera used without' && ok "cx3b a real block comment naming AVCaptureDevice still raises nothing" || bad "cx3b a real block comment naming AVCaptureDevice still raises nothing (rc=$RC)"
+rr_has 'Camera used without' && ok "cx3b a block comment naming AVCaptureDevice counts, as in 1.0.0" || bad "cx3b a block comment naming AVCaptureDevice counts, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_rr_ios '' 'import AVFoundation
 let s = #"raw"# /* AVCaptureDevice.default(for: .video) */')"
@@ -2504,7 +2504,7 @@ D="$(mk_rr_ios '' 'import AVFoundation
   // AVCaptureDevice on its own line
 let x = 1')"
 rr_run "$D"
-! rr_has 'Camera used without' && ok "r4-4b a whole-line comment is still a comment" || bad "r4-4b a whole-line comment is still a comment (rc=$RC)"
+rr_has 'Camera used without' && ok "r4-4b a whole-line comment counts as a trigger, as in 1.0.0" || bad "r4-4b a whole-line comment counts as a trigger, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 # R4-7 the no-parser fallback trusts a tool name only when the payload names exactly one
 D="$(mk_ios_bad)"
@@ -2646,7 +2646,7 @@ let dev = AVCaptureDevice.default(for: .video)')"
 rr_hook "$FL deliver" "$D"
 [ "$RC" -eq 2 ] && ok "r6-2 an unclosed block comment never hides a camera call" || bad "r6-2 an unclosed block comment never hides a camera call (rc=$RC)"
 rm -rf "$D"
-# R6-3 a closed block comment still hides a camera mention
+# R6-3 a camera mention in a closed block comment counts, as in 1.0.0
 D="$(mk_rr_ios '' 'import Foundation
 /* AVCaptureDevice.default(for: .video)
 */
@@ -2788,7 +2788,7 @@ rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r9-4 a Cordova host keeps the Ionic checks" || bad "r9-4 a Cordova host keeps the Ionic checks (rc=$RC)"
 rm -rf "$D"
 # R10 Codex round 9
-# R10-1 only a line led by // is left out of the triggers. a spaced pointer write and code after a closing */ count
+# R10-1 a spaced pointer write and code after a closing */ count as triggers
 for src in '* out = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' ' */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];'; do
   D="$(mk_rr_ios '' 'let s = "x"')"
   printf '%s\n' "$src" > "$D/App/R.m"
@@ -2833,6 +2833,44 @@ let dev = AVCaptureDevice.default(for: .video)')"
   rm -rf "$D"
 done
 
+# R11 Codex round 10
+# R11-1 triggers read every line raw, as in 1.0.0, so a // line holding a live Swift interpolation still counts
+D="$(mk_rr_ios '' 'import AVFoundation
+let message = """
+// \(AVCaptureDevice.requestAccess(for: .video, completionHandler: { _ in }))
+"""')"
+rr_hook "$FL deliver" "$D"
+rr_has 'NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r11-1 a // line holding an interpolation still triggers" || bad "r11-1 a // line holding an interpolation still triggers (rc=$RC)"
+rm -rf "$D"
+# R11-2 an RCTAppDelegate host stays in the root scan and keeps the React Native checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj" "$D/Native/js"
+printf '{"name":"r","dependencies":{"expo":"51.0.0","react-native":"0.74.0"}}' > "$D/package.json"
+printf 'module.exports = { name: "r" };\n' > "$D/app.config.js"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import React_RCTAppDelegate\nclass AppDelegate: RCTAppDelegate {}\n' > "$D/Native/Host.swift"
+printf '{"name":"native-js","dependencies":{"@react-native-async-storage/async-storage":"2"}}' > "$D/Native/js/package.json"
+printf "import AsyncStorage from '@react-native-async-storage/async-storage';\nAsyncStorage.getItem('x');\n" > "$D/Native/js/storage.js"
+rr_run "$D"
+rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r11-2 an RCTAppDelegate host keeps the React Native checks" || bad "r11-2 an RCTAppDelegate host keeps the React Native checks (rc=$RC)"
+rm -rf "$D"
+# R11-3 a zsh =(...) substitution is executable, so a commit message and a safe command lose their pass
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/scripts"; printf '%s deliver\n' "$FL" > "$D/scripts/up.sh"
+rr_hook "git commit -m \"$FL deliver\" =(sh scripts/up.sh)" "$D"
+[ "$RC" -eq 2 ] && ok "r11-3 a zsh =() beside a commit message still scans" || bad "r11-3 a zsh =() beside a commit message still scans (rc=$RC)"
+rr_hook "./gradlew bundleRelease && echo =(sh scripts/up.sh)" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r11-3 a zsh =() beside an Android build keeps the Apple checks" || bad "r11-3 a zsh =() beside an Android build keeps the Apple checks (rc=$RC)"
+rm -rf "$D"
+# R11-4 a /* ... */ pair inside quoted strings never removes the code between them
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' "signIn();" "const s = ' /* '; deleteAccount(); const end = ' */ ';" > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r11-4 quoted block markers keep the deletion between them" || bad "r11-4 quoted block markers keep the deletion between them (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

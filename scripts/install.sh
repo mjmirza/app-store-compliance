@@ -74,7 +74,8 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${HOME:-}/.grok" ] && found="$found grok"
   QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*|"~\\"*) QDIR="${QDIR#\~}"; QDIR="${HOME:-}/${QDIR#?}" ;; esac
   [ -d "$QDIR" ] && found="$found qwen"
-  [ -d "${HOME:-}/.kimi-code" ] && found="$found kimi"
+  KDIR="${KIMI_CODE_HOME:-${HOME:-}/.kimi-code}"; case "$KDIR" in "~"|"~/"*|"~\\"*) KDIR="${KDIR#\~}"; KDIR="${HOME:-}/${KDIR#?}" ;; esac
+  [ -d "$KDIR" ] && found="$found kimi"
   [ -d "${HOME:-}/.factory" ] && found="$found droid"
   [ -d "${HOME:-}/.augment" ] && found="$found auggie"
   [ -d "${HOME:-}/.codeium/windsurf" ] && found="$found windsurf"

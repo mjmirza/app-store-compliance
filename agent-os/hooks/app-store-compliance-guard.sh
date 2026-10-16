@@ -178,7 +178,7 @@ function blank(s,   o, i, n, c, w, prev, j, body) {
     o=o c; w=w c; i++ }
   return o }
 function seg(s,   t) {
-  if (index(s, "$(") || index(s, bt) || index(s, "<(") || index(s, ">(")) return s
+  if (index(s, "$(") || index(s, bt) || index(s, "<(") || index(s, ">(") || index(s, "=(")) return s
   t=s; sub(/^[ \t({!]+/, "", t)
   while (t ~ /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/) sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", t)
   if (t ~ /^git([ \t]+-C[ \t]+[^ \t]+)?[ \t]+(commit|tag|notes)([ \t]|$)/ || t ~ /^gh[ \t]+(pr|issue)[ \t]+(create|comment|edit)([ \t]|$)/) return blank(s)
@@ -366,7 +366,7 @@ if [ -n "$CMD" ]; then
   SEG_SUBMITS=0; SEG_ALL_AND=1
   # Beside an Android submit only a known harmless command keeps it Android only. Anything else may upload to Apple.
   SAFE_SEG_RE='^(cd|pushd|popd|echo|printf|export|unset|set|true|false|:|test|sleep|ls|pwd|mkdir|rm|cp|mv|cat|touch|tee|grep|head|tail|wc|date|clear)$'
-  SUBST=0; printf '%s' "$CMD" | grep -qE '\$\(|`|<\(|>\(' && SUBST=1
+  SUBST=0; printf '%s' "$CMD" | grep -qE '\$\(|`|<\(|>\(|=\(' && SUBST=1
   while IFS= read -r SEG; do
     W1="$(printf '%s' "$SEG" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
     [ -n "$W1" ] || continue
@@ -436,18 +436,18 @@ config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin so
 
 SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
 # Comments dropped line by line, with no string state, so a misread quote can never hide a later line.
-# tc=0 (triggers) drops only a line led by //. tc=1 (implementation) also drops block comment lines and trailing comments.
+# Only the implementation buffer is stripped. Triggers read every line raw, as in 1.0.0, so no comment rule can hide a call.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39) }
     function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
     { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
       t=l; sub(/^[ \t]+/, "", t)
       if (substr(t, 1, 2) == "//") { print ""; next }
-      if (!tc) { print l; next }
       if (substr(t, 1, 2) == "*/" || t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
       if (substr(t, 1, 2) == "/*") { r=t; sub(/[ \t]+$/, "", r); j=index(substr(r, 3), "*/")
         if (j == 0 || j + 3 == length(r)) { print ""; next } }
       if (tc) {
-        while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) l=substr(l, 1, o-1) substr(l, o+c+3)
+        while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) { pre=substr(l, 1, o-1); p2=pre
+          nq=gsub(/[\"`]/, "", pre); ns=gsub(sq, "", p2); if (nq % 2 || ns % 2) break; l=substr(l, 1, o-1) substr(l, o+c+3) }
         if (index(l, "//") && (o=opener(l, "//")) > 0 && substr(l, o+2) !~ /<\/|\/>/) { pre=substr(l, 1, o-1); p2=pre; nq=gsub(/[\"`]/, "", pre); ns=gsub(sq, "", p2); if (nq % 2 == 0 && ns % 2 == 0) l=substr(l, 1, o-1) } }
       print l }'
 build_code() {  # .code is the trigger buffer, .impl the buffer an implementation must appear in (no config or translation text)
@@ -465,12 +465,11 @@ build_code() {  # .code is the trigger buffer, .impl the buffer an implementatio
         if (nh) { for (k=1; k<=nh; k++) print ho[k]; nh=0 }
         print o } END { flush() }' 2>/dev/null
     printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.impl" 2>/dev/null
-  { grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk -v tc=0 "$STRIP_AWK" 2>/dev/null
-    grep -vE "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIh -e '' 2>/dev/null
+  { tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIh -e '' 2>/dev/null
     printf '\n%s\n' "$BLOB_END"; } >> "$FILELIST.code" 2>/dev/null
   [ "$(tail -n 1 "$FILELIST.code" 2>/dev/null)" = "$BLOB_END" ] && [ "$(tail -n 1 "$FILELIST.impl" 2>/dev/null)" = "$BLOB_END" ] && CODE_OK=1
 }
-code_has() {  # grep_has over the comment-stripped source plus raw non-source. Falls back to grep_has without a buffer
+code_has() {  # grep_has over every file read raw, as in 1.0.0. Falls back to grep_has without a buffer
   [ -s "$FILELIST" ] || return 1
   [ -n "${CODE_STATE:-}" ] || { build_code; CODE_STATE=1; }
   if [ "${CODE_OK:-0}" -eq 1 ]; then grep -Eqs -e "$1" "$FILELIST.code" 2>/dev/null; return; fi
@@ -1230,7 +1229,7 @@ bare_native_apart() {  # $1 candidate dir below $DIR
     || find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name build \) -prune \) -o \( -name 'build.gradle' -o -name 'build.gradle.kts' \) -print 2>/dev/null \
       | while IFS= read -r f; do grep -lE 'com\.android\.application|android\.application' "$f" 2>/dev/null; done | grep . >/dev/null || return 1
   # A native host that embeds the root framework (brownfield) shares its dependencies, so it stays in the root scan.
-  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|import Cordova|CDVViewController|CDVPlugin|CDVAppDelegate|import Flutter' "$1" \
+  grep -rlsE 'RCTBridge|RCTRootView|RCTReactNativeFactory|RCTAppDelegate|RCTDefaultReactNativeFactoryDelegate|ReactNativeDelegate|ExpoAppDelegate|ExpoReactNativeFactory|React-Core|react-native|CodePush|ExpoModulesCore|EXAppDelegate|FlutterEngine|FlutterViewController|Flutter/Flutter\.h|<React/|import Capacitor|Capacitor/Capacitor\.h|CAPBridgeViewController|Cordova/|import Cordova|CDVViewController|CDVPlugin|CDVAppDelegate|import Flutter' "$1" \
     --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' --include='Podfile' --include='*.pbxproj' \
     --exclude-dir=Pods --exclude-dir=node_modules --exclude-dir=build 2>/dev/null | grep . >/dev/null && return 1
   # The root keeps the scan for a platform it has no folder of, or its checks for that platform would vanish.

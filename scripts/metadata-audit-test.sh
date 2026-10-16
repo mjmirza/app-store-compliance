@@ -147,5 +147,17 @@ OUT="$($AUDIT "$EQ" 2>&1)"
 echo "$OUT" | grep -q 'CROSS-PLATFORM' && ok "an equal-length conflicting name is audited too" || bad "an equal-length conflicting name is audited too"
 rm -rf "$EQ"
 
+# two fields in conflict at once, the risky pairing across them is still audited
+XC="$(mktemp -d)"; mkdir -p "$XC/en-US"
+printf 'Notes xxxxxxxxxxxxxxxxxxxx' > "$XC/en-US/full_description.txt"
+printf 'Subscribe' > "$XC/en-US/short_description.txt"
+printf 'Terms https://j.test/terms' > "$XC/en-US/description.txt"
+printf 'Notebooks' > "$XC/en-US/promo_text.txt"
+printf 'Journal' > "$XC/en-US/name.txt"
+printf 'https://j.test/privacy' > "$XC/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$XC/en-US/support_url.txt"
+OUT="$($AUDIT "$XC" 2>&1)"
+echo "$OUT" | grep -q 'APPLE-3.1.2-MISLEADING-PRICING' && ok "a risky pairing across two conflicting fields is audited" || bad "a risky pairing across two conflicting fields is audited"
+rm -rf "$XC"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
