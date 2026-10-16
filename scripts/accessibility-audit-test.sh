@@ -1001,6 +1001,12 @@ printf '%s\n' 'import SwiftUI' 'let example = #"""' '\#"""' '/*' '"""#' 'let reg
 OUT=$($AUDIT "$R20_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a raw multiline string is still reported"; else bad "an Image after a raw multiline string was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R20_DIR" 2>/dev/null || true
+# A triple quote inside a // comment never opens a string
+R21_DIR="$(mktemp -d)"; mkdir -p "$R21_DIR/app"
+printf '%s\n' 'import SwiftUI' '// """' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R21_DIR/app/V.swift"
+OUT=$($AUDIT "$R21_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a comment holding a triple quote is still reported"; else bad "an Image after a comment holding a triple quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R21_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

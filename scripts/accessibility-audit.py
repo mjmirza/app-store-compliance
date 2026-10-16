@@ -189,6 +189,10 @@ def swift_code_lines(content):
     in_text = False
     for line in content.split("\n"):
         t = line.lstrip(" \t")
+        if not in_block and not in_text and t.startswith("//"):
+            # a comment line is blanked before its quotes are counted, so a quote in a comment never opens a string
+            out.append(" " * len(line))
+            continue
         quotes = re.sub(chr(92) * 2 + '#*"', "", line).count('"""')
         if not in_block and (in_text or quotes % 2):
             # a multiline string line is kept as is, so a /* or // inside one never blanks the code after it

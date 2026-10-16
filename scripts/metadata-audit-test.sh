@@ -213,5 +213,13 @@ printf 'Sign in with the supplied account.' > "$TA/app-b/metadata/review_informa
 OUT="$($AUDIT "$TA" 2>&1)"
 echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "one app's review notes never hide another app's placeholder" || bad "one app's review notes never hide another app's placeholder"
 rm -rf "$TA"
+# fastlane's default folder is not a listing of its own when real locales sit beside it
+DF2="$(mktemp -d)"; mkdir -p "$DF2/default" "$DF2/en-US"
+printf 'writing' > "$DF2/default/keywords.txt"
+printf 'Journal' > "$DF2/en-US/name.txt"
+printf 'https://j.test/privacy' > "$DF2/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$DF2/en-US/support_url.txt"
+OUT="$($AUDIT "$DF2" 2>&1)"
+! echo "$OUT" | grep -q 'MISSING-PRIVACY' && ! echo "$OUT" | grep -q 'MISSING-SUPPORT' && ok "default/ is not audited as a listing beside real locales" || bad "default/ is not audited as a listing beside real locales"
+rm -rf "$DF2"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

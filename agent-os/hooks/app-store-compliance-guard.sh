@@ -273,6 +273,8 @@ FASTFILES
         pick=""
         while IFS= read -r s2; do
           [ -n "$s2" ] || continue
+          # an exclusion such as '!@acme/docs' selects every other package, so every package is read
+          case "$s2" in '!'*) pick="$files"; break ;; esac
           s2="${s2#./}"; s2="${s2#!}"; s2="${s2#^}"; s2="${s2#...}"; s2="${s2%...}"; s2="${s2#\{}"; s2="${s2%\}}"; s2="${s2%/}"; base="${s2##*/}"
           # bash 3.2 misreads a case pattern inside $( ), so the scope test sits out here.
           scoped=0; pat="(@[^/\"]+/)?$base"

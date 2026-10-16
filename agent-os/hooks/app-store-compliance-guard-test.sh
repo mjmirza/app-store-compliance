@@ -3055,6 +3055,18 @@ D="$(mk_rr_ios '' 'class A { func signIn() {} }
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r20-2 a deletion after a closing block comment still counts" || bad "r20-2 a deletion after a closing block comment still counts (rc=$RC)"
 rm -rf "$D"
+# R21 Codex round 19
+# R21-1 an exclusion-only pnpm filter reads every other package, so the submitting one is found
+D="$(mktemp -d)"; mkdir -p "$D/apps/docs" "$D/apps/mobile/App"
+printf '{"name":"root","private":true}\n' > "$D/package.json"
+printf 'packages: ["apps/*"]\n' > "$D/pnpm-workspace.yaml"
+printf '{"name":"@acme/docs","scripts":{"ship":"echo done"}}\n' > "$D/apps/docs/package.json"
+printf '{"name":"@acme/mobile","scripts":{"ship":"%s deliver"}}\n' "$FL" > "$D/apps/mobile/package.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/mobile/App/Info.plist"; mkdir -p "$D/apps/mobile/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/mobile/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/mobile/App/A.swift"
+rr_hook "pnpm --filter '!@acme/docs' run ship" "$D"
+[ "$RC" -eq 2 ] && ok "r21-1 an exclusion-only pnpm filter still finds the submitting package" || bad "r21-1 an exclusion-only pnpm filter still finds the submitting package (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

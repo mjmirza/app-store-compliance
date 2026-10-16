@@ -529,6 +529,13 @@ def load_locales(d, platform=None):
             continue
         plat = platform or group_platform(rel, d)
         aliases = GOOGLE_ALIASES if plat == "google" else ALIASES
+        # fastlane's default folder only fills the real locales beside it, it is not a listing of its own
+        if os.path.basename(rel) == "default" and any(
+            o != rel and os.path.dirname(o) == os.path.dirname(rel)
+            and os.path.basename(o) not in NON_LOCALE_DIRS and _fields_from(groups[o], aliases)
+            for o in rels
+        ):
+            continue
         clash = []
         own = _fields_from(groups[rel], aliases, clash)
         if not own:
