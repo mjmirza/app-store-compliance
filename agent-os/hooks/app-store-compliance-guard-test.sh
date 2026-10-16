@@ -3119,6 +3119,14 @@ for js in 'signIn(); const r = true && /"/; const s = " // "; function deleteAcc
   ! rr_has 'NO-ACCOUNT-DELETION' && ok "r25-2 a regex literal after an operator never hides a deletion" || bad "r25-2 a regex literal after an operator never hides a deletion (rc=$RC)"
   rm -rf "$D"
 done
+# R26 Qwen round 24. a regex literal after + - * < > never hides a deletion after it
+for op in '+' '-' '*' '>' '<' '%'; do
+  D="$(mk_rr_ios '' 'let ready = true')"
+  printf '%s\n' "var a = 1; signIn(); const x = a $op /\"/; const s = \" // \"; function deleteAccount() { return api.deleteUser(); }" > "$D/App/account.js"
+  rr_run "$D"
+  ! rr_has 'NO-ACCOUNT-DELETION' && ok "r26 a regex literal after $op never hides a deletion" || bad "r26 a regex literal after $op never hides a deletion (rc=$RC)"
+  rm -rf "$D"
+done
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
