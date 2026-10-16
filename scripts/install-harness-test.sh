@@ -377,7 +377,7 @@ rm -rf "$APP"
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
 fresh; run --tool gemini >/dev/null; run --tool opencode >/dev/null
 python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); sys.exit(0 if d["description"] and "{{args}}" in d["prompt"] else 1)' "$H/.gemini/commands/app-store-audit.toml" && ok "the gemini command is valid TOML with {{args}}" || bad "the gemini command is valid TOML with {{args}}"
-! grep -q "~/.claude" "$H/.gemini/commands/app-store-audit.toml" "$H/.config/opencode/commands/app-store-audit.md" && ok "the commands name no Claude Code path" || bad "the commands name no Claude Code path"
+! grep -q "[~]/.claude" "$H/.gemini/commands/app-store-audit.toml" "$H/.config/opencode/commands/app-store-audit.md" && ok "the commands name no Claude Code path" || bad "the commands name no Claude Code path"
 
 # 8 --tool all installs into every tool it finds, and only those
 fresh; mkdir -p "$H/.codex" "$H/.cursor"
@@ -446,7 +446,7 @@ await a["tool.execute.before"]({ tool: "bash" }, out); await b["tool.execute.bef
 else ok "opencode double-load check skipped, node not installed"; fi
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
-run --tool kimi >/dev/null; N1="$(ls "$H/.kimi-code" | grep -c bak)"; OUT="$(run --tool kimi)"; N2="$(ls "$H/.kimi-code" | grep -c bak)"
+run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
 [ "$N1" = "$N2" ] && echo "$OUT" | grep -q 'already registered' && ok "kimi a second run on a CRLF config changes nothing" || bad "kimi a second run on a CRLF config changes nothing ($N1 $N2)"
 # 8i without node the OpenCode install never says verified
 fresh; mkdir -p "$H/.config/opencode"

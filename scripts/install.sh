@@ -70,12 +70,12 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "${HOME:-}/.gemini" ] && found="$found gemini"
   [ -d "${XDG_CONFIG_HOME:-${HOME:-}/.config}/opencode" ] && found="$found opencode"
   [ -d "${HOME:-}/.cursor" ] && found="$found cursor"
-  CDIR="${COPILOT_HOME:-${HOME:-}/.copilot}"; case "$CDIR" in "~"|"~/"*|"~\\"*) CDIR="${CDIR#\~}"; CDIR="${HOME:-}/${CDIR#?}" ;; esac
+  CDIR="${COPILOT_HOME:-${HOME:-}/.copilot}"; case "$CDIR" in [~]|[~]/*|[~]\\*) CDIR="${CDIR#\~}"; CDIR="${HOME:-}/${CDIR#?}" ;; esac
   [ -d "$CDIR" ] && found="$found copilot"
   [ -d "${HOME:-}/.grok" ] && found="$found grok"
-  QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in "~"|"~/"*|"~\\"*) QDIR="${QDIR#\~}"; QDIR="${HOME:-}/${QDIR#?}" ;; esac
+  QDIR="${QWEN_HOME:-${HOME:-}/.qwen}"; case "$QDIR" in [~]|[~]/*|[~]\\*) QDIR="${QDIR#\~}"; QDIR="${HOME:-}/${QDIR#?}" ;; esac
   [ -d "$QDIR" ] && found="$found qwen"
-  KDIR="${KIMI_CODE_HOME:-${HOME:-}/.kimi-code}"; case "$KDIR" in "~"|"~/"*|"~\\"*) KDIR="${KDIR#\~}"; KDIR="${HOME:-}/${KDIR#?}" ;; esac
+  KDIR="${KIMI_CODE_HOME:-${HOME:-}/.kimi-code}"; case "$KDIR" in [~]|[~]/*|[~]\\*) KDIR="${KDIR#\~}"; KDIR="${HOME:-}/${KDIR#?}" ;; esac
   [ -d "$KDIR" ] && found="$found kimi"
   [ -d "${HOME:-}/.factory" ] && found="$found droid"
   [ -d "${HOME:-}/.augment" ] && found="$found auggie"
