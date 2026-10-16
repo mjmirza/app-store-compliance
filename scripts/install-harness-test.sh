@@ -180,6 +180,20 @@ run --tool qwen doctor >/dev/null; RC=$?
 run --tool qwen >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if all(not h.get("async") for g in d["hooks"]["PreToolUse"] for h in g["hooks"] if "guard.sh" in h["command"]) else 1)' "$(cfg qwen)" \
   && ok "qwen install repairs an async guard handler" || bad "qwen install repairs an async guard handler"
+# Copilot needs version to be the number 1, true is not 1, and a version repair is written even when the handlers are fine
+fresh; mkdir -p "$(dirname "$(cfg copilot)")"; printf '{"version":true}\n' > "$(cfg copilot)"
+run --tool copilot >/dev/null
+python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get("version"); sys.exit(0 if type(v) is int and v == 1 else 1)' "$(cfg copilot)" \
+  && ok "copilot install repairs a version of true" || bad "copilot install repairs a version of true"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d.pop("version", None); json.dump(d, open(p,"w"))' "$(cfg copilot)"
+run --tool copilot >/dev/null
+python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get("version"); sys.exit(0 if type(v) is int and v == 1 else 1)' "$(cfg copilot)" \
+  && ok "copilot reinstall writes back a missing version" || bad "copilot reinstall writes back a missing version"
+# Gemini runs no hook when hooksConfig.enabled is false
+fresh; run --tool gemini >/dev/null
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["hooksConfig"]={"enabled": False}; json.dump(d, open(p,"w"))' "$(cfg gemini)"
+run --tool gemini doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "gemini doctor fails when hooksConfig.enabled is false" || bad "gemini doctor fails when hooksConfig.enabled is false (rc=$RC)"
 # Copilot rejects a hooks file whose version is not 1, and runs a handler only for the tools its matcher names
 fresh; mkdir -p "$(dirname "$(cfg copilot)")"; printf '{"version":0}\n' > "$(cfg copilot)"
 run --tool copilot >/dev/null

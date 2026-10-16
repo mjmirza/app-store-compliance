@@ -189,7 +189,7 @@ def swift_code_lines(content):
     in_text = False
     for line in content.split("\n"):
         t = line.lstrip(" \t")
-        if chr(92) + "(" in line:
+        if re.search(chr(92) * 2 + "#*" + chr(92) + "(", line):
             out.append(line)
             continue
         if not in_block and not in_text and t.startswith("//"):

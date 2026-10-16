@@ -3096,6 +3096,13 @@ printf '%s\n' 'signIn(); const r = /"/; const s = " // "; function deleteAccount
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r23-2 a quote in a regex literal never hides a deletion" || bad "r23-2 a quote in a regex literal never hides a deletion (rc=$RC)"
 rm -rf "$D"
+# R24 Codex round 22
+# R24-1 a JS regex literal holding a quote and a space never hides a deletion after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const r = /" /; const s = " // "; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r24-1 a regex literal with a space never hides a deletion" || bad "r24-1 a regex literal with a space never hides a deletion (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

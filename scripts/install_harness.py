@@ -593,10 +593,14 @@ def register(tool, lay, guard, dry):
         )
         print(manual_block(tool, lay, cmd))
         return False
-    if tool in ("cursor", "copilot", "copilot-repo"):
-        data.setdefault("version", 1)
-    if tool in ("copilot", "copilot-repo") and data.get("version") != 1:
+    fixed = False
+    if tool in ("cursor", "copilot", "copilot-repo") and "version" not in data:
         data["version"] = 1
+        fixed = True
+    # Copilot rejects the whole hooks file unless version is the number 1, and true is not 1
+    if tool in ("copilot", "copilot-repo") and not (type(data.get("version")) is int and data.get("version") == 1):
+        data["version"] = 1
+        fixed = True
     if tool == "gemini" and not isinstance(data.setdefault("tools", {}), dict):
         fail(
             shown(lay["config"])
@@ -605,7 +609,7 @@ def register(tool, lay, guard, dry):
         print(manual_block(tool, lay, cmd))
         return False
     box = container(lay, data)
-    changed = False
+    changed = fixed
     for ev, st in events(tool):
         groups = box.setdefault(ev, []) if isinstance(box, dict) else None
         if not isinstance(groups, list) or not all(isinstance(g, dict) for g in groups):
@@ -1136,8 +1140,11 @@ def check_hooks(tool, lay, guard, app, repo_dir):
             prove_ps(found[0]["powershell"], tool, app, repo_dir or "/")
     if found_any:
         ok("hook registered in " + shown(lay["config"]))
-    if tool in ("copilot", "copilot-repo") and data.get("version") != 1:
+    if tool in ("copilot", "copilot-repo") and not (type(data.get("version")) is int and data.get("version") == 1):
         fail("version is not 1 in " + shown(lay["config"]) + ", so Copilot rejects the whole hooks file")
+    hc = data.get("hooksConfig")
+    if tool == "gemini" and isinstance(hc, dict) and hc.get("enabled") is False:
+        fail("hooksConfig.enabled is false in " + shown(lay["config"]) + ", so Gemini CLI runs no hook, the guard included")
     if tool in ("qwen", "copilot", "copilot-repo") and data.get("disableAllHooks") is True:
         fail("disableAllHooks is true in " + shown(lay["config"]) + ", so the tool runs no hook, the guard included")
     if tool == "gemini" and (data.get("tools") or {}).get("enableHooks") is not True:

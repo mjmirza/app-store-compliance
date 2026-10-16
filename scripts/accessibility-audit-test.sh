@@ -1019,6 +1019,12 @@ printf '%s\n' 'import SwiftUI' 'let q = #"three: """ here"#' 'let text = Text(""
 OUT=$($AUDIT "$R23_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "an interpolated Image inside a string is still reported"; else bad "an interpolated Image inside a string was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R23_DIR" 2>/dev/null || true
+# A raw-string interpolation such as \#( is code inside a string, even on a line led by //
+R24_DIR="$(mktemp -d)"; mkdir -p "$R24_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let q = #"three: """ here"#' 'let text = Text(#"""' '// \#(Image("hero"))' '"""#)' > "$R24_DIR/app/V.swift"
+OUT=$($AUDIT "$R24_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "a raw-string interpolated Image is still reported"; else bad "a raw-string interpolated Image was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R24_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
