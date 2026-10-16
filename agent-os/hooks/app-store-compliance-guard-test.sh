@@ -2211,12 +2211,16 @@ for c in "./gradlew :app:bundleRelease" "./gradlew clean app:assembleRelease --s
 done
 rm -rf "$D"
 
-# CX14 every Android platform flag form is Android only, iOS and all are not
+# CX14 the platform flag forms 1.0.0 knew are Android only, the forms it did not know keep the Apple checks, as in 1.0.0
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
-for c in "eas build -p android" "eas submit --platform=android" "eas submit --platform android" "eas build -p=android" "eas build --platform  android --profile production"; do
+for c in "eas submit --platform android" "eas build --platform  android --profile production"; do
   rr_hook "$c" "$D"
   [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "cx14 Android only. $c" || bad "cx14 Android only. $c (rc=$RC)"
+done
+for c in "eas build -p android" "eas submit --platform=android" "eas build -p=android"; do
+  rr_hook "$c" "$D"
+  ! rr_has 'Command targets Android only' && rr_has 'NSCameraUsageDescription' && ok "cx14 the Apple checks still run, as in 1.0.0. $c" || bad "cx14 the Apple checks still run, as in 1.0.0. $c (rc=$RC)"
 done
 for c in "eas build -p ios" "eas build -p all" "eas submit --platform=android && eas submit --platform=ios"; do
   rr_hook "$c" "$D"
@@ -2929,7 +2933,7 @@ for c in "$FL \"beta\" notes:\"test -p android\"; $EA -p android" "$FL \"\$LANE\
   rr_has 'NSCameraUsageDescription' && ok "r14-1 the iOS submit keeps the Apple checks. $c" || bad "r14-1 the iOS submit keeps the Apple checks. $c (rc=$RC)"
 done
 rr_hook "$EA -p android && echo done" "$D"
-! rr_has 'NSCameraUsageDescription' && ok "r14-1b a plain Android submit with a harmless echo stays Android only" || bad "r14-1b a plain Android submit with a harmless echo stays Android only (rc=$RC)"
+rr_has 'NSCameraUsageDescription' && ok "r14-1b a -p android submit beside a harmless echo keeps the Apple checks, as in 1.0.0" || bad "r14-1b a -p android submit beside a harmless echo keeps the Apple checks, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
 # R14-2 a native app split off a framework root keeps that root's framework checks
 D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/ios/App" "$D/Native/Legacy.xcodeproj"
@@ -2942,6 +2946,27 @@ printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
 printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/Native/Legacy.swift"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r14-2 a split native app keeps the root framework checks" || bad "r14-2 a split native app keeps the root framework checks (rc=$RC)"
+rm -rf "$D"
+# R15 Codex round 14
+# R15-1 a wrapped Apple submit never borrows an Android flag from a harmless command, Android only needs main's rule too
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf '{"name":"r","scripts":{"ship":"%s deliver"}}' "$FL" > "$D/package.json"
+rr_hook "npm run ship; echo -p android" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r15-1 a wrapped Apple submit keeps the Apple checks beside echo -p android" || bad "r15-1 a wrapped Apple submit keeps the Apple checks beside echo -p android (rc=$RC)"
+rm -rf "$D"
+# R15-2 a framework marker inside a split native app still counts for the root it was pooled with
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/Native/Native.xcodeproj"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Info.plist"
+printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/ios/Legacy.swift"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '<widget id="com.acme.native"/>\n' > "$D/Native/config.xml"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r15-2 a framework marker in a split native app still counts for the root" || bad "r15-2 a framework marker in a split native app still counts for the root (rc=$RC)"
 rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

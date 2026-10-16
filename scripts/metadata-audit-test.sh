@@ -171,5 +171,13 @@ OUT="$($AUDIT "$OV" 2>&1)"
 ! echo "$OUT" | grep -q 'INVALID-METADATA-URL' && ok "a locale value overrides a parent conflict" || bad "a locale value overrides a parent conflict"
 rm -rf "$OV"
 
+# fastlane's default folder fills every locale that lacks a field, so the name and keywords are audited together
+DF="$(mktemp -d)"; mkdir -p "$DF/default" "$DF/en-US"
+printf 'Journal' > "$DF/default/name.txt"
+printf 'https://j.test/privacy' > "$DF/default/privacy_url.txt"; printf 'https://j.test/help' > "$DF/default/support_url.txt"
+printf 'journal' > "$DF/en-US/keywords.txt"
+OUT="$($AUDIT "$DF" 2>&1)"
+echo "$OUT" | grep -q 'KEYWORD-FORMAT' && ! echo "$OUT" | grep -q 'MISSING-PRIVACY' && ok "a locale inherits the default folder" || bad "a locale inherits the default folder"
+rm -rf "$DF"
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

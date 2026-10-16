@@ -420,6 +420,11 @@ NQSEGS
     fi
   fi
 fi
+# Android only also needs the 1.0.0 rule, so the Apple checks are never off where 1.0.0 ran them.
+if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && ! { printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b' \
+  && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; }; then
+  CMD_TARGET_ANDROID_ONLY=0
+fi
 CMD_TARGET_IOS_ONLY=0
 if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \
   && ! printf '%s' "$CMD" | grep -qiE 'android|(-p|--platform)[[:space:]=]+all'; then
@@ -614,6 +619,37 @@ fi
 SCAN_ERROR=""
 
 # ----- the scan of one tree (issue #612). Runs once per app root, or once on the project root -----
+detect_frameworks() {  # sets the IS_<framework> flags for the tree under DIR
+IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
+find_app 12 -name 'pubspec.yaml' | grep . >/dev/null && IS_FLUTTER=1
+# Scan EVERY package.json within depth (not just the first), so a monorepo root's tooling
+# package.json never shadows a real apps/mobile/package.json deeper in the tree.
+while IFS= read -r pkg; do
+  grep -qE '"react-native"|"expo"' "$pkg" 2>/dev/null && IS_RN=1
+  grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$pkg" 2>/dev/null && IS_IONIC=1
+done < <(find_app 12 -name 'package.json' | grep -vE '/(node_modules|ios/Pods)/')
+find_app 12 -name 'capacitor.config.*' | grep . >/dev/null && IS_IONIC=1
+# config.xml alone is ambiguous (Maven/NuGet/tooling also use that filename), so require the
+# Cordova widget marker before it counts as a signal.
+while IFS= read -r cfg; do
+  grep -qE '<widget|xmlns:cdv' "$cfg" 2>/dev/null && IS_IONIC=1
+done < <(find_app 12 -name 'config.xml')
+
+# ----- Unity, .NET MAUI, Tauri mobile, Kotlin Multiplatform (issue #837) -----
+IS_UNITY=0; IS_MAUI=0; IS_TAURI=0; IS_KMP=0
+find_app 6 -name 'ProjectVersion.txt' -path '*/ProjectSettings/*' | grep . >/dev/null && IS_UNITY=1
+while IFS= read -r cs; do
+  grep -qE '<UseMaui>[[:space:]]*true|net[0-9.]+-(ios|android|maccatalyst)' "$cs" 2>/dev/null || continue
+  IS_MAUI=1
+  grep -qE 'net[0-9.]+-ios' "$cs" 2>/dev/null && IS_IOS=1
+  grep -qE 'net[0-9.]+-android' "$cs" 2>/dev/null && IS_AND=1
+done < <(find_app 6 -name '*.csproj')
+find_app 6 -name 'tauri.conf.json' -o -name 'tauri.conf.json5' -o -name 'Tauri.toml' | grep . >/dev/null && IS_TAURI=1
+while IFS= read -r g; do
+  grep -qE 'kotlin\("multiplatform"\)|org\.jetbrains\.kotlin\.multiplatform|kotlinMultiplatform' "$g" 2>/dev/null && { IS_KMP=1; break; }
+done < <(find_app 6 -name 'build.gradle.kts' -o -name 'build.gradle' -o -name 'libs.versions.toml')
+}
+
 scan_tree() {
 
 # ----- build a source file list, excluding vendor dirs -----
@@ -651,35 +687,8 @@ find_app 12 -name 'package.json' -o -name 'index.html' -o -name 'webpack.config.
 
 # ----- cross-platform framework detection -----
 # IS_IOS/IS_AND above still fire on the built artifact. This adds framework-specific checks.
-IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
-find_app 12 -name 'pubspec.yaml' | grep . >/dev/null && IS_FLUTTER=1
-# Scan EVERY package.json within depth (not just the first), so a monorepo root's tooling
-# package.json never shadows a real apps/mobile/package.json deeper in the tree.
-while IFS= read -r pkg; do
-  grep -qE '"react-native"|"expo"' "$pkg" 2>/dev/null && IS_RN=1
-  grep -qE '"@capacitor/core"|"@capacitor/ios"|"@capacitor/android"|"@ionic/(angular|react|vue)"|"cordova-android"|"cordova-ios"' "$pkg" 2>/dev/null && IS_IONIC=1
-done < <(find_app 12 -name 'package.json' | grep -vE '/(node_modules|ios/Pods)/')
-find_app 12 -name 'capacitor.config.*' | grep . >/dev/null && IS_IONIC=1
-# config.xml alone is ambiguous (Maven/NuGet/tooling also use that filename), so require the
-# Cordova widget marker before it counts as a signal.
-while IFS= read -r cfg; do
-  grep -qE '<widget|xmlns:cdv' "$cfg" 2>/dev/null && IS_IONIC=1
-done < <(find_app 12 -name 'config.xml')
-
-# ----- Unity, .NET MAUI, Tauri mobile, Kotlin Multiplatform (issue #837) -----
-IS_UNITY=0; IS_MAUI=0; IS_TAURI=0; IS_KMP=0
-find_app 6 -name 'ProjectVersion.txt' -path '*/ProjectSettings/*' | grep . >/dev/null && IS_UNITY=1
-while IFS= read -r cs; do
-  grep -qE '<UseMaui>[[:space:]]*true|net[0-9.]+-(ios|android|maccatalyst)' "$cs" 2>/dev/null || continue
-  IS_MAUI=1
-  grep -qE 'net[0-9.]+-ios' "$cs" 2>/dev/null && IS_IOS=1
-  grep -qE 'net[0-9.]+-android' "$cs" 2>/dev/null && IS_AND=1
-done < <(find_app 6 -name '*.csproj')
-find_app 6 -name 'tauri.conf.json' -o -name 'tauri.conf.json5' -o -name 'Tauri.toml' | grep . >/dev/null && IS_TAURI=1
-while IFS= read -r g; do
-  grep -qE 'kotlin\("multiplatform"\)|org\.jetbrains\.kotlin\.multiplatform|kotlinMultiplatform' "$g" 2>/dev/null && { IS_KMP=1; break; }
-done < <(find_app 6 -name 'build.gradle.kts' -o -name 'build.gradle' -o -name 'libs.versions.toml')
-# A native app split off a framework root keeps that root's framework checks, as when both were scanned together (#656).
+detect_frameworks
+# The project root and a native app split off it keep every framework the pooled tree showed, as when it was one scan (#656).
 for fw in ${INHERIT_FW:-}; do
   case "$fw" in flutter) IS_FLUTTER=1 ;; rn) IS_RN=1 ;; ionic) IS_IONIC=1 ;; unity) IS_UNITY=1 ;; maui) IS_MAUI=1 ;; tauri) IS_TAURI=1 ;; kmp) IS_KMP=1 ;; esac
 done
@@ -1375,14 +1384,33 @@ if [ -n "$ROOTS" ]; then
   PROJECT_ROOT="${DIR%/}"
   echo "Apps. $(printf '%s\n' "$ROOTS" | grep -c .) app roots, each scanned on its own"
   echo ""
-  # The project root goes first, so a native app split off it can inherit its framework checks.
-  ROOTS="$(printf '%s\n' "$ROOTS" | awk -v r="$PROJECT_ROOT" '{ k=$0; sub(/\/$/, "", k) } k == r { print; next } { o=o $0 "\n" } END { printf "%s", o }')"
-  ROOT_FW=""
+  POOL_FW=""; SPLIT_NATIVE=""
+  if printf '%s\n' "$ROOTS" | sed 's:/$::' | grep -qxF "$PROJECT_ROOT"; then
+    NESTED_PRUNE=()
+    while IFS= read -r OTHER; do
+      [ -n "$OTHER" ] && [ "${OTHER%/}" != "$PROJECT_ROOT" ] || continue
+      if ! has_framework_marker "$OTHER" && (DIR="$PROJECT_ROOT"; bare_native_apart "$OTHER"); then
+        SPLIT_NATIVE="$SPLIT_NATIVE${OTHER%/}
+"
+      else
+        NESTED_PRUNE+=(-o -path "$(printf '%s' "$OTHER" | sed 's/[][*?\\]/\\&/g')")
+      fi
+    done <<EOF3
+$ROOTS
+EOF3
+    if [ -n "$SPLIT_NATIVE" ]; then
+      SAVE_DIR="$DIR"; SAVE_IOS="${IS_IOS:-0}"; SAVE_AND="${IS_AND:-0}"; DIR="$PROJECT_ROOT"; detect_frameworks; DIR="$SAVE_DIR"; IS_IOS="$SAVE_IOS"; IS_AND="$SAVE_AND"
+      [ "$IS_FLUTTER" -eq 1 ] && POOL_FW="$POOL_FW flutter"; [ "$IS_RN" -eq 1 ] && POOL_FW="$POOL_FW rn"
+      [ "$IS_IONIC" -eq 1 ] && POOL_FW="$POOL_FW ionic"; [ "$IS_UNITY" -eq 1 ] && POOL_FW="$POOL_FW unity"
+      [ "$IS_MAUI" -eq 1 ] && POOL_FW="$POOL_FW maui"; [ "$IS_TAURI" -eq 1 ] && POOL_FW="$POOL_FW tauri"
+      [ "$IS_KMP" -eq 1 ] && POOL_FW="$POOL_FW kmp"
+    fi
+  fi
   while IFS= read -r ROOT; do
     [ -n "$ROOT" ] || continue
     INHERIT_FW=""
-    if [ "${ROOT%/}" != "$PROJECT_ROOT" ] && [ -n "$ROOT_FW" ] && ! has_framework_marker "$ROOT" && (DIR="$PROJECT_ROOT"; bare_native_apart "$ROOT"); then
-      INHERIT_FW="$ROOT_FW"
+    if [ -n "$POOL_FW" ] && { [ "${ROOT%/}" = "$PROJECT_ROOT" ] || printf '%s' "$SPLIT_NATIVE" | grep -qxF "${ROOT%/}"; }; then
+      INHERIT_FW="$POOL_FW"
     fi
     NESTED_PRUNE=()
     if [ "${ROOT%/}" = "$PROJECT_ROOT" ]; then
@@ -1394,13 +1422,6 @@ EOF2
     [ -L "${DIR%/}" ] && DIR="$(cd "$DIR" 2>/dev/null && pwd -P)"   # a linked app (issue #657) is walked through its target
     echo "App. $ROOT"
     scan_tree
-    if [ "${ROOT%/}" = "$PROJECT_ROOT" ]; then
-      ROOT_FW=""
-      [ "$IS_FLUTTER" -eq 1 ] && ROOT_FW="$ROOT_FW flutter"; [ "$IS_RN" -eq 1 ] && ROOT_FW="$ROOT_FW rn"
-      [ "$IS_IONIC" -eq 1 ] && ROOT_FW="$ROOT_FW ionic"; [ "$IS_UNITY" -eq 1 ] && ROOT_FW="$ROOT_FW unity"
-      [ "$IS_MAUI" -eq 1 ] && ROOT_FW="$ROOT_FW maui"; [ "$IS_TAURI" -eq 1 ] && ROOT_FW="$ROOT_FW tauri"
-      [ "$IS_KMP" -eq 1 ] && ROOT_FW="$ROOT_FW kmp"
-    fi
     flush_findings
     # One scannable sibling must not speak for a root the store checks never ran on.
     # The project root scanned only beside a linked app, with no marker and nothing found, is not an app (#657).

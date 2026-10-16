@@ -191,8 +191,8 @@ def swift_code_lines(content):
             out.append(" " * len(line))
             continue
         if t.startswith("/*") or t.startswith("*"):
-            # a block comment that closes on this line hides only itself, the code after */ still counts
-            end = line.rfind("*/")
+            # only the leading block comment is blanked, the code after its */ still counts
+            end = line.find("*/", len(line) - len(t) + (2 if t.startswith("/*") else 0))
             if end == -1:
                 out.append(" " * len(line))
             else:
