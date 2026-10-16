@@ -391,7 +391,7 @@ SEGS
   # Each command in the line is read twice, quoted text kept and quoted text blanked, # comments dropped. A submit is found
   # in the kept text, its Android word only in the blanked text, and anything that is neither a submit nor harmless keeps Apple.
   if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ]; then
-    NQ_SEP="$(printf '\001')"
+    NQ_SEP="$(printf '\037')"
     CMD_PAIRS="$(printf '%s' "$CMD" | awk -v sq="'" -v sep="$NQ_SEP" '{ k=""; b=""; n=length($0); i=1
       while (i <= n) { c=substr($0, i, 1)
         if (c == "#" && (i == 1 || substr($0, i-1, 1) ~ /[ \t]/)) break

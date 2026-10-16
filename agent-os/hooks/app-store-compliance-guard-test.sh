@@ -3028,6 +3028,15 @@ printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "
 rr_hook "nx run x:ship" "$D"
 [ "$RC" -eq 2 ] && ok "r18-2 an Nx target with an env object is still a submit" || bad "r18-2 an Nx target with an env object is still a submit (rc=$RC)"
 rm -rf "$D"
+# R19 the guard itself on macOS bash 3.2, which reads the \001 separator as a quoting byte
+if [ -x /bin/bash ] && /bin/bash --version 2>/dev/null | grep -q 'version 3\.'; then
+  D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+  EA="eas"" submit"
+  OUT="$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$EA --platform android" | CLAUDE_PROJECT_DIR="$D" /bin/bash "$GUARD" 2>&1)"; RC=$?
+  [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "r19 bash 3.2 reads an Android submit as Android only" || bad "r19 bash 3.2 reads an Android submit as Android only (rc=$RC)"
+  rm -rf "$D"
+fi
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
