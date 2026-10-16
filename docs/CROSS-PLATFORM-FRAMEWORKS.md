@@ -9,9 +9,13 @@ generated the app, on top of the native checks.
 
 | Framework | Detected by |
 |---|---|
-| Flutter | `pubspec.yaml` present within 3 levels of the project root |
-| React Native / Expo | `package.json` dependency on `react-native` or `expo` |
-| Ionic / Capacitor / Cordova | `package.json` dependency on `@capacitor/*`, `@ionic/*`, or `cordova-*`, OR a `capacitor.config.*` / `config.xml` file |
+| Flutter | `pubspec.yaml` present within 12 levels of the project root |
+| React Native / Expo | `package.json` within 12 levels with a dependency on `react-native` or `expo` |
+| Ionic / Capacitor / Cordova | `package.json` within 12 levels with a dependency on `@capacitor/*`, `@ionic/*`, or `cordova-*`, OR a `capacitor.config.*` / `config.xml` file within 12 levels |
+
+These depths come from the `find_app` calls in
+`agent-os/hooks/app-store-compliance-guard.sh`. Unity, .NET MAUI, Tauri mobile,
+and Kotlin Multiplatform are searched within 6 levels.
 
 A project can match more than one framework flag (a Capacitor app that also
 imports `expo` polyfills, for example); every matching check runs. Detection scans
@@ -28,7 +32,8 @@ known (hook mode) and clearly targets Android only (`build apk/appbundle`,
 `assembleRelease`, `bundleRelease`, `run-android`, `run:android`,
 `--platform android`, `capacitor android`, with no `ios`/`ipa`/`xcodebuild`
 token present), the command overrides the file-tree signal and these Apple-only
-checks stay silent. Standalone mode (no command context) falls back to plain
+checks stay silent. 2.0.0 also requires every other command in the line to be a
+known harmless one, so it never silences more than 1.0.0 did. Standalone mode (no command context) falls back to plain
 file-tree detection.
 
 ## Submission commands the guard recognizes
@@ -99,11 +104,12 @@ Added for issue 837. Each one is detected, named on the `Frameworks.` line, and 
 | Tauri mobile | `tauri.conf.json`, `tauri.conf.json5` or `Tauri.toml` | `.rs`, `.toml` | `tauri ios build`, `tauri android build`, with or without `cargo` or `npx` |
 | Kotlin Multiplatform | the multiplatform plugin in a Gradle file | `commonMain` Kotlin, as before | the Gradle and `xcodebuild archive` commands already covered |
 
-Three behaviours to know.
+Four behaviours to know.
 
 - A Unity project is scanned for both stores when it is run by hand. As a hook the `-buildTarget` value picks the store.
 - A Unity project holds no Xcode or Gradle project until it is exported, so the export compliance check and the R8 check stay silent and the report says so. Scan the exported project too.
 - A Kotlin Multiplatform project is scanned as one app, so shared code in `commonMain` counts for both the iOS and the Android checks.
+- A bare Xcode or Android project under a root Expo, React Native, Flutter, or Capacitor app is scanned as its own app when it has its own `Info.plist` or `AndroidManifest.xml` and no root build file names its path (`settings.gradle`, a `Podfile`, or an `.xcworkspace`). It counts as an app only with an `.xcodeproj` that builds an application (or names no product type) or an Android application module, so a library, a framework or a local native module stays with the app that uses it. A native host that embeds the root framework (React Native, Expo, Flutter, Capacitor or Cordova code in its sources, such as an `RCTAppDelegate`, or its Podfile or Gradle files) is a brownfield host and stays in the root scan, so the root's framework checks still cover it. A native app that does split off, and the root it left, both keep every framework check the pooled tree showed, so every check that ran when they were scanned as one still runs, a framework marker found only inside the split app included. The root and its split native apps are also scanned together as in 1.0.0, and any finding the separate scans missed is added once, so evidence spread across a shared file and the split app still counts. A project in a folder named exactly `demo`, `example`, `sample`, or `playground` (or the plural) is treated as a repo demo and stays part of the root scan. A nested project splits off only when the root has its own project for that platform, so a managed Expo root with no native project keeps scanning the nested project and keeps its iOS checks. A native root app never splits off a nested project (issue #656).
 
 ## What stays out of reach
 
@@ -118,6 +124,10 @@ These are limits, not bugs waiting for a fix. Plan around them.
 - **Rust naming.** The sign-in and account-deletion patterns look for camelCase names such as `signIn`. A Rust function named `sign_in` does not trigger them.
 - **Frameworks not detected.** NativeScript and legacy Xamarin.Forms projects.
 - **More than one Xcode target.** Targets are read as one body of source, so an app extension can satisfy, or trigger, a finding for the main app. A watchOS-only or visionOS-only workspace is treated as iOS.
+- **Pooled or split layouts that remain coarse (inherited from 1.0).** A single nested managed Expo app is read through the root's config only, shared packages and a brownfield host's source outside the scanned root are not followed, every native target in one root is pooled, and two .NET MAUI or Unity apps in one repo are scanned as one.
+- **Workspace runners.** A package script is followed one level deep, so a root script that runs `turbo run build`, which in turn runs a mobile package's submit, is not seen. A pnpm graph selector (`web...`, `...web`, `{apps/web}`) is reduced to its package name, without following that package's dependencies or dependents, and a change-set selector such as `"[origin/main]"` cannot be resolved, so it reads every package, which can block a web-only build in a repo that also holds a mobile app. Run the web build without the wrapper, or set `APP_STORE_GUARD_OK=1` once.
+- **Cross-platform purchase plugins.** 1.0.0 checked the restore flow only for native StoreKit apps. 2.0.0 also checks a react-native-iap, RevenueCat or Flutter purchase plugin app, where a purchase list query (`getAvailablePurchases`, `queryPastPurchases`) or the plugin's restore call counts as the restore flow. Check by hand that a visible Restore Purchases control calls it.
+- **Monitor source verification.** The regulatory and privacy monitors mark a claim as corroborated when an official source shares its keywords, not when that source states the same claim. Read the official source before acting on a monitor item.
 - **Store console state.** The guard cannot see App Store Connect or Play Console, so the age rating, social media declaration, and closed testing items are reminders, not proof of a problem.
 
 ## Known gaps (found by Codex and Qwen adversarial review, not yet fixed)
@@ -130,26 +140,30 @@ These are limits, not bugs waiting for a fix. Plan around them.
   `<!-- <widget ...> -->` or a look-alike tag like `<widgetConfig>` still counts
   as Cordova evidence. Low severity, no realistic false negative on a real
   Cordova project, though not a hard proof either.
-- **Android-side framework checks are absent.** Every check in this doc is
+- **Android-side framework checks are thin.** Apart from the Android
+  permissions array a managed Expo app config declares, every check in this doc is
   Apple-side. Flutter/RN/Ionic apps also ship to Google Play, where Data Safety
   disclosure for bundled SDKs, WebView-controlled data collection, cleartext
   traffic, and mixed-content/debug flags are real, framework-relevant risks this
   guard does not yet check.
-- **The PrivacyInfo.xcprivacy presence check is both too loose and too strict.**
-  It accepts a manifest found anywhere, including inside `node_modules` or
-  `Pods`, which does not prove an APP-LEVEL manifest exists. It also has no
-  Expo-managed-workflow awareness (`expo.ios.privacyManifests` in `app.json`
-  can be valid with no `ios/PrivacyInfo.xcprivacy` on disk yet, since EAS
-  generates the native project remotely at build time).
-- **Expo Continuous Native Generation (CNG) is not modeled.** A managed Expo
-  project legitimately has no committed `ios/`/`android/` folder; treating that
-  as "no iOS target" is not always correct.
+- **The PrivacyInfo.xcprivacy check reads the app's own manifest only.**
+  A manifest under `Pods`, `Carthage`, `node_modules`, SwiftPM `.build` or
+  checkouts, `SourcePackages` or Flutter `.symlinks` does not count. A managed
+  Expo app passes with `expo.ios.privacyManifests` in its app config, since EAS
+  generates the native project at build time.
+- **Expo Continuous Native Generation (CNG) is modeled for config only.** A
+  managed Expo project with no committed `ios/` or `android/` folder has its
+  `app.json` or `app.config` read for camera and location purpose strings,
+  `ios.privacyManifests` and the sensitive `android.permissions` entries. Its
+  native code is still NOT CHECKED until `npx expo prebuild` runs.
 - **Two frameworks have no coverage.** NativeScript and legacy Xamarin.Forms
   are not detected. Unity, .NET MAUI, Tauri mobile, and Kotlin Multiplatform
   are, see the section above for what each one still cannot see.
-- **The submission regex still misses a few real commands**
-  (`eas build` with no platform flag, ambiguous local `cap run` without a
-  release intent) and can overfire on non-release local dev commands.
+- **The submission regex errs toward firing.** `SUBMIT_RE` in
+  `agent-os/hooks/app-store-compliance-guard.sh` matches `eas build` with or
+  without a `--platform` flag, also when global flags come before the
+  subcommand. It also matches every `cap run` and `cap open`, so a local dev
+  run with no release intent still triggers the guard.
 
 These are logged, not hidden. Track them before treating this guard as complete
 coverage for a cross-platform team; the checks that exist are a real

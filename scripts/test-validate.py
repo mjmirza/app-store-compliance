@@ -133,5 +133,31 @@ class TestDateOrder(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
+class TestVersionsAgree(unittest.TestCase):
+    """VERSION, the data files and CITATION.cff must name one release."""
+
+    def run_with(self, text):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "VERSION")
+            with open(path, "w") as f:
+                f.write(text)
+            env = {k: v for k, v in os.environ.items() if k != "DEADLINES_FILE"}
+            env["VERSION_FILE"] = path
+            cmd = [sys.executable, os.path.join(ROOT, "scripts", "validate.py")]
+            r = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_mismatch_fails(self):
+        rc, out = self.run_with("9.9.9\n")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("9.9.9", out)
+        self.assertIn("CITATION.cff", out)
+
+    def test_real_version_matches(self):
+        with open(os.path.join(ROOT, "VERSION")) as f:
+            rc, out = self.run_with(f.read())
+        self.assertEqual(rc, 0, out)
+
+
 if __name__ == "__main__":
     unittest.main()

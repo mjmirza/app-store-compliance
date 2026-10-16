@@ -1,6 +1,11 @@
 # Pre Submission Checklist
 
-Treat every unchecked box as a release blocker. Run this before any upload to App Store Connect or the Play Console. Each item is phrased as a verifiable check.
+Run this before any upload to App Store Connect or the Play Console. Each item is phrased as a verifiable check. Every box ends in one of two states, checked or marked not applicable. An empty box is a release blocker.
+
+Not applicable is allowed one item at a time, and only with a one-line reason written next to the box, for example "N/A. no login, so no demo account" or "N/A. no in app purchases". An item with no reason counts as unchecked. Two items can never be marked not applicable, because every app has them:
+
+- The privacy declaration matches what the app really collects at runtime, every SDK included.
+- A privacy policy URL is published and reachable from inside the app.
 
 ## Start here. Two checks, about five minutes
 
@@ -30,14 +35,14 @@ Then work down the page. Do Shared first, then the store you ship to. Skip any s
 - [ ] Every third party SDK and its data behavior is known and declared.
 
 ### Mobile Security and Best Practices
-For a deep-dive reference across platform best practices, see `docs/MOBILE-SECURITY-2026.md`.
+For a deep-dive reference across platform best practices, see the [mobile security guide](MOBILE-SECURITY-2026.md).
 - [ ] **Secure Storage:** Sensitive items (session tokens, passwords, keys) are stored securely (iOS Keychain or Android EncryptedSharedPreferences/Keystore) and never in plaintext files, plain SharedPreferences, or unencrypted local databases.
 - [ ] **Biometrics:** Biometric login (FaceID, TouchID, BiometricPrompt) is crypto-backed, requiring biometric validation to unlock a secure cryptographic key rather than just returning a bypassable boolean.
 - [ ] **Jailbreak and Root Detection:** Device environment check is implemented locally (and backed by Google Play Integrity on Android) to block or gracefully degrade app features when run on compromised/rooted/jailbroken devices.
-- [ ] **Certificate Pinning and SSL:** SSL/TLS cleartext traffic is completely disabled. Public key pinning (SPKI hashes) is implemented on critical endpoints with valid backup pins configured.
+- [ ] **Certificate Pinning and SSL:** SSL/TLS cleartext traffic is completely disabled. Public key pinning (SPKI hashes, a fingerprint of the server's public key) is implemented on critical endpoints with valid backup pins configured.
 - [ ] **Backup Exclusion:** Sensitive private directory files (database files, token preferences) are explicitly excluded from automatic iOS iCloud/iTunes backups and Android ADB/Google Drive backups.
 - [ ] **Deep Link and URL Schemes Verification:** Inputs from deep links, Universal Links, and App Links are treated as untrusted, sanitized, and thoroughly validated. Secure Universal Links (iOS) and verified App Links (Android) are used instead of easily hijackable custom schemes.
-- [ ] **Secure Auth and Session Flows:** Standard modern flows like OAuth 2.1 or OIDC with PKCE are used without hardcoded client secrets. Session timeouts are enforced, and all local tokens, databases, and caches are thoroughly destroyed on logout or session expiration.
+- [ ] **Secure Auth and Session Flows:** Standard modern flows like OAuth 2.1 or OIDC with PKCE (a one-time proof that stops a stolen login code from being reused) are used without hardcoded client secrets. Session timeouts are enforced, and all local tokens, databases, and caches are thoroughly destroyed on logout or session expiration.
 
 ### Metadata and listing
 - [ ] The app name, description, and screenshots match what the app actually does.
@@ -88,7 +93,7 @@ For a deep-dive reference across platform best practices, see `docs/MOBILE-SECUR
 
 ## EU specific (legal layer, if the app reaches EU users)
 
-Passing App Review does not make an app EU-legal. The full hard rules and sources are in docs/EU-REGULATORY-2026.md.
+Passing App Review does not make an app EU-legal. The full hard rules and sources are in the [EU regulatory guide](EU-REGULATORY-2026.md).
 
 - [ ] DSA trader status is declared and verified in App Store Connect. A missing declaration removes the app from the EU App Store (Apple enforced 17 February 2025).
 - [ ] Any AI feature reaching EU users shows an in-app notice that the user is interacting with AI, at or before first interaction (EU AI Act Article 50(1), in force 2 August 2026).
@@ -102,7 +107,7 @@ Passing App Review does not make an app EU-legal. The full hard rules and source
 
 ## Global specific (USA and other markets, if the app reaches those users)
 
-The full hard rules and sources are in docs/GLOBAL-REGULATORY-2026.md. This is legal, on top of App Review. Several dates are under active litigation, so re-verify each against the cited source.
+The full hard rules and sources are in the [global regulatory guide](GLOBAL-REGULATORY-2026.md). This is legal, on top of App Review. Several dates are under active litigation, so re-verify each against the cited source.
 
 - [ ] Child-directed or under-13 data. COPPA verifiable parental consent, a separate opt-in for ad or third-party disclosure, a written retention policy and a written security program (general compliance date 22 April 2026).
 - [ ] US state App Store Accountability Acts (Utah, Texas, Louisiana, Alabama). the app requests an age category from the store, confirms parental consent for a minor, and re-requests on a major change, wired through the Declared Age Range API (iOS) or the Play Age Signals API (Android, ensuring strict ToS compliance prohibiting ads, marketing, user profiling, or analytics use of age data).
@@ -119,7 +124,7 @@ The full hard rules and sources are in docs/GLOBAL-REGULATORY-2026.md. This is l
 
 ## Platform mechanics gate (both stores, if the item applies)
 
-The full detail with dated sources is in `PLATFORM-MECHANICS-2026.md`. These are current, common, blocking causes the base maps did not carry.
+The full detail with dated sources is in the [platform mechanics guide](PLATFORM-MECHANICS-2026.md). These are current, common, blocking causes the base maps did not carry.
 
 Apple.
 
@@ -149,7 +154,7 @@ Cross-cutting.
 - [ ] Account-creating app has both an in-app account-and-data deletion flow and a publicly reachable web deletion URL, declared.
 - [ ] Not on the OFAC SDN list, and country availability excludes the embargoed territories.
 - [ ] Releasing in Syria. EAR jurisdiction, classification, and the license exception or license relied on are documented (15 CFR 746.9).
-- [ ] Non-store card payments for real goods implement PSD2 SCA and 3D Secure in the EU or UK, store no card number, and identify the correct PCI SAQ.
+- [ ] Non-store card payments for real goods implement PSD2 SCA and 3D Secure in the EU or UK, store no card number, and identify the correct PCI SAQ (the card industry self-assessment form that fits how the app takes payments).
 
 ## The two checks that prevent the most rejections
 

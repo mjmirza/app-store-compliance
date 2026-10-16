@@ -42,5 +42,4 @@ bash ~/.claude/hooks/app-store-compliance-guard.sh <project-path>
 
 - Skill. `~/.claude/skills/app-store-compliance/`
 - Guard. `~/.claude/hooks/app-store-compliance-guard.sh`
-- Rule. `~/.claude/rules/app-store-compliance.md`
 - Public playbook. https://github.com/mjmirza/app-store-compliance

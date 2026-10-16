@@ -31,7 +31,7 @@ The compliance reference lives in the `app-store-compliance` repo. The key files
 - `docs/PLATFORM-MECHANICS-2026.md` the platform-mechanics and newer-policy hard rules with dated sources. macOS notarization, Guideline 4.2 and 4.3 with the June 2026 saturation tightening, reader apps, France ANSSI encryption, visionOS and watchOS and tvOS specifics, Android developer verification, Foreground Service types, Play Integrity, Play Billing v8, target API, Health Connect, and the cross-cutting CSAM, UGC, accessibility, sanctions, and PCI items. Load it for any app whose type touches these.
 - `references/` the structured, AI loadable tree. Load `references/guidelines/by-app-type/<type>.md` for the app at hand and the relevant `references/rules/<category>.md` files for full context before judging.
 - `templates/REVIEW-NOTES-TEMPLATE.md` the review notes template to hand the user for a new submission.
-- `agent-os/hooks/app-store-compliance-guard.sh` the automated scanner.
+- `app-store-compliance-guard.sh` the automated scanner. The install puts it in your tool's hooks folder, listed in Step 2.
 
 For the strongest audit, also run the metadata layer. A large share of rejections live in the listing text, not the source.
 
@@ -39,9 +39,13 @@ For the strongest audit, also run the metadata layer. A large share of rejection
 bash scripts/pull-metadata.sh apple      # pulls the live listing into ./metadata via the asc CLI
 python3 scripts/metadata-audit.py ./metadata        # audits name, subtitle, keywords, description, URLs
 python3 scripts/metadata-audit.py ./metadata --propose   # writes suggested fixes, source copy untouched
+python3 scripts/metadata-audit.py ./metadata/android --platform google   # Google Play limits and rules
+python3 scripts/release-audit.py /path/to/app --metadata ./metadata     # full gate, exit 0 clear, 2 blocked, 3 incomplete
 ```
 
-The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and broken URLs. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
+The metadata audit checks character limits, other platform mentions, future functionality, negative Apple sentiment, profanity, ranking and price claims, keyword formatting, missing privacy policy and subscription terms, China storefront AI references, and malformed URLs (pass `--check-urls` to also test that each URL loads). It audits every locale folder on its own, filled from a fastlane `default/` folder and parent folders like fastlane does, and names the locale in each finding. It flags a URL that is not a real http or https address, an Apple listing with no support URL, a Google listing with no contact email, and a subscription with no real Terms or EULA link. Run it, then re run it after applying fixes. That is the detect, propose, re validate loop.
+
+The release audit blocks on any critical or high finding with exit 2. It exits 3 when a scan failed or the listing was not audited, so pass `--metadata` with your pulled listing.
 
 For monitoring evolving developer requirements, also run the Apple Developer requirements monitor. This tracks 25 key categories against active developer news/announcements and maps updates directly to repository impact:
 
@@ -59,11 +63,29 @@ The monitor determines repository impact, identifies affected files, generates m
 
 ### Step 2. Run the automated scan
 
-Run the guard against the project root.
+Run the guard against the project root. Use the copy the install put in your tool's hooks folder.
+
+| Tool | Guard |
+|---|---|
+| Claude Code | `~/.claude/hooks/app-store-compliance-guard.sh` |
+| Codex CLI | `~/.codex/hooks/app-store-compliance-guard.sh` |
+| Gemini CLI | `~/.gemini/hooks/app-store-compliance-guard.sh` |
+| OpenCode | `~/.config/opencode/hooks/app-store-compliance-guard.sh` |
+| Cursor | `~/.cursor/hooks/app-store-compliance-guard.sh` |
+| Copilot CLI | `~/.copilot/hooks/app-store-compliance-guard.sh`, or under `$COPILOT_HOME` when set |
+| Grok | `~/.grok/hooks/app-store-compliance-guard.sh` |
+| Qwen Code | `~/.qwen/hooks/app-store-compliance-guard.sh`, or under `$QWEN_HOME` when set |
+| Kimi Code | `~/.kimi-code/hooks/app-store-compliance-guard.sh`, or under `$KIMI_CODE_HOME` when set |
+| Factory Droid | `~/.factory/hooks/app-store-compliance-guard.sh` |
+| Auggie | `~/.augment/hooks/app-store-compliance-guard.sh` |
+| Windsurf | `~/.codeium/windsurf/hooks/app-store-compliance-guard.sh` |
+| From a checkout | `~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-guard.sh` |
 
 ```
-bash <repo>/agent-os/hooks/app-store-compliance-guard.sh /path/to/app/project
+bash <guard path from the table> "/path/to/app/project"
 ```
+
+The `scripts/` paths in this skill are relative to this skill's own folder.
 
 It detects iOS and Android, scans for the rejection patterns, and prints findings ranked critical, high, medium. It exits 2 when a critical risk is present.
 

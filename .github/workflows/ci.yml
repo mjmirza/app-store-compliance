@@ -27,7 +27,9 @@ jobs:
         run: bash agent-os/hooks/app-store-compliance-guard-test.sh
 
       - name: Installer test suite
-        run: bash scripts/install-test.sh
+        run: |
+          bash scripts/install-test.sh
+          bash scripts/install-harness-test.sh
 
       - name: Every link, path, script and flag named in the docs exists
         run: |
@@ -45,6 +47,11 @@ jobs:
 
       - name: Release audit test
         run: bash scripts/release-audit-test.sh
+
+      - name: Privacy manifest validator and citation verifier tests
+        run: |
+          bash scripts/validate-privacy-manifest-test.sh
+          bash scripts/verify-citations-test.sh
 
       - name: Timeline and deadline checker tests
         run: |

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Runs metadata/guard scans against a target project and compiles a
-release-readiness report. Exits non-zero on any critical finding."""
+"""Release readiness audit. Usage. release-audit.py <app-dir> [--metadata <pulled-listing-dir>]
+Exit 0 clear, 2 blocked on a critical or high finding, 3 incomplete scan, 1 bad input."""
 
 import os
 import sys
@@ -9,6 +9,9 @@ import json
 import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GUARD_NAME = "app-store-compliance-guard.sh"
+BLOCKING = ("critical", "high")
+LISTING_HINT = "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>."
 
 # 13 Required areas
 REQUIRED_AREAS = [
@@ -103,7 +106,64 @@ MAP_PATTERNS_TO_AREAS = {
     "APPLE-2.1-DEBUG-FEATURES": ["Apple requirements", "Security"],
     "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION": ["Apple requirements"],
     "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": ["Apple requirements", "Store metadata"],
+    "BOTH-INVALID-METADATA-URL": ["Store metadata"],
+    "APPLE-MISSING-SUPPORT-URL": ["Apple requirements", "Store metadata"],
+    "GOOGLE-MISSING-CONTACT-EMAIL": ["Google Play requirements", "Store metadata"],
 }
+
+
+def resolve_guard():
+    """Find the guard. APP_STORE_GUARD_PATH wins, then the repo layout, then an installed skill.
+    Returns (path, None) or (None, reason)."""
+    env = os.environ.get("APP_STORE_GUARD_PATH", "").strip()
+    if env:
+        if os.path.isfile(env):
+            return os.path.abspath(env), None
+        return None, f"APP_STORE_GUARD_PATH points at {env}, which is not a file"
+    candidates = [
+        os.path.join(ROOT, "agent-os", "hooks", GUARD_NAME),
+        # installed. <config>/skills/app-store-compliance/scripts -> <config>/hooks
+        os.path.normpath(os.path.join(ROOT, "..", "..", "hooks", GUARD_NAME)),
+    ]
+    # shared skill in ~/.agents. the installer records each tool's guard path in .guards
+    try:
+        with open(os.path.join(ROOT, ".guards"), encoding="utf-8") as f:
+            candidates += [ln.rstrip("\n").partition("\t")[2] for ln in f if "\t" in ln]
+    except OSError:
+        pass
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c, None
+    return None, "looked in " + " and ".join(candidates)
+
+
+def scan_problems(name, code, out, err, ok_codes=(0, 2)):
+    """Reasons a scanner run cannot be trusted as a complete check. Empty means it ran fine."""
+    problems = []
+    text = (out or "") + "\n" + (err or "")
+    if code not in ok_codes:
+        problems.append(f"{name} exited {code}")
+    for marker in ("NOT CHECKED", "Nothing was audited"):
+        if marker in text:
+            line = next((ln.strip() for ln in text.splitlines() if marker in ln), marker)
+            problems.append(f"{name} did not check everything. {line}")
+    return problems
+
+
+def tail(text, n=8):
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    return lines[-n:]
+
+
+def decide_status(findings, problems):
+    """Overall status and exit code. A failed or partial scan never passes, a high finding blocks."""
+    if problems:
+        return "INCOMPLETE", 3
+    if any(f["severity"] in BLOCKING for f in findings):
+        return "BLOCKED", 2
+    if findings:
+        return "ADVISORY", 0
+    return "PASSED", 0
 
 
 def run_command(args, cwd=ROOT):
@@ -302,15 +362,33 @@ def find_affected_files(target_dir, patterns_dict):
 
 
 def main():
-    target_dir = ROOT
-    if len(sys.argv) > 1:
-        if not os.path.isdir(sys.argv[1]):
-            print(f"release-audit. '{sys.argv[1]}' is not a directory.", file=sys.stderr)
+    args = sys.argv[1:]
+    meta_dir = None
+    if "--metadata" in args:
+        i = args.index("--metadata")
+        meta_dir = args[i + 1] if i + 1 < len(args) else ""
+        del args[i:i + 2]
+        if not os.path.isdir(meta_dir):
+            print(f"release-audit. --metadata '{meta_dir}' is not a directory.", file=sys.stderr)
             return 1
-        target_dir = os.path.abspath(sys.argv[1])
+        meta_dir = os.path.abspath(meta_dir)
+    target_dir = ROOT
+    if args:
+        if not os.path.isdir(args[0]):
+            print(f"release-audit. '{args[0]}' is not a directory.", file=sys.stderr)
+            return 1
+        target_dir = os.path.abspath(args[0])
+
+    guard_path, guard_missing = resolve_guard()
+    if not guard_path:
+        print(f"release-audit. compliance guard not found, {guard_missing}.", file=sys.stderr)
+        print("Set APP_STORE_GUARD_PATH to the guard script, or reinstall with scripts/install.sh.", file=sys.stderr)
+        return 1
 
     print("== Starting Release Readiness Compliance Audit ==")
     print(f"Target Directory: {target_dir}")
+    print(f"Guard. {guard_path}")
+    print(f"Store listing. {meta_dir or target_dir + ' (pass --metadata to audit a pulled listing)'}")
     print("")
 
     # --- Step 1. Run Internal Validation and Test Engines ---
@@ -323,14 +401,16 @@ def main():
         print(val_err)
         return 1
 
-    guard_test_code, guard_test_out, guard_test_err = run_command(
-        ["bash", "agent-os/hooks/app-store-compliance-guard-test.sh"]
-    )
-    if guard_test_code != 0:
-        print("  ERROR: compliance guard tests failed")
-        print(guard_test_out)
-        print(guard_test_err)
-        return 1
+    guard_test = os.path.join(ROOT, "agent-os", "hooks", "app-store-compliance-guard-test.sh")
+    if os.path.isfile(guard_test):
+        guard_test_code, guard_test_out, guard_test_err = run_command(["bash", guard_test])
+        if guard_test_code != 0:
+            print("  ERROR: compliance guard tests failed")
+            print(guard_test_out)
+            print(guard_test_err)
+            return 1
+    else:
+        print("  The guard's own tests ship only with the repository, skipped in this installed copy.")
 
     meta_test_code, meta_test_out, meta_test_err = run_command(
         ["bash", "scripts/metadata-audit-test.sh"]
@@ -348,22 +428,46 @@ def main():
     print("Step 2 of 2. Scanning your app...", flush=True)
 
     # Run the compliance guard
-    guard_code, guard_out, guard_err = run_command(
-        ["bash", "agent-os/hooks/app-store-compliance-guard.sh", target_dir]
-    )
+    guard_code, guard_out, guard_err = run_command(["bash", guard_path, target_dir])
 
     # Run metadata-audit.py
-    # If en-US metadata exists, use it, otherwise let it run with default empty metadata scan
+    # The pulled listing from --metadata when given, otherwise the app folder itself
     meta_code, meta_out, meta_err = run_command(
-        ["python3", "scripts/metadata-audit.py", target_dir]
+        ["python3", "scripts/metadata-audit.py", meta_dir or target_dir]
     )
 
-    # Parse findings
     patterns_dict = load_patterns()
-    findings = []
+    findings = parse_findings(guard_out + "\n" + meta_out)
 
-    # Simple parse function for stdout of guard and metadata scripts
-    all_scanner_stdout = guard_out + "\n" + meta_out
+    problems = scan_problems("compliance guard", guard_code, guard_out, guard_err)
+    listing_missing = meta_dir is None and "Nothing was audited" in meta_out + meta_err
+    if listing_missing:
+        problems.append(LISTING_HINT)
+    else:
+        problems += scan_problems("metadata audit", meta_code, meta_out, meta_err)
+    if guard_code == 2 and not any(f["severity"] == "critical" for f in parse_findings(guard_out)):
+        problems.append("compliance guard exited 2 but reported no critical finding")
+    if problems:
+        print("")
+        print("Scan problems. The release cannot be approved until every scan completes.")
+        for p in problems:
+            print(f"  - {p}")
+        for name, out, err in (("compliance guard", guard_out, guard_err), ("metadata audit", meta_out, meta_err)):
+            if name in " ".join(problems):
+                for ln in tail(err) or tail(out):
+                    print(f"    {name}. {ln}")
+        if listing_missing:
+            seen = next((ln.strip() for ln in (meta_out + meta_err).splitlines() if "Nothing was audited" in ln), "")
+            print(f"    metadata audit. {seen}")
+        print("")
+
+    # Programmatically scan for affected files
+    affected_files_map = find_affected_files(target_dir, patterns_dict)
+    return compile_report(target_dir, findings, problems, patterns_dict, affected_files_map)
+
+
+def parse_findings(all_scanner_stdout):
+    findings = []
     lines = all_scanner_stdout.splitlines()
     i = 0
     while i < len(lines):
@@ -402,20 +506,17 @@ def main():
                     {"id": pid, "severity": sev, "title": title, "fix": fix}
                 )
         i += 1
+    return findings
 
-    # Programmatically scan for affected files
-    affected_files_map = find_affected_files(target_dir, patterns_dict)
 
+def compile_report(target_dir, findings, problems, patterns_dict, affected_files_map):
     # --- Step 3. Compile Report and Map to 13 Areas ---
     area_findings = {area: [] for area in REQUIRED_AREAS}
-    has_critical = False
+    overall_status, exit_code = decide_status(findings, problems)
+    has_blocking = any(f["severity"] in BLOCKING for f in findings)
 
     for f in findings:
         pid = f["id"]
-        sev = f["severity"]
-        if sev == "critical":
-            has_critical = True
-
         areas = get_areas_for_pattern(pid, patterns_dict)
         for area in areas:
             if area in area_findings:
@@ -428,16 +529,21 @@ def main():
     report_lines.append("")
     report_lines.append(f"Target Directory: {target_dir}")
 
-    overall_status = (
-        "BLOCKED" if has_critical else ("ADVISORY" if findings else "PASSED")
-    )
     report_lines.append(f"Overall Compliance Status: {overall_status}")
     report_lines.append("")
 
     report_lines.append("## Executive Summary")
-    if has_critical:
+    if problems:
         report_lines.append(
-            "The release is currently BLOCKED due to one or more critical compliance issues that must be resolved before submitting to the platforms."
+            "The audit is INCOMPLETE. One or more scans failed or did not check the app, so the release cannot be approved. Fix the scan problems below and run the audit again."
+        )
+        report_lines.append("")
+        report_lines.append("## Scan Problems")
+        for p in problems:
+            report_lines.append(f"- {p}")
+    elif has_blocking:
+        report_lines.append(
+            "The release is currently BLOCKED due to one or more critical or high compliance issues that must be resolved before submitting to the platforms."
         )
     elif findings:
         report_lines.append(
@@ -458,7 +564,7 @@ def main():
         area_status = "PASSED"
         area_f = area_findings[area]
         if area_f:
-            if any(af["severity"] == "critical" for af in area_f):
+            if any(af["severity"] in BLOCKING for af in area_f):
                 area_status = "BLOCKED"
             else:
                 area_status = "ADVISORY"
@@ -475,7 +581,7 @@ def main():
         area_f = area_findings[area]
         area_status = "PASSED"
         if area_f:
-            if any(af["severity"] == "critical" for af in area_f):
+            if any(af["severity"] in BLOCKING for af in area_f):
                 area_status = "BLOCKED"
             else:
                 area_status = "ADVISORY"
@@ -527,12 +633,13 @@ def main():
     )
     print(f"Overall Status: {overall_status}")
 
-    if has_critical:
-        print("Release is BLOCKED. Resolve critical issues.")
-        return 2
+    if overall_status == "INCOMPLETE":
+        print("Release is NOT APPROVED. A scan failed or did not check the app, see Scan problems above.")
+    elif overall_status == "BLOCKED":
+        print("Release is BLOCKED. Resolve the critical and high issues.")
     else:
         print("Release is CLEAR TO SUBMIT.")
-        return 0
+    return exit_code
 
 
 if __name__ == "__main__":

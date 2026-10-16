@@ -941,7 +941,7 @@ rm -rf "$D"
 # 94 a 5MB payload that is valid JSON with the command up front is scanned, well under the cap
 D="$(mk_ios_bad)"
 BIG="$(mktemp)"; { printf '{"tool_name":"Bash","tool_input":{"command":"npx eas submit --platform ios","description":"'; head -c 5000000 /dev/zero | tr '\0' 'x'; printf '"}}'; } > "$BIG"
-OUT="$(bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
+OUT="$(CLAUDE_PROJECT_DIR="$D" bash "$GUARD" < "$BIG" 2>&1)"; RC=$?; rm -f "$BIG"
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-32 5MB valid payload is scanned" || bad "610-32 5MB valid payload is scanned (rc=$RC bytes=${#OUT})"
 rm -rf "$D"
 
@@ -1575,7 +1575,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && ok "655-4 react-native as a dev dependency only never makes an app" || bad "655-4 react-native as a dev dependency only never makes an app (rc=$RC)"
 rm -rf "$D"
 
-# 656 documented limit, pinned. a bare Xcode project with its own Info.plist under a root Expo app stays part of the root scan
+# 656 a bare Xcode project in an examples folder under a root Expo app stays part of the root scan
 D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/examples/NativeDemo/Demo.xcodeproj" "$D/examples/NativeDemo/Demo"
 printf '{"expo":{"name":"root"}}' > "$D/app.json"
 printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
@@ -1898,6 +1898,1235 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$OUT" | grep -q '^CLEAR' && ok "c4-2 a plain Dart package beside a native app does not stop CLEAR" || bad "c4-2 a plain Dart package beside a native app does not stop CLEAR (rc=$RC)"
 rm -rf "$D"
 
+# Harness payloads (2.0.0). Codex, Gemini CLI, Cursor, Copilot CLI and OpenCode each send the shell command
+# in their own shape. Each must reach the scan on the jq and python3 tiers, and a non-shell tool must stay silent.
+D="$(mk_ios_bad)"
+NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date env; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
+harness_payload() { python3 -c '
+import json, sys
+kind, cmd, cwd = sys.argv[1], sys.argv[2], sys.argv[3]
+shapes = {
+  "codex": {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "gemini": {"hook_event_name": "BeforeTool", "tool_name": "run_shell_command", "tool_input": {"command": cmd}, "cwd": cwd},
+  "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
+  "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+  "copilot-obj": {"toolName": "bash", "toolArgs": {"command": cmd}, "cwd": cwd},
+  "grok": {"hookEventName": "PreToolUse", "toolName": "run_terminal_command", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-cmd": {"hookEventName": "PreToolUse", "toolName": "run_terminal_cmd", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-monitor": {"hookEventName": "PreToolUse", "toolName": "monitor", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-bash": {"hookEventName": "PreToolUse", "toolName": "bash", "toolInput": {"command": cmd}, "cwd": cwd},
+  "grok-readfile": {"hookEventName": "PreToolUse", "toolName": "read_file", "toolInput": {"command": cmd, "path": "x"}, "cwd": cwd},
+  "droid": {"hook_event_name": "PreToolUse", "tool_name": "Execute", "tool_input": {"command": cmd}, "cwd": cwd},
+  "auggie": {"hook_event_name": "PreToolUse", "tool_name": "launch-process", "tool_input": {"command": cmd}, "workspace_roots": [cwd]},
+  "windsurf": {"agent_action_name": "pre_run_command", "tool_info": {"command_line": cmd, "cwd": cwd}},
+  "vscode": {"hook_event_name": "PreToolUse", "tool_name": "runInTerminal", "tool_input": {"command": cmd}, "cwd": cwd},
+  "kiro": {"hook_event_name": "preToolUse", "tool_name": "execute_bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "goose": {"hook_event_name": "PreToolUse", "tool_name": "shell", "tool_input": {"command": cmd}, "working_dir": cwd},
+  "grok-read": {"hookEventName": "PreToolUse", "toolName": "Read", "toolInput": {"command": cmd, "path": "x"}, "cwd": cwd},
+  "windsurf-read": {"agent_action_name": "pre_read_code", "tool_info": {"file_path": cmd, "cwd": cwd}},
+  "opencode": {"tool_name": "bash", "tool_input": {"command": cmd}, "cwd": cwd},
+  "write": {"tool_name": "Write", "tool_input": {"command": cmd, "file_path": "x"}, "cwd": cwd},
+  "gemini-write": {"tool_name": "write_file", "tool_input": {"command": cmd}, "cwd": cwd},
+  "copilot-edit": {"toolName": "edit", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+}
+print(json.dumps(shapes[kind]))' "$1" "$2" "$3"; }
+SUB="fastlane deliver"
+for tier in "$PATH" "$NOJQ"; do
+  tn="${tier##*/}"; [ "$tier" = "$PATH" ] && tn=jq
+  for kind in codex gemini cursor copilot-str copilot-obj opencode grok grok-cmd grok-monitor grok-bash droid auggie windsurf vscode kiro goose; do
+    RC="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+    [ "$RC" = "2" ] && ok "h-$kind blocks a submit command and scans the payload cwd (tier=$tn)" || bad "h-$kind blocks a submit command and scans the payload cwd (tier=$tn rc=$RC)"
+  done
+  for kind in write gemini-write copilot-edit grok-read grok-readfile windsurf-read; do
+    OUT="$( cd /tmp && harness_payload "$kind" "$SUB" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" 2>&1 )"; RC=$?
+    [ "$RC" = "0" ] && [ -z "$OUT" ] && ok "h-$kind a non-shell tool stays silent (tier=$tn)" || bad "h-$kind a non-shell tool stays silent (tier=$tn rc=$RC)"
+  done
+  RC="$( cd /tmp && harness_payload codex "ls -la" "$D" | env -u CLAUDE_PROJECT_DIR PATH="$tier" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+  [ "$RC" = "0" ] && ok "h-ordinary an ordinary command stays silent (tier=$tn)" || bad "h-ordinary an ordinary command stays silent (tier=$tn rc=$RC)"
+done
+# CLAUDE_PROJECT_DIR still wins over the payload cwd, so Claude Code behaves exactly as before.
+CLEAN="$(mk_ios_clean)"
+RC="$( harness_payload codex "$SUB" "$D" | CLAUDE_PROJECT_DIR="$CLEAN" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+[ "$RC" = "0" ] && ok "h-precedence CLAUDE_PROJECT_DIR wins over the payload cwd" || bad "h-precedence CLAUDE_PROJECT_DIR wins over the payload cwd (rc=$RC)"
+# A payload cwd that is not a directory falls back to the working directory.
+RC="$( cd "$CLEAN" && harness_payload codex "$SUB" "/nonexistent/x" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" >/dev/null 2>&1; echo $? )"
+[ "$RC" = "0" ] && ok "h-badcwd a missing payload cwd falls back to the working directory" || bad "h-badcwd a missing payload cwd falls back to the working directory (rc=$RC)"
+rm -rf "$CLEAN" "$NOJQ"
+# fastlane global options before the action or lane must not hide a submission.
+for c in "fastlane --verbose deliver" "fastlane --env production deliver" "bundle exec fastlane --verbose pilot" "fastlane --capture_output ios release" "fastlane -v upload_to_testflight"; do
+  RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "2" ] && ok "fl-opt blocks. $c" || bad "fl-opt blocks. $c (rc=$RC)"
+done
+for c in "fastlane --version" "fastlane --help" "fastlane --env production tests"; do
+  RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "0" ] && ok "fl-opt silent. $c" || bad "fl-opt silent. $c (rc=$RC)"
+done
+rm -rf "$D"
+
+# ===== Rule precision round (October 2026 review). each case failed on the guard before its fix =====
+rr_run() { OUT="$(bash "$GUARD" "$1" 2>&1)"; RC=$?; }
+rr_has() { printf '%s\n' "$OUT" | grep -q -e "$1"; }
+rr_hook() {  # $1 command, $2 project dir. sets OUT (stdout and stderr) and RC
+  OUT="$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | CLAUDE_PROJECT_DIR="$2" bash "$GUARD" 2>&1)"; RC=$?
+}
+mk_rr_ios() {  # $1 Info.plist dict body, $2 Swift source
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  printf '<plist><dict>%s<key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' "$1" > "$d/App/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/App/PrivacyInfo.xcprivacy"
+  printf '%s\nlet policy = "https://realbackend.io/privacy-policy"\n' "$2" > "$d/App/X.swift"
+  echo "$d"
+}
+
+# A02 a usage-description key or a deletion call that exists only in a comment satisfies nothing
+D="$(mk_rr_ios '' 'import AVFoundation
+// NSCameraUsageDescription is set later
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A02-1 a camera key named only in a Swift comment still raises the finding" || bad "rr-A02-1 a camera key named only in a Swift comment still raises the finding (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+// deleteAccount comes in the next release
+/* func deleteUser() {} */')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "rr-A02-2 a deletion call that exists only in comments raises the finding" || bad "rr-A02-2 a deletion call that exists only in comments raises the finding (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+class A { func signIn() {} }
+let dev = AVCaptureDevice.default(for: .video)
+let endpoint = "https://api.realbackend.io/v1/deleteAccount" // removes the user')"
+mkdir -p "$D/App.xcodeproj"; printf 'INFOPLIST_KEY_NSCameraUsageDescription = "Scan receipts";\n' > "$D/App.xcodeproj/project.pbxproj"
+rr_run "$D"
+! rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'NO-ACCOUNT-DELETION' && ok "rr-A02-3 a build-setting key and a deletion URL before a trailing comment stay clean" || bad "rr-A02-3 a build-setting key and a deletion URL before a trailing comment stay clean (rc=$RC)"
+rm -rf "$D"
+D="$(mk_ios_clean)"; rr_run "$D"
+! rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'NO-ACCOUNT-DELETION' && [ "$RC" -eq 0 ] && ok "rr-A02-4 the clean iOS fixture stays clean" || bad "rr-A02-4 the clean iOS fixture stays clean (rc=$RC)"
+rm -rf "$D"
+
+# A02b a purpose string that exists only in InfoPlist.strings satisfies nothing, Apple reads Info.plist (ITMS-90683)
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/App/en.lproj"; printf '"NSCameraUsageDescription" = "Scan receipts";\n' > "$D/App/en.lproj/InfoPlist.strings"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding" || bad "rr-A02-5 a camera key only in InfoPlist.strings still raises the finding (rc=$RC)"
+rm -rf "$D"
+
+# A02c a permission API named in a comment counts, as in 1.0.0. the system photo picker needs no permission
+D="$(mk_rr_ios '' 'class A {}
+// TODO maybe use AVCaptureDevice and CLLocationManager later
+/* CNContactStore() */')"
+rr_run "$D"
+rr_has 'MISSING-USAGE-DESCRIPTION' && ok "rr-A02-6 a permission API named only in comments still counts, as in 1.0.0" || bad "rr-A02-6 a permission API named only in comments still counts, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import PhotosUI
+let picker = PHPickerViewController(configuration: PHPickerConfiguration())')"
+rr_run "$D"
+! rr_has 'Photos used without' && ok "rr-A02-7 PHPickerViewController alone needs no photo library purpose string" || bad "rr-A02-7 PHPickerViewController alone needs no photo library purpose string (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import Photos
+PHPhotoLibrary.requestAuthorization { _ in }')"
+rr_run "$D"
+rr_has 'Photos used without' && ok "rr-A02-8 PHPhotoLibrary access still needs the photo library purpose string" || bad "rr-A02-8 PHPhotoLibrary access still needs the photo library purpose string (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video) // camera for receipts')"
+rr_run "$D"
+rr_has 'Camera used without' && [ "$RC" -eq 2 ] && ok "rr-A02-9 a real camera call with a trailing comment still blocks" || bad "rr-A02-9 a real camera call with a trailing comment still blocks (rc=$RC)"
+rm -rf "$D"
+
+# A13 ATT needs both halves, the purpose string and the authorization call, and names the missing one
+D="$(mk_rr_ios '<key>NSUserTrackingUsageDescription</key><string>Measure ads</string>' 'import AppsFlyerLib
+let af = AppsFlyerLib.shared()')"
+rr_run "$D"
+rr_has 'APPLE-5.1.2-MISSING-ATT' && rr_has 'requestTrackingAuthorization call' && ! rr_has 'NSUserTrackingUsageDescription in Info.plist' && ok "rr-A13-1 a purpose string without the request call is flagged and the call is named" || bad "rr-A13-1 a purpose string without the request call is flagged and the call is named"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AppsFlyerLib
+import AppTrackingTransparency
+// NSUserTrackingUsageDescription
+ATTrackingManager.requestTrackingAuthorization { _ in }')"
+rr_run "$D"
+rr_has 'APPLE-5.1.2-MISSING-ATT' && rr_has 'NSUserTrackingUsageDescription in Info.plist' && ! rr_has 'requestTrackingAuthorization call' && ok "rr-A13-2 the request call without a purpose string is flagged and the key is named" || bad "rr-A13-2 the request call without a purpose string is flagged and the key is named"
+rm -rf "$D"
+D="$(mk_rr_ios '<key>NSUserTrackingUsageDescription</key><string>Measure ads</string>' 'import AppsFlyerLib
+import AppTrackingTransparency
+ATTrackingManager.requestTrackingAuthorization { _ in AppsFlyerLib.shared().start() }')"
+rr_run "$D"
+! rr_has 'APPLE-5.1.2-MISSING-ATT' && ok "rr-A13-3 both halves present stays clean" || bad "rr-A13-3 both halves present stays clean"
+rm -rf "$D"
+
+# A10 a vendored privacy manifest is the SDK's, never the app's own
+D="$(mk_rr_ios '' 'let d = UserDefaults.standard')"
+rm -f "$D/App/PrivacyInfo.xcprivacy"
+mkdir -p "$D/Pods/SomeSDK" "$D/.build/checkouts/Lib/Sources" "$D/node_modules/x/ios" "$D/ios/.symlinks/plugins/p/ios"
+for v in Pods/SomeSDK .build/checkouts/Lib/Sources node_modules/x/ios ios/.symlinks/plugins/p/ios; do printf '%s' "$PLIST_EMPTY" > "$D/$v/PrivacyInfo.xcprivacy"; done
+rr_run "$D"
+rr_has 'APPLE-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-1 vendored manifests alone do not count as the app manifest" || bad "rr-A10-1 vendored manifests alone do not count as the app manifest (rc=$RC)"
+printf '%s' "$PLIST_EMPTY" > "$D/App/PrivacyInfo.xcprivacy"
+rr_run "$D"
+! rr_has 'APPLE-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-2 an app manifest beside vendored ones stays clean" || bad "rr-A10-2 an app manifest beside vendored ones stays clean"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/ios/.symlinks/plugins/permission_handler/ios" "$D/lib"
+printf 'name: t\ndependencies:\n  permission_handler: ^11.0.0\n' > "$D/pubspec.yaml"
+printf "import 'package:permission_handler/permission_handler.dart';\nvoid main(){}\n" > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/ios/.symlinks/plugins/permission_handler/ios/PrivacyInfo.xcprivacy"
+rr_run "$D"
+rr_has 'FLUTTER-PRIVACY-MANIFEST-MISSING' && ok "rr-A10-3 a Flutter plugin manifest under .symlinks is not the app manifest" || bad "rr-A10-3 a Flutter plugin manifest under .symlinks is not the app manifest"
+rm -rf "$D"
+
+# A12 framework IAP plugins need a restore call too, and their own restore APIs count
+mk_rr_flutter_iap() {  # $1 Dart body
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/lib"
+  printf 'name: t\ndependencies:\n  purchases_flutter: ^8.0.0\n' > "$d/pubspec.yaml"
+  printf "import 'package:purchases_flutter/purchases_flutter.dart';\n%s\n" "$1" > "$d/lib/main.dart"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/ios/Runner/PrivacyInfo.xcprivacy"
+  echo "$d"
+}
+D="$(mk_rr_flutter_iap 'void buy() { Purchases.purchasePackage(p); }')"; rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-1 RevenueCat purchases without restore are flagged" || bad "rr-A12-1 RevenueCat purchases without restore are flagged"
+rm -rf "$D"
+D="$(mk_rr_flutter_iap 'void buy() { Purchases.purchasePackage(p); }
+void restore() { Purchases.restorePurchases(); }')"; rr_run "$D"
+! rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-2 Purchases.restorePurchases counts as restore" || bad "rr-A12-2 Purchases.restorePurchases counts as restore"
+rm -rf "$D"
+mk_rr_unity_iap() {  # $1 C# body
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ProjectSettings" "$d/Assets"
+  printf 'm_EditorVersion: 2022.3.1f1\n' > "$d/ProjectSettings/ProjectVersion.txt"
+  printf 'using UnityEngine.Purchasing;\nclass Shop { %s }\n' "$1" > "$d/Assets/Shop.cs"
+  echo "$d"
+}
+D="$(mk_rr_unity_iap 'void Buy() { controller.InitiatePurchase("gems"); }')"; rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-3 Unity IAP without restore is flagged" || bad "rr-A12-3 Unity IAP without restore is flagged"
+rm -rf "$D"
+D="$(mk_rr_unity_iap 'void Restore() { apple.RestoreTransactions(r => {}); }')"; rr_run "$D"
+! rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "rr-A12-4 Unity RestoreTransactions counts as restore" || bad "rr-A12-4 Unity RestoreTransactions counts as restore"
+rm -rf "$D"
+
+# A09 an Android-only build command never meets a native Apple finding, an iOS command still does
+D="$(mktemp -d)"; mkdir -p "$D/ios/Runner" "$D/android/app/src/main" "$D/lib"
+printf 'name: t\n' > "$D/pubspec.yaml"; printf 'void main(){}\n' > "$D/lib/main.dart"
+printf '<plist><dict></dict></plist>' > "$D/ios/Runner/Info.plist"
+printf 'import AVFoundation\nlet dev = AVCaptureDevice.default(for: .video)\n' > "$D/ios/Runner/Cam.swift"
+printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"></manifest>' > "$D/android/app/src/main/AndroidManifest.xml"
+rr_hook "flutter build appbundle --release" "$D"
+! rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ! rr_has 'APPLE-EXPORT-COMPLIANCE' && ok "rr-A09-1 an Android-only build skips the native Apple checks" || bad "rr-A09-1 an Android-only build skips the native Apple checks (rc=$RC)"
+for c in "./gradlew bundleRelease" "flutter build ipa"; do
+  rr_hook "$c" "$D"
+  case "$c" in
+    *ipa) rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "rr-A09-2 an iOS build still raises the Apple finding" || bad "rr-A09-2 an iOS build still raises the Apple finding (rc=$RC)" ;;
+    *) ! rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ok "rr-A09-3 a Gradle release bundle skips the native Apple checks" || bad "rr-A09-3 a Gradle release bundle skips the native Apple checks (rc=$RC)" ;;
+  esac
+done
+rr_run "$D"
+rr_has 'APPLE-5.1.1-MISSING-USAGE-DESCRIPTION' && ok "rr-A09-4 a standalone scan still covers both stores" || bad "rr-A09-4 a standalone scan still covers both stores"
+rm -rf "$D"
+
+# A24 an unusable mktemp falls back to /tmp, as before 2.0.0, so the scan still runs
+# macOS mktemp ignores an unusable TMPDIR, so a PATH shim stands in. one fails, one hands back a path that cannot be written.
+D="$(mk_ios_clean)"; SHIMS="$(mktemp -d)"; mkdir -p "$SHIMS/fail" "$SHIMS/bad"
+printf '#!/bin/sh\nexit 1\n' > "$SHIMS/fail/mktemp"
+printf '#!/bin/sh\necho /nonexistent/ascg-tmp/buffer\n' > "$SHIMS/bad/mktemp"
+chmod +x "$SHIMS/fail/mktemp" "$SHIMS/bad/mktemp"
+for s in fail bad; do
+  OUT="$(PATH="$SHIMS/$s:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?
+  [ "$RC" -eq 0 ] && ! rr_has 'NOT CHECKED' && rr_has '^CLEAR' && ok "rr-A24-1 an unusable mktemp falls back to /tmp and still scans (mktemp $s)" || bad "rr-A24-1 an unusable mktemp falls back to /tmp and still scans (mktemp $s rc=$RC)"
+  ERR="$(python3 -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"xcrun altool --upload-app -f a.ipa"}}))' | PATH="$SHIMS/$s:$PATH" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+  ! printf '%s' "$ERR" | grep -q 'NOT CHECKED' && printf '%s' "$ERR" | grep -q 'App Store Compliance Guard' && ok "rr-A24-2 as a hook an unusable mktemp still scans through /tmp (mktemp $s)" || bad "rr-A24-2 as a hook an unusable mktemp still scans through /tmp (mktemp $s rc=$RC)"
+done
+rm -rf "$D" "$SHIMS"
+
+# A11 a managed Expo app has its app config checked, and a critical config finding blocks
+mk_rr_expo() {  # $1 package.json, $2 app.json
+  local d; d="$(mktemp -d)"
+  printf '%s' "$1" > "$d/package.json"; printf '%s' "$2" > "$d/app.json"
+  echo "$d"
+}
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0"}}' '{"expo":{"name":"x","android":{"permissions":["ACCESS_BACKGROUND_LOCATION"]}}}')"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && ok "rr-A11-1 background location in the Expo config blocks an Android submit" || bad "rr-A11-1 background location in the Expo config blocks an Android submit (rc=$RC)"
+rr_hook "eas submit -p ios" "$D"
+[ "$RC" -eq 0 ] && ! rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && rr_has 'NOT CHECKED' && ok "rr-A11-2 an iOS-only submit skips the Android config check" || bad "rr-A11-2 an iOS-only submit skips the Android config check (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0"}}' '{"expo":{"name":"x","android":{"permissions":["android.permission.READ_SMS"]}}}')"
+rr_run "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-SMS-CALLLOG' && rr_has 'Camera module in the Expo app' && ok "rr-A11-3 a standalone scan reads the Expo config, SMS blocks and the camera string is named" || bad "rr-A11-3 a standalone scan reads the Expo config, SMS blocks and the camera string is named (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_expo '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0","@react-native-async-storage/async-storage":"1.0.0"}}' '{"expo":{"name":"x","plugins":[["expo-camera",{"cameraPermission":"Scan receipts to log expenses"}]],"ios":{"privacyManifests":{"NSPrivacyAccessedAPITypes":[]}},"android":{"blockedPermissions":["android.permission.ACCESS_BACKGROUND_LOCATION","android.permission.READ_SMS"]}}}')"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 0 ] && rr_has 'critical=0 high=0 medium=0' && rr_has 'NOT CHECKED' && ok "rr-A11-4 a clean Expo config with blockedPermissions stays clean and NOT CHECKED" || bad "rr-A11-4 a clean Expo config with blockedPermissions stays clean and NOT CHECKED (rc=$RC)"
+rm -rf "$D"
+
+# FP1 a commit or PR message is text, a real submit beside it is not
+D="$(mk_ios_bad)"
+for c in 'git commit -m "docs: mention eas build"' "git commit -am 'note the fastlane deliver lane'" 'gh pr create --title "Ship" --body "run eas submit -p ios after merge"' 'git tag -a v1 -m "eas submit done"'; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "rr-FP1 a message stays silent. $c" || bad "rr-FP1 a message stays silent. $c (rc=$RC bytes=${#OUT})"
+done
+for c in 'git commit -m x && eas submit -p ios' 'git commit -m "$(eas submit -p ios)"'; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "rr-FP1 a real submit beside a message blocks. $c" || bad "rr-FP1 a real submit beside a message blocks. $c (rc=$RC)"
+done
+rm -rf "$D"
+
+# ===== Codex review round (October 2026). each case failed on the guard before its fix =====
+FL="fast""lane"
+cx_payload() {  # $1 json shape, $2 command, $3 cwd, $4 tool name. prints one payload
+  python3 -c '
+import json, sys
+kind, cmd, cwd, tool = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+shapes = {
+  "bash": {"tool_name": tool, "tool_input": {"command": cmd}, "cwd": cwd},
+  "cursor": {"hook_event_name": "beforeShellExecution", "command": cmd, "cwd": cwd},
+  "copilot-str": {"toolName": "bash", "toolArgs": json.dumps({"command": cmd}), "cwd": cwd},
+}
+print(json.dumps(shapes[kind]))' "$1" "$2" "$3" "${4:-Bash}"
+}
+CX_NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head tail mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date env ls; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$CX_NOTOOLS/$b"; done
+
+# CX1 a commit message exemption covers only the git segment, never a later command's arguments
+D="$(mk_ios_bad)"
+rr_hook "git commit -m safe; bash -c 'eval \"\$1\"' -m '$FL deliver'" "$D"
+[ "$RC" -eq 2 ] && ok "cx1-1 a -m argument of a later bash -c segment is not blanked as a message" || bad "cx1-1 a -m argument of a later bash -c segment is not blanked as a message (rc=$RC)"
+rr_hook "git commit -m \"wip; $FL deliver | later\" -m 'and && eas submit'" "$D"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx1-2 separators inside a quoted commit message stay text" || bad "cx1-2 separators inside a quoted commit message stay text (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# CX2 a compound command is classified per segment. any Apple upload keeps the Apple checks
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+for c in "./gradlew bundleRelease && $FL deliver" "$FL deliver && echo bundleRelease" "$FL pilot; ./gradlew assembleRelease"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'Command targets Android only' && ok "cx2 Apple checks stay on. $c" || bad "cx2 Apple checks stay on. $c (rc=$RC)"
+done
+rr_hook "./gradlew bundleRelease" "$D"
+rr_has 'Command targets Android only' && ok "cx2 a plain Android build stays Android only" || bad "cx2 a plain Android build stays Android only (rc=$RC)"
+# An Apple upload is never Android, and an Android word inside another tool's argument is not a gradle task or flag
+for c in "$FL deliver output_path:bundleRelease" "$FL pilot upload ipa:app-bundleRelease.ipa" "$FL upload_to_testflight build:assembleRelease" "$FL --verbose deliver notes:run-android" "$FL deliver --platform android" "$FL testflight -p android"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'MISSING-USAGE-DESCRIPTION' && ! rr_has 'Command targets Android only' && ok "cx2b an Apple upload keeps the Apple checks. $c" || bad "cx2b an Apple upload keeps the Apple checks. $c (rc=$RC)"
+done
+for c in "./gradlew :app:bundleRelease" "./gradlew clean app:assembleRelease --stacktrace" "flutter build appbundle --release"; do
+  rr_hook "$c" "$D"
+  rr_has 'Command targets Android only' && ok "cx2b a real Android task stays Android only. $c" || bad "cx2b a real Android task stays Android only. $c (rc=$RC)"
+done
+rm -rf "$D"
+
+# CX14 the platform flag forms 1.0.0 knew are Android only, the forms it did not know keep the Apple checks, as in 1.0.0
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+for c in "eas submit --platform android" "eas build --platform  android --profile production"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "cx14 Android only. $c" || bad "cx14 Android only. $c (rc=$RC)"
+done
+for c in "eas build -p android" "eas submit --platform=android" "eas build -p=android"; do
+  rr_hook "$c" "$D"
+  ! rr_has 'Command targets Android only' && rr_has 'NSCameraUsageDescription' && ok "cx14 the Apple checks still run, as in 1.0.0. $c" || bad "cx14 the Apple checks still run, as in 1.0.0. $c (rc=$RC)"
+done
+for c in "eas build -p ios" "eas build -p all" "eas submit --platform=android && eas submit --platform=ios"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "cx14 not Android only. $c" || bad "cx14 not Android only. $c (rc=$RC)"
+done
+rm -rf "$D"
+
+# CX3 a comment marker inside a string is not a comment. the code after it still counts
+D="$(mk_rr_ios '' 'import AVFoundation
+let help = """
+/* Start a comment using this marker
+"""
+let camera = AVCaptureDevice.default(for: .video)')"
+rr_run "$D"
+rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "cx3-1 /* inside a Swift multiline string does not hide the camera call" || bad "cx3-1 /* inside a Swift multiline string does not hide the camera call (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import CoreLocation
+let a = "x /* y", b = 1
+let m = CLLocationManager()
+let c = "z */ w"')"
+mkdir -p "$D/Web"; printf 'const t = `\n/* not a comment\n`;\nconst cam = "AVCaptureDevice";\n' > "$D/Web/t.ts"
+rr_run "$D"
+rr_has 'Location used without' && rr_has 'Camera used without NSCameraUsageDescription' && ok "cx3-2 /* inside a one-line string and a template literal keeps the code" || bad "cx3-2 /* inside a one-line string and a template literal keeps the code (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+let x = 1 /* deleteAccount */
+let y = "a" + "b" // deleteUser')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx3-3 a mid-line block comment still satisfies nothing" || bad "cx3-3 a mid-line block comment still satisfies nothing (rc=$RC)"
+rm -rf "$D"
+
+# CX3b a /* inside a Swift raw string #"..."#, a multiline raw string, or any number of # is text, not a comment
+for src in 'let s = #"/* not a comment"#' 'let s = #"say "hi" /* not a comment"#' 'let s = #"\"/* not a comment"#' 'let s = ##"a "# /* not a comment"##' 'let s = #"""
+/* not a comment
+"""#' 'let s = ##"""
+"""# /* still inside
+"""##' 'let s = #"/*"#; let t = #"*/"#'; do
+  D="$(mk_rr_ios '' "import AVFoundation
+$src
+let camera = AVCaptureDevice.default(for: .video)")"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "cx3b raw string keeps the camera call. ${src%%$'\n'*}" || bad "cx3b raw string keeps the camera call. ${src%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+/* AVCaptureDevice */')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "cx3b a block comment naming AVCaptureDevice counts, as in 1.0.0" || bad "cx3b a block comment naming AVCaptureDevice counts, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+let s = #"raw"# /* AVCaptureDevice.default(for: .video) */')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "cx3b a mid-line block comment counts as a trigger, as in 1.0.0" || bad "cx3b a mid-line block comment counts as a trigger, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+let s = #"\"# // deleteAccount')"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx3b a backslash in a raw string does not turn a trailing comment into code" || bad "cx3b a backslash in a raw string does not turn a trailing comment into code (rc=$RC)"
+rm -rf "$D"
+
+# CX4 a translation or config file never satisfies an implementation check
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+mkdir -p "$D/App/en.lproj"; printf '/* TODO: deleteAccount */\n"title" = "deleteUser";\n' > "$D/App/en.lproj/InfoPlist.strings"
+printf '{"deleteAccount": "soon"}\n' > "$D/App/flags.json"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "cx4-1 deleteAccount in InfoPlist.strings or a json config satisfies nothing" || bad "cx4-1 deleteAccount in InfoPlist.strings or a json config satisfies nothing (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+mkdir -p "$D/www"; printf '<html><!-- deleteAccount --><script>function deleteAccount(){ api.del() }</script></html>\n' > "$D/www/index.html"
+rr_run "$D"
+! rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "cx4-2 a real deletion function in inline HTML script still counts" || bad "cx4-2 a real deletion function in inline HTML script still counts (rc=$RC)"
+rm -rf "$D"
+
+# CX11 Cursor beforeShellExecution always gets permission JSON on stdout, the report on stderr
+CLEAN="$(mk_ios_clean)"; D="$(mk_ios_bad)"; EMPTY="$(mktemp -d)"
+ERRF="$(mktemp)"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$CLEAN" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="allow" else 1)' && [ "$RC" -eq 0 ] && grep -q 'CLEAR' "$ERRF" && ok "cx11-1 an allowed Cursor submit prints permission allow JSON" || bad "cx11-1 an allowed Cursor submit prints permission allow JSON (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$D" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="deny" and d.get("user_message") and d.get("agent_message") else 1)' && [ "$RC" -eq 2 ] && grep -q 'BLOCKED' "$ERRF" && ok "cx11-2 a blocked Cursor submit prints permission deny JSON and exits 2" || bad "cx11-2 a blocked Cursor submit prints permission deny JSON and exits 2 (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$EMPTY" | env -u CLAUDE_PROJECT_DIR bash "$GUARD" 2>"$ERRF" )"; RC=$?
+printf '%s' "$OUTJ" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("permission")=="allow" else 1)' && [ "$RC" -eq 0 ] && grep -q 'NOT CHECKED' "$ERRF" && ok "cx11-3 a NOT CHECKED Cursor submit still prints valid JSON" || bad "cx11-3 a NOT CHECKED Cursor submit still prints valid JSON (rc=$RC out=${OUTJ:0:60})"
+OUTJ="$( cd /tmp && cx_payload cursor "$FL deliver" "$CLEAN" | env CLAUDE_PROJECT_DIR="$CLEAN" PATH="$CX_NOTOOLS" bash "$GUARD" 2>"$ERRF" )"; RC=$?
+[ "$OUTJ" = '{"permission":"allow"}' ] && [ "$RC" -eq 0 ] && ok "cx11-4 the no-tools tier also answers Cursor with JSON" || bad "cx11-4 the no-tools tier also answers Cursor with JSON (rc=$RC out=${OUTJ:0:60})"
+rm -rf "$CLEAN" "$D" "$EMPTY" "$ERRF"
+
+# CX16 a managed Expo config with single-quoted keys is read like a double-quoted one
+D="$(mktemp -d)"; printf '{"dependencies":{"expo":"51.0.0"}}' > "$D/package.json"
+printf "export default {\n  expo: { android: { 'permissions': ['android.permission.READ_SMS'] } }\n};\n" > "$D/app.config.js"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-SMS-CALLLOG' && ok "cx16-1 a single-quoted permissions key is read" || bad "cx16-1 a single-quoted permissions key is read (rc=$RC)"
+printf "export default { expo: { android: { 'isAndroidBackgroundLocationEnabled': true } } };\n" > "$D/app.config.js"
+rr_hook "eas submit -p android" "$D"
+[ "$RC" -eq 2 ] && rr_has 'GOOGLE-PERM-BACKGROUND-LOCATION' && ok "cx16-2 a single-quoted background location flag is read" || bad "cx16-2 a single-quoted background location flag is read (rc=$RC)"
+printf '{"dependencies":{"expo":"51.0.0","expo-camera":"15.0.0"}}' > "$D/package.json"
+printf "export default { expo: { ios: { infoPlist: { 'NSCameraUsageDescription': 'Scan receipts' } } } };\n" > "$D/app.config.js"
+rr_hook "eas submit -p ios" "$D"
+! rr_has 'Camera module in the Expo app' && ok "cx16-3 a single-quoted camera purpose key is read" || bad "cx16-3 a single-quoted camera purpose key is read (rc=$RC)"
+rm -rf "$D"
+
+# CX17 with no jq and no python3, a Copilot toolArgs JSON string is still parsed (that tier reads no payload cwd)
+D="$(mk_ios_bad)"
+P_CS="$(cx_payload copilot-str "$FL deliver" "$D")"
+OUT="$( cd /tmp && printf '%s' "$P_CS" | env CLAUDE_PROJECT_DIR="$D" PATH="$CX_NOTOOLS" bash "$GUARD" 2>&1 )"; RC=$?
+[ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'App Store Compliance Guard' && ok "cx17-1 a Copilot toolArgs string is parsed on the no-tools tier" || bad "cx17-1 a Copilot toolArgs string is parsed on the no-tools tier (rc=$RC bytes=${#OUT})"
+P_CS="$(cx_payload copilot-str "ls -la" "$D")"
+OUT="$( cd /tmp && printf '%s' "$P_CS" | env CLAUDE_PROJECT_DIR="$D" PATH="$CX_NOTOOLS" bash "$GUARD" 2>&1 )"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx17-2 an ordinary Copilot command stays silent on the no-tools tier" || bad "cx17-2 an ordinary Copilot command stays silent on the no-tools tier (rc=$RC)"
+rm -rf "$D"
+
+# CX18 only real shell tool names carry a command. a read-only MCP tool named like a terminal is silent
+D="$(mk_ios_bad)"
+for tn in jq python3; do
+  TP="$PATH"; [ "$tn" = python3 ] && { TP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head tail mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date env ls python3; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$TP/$b"; done; }
+  for t in mcp__terminal__explain_command mcp__shell__lint myTerminalHelper; do
+    OUT="$( cd /tmp && cx_payload bash "$FL deliver" "$D" "$t" | env -u CLAUDE_PROJECT_DIR PATH="$TP" bash "$GUARD" 2>&1 )"; RC=$?
+    [ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "cx18 $t stays silent (tier=$tn)" || bad "cx18 $t stays silent (tier=$tn rc=$RC)"
+  done
+  for t in run_in_terminal runInTerminal PowerShell execute_cmd; do
+    RC="$( cd /tmp && cx_payload bash "$FL deliver" "$D" "$t" | env -u CLAUDE_PROJECT_DIR PATH="$TP" bash "$GUARD" >/dev/null 2>&1; echo $? )"
+    [ "$RC" = "2" ] && ok "cx18 $t is scanned (tier=$tn)" || bad "cx18 $t is scanned (tier=$tn rc=$RC)"
+  done
+  [ "$tn" = python3 ] && rm -rf "$TP"
+done
+rm -rf "$D" "$CX_NOTOOLS"
+
+# 656 a bare native project under a root framework app is its own app, unless a root build file pulls it in
+mk_fw_root_plus_native() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/native/Legacy/Legacy.xcodeproj" "$d/native/Legacy/Legacy"
+  printf '{"expo":{"name":"root"}}' > "$d/app.json"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/App/Info.plist"
+  printf '%s' "$PLIST_EMPTY" > "$d/ios/App/PrivacyInfo.xcprivacy"
+  printf 'let policy="https://root.example.io/privacy-policy"\n' > "$d/ios/App/R.swift"
+  printf 'X=1;\n' > "$d/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$d/native/Legacy/Legacy/Info.plist"
+  printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$d/native/Legacy/Legacy/L.swift"
+  echo "$d"
+}
+D="$(mk_fw_root_plus_native)"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$(echo "$OUT" | grep -c '^App\. ')" -eq 2 ] && echo "$OUT" | grep -q "^App\. $D/native/Legacy$" && [ "$RC" -eq 2 ] && ok "i656-1 a bare Xcode project under a root Expo app is scanned on its own" || bad "i656-1 a bare Xcode project under a root Expo app is scanned on its own (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+mkdir -p "$D/ios/App.xcworkspace"; printf '<Workspace><FileRef location="group:../native/Legacy/Legacy.xcodeproj"></FileRef></Workspace>\n' > "$D/ios/App.xcworkspace/contents.xcworkspacedata"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "i656-2 a nested project the root workspace references stays merged" || bad "i656-2 a nested project the root workspace references stays merged (rc=$RC)"
+rm -rf "$D"
+D="$(mk_fw_root_plus_native)"; rm -rf "$D/native"
+mkdir -p "$D/android/app" "$D/libs/legacy/src/main"
+printf "include ':app', ':legacy'\nproject(':legacy').projectDir = new File('../libs/legacy')\n" > "$D/android/settings.gradle"
+printf 'apply plugin: "com.android.application"\n' > "$D/android/app/build.gradle"
+printf 'apply plugin: "com.android.application"\nandroid { defaultConfig { targetSdkVersion 36 } }\n' > "$D/libs/legacy/build.gradle"
+printf '<manifest/>' > "$D/libs/legacy/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q '^App\. ' && ok "i656-3 an Android project the root settings.gradle includes stays merged" || bad "i656-3 an Android project the root settings.gradle includes stays merged (rc=$RC sections=$(echo "$OUT" | grep -c '^App\. '))"
+rm -f "$D/android/settings.gradle"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q "^App\. $D/libs/legacy$" && ok "i656-4 the same Android project with no shared build file is its own app" || bad "i656-4 the same Android project with no shared build file is its own app (rc=$RC)"
+rm -rf "$D"
+
+# R3 round 3 review. every input below is one where main scanned or reported, and the branch must too
+FL="fast""lane"
+# R3-1 a git message that sits inside a command substitution is never blanked
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "git commit -m safe \$(bash -c 'eval \"\$1\"' -m '$FL deliver')" "$D"
+[ "$RC" -eq 2 ] && rr_has 'Camera used without' && ok "r3-1 a submit inside a command substitution in a git commit is scanned" || bad "r3-1 a submit inside a command substitution in a git commit is scanned (rc=$RC)"
+BT='`'
+rr_hook "git commit -m safe ${BT}bash -c 'eval \"\$1\"' -m '$FL deliver'${BT}" "$D"
+[ "$RC" -eq 2 ] && ok "r3-1b a submit inside a backtick substitution in a git commit is scanned" || bad "r3-1b a submit inside a backtick substitution in a git commit is scanned (rc=$RC)"
+# R3-2 a wrapped Apple upload (npm run, make) keeps the Apple checks next to an Android build
+printf '{"scripts":{"submit-ios":"%s deliver","ship":"%s deliver"}}\n' "$FL" "$FL" > "$D/package.json"
+printf 'ship:\n\t%s deliver\n' "$FL" > "$D/Makefile"
+GW="./gradle""w bundle""Release"
+for c in "$GW && npm run submit-ios" "$GW && npm run ship" "$GW && make ship" "$GW && make ship-ios"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && rr_has 'Camera used without' && ! rr_has 'Command targets Android only' && ok "r3-2 Apple checks stay on. $c" || bad "r3-2 Apple checks stay on. $c (rc=$RC)"
+done
+rr_hook "$GW" "$D"
+rr_has 'Command targets Android only' && ok "r3-2b a plain Android build next to a package.json stays Android only" || bad "r3-2b a plain Android build next to a package.json stays Android only (rc=$RC)"
+rm -rf "$D"
+# R3-3 the comment stripper never drops compiled code after an escaped raw delimiter, a regex literal, or a Rust raw string
+for src in 'let text = #"""
+\#"""#
+/*
+"""#' 'let pattern = #/[/*]/#' 'let pattern = /[/*]/' 'let s = "a" + #"\#"/*"#'; do
+  D="$(mk_rr_ios '' "import AVFoundation
+$src
+let camera = AVCaptureDevice.default(for: .video)")"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r3-3 the camera call survives. ${src%%$'\n'*}" || bad "r3-3 the camera call survives. ${src%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+for rs in 'let s = r#"
+/*
+"#;' 'let p = r"C:\"; let q = "/*";' 'let b = br#"x"#; let q = r"\"; let t = "/*";'; do
+  D="$(mk_rr_ios '' 'import AVFoundation')"
+  printf '%s\nlet camera = "AVCaptureDevice";\n' "$rs" > "$D/App/lib.rs"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r3-3 a Rust raw string keeps the code after it. ${rs%%$'\n'*}" || bad "r3-3 a Rust raw string keeps the code after it. ${rs%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+/* a real
+ * multiline AVCaptureDevice comment */')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "r3-3b a mention inside a block comment counts as a trigger, as in 1.0.0" || bad "r3-3b a mention inside a block comment counts as a trigger, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+/* an unmarked line inside a block counts as code, as in 1.0.0
+   AVCaptureDevice.default(for: .video) */')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "r3-3c an unmarked line inside a block counts, as in 1.0.0" || bad "r3-3c an unmarked line inside a block counts, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+# R3-4 translation text never proves StoreKit or a restore control
+D="$(mk_rr_ios '' 'import Stripe')"
+mkdir -p "$D/App/en.lproj"; printf '"help" = "StoreKit";\n"restore" = "Restore Purchases";\n' > "$D/App/en.lproj/InfoPlist.strings"
+rr_run "$D"
+rr_has 'APPLE-3.1.1-EXTERNAL-PAYMENT' && [ "$RC" -eq 2 ] && ok "r3-4 StoreKit named only in InfoPlist.strings does not hide an external payment SDK" || bad "r3-4 StoreKit named only in InfoPlist.strings does not hide an external payment SDK (rc=$RC)"
+rm -rf "$D"
+# R3-8 the no-parser fallback stays quiet for a read tool, like jq and python3 do
+D="$(mk_ios_bad)"
+NOP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOP/$b"; done
+OUT="$(printf '{"tool_name":"Read","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "r3-8 a Read payload stays quiet without jq or python3" || bad "r3-8 a Read payload stays quiet without jq or python3 (rc=$RC bytes=${#OUT})"
+OUT="$(printf '{"tool_name":"Bash","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8b a Bash payload is still scanned without jq or python3" || bad "r3-8b a Bash payload is still scanned without jq or python3 (rc=$RC)"
+OUT="$(printf '{"toolName":"run_terminal_command","toolInput":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8c a Grok payload is still scanned without jq or python3" || bad "r3-8c a Grok payload is still scanned without jq or python3 (rc=$RC)"
+OUT="$(printf '{"tool_info":{"command_line":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r3-8d a Windsurf payload with no tool name is still scanned without jq or python3" || bad "r3-8d a Windsurf payload with no tool name is still scanned without jq or python3 (rc=$RC)"
+rm -rf "$D" "$NOP"
+# R3-M a clean nested native project never takes the scan away from a managed Expo root with no native folder
+D="$(mktemp -d)"; mkdir -p "$D/src" "$D/native/Legacy/Legacy.xcodeproj" "$D/native/Legacy/Legacy"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'export function signIn(){}\nexport function createAccount(){}\n' > "$D/src/auth.ts"
+printf 'X=1;\n' > "$D/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/native/Legacy/Legacy/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/native/Legacy/Legacy/PrivacyInfo.xcprivacy"
+printf 'let x = 1\n' > "$D/native/Legacy/Legacy/L.swift"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "r3-M a managed Expo root keeps its account deletion finding beside a clean native child" || bad "r3-M a managed Expo root keeps its account deletion finding beside a clean native child (rc=$RC)"
+rm -rf "$D"
+
+# R4 round 4 review. each input is one where main scanned or reported, or a real submit went unchecked
+FL="fast""lane"
+GW="./gradle""w bundle""Release"
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+# R4-1 a git alias or any git global option other than -C keeps the whole command scanned
+rr_hook "git -c 'alias.ship=!f() { eval \"\$3\"; }; f' ship commit -m '$FL deliver'" "$D"
+[ "$RC" -eq 2 ] && ok "r4-1 a git alias that runs its argument is scanned" || bad "r4-1 a git alias that runs its argument is scanned (rc=$RC)"
+rr_hook "git -C . commit -m 'release notes for $FL deliver'" "$D"
+[ "$RC" -eq 0 ] && ok "r4-1b a plain git -C commit message stays text" || bad "r4-1b a plain git -C commit message stays text (rc=$RC)"
+# R4-2 only a known harmless command may sit beside an Android build and keep it Android only
+mkdir -p "$D/scripts"; printf 'import os\nos.system("%s deliver")\n' "$FL" > "$D/scripts/upload.py"
+printf '%s deliver\n' "$FL" > "$D/scripts/upload.sh"
+for c in "$GW && python3 scripts/upload.py" "$GW && node scripts/upload.js" "$GW && ruby scripts/upload.rb" "$GW && scripts/upload.sh" "$GW && ./upload" "$GW && deno run up.ts"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "r4-2 Apple checks stay on. $c" || bad "r4-2 Apple checks stay on. $c (rc=$RC)"
+done
+for c in "$GW && echo done" "cd android && $GW" "export X=1; $GW" "$GW; ls"; do
+  rr_hook "$c" "$D"
+  rr_has 'Command targets Android only' && ok "r4-2b stays Android only. $c" || bad "r4-2b stays Android only. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R4-3 an empty or project-less ios folder never counts as the root's own platform
+D="$(mktemp -d)"; mkdir -p "$D/src" "$D/ios" "$D/native/Legacy/Legacy.xcodeproj" "$D/native/Legacy/Legacy"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'export function signIn(){}\nexport function createAccount(){}\n' > "$D/src/auth.ts"
+printf 'X=1;\n' > "$D/native/Legacy/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/native/Legacy/Legacy/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$D/native/Legacy/Legacy/PrivacyInfo.xcprivacy"
+printf 'let x = 1\n' > "$D/native/Legacy/Legacy/L.swift"
+rr_run "$D"
+rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && [ "$RC" -eq 2 ] && ok "r4-3 an empty ios folder does not split the native child off a managed Expo root" || bad "r4-3 an empty ios folder does not split the native child off a managed Expo root (rc=$RC)"
+rm -rf "$D"
+# R4-4 a // inside a JavaScript or Swift regex literal is not a comment
+for src in 'const pattern = /[//]/; const camera = "AVCaptureDevice";' 'const u = x.replace(/https?:\/\//, ""); const camera = "AVCaptureDevice";'; do
+  D="$(mk_rr_ios '' 'import AVFoundation')"
+  printf '%s\n' "$src" > "$D/App/bridge.js"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r4-4 the code after a regex survives. $src" || bad "r4-4 the code after a regex survives. $src (rc=$RC)"
+  rm -rf "$D"
+done
+D="$(mk_rr_ios '' 'import AVFoundation
+  // AVCaptureDevice on its own line
+let x = 1')"
+rr_run "$D"
+rr_has 'Camera used without' && ok "r4-4b a whole-line comment counts as a trigger, as in 1.0.0" || bad "r4-4b a whole-line comment counts as a trigger, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+# R4-7 the no-parser fallback trusts a tool name only when the payload names exactly one
+D="$(mk_ios_bad)"
+NOP="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOP/$b"; done
+OUT="$(printf '{"metadata":{"tool_name":"Read"},"tool_name":"Bash","tool_input":{"command":"%s deliver"}}' "$FL" | PATH="$NOP" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r4-7 a nested tool_name never hides a Bash submit without jq or python3" || bad "r4-7 a nested tool_name never hides a Bash submit without jq or python3 (rc=$RC)"
+rm -rf "$D" "$NOP"
+# R4-9 workspace runners resolve the selected package's script
+D="$(mktemp -d)"; mkdir -p "$D/apps/x/App"
+printf '{"name":"root","private":true,"workspaces":["apps/*"]}\n' > "$D/package.json"
+printf '{"name":"x","scripts":{"ship-it":"%s deliver"}}\n' "$FL" > "$D/apps/x/package.json"
+printf '{"name":"x","targets":{"ship-it":{"executor":"nx:run-commands","options":{"command":"%s deliver"}}}}\n' "$FL" > "$D/apps/x/project.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/x/App/Info.plist"; mkdir -p "$D/apps/x/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/x/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/x/App/A.swift"
+for c in "yarn workspace x ship-it" "pnpm --filter x ship-it" "pnpm --filter x run ship-it" "npm -w x run ship-it" "npm --prefix apps/x run ship-it" "turbo run ship-it" "npx turbo run ship-it --filter=x" "nx run x:ship-it" "npx nx run x:ship-it" "lerna run ship-it" "bun --filter x run ship-it"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r4-9 a workspace runner is scanned. $c" || bad "r4-9 a workspace runner is scanned. $c (rc=$RC)"
+done
+rr_hook "yarn workspace x lint" "$D"
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "r4-9b a workspace runner with a harmless script stays quiet" || bad "r4-9b a workspace runner with a harmless script stays quiet (rc=$RC)"
+mkdir -p "$D/apps/web"; printf '{"name":"web","scripts":{"build":"next build"}}\n' > "$D/apps/web/package.json"
+printf '{"name":"x","scripts":{"ship-it":"%s deliver","build":"eas build -p ios"}}\n' "$FL" > "$D/apps/x/package.json"
+for c in "pnpm --filter web build" "yarn workspace web build" "npm --prefix apps/web run build" "npm -w web run build"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 0 ] && ok "r4-9c a named web package never inherits the mobile package script. $c" || bad "r4-9c a named web package never inherits the mobile package script. $c (rc=$RC)"
+done
+rr_hook "pnpm --filter x build" "$D"
+[ "$RC" -eq 2 ] && ok "r4-9d the named mobile package build script is scanned" || bad "r4-9d the named mobile package build script is scanned (rc=$RC)"
+rm -rf "$D"
+
+# R4P the persona review on real monorepo layouts
+# R4P-1 a local Expo native module (an Android library) never becomes its own app
+D="$(mktemp -d)"; mkdir -p "$D/android/app/src/main" "$D/modules/pay/android/src/main/java"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '{"dependencies":{"expo":"52","react-native":"0.76"}}' > "$D/package.json"
+printf 'apply plugin: "com.android.application"\nandroid { defaultConfig { targetSdkVersion 36 } }\n' > "$D/android/app/build.gradle"
+printf '<manifest/>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf 'apply plugin: "com.android.library"\n' > "$D/modules/pay/android/build.gradle"
+printf '<manifest/>' > "$D/modules/pay/android/src/main/AndroidManifest.xml"
+printf 'import com.stripe.android.Stripe\n' > "$D/modules/pay/android/src/main/java/Pay.kt"
+rr_run "$D"
+! rr_has '^App\. ' && ok "r4p-1 a local native library module stays with the app that uses it" || bad "r4p-1 a local native library module stays with the app that uses it (rc=$RC)"
+rm -rf "$D"
+# R4P-2 a Tuist Project.swift purpose string counts as the key
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf 'let project = Project(name: "App", targets: [.target(name: "App", infoPlist: .extendingDefault(with: ["NSCameraUsageDescription": "Scan receipts to log expenses"]))])\n' > "$D/Project.swift"
+rr_run "$D"
+! rr_has 'Camera used without' && ok "r4p-2 a camera key set in Tuist Project.swift counts" || bad "r4p-2 a camera key set in Tuist Project.swift counts (rc=$RC)"
+rm -rf "$D"
+# R4P-3 only a folder named exactly like demo or sample is a demo. resample and sample-store are real apps
+for name in resample sample-store; do
+  D="$(mktemp -d)"; mkdir -p "$D/ios/Main" "$D/apps/$name/Store.xcodeproj" "$D/apps/$name/Store"
+  printf '{"expo":{"name":"root"}}' > "$D/app.json"
+  printf '<plist><dict><key>NSLocationWhenInUseUsageDescription</key><string>Show nearby stores</string></dict></plist>' > "$D/ios/Main/Info.plist"
+  mkdir -p "$D/ios/Main.xcodeproj"; printf 'X=1;\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+  printf 'X=1;\n' > "$D/apps/$name/Store.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$D/apps/$name/Store/Info.plist"
+  printf 'import CoreLocation\nlet m = CLLocationManager()\n' > "$D/apps/$name/Store/S.swift"
+  rr_run "$D"
+  rr_has "^App\. $D/apps/$name$" && ok "r4p-3 apps/$name is scanned as its own app" || bad "r4p-3 apps/$name is scanned as its own app (rc=$RC)"
+  rm -rf "$D"
+done
+# R4P-4 a native StoreKit app needs a real restore call. a plugin's purchase list does not count
+D="$(mk_rr_ios '' 'import StoreKit
+let p: SKProduct? = nil
+func load() { getAvailablePurchases() }')"
+rr_run "$D"
+rr_has 'APPLE-RESTORE-PURCHASES-MISSING' && ok "r4p-4 a StoreKit app with only getAvailablePurchases still needs Restore Purchases" || bad "r4p-4 a StoreKit app with only getAvailablePurchases still needs Restore Purchases (rc=$RC)"
+rm -rf "$D"
+
+# R5 round 5 review
+FL="fast""lane"
+GW="./gradle""w bundle""Release"
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+# R5-1 a harmless-looking command beside an Android build is trusted only without any substitution, and git is never trusted
+for c in "$GW && echo \"\$(python3 scripts/upload.py)\"" "$GW && echo \`./up.sh\`" "$GW && git upload" "$GW && cat <(./up.sh)"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "r5-1 Apple checks stay on. $c" || bad "r5-1 Apple checks stay on. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R5-2 a // or /* inside a regex never hides code, even with a space before it
+for src in 'const pattern = /[ //]/; const camera = "AVCaptureDevice";' 'const pattern = /[ /*]/; const camera = "AVCaptureDevice"; /* tail */' 'const s = "a\
+/* not a comment";
+const camera = "AVCaptureDevice";'; do
+  D="$(mk_rr_ios '' 'import AVFoundation')"
+  printf '%s\n' "$src" > "$D/App/bridge.js"
+  rr_run "$D"
+  rr_has 'Camera used without NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r5-2 the code survives. ${src%%$'\n'*}" || bad "r5-2 the code survives. ${src%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+# R5-3 an option in a later command never scopes the runner. the root package script still counts
+D="$(mktemp -d)"; mkdir -p "$D/apps/web" "$D/App"
+printf '{"name":"root","scripts":{"ship":"%s deliver"}}\n' "$FL" > "$D/package.json"
+printf '{"name":"web","scripts":{"ship":"echo web"}}\n' > "$D/apps/web/package.json"
+printf '<plist><dict></dict></plist>' > "$D/App/Info.plist"; mkdir -p "$D/App.xcodeproj"; printf 'X=1;\n' > "$D/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/App/A.swift"
+rr_hook "npm run ship && echo --prefix apps/web" "$D"
+[ "$RC" -eq 2 ] && ok "r5-3 a later echo --prefix never hides the root script" || bad "r5-3 a later echo --prefix never hides the root script (rc=$RC)"
+# R5-5 recursive runners read every package, and a scoped name matches in full
+printf '{"name":"root"}\n' > "$D/package.json"; mkdir -p "$D/apps/mob"
+printf '{"name":"@mobile/web","scripts":{"ship":"%s deliver"}}\n' "$FL" > "$D/apps/mob/package.json"
+for c in "npm --workspaces run ship" "npm run ship --workspaces" "pnpm -r run ship" "pnpm --recursive run ship" "yarn workspaces foreach run ship" "pnpm --filter @mobile/web ship"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r5-5 scanned. $c" || bad "r5-5 scanned. $c (rc=$RC)"
+done
+rr_hook "pnpm --filter @other/web ship" "$D"
+[ "$RC" -eq 2 ] && ok "r5-5b an unknown scoped package falls back to every package" || bad "r5-5b an unknown scoped package falls back to every package (rc=$RC)"
+rm -rf "$D"
+# R5-7 an Xcode framework project never splits off as its own app
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/modules/Pay/Pay.xcodeproj" "$D/modules/Pay/Pay"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'X=1;\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>NSCameraUsageDescription</key><string>Scan receipts</string></dict></plist>' > "$D/ios/Main/Info.plist"
+printf 'productType = "com.apple.product-type.framework";\n' > "$D/modules/Pay/Pay.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/modules/Pay/Pay/Info.plist"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/modules/Pay/Pay/P.swift"
+rr_run "$D"
+! rr_has '^App\. ' && ok "r5-7 a framework Xcode project stays with the app that links it" || bad "r5-7 a framework Xcode project stays with the app that links it (rc=$RC)"
+rm -rf "$D"
+# R6 persona round 2
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+# R6-1 a message quote left open across lines never hides the submit that bash runs
+rr_hook "git commit -m \"a
+git commit -m \" ; $FL deliver ; echo \"
+\"" "$D"
+[ "$RC" -eq 2 ] && ok "r6-1 a multi-line quoted message never hides a submit" || bad "r6-1 a multi-line quoted message never hides a submit (rc=$RC)"
+rr_hook "gh pr create -b \"x
+\" ; $FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r6-1b a gh body across lines never hides a submit" || bad "r6-1b a gh body across lines never hides a submit (rc=$RC)"
+rm -rf "$D"
+# R6-2 a /* that never closes was a misread string, so the code after it still counts
+D="$(mk_rr_ios '' 'import AVFoundation
+let s = "x"
+/* stray opener inside what was really a string
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r6-2 an unclosed block comment never hides a camera call" || bad "r6-2 an unclosed block comment never hides a camera call (rc=$RC)"
+rm -rf "$D"
+# R6-3 a camera mention in a closed block comment counts, as in 1.0.0
+D="$(mk_rr_ios '' 'import Foundation
+/* AVCaptureDevice.default(for: .video)
+*/
+let s = "x"')"
+rr_hook "$FL deliver" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r6-3 a camera mention in a block comment counts, as in 1.0.0" || bad "r6-3 a camera mention in a block comment counts, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+# R7 Codex round 6
+# R7-1 a C# verbatim string, a Rust string holding /*, and a mid-line // never hide a camera call
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'var path = @"C:\"; var q = " // "; var camera = AVCaptureDevice.GetDefaultDevice(AVMediaTypes.Video);' > "$D/App/Cam.cs"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r7-1a a C# verbatim string never hides a camera call" || bad "r7-1a a C# verbatim string never hides a camera call (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'let s = "a' '/* b";' 'let camera = unsafe { AVCaptureDevice::defaultDeviceWithMediaType(AVMediaTypeVideo) };' '/* end */' > "$D/App/cam.rs"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r7-1b a Rust string holding /* never hides a camera call" || bad "r7-1b a Rust string holding /* never hides a camera call (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'import AVFoundation
+let q = "a" ; _ = 1 // b ; let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r7-1c code after a mid-line // still counts, as on main" || bad "r7-1c code after a mid-line // still counts, as on main (rc=$RC)"
+rm -rf "$D"
+# R7-2 a later web workspace build never masks an earlier root submit script
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/web"
+printf '{"name":"root","scripts":{"ship":"eas submit -p ios"}}' > "$D/package.json"
+printf '{"name":"web","scripts":{"build":"vercel deploy"}}' > "$D/apps/web/package.json"
+rr_hook "npm run ship && yarn workspace web build" "$D"
+[ "$RC" -eq 2 ] && ok "r7-2 every runner in the command is read" || bad "r7-2 every runner in the command is read (rc=$RC)"
+# R7-2b runner shorthands that name a script without run
+for c in "bun ship" "turbo ship" "nx run-many -t ship" "nx affected --target=ship" "pnpm -r ship"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r7-2b scanned. $c" || bad "r7-2b scanned. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R7-3 git beside an Android build can run a configured helper, so the Apple checks stay on
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+for c in "$GW && git diff --no-index --ext-diff /dev/null README.md" "$GW && git status"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ! rr_has 'Command targets Android only' && ok "r7-3 Apple checks stay on. $c" || bad "r7-3 Apple checks stay on. $c (rc=$RC)"
+done
+# R7-5 Kiro runs PowerShell through execute_pwsh
+OUT="$(python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"preToolUse","tool_name":"execute_pwsh","tool_input":{"command":sys.argv[1]}}))' "$FL deliver" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && ok "r7-5 a Kiro execute_pwsh submit is checked" || bad "r7-5 a Kiro execute_pwsh submit is checked (rc=$RC)"
+rm -rf "$D"
+# R7-4 a brownfield native host that embeds React Native stays in the root scan, so its OTA updater is still reported
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"react-native":"0.76.0"}}' > "$D/package.json"
+printf '{"name":"r","displayName":"R"}' > "$D/app.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'let url = CodePush.bundleURL()\n' > "$D/Native/Entry.swift"
+rr_run "$D"
+rr_has 'RN-OTA-UNDECLARED' && ok "r7-4 a brownfield host keeps the React Native checks" || bad "r7-4 a brownfield host keeps the React Native checks (rc=$RC)"
+rm -rf "$D"
+# R8 Codex round 7
+# R8-1 a multi-line Rust string holding /* and quotes never hides a camera call
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'let pattern = "first' '/* \"quoted\"' 'last";' 'let camera = unsafe {' '    AVCaptureDevice::defaultDeviceWithMediaType(AVMediaTypeVideo)' '};' '/* end */' > "$D/App/cam.rs"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r8-1 a multi-line string holding /* never hides a camera call" || bad "r8-1 a multi-line string holding /* never hides a camera call (rc=$RC)"
+rm -rf "$D"
+# R8-2 JSX text holding // never hides the deletion handler after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' 'export const S = () => <View><Text>a // b</Text><Button onPress={deleteAccount} /></View>;' > "$D/App/Settings.tsx"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r8-2 JSX text holding // keeps the handler after it" || bad "r8-2 JSX text holding // keeps the handler after it (rc=$RC)"
+rm -rf "$D"
+# R8-3 an Objective-C Capacitor host is brownfield and stays in the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '#import <Capacitor/Capacitor.h>\n@interface H : CAPBridgeViewController\n@end\n@implementation H { UIWebView *old; }\n@end\n' > "$D/Native/Host.m"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r8-3 an Objective-C Capacitor host keeps the Ionic checks" || bad "r8-3 an Objective-C Capacitor host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R8-4 a quoted folder holding a ; is never split into two commands
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/a;b"; printf '{"name":"ab","scripts":{"ship":"eas submit -p ios"}}' > "$D/apps/a;b/package.json"
+rr_hook "npm --prefix \"apps/a;b\" run ship" "$D"
+[ "$RC" -eq 2 ] && ok "r8-4 a quoted folder with ; still finds the script" || bad "r8-4 a quoted folder with ; still finds the script (rc=$RC)"
+# R8-5 a script defined only in a child package, reached by nx, bun or several filters
+mkdir -p "$D/apps/mobile" "$D/apps/web"
+printf '{"name":"@acme/mobile","scripts":{"ship":"eas submit -p ios"}}' > "$D/apps/mobile/package.json"
+printf '{"name":"@acme/web","scripts":{"ship":"vercel deploy"}}' > "$D/apps/web/package.json"
+for c in "nx ship mobile" "nx affected --target=ship" "bun run --filter @acme/mobile ship" "pnpm --filter @acme/mobile --filter @acme/web ship"; do
+  rr_hook "$c" "$D"
+  [ "$RC" -eq 2 ] && ok "r8-5 scanned. $c" || bad "r8-5 scanned. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R9 Codex round 8
+# R9-1 a pointer write led by * and a line with code after a leading /* note */ are code
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' 'void f(void **out) {' '*out = (__bridge void *)[AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' '}' > "$D/App/P.m"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r9-1a a pointer write led by * is code" || bad "r9-1a a pointer write led by * is code (rc=$RC)"
+rm -rf "$D"
+D="$(mk_rr_ios '' 'let s = "x"')"
+printf '%s\n' '/* note */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo]; NSString *s = @"*/";' > "$D/App/Q.m"
+rr_hook "$FL deliver" "$D"
+[ "$RC" -eq 2 ] && ok "r9-1b code after a leading /* note */ counts" || bad "r9-1b code after a leading /* note */ counts (rc=$RC)"
+rm -rf "$D"
+# R9-2 a // inside a string never hides the deletion call after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' 'const s = " // x "; deleteAccount();' > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r9-2 a // inside a string keeps the deletion after it" || bad "r9-2 a // inside a string keeps the deletion after it (rc=$RC)"
+rm -rf "$D"
+# R9-3 a runner inside $( ) never masks the outer submit script
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/web"
+printf '{"name":"root","scripts":{"ship":"eas submit -p ios"}}' > "$D/package.json"
+printf '{"name":"web","scripts":{"args":"printf x"}}' > "$D/apps/web/package.json"
+rr_hook "npm run ship -- \"\$(yarn workspace web args)\"" "$D"
+[ "$RC" -eq 2 ] && ok "r9-3 a nested runner never masks the outer submit" || bad "r9-3 a nested runner never masks the outer submit (rc=$RC)"
+rm -rf "$D"
+# R9-4 a native host that imports Cordova under a Capacitor root is brownfield and keeps the Ionic checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0","cordova-plugin-x":"1.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '#import <Cordova/CDV.h>\nUIWebView *webView;\n' > "$D/Native/Host.m"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r9-4 a Cordova host keeps the Ionic checks" || bad "r9-4 a Cordova host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R10 Codex round 9
+# R10-1 a spaced pointer write and code after a closing */ count as triggers
+for src in '* out = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' ' */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];'; do
+  D="$(mk_rr_ios '' 'let s = "x"')"
+  printf '%s\n' "$src" > "$D/App/R.m"
+  rr_hook "$FL deliver" "$D"
+  [ "$RC" -eq 2 ] && ok "r10-1 the camera call counts. $src" || bad "r10-1 the camera call counts. $src (rc=$RC)"
+  rm -rf "$D"
+done
+# R10-2 runner text inside an argument never hides the outer npm script
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/apps/web"
+printf '{"name":"root","scripts":{"ship":"eas submit -p ios"}}' > "$D/package.json"
+printf '{"name":"web","scripts":{"args":"printf x"}}' > "$D/apps/web/package.json"
+rr_hook "npm run ship -- --path=\"yarn workspace web args.ipa\"" "$D"
+[ "$RC" -eq 2 ] && ok "r10-2 runner text in an argument never hides the npm script" || bad "r10-2 runner text in an argument never hides the npm script (rc=$RC)"
+rm -rf "$D"
+# R10-3 a Swift host that imports Cordova stays in the root scan
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import Cordova\nclass AppDelegate: CDVAppDelegate { var legacy: UIWebView? }\n' > "$D/Native/AppDelegate.swift"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r10-3 a Swift Cordova host keeps the Ionic checks" || bad "r10-3 a Swift Cordova host keeps the Ionic checks (rc=$RC)"
+rm -rf "$D"
+# R10-4 a // inside a single-quoted string keeps the deletion after it
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' "const s = ' // x '; deleteAccount();" > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r10-4 a // in a single-quoted string keeps the deletion" || bad "r10-4 a // in a single-quoted string keeps the deletion (rc=$RC)"
+rm -rf "$D"
+# R7-6 a purpose key in an XcodeGen include, an Nx project.json, a Tuist helper or a Cordova config.xml counts
+for f in targets/App.yml project.json Tuist/ProjectDescriptionHelpers/Info.swift config.xml; do
+  D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+  mkdir -p "$D/$(dirname "$f")"; printf 'NSCameraUsageDescription Scan receipts\n' > "$D/$f"
+  rr_hook "$FL deliver" "$D"
+  ! rr_has 'NSCameraUsageDescription' && ok "r7-6 a camera key in $f counts" || bad "r7-6 a camera key in $f counts (rc=$RC)"
+  rm -rf "$D"
+done
+
+# R11 Codex round 10
+# R11-1 triggers read every line raw, as in 1.0.0, so a // line holding a live Swift interpolation still counts
+D="$(mk_rr_ios '' 'import AVFoundation
+let message = """
+// \(AVCaptureDevice.requestAccess(for: .video, completionHandler: { _ in }))
+"""')"
+rr_hook "$FL deliver" "$D"
+rr_has 'NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r11-1 a // line holding an interpolation still triggers" || bad "r11-1 a // line holding an interpolation still triggers (rc=$RC)"
+rm -rf "$D"
+# R11-2 an RCTAppDelegate host stays in the root scan and keeps the React Native checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/ios/Main" "$D/Native/Native.xcodeproj" "$D/Native/js"
+printf '{"name":"r","dependencies":{"expo":"51.0.0","react-native":"0.74.0"}}' > "$D/package.json"
+printf 'module.exports = { name: "r" };\n' > "$D/app.config.js"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Main/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import React_RCTAppDelegate\nclass AppDelegate: RCTAppDelegate {}\n' > "$D/Native/Host.swift"
+printf '{"name":"native-js","dependencies":{"@react-native-async-storage/async-storage":"2"}}' > "$D/Native/js/package.json"
+printf "import AsyncStorage from '@react-native-async-storage/async-storage';\nAsyncStorage.getItem('x');\n" > "$D/Native/js/storage.js"
+rr_run "$D"
+rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r11-2 an RCTAppDelegate host keeps the React Native checks" || bad "r11-2 an RCTAppDelegate host keeps the React Native checks (rc=$RC)"
+rm -rf "$D"
+# R11-3 a zsh =(...) substitution is executable, so a commit message and a safe command lose their pass
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/scripts"; printf '%s deliver\n' "$FL" > "$D/scripts/up.sh"
+rr_hook "git commit -m \"$FL deliver\" =(sh scripts/up.sh)" "$D"
+[ "$RC" -eq 2 ] && ok "r11-3 a zsh =() beside a commit message still scans" || bad "r11-3 a zsh =() beside a commit message still scans (rc=$RC)"
+rr_hook "./gradlew bundleRelease && echo =(sh scripts/up.sh)" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r11-3 a zsh =() beside an Android build keeps the Apple checks" || bad "r11-3 a zsh =() beside an Android build keeps the Apple checks (rc=$RC)"
+rm -rf "$D"
+# R11-4 a /* ... */ pair inside quoted strings never removes the code between them
+D="$(mk_rr_ios '' 'class A { func signIn() {} }')"
+printf '%s\n' "signIn();" "const s = ' /* '; deleteAccount(); const end = ' */ ';" > "$D/App/del.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r11-4 quoted block markers keep the deletion between them" || bad "r11-4 quoted block markers keep the deletion between them (rc=$RC)"
+rm -rf "$D"
+# R12 Codex round 11
+# R12-1 an Android word inside a quoted lane parameter is text, so an iOS lane keeps the Apple checks
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+rr_hook "$FL beta notes:\"test -p android\"" "$D"
+rr_has 'NSCameraUsageDescription' && [ "$RC" -eq 2 ] && ok "r12-1 a quoted -p android in a lane parameter keeps the Apple checks" || bad "r12-1 a quoted -p android in a lane parameter keeps the Apple checks (rc=$RC)"
+rr_hook "$FL beta notes:'flutter build appbundle'" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r12-1 a single-quoted Android build in a parameter keeps the Apple checks" || bad "r12-1 a single-quoted Android build in a parameter keeps the Apple checks (rc=$RC)"
+rm -rf "$D"
+# R12-1b a plain Android release command still stays Android only
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+rr_hook "./gradlew bundleRelease" "$D"
+! rr_has 'NSCameraUsageDescription' && ok "r12-1b a plain Android build still skips the Apple checks" || bad "r12-1b a plain Android build still skips the Apple checks (rc=$RC)"
+rm -rf "$D"
+# R13 Codex round 12
+# R13-1 a harmless echo, a comment or a second line naming Android never vouches for an iOS lane
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "$FL beta notes:\"test -p android\"; echo -p android" "$FL beta notes:\"test -p android\" # -p android" "$FL beta notes:\"x -p android\" && ./gradlew bundleRelease"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r13-1 the iOS lane keeps the Apple checks. $c" || bad "r13-1 the iOS lane keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R13-2 a host using React's surface view, or an Android React activity, stays in the root scan
+for host in 'import React
+let v = RCTSurfaceHostingProxyRootView(bridge: b, moduleName: "x")' 'class MainActivity : ReactActivity() {}'; do
+  D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/ios/App" "$D/Native/Host.xcodeproj"
+  printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+  printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+  printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Host.xcodeproj/project.pbxproj"
+  printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+  printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+  printf '%s\n' "$host" > "$D/Native/Host.swift"
+  printf 'AsyncStorage.getItem("theme");\n' > "$D/Native/Feature.ts"
+  rr_run "$D"
+  rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*}" || bad "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*} (rc=$RC)"
+  rm -rf "$D"
+done
+# R14 Codex round 13
+# R14-1 a quoted lane name, a quoted variable or a quoted fastlane still counts as an iOS submit beside an Android one
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+mkdir -p "$D/fastlane"
+UP="upload_to_""testflight"
+printf 'lane :beta do |options|\n  %s(changelog: options[:notes])\nend\n' "$UP" > "$D/fastlane/Fastfile"
+EA="eas"" submit"
+for c in "$FL \"beta\" notes:\"test -p android\"; $EA -p android" "$FL \"\$LANE\" notes:x; $EA -p android" "\"$FL\" beta; $EA -p android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r14-1 the iOS submit keeps the Apple checks. $c" || bad "r14-1 the iOS submit keeps the Apple checks. $c (rc=$RC)"
+done
+rr_hook "$EA -p android && echo done" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r14-1b a -p android submit beside a harmless echo keeps the Apple checks, as in 1.0.0" || bad "r14-1b a -p android submit beside a harmless echo keeps the Apple checks, as in 1.0.0 (rc=$RC)"
+rm -rf "$D"
+# R14-2 a native app split off a framework root keeps that root's framework checks
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/ios/App" "$D/Native/Legacy.xcodeproj"
+printf '{"name":"r","dependencies":{"@capacitor/core":"6.0.0"}}' > "$D/package.json"
+printf 'export default { appId: "a.b" };\n' > "$D/capacitor.config.ts"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Legacy.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/App/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/Native/Legacy.swift"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r14-2 a split native app keeps the root framework checks" || bad "r14-2 a split native app keeps the root framework checks (rc=$RC)"
+rm -rf "$D"
+# R15 Codex round 14
+# R15-1 a wrapped Apple submit never borrows an Android flag from a harmless command, Android only needs main's rule too
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf '{"name":"r","scripts":{"ship":"%s deliver"}}' "$FL" > "$D/package.json"
+rr_hook "npm run ship; echo -p android" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r15-1 a wrapped Apple submit keeps the Apple checks beside echo -p android" || bad "r15-1 a wrapped Apple submit keeps the Apple checks beside echo -p android (rc=$RC)"
+rm -rf "$D"
+# R15-2 a framework marker inside a split native app still counts for the root it was pooled with
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/Native/Native.xcodeproj"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Info.plist"
+printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/ios/Legacy.swift"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf '<widget id="com.acme.native"/>\n' > "$D/Native/config.xml"
+rr_run "$D"
+rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r15-2 a framework marker in a split native app still counts for the root" || bad "r15-2 a framework marker in a split native app still counts for the root (rc=$RC)"
+rm -rf "$D"
+# R16 Codex round 15
+# R16-1 a wrapped Apple submit never borrows an Android flag from an echo beside it
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+printf '{"name":"r","scripts":{"ship":"%s deliver"}}' "$FL" > "$D/package.json"
+for c in "npm run ship; echo --platform android" "npm run ship && echo build apk"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r16-1 a wrapped Apple submit keeps the Apple checks. $c" || bad "r16-1 a wrapped Apple submit keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R16-2 a wrapped submit that names Android itself stays Android only
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+BR="bundle""Release"
+printf '{"name":"r","scripts":{"ship":"./gradlew %s"}}' "$BR" > "$D/package.json"
+rr_hook "npm run ship -- --platform android" "$D"
+rr_has 'Command targets Android only' && ok "r16-2 a wrapped submit naming Android itself stays Android only" || bad "r16-2 a wrapped submit naming Android itself stays Android only (rc=$RC)"
+rm -rf "$D"
+# R17 Codex round 16
+# R17-1 a submit quoted inside bash -c never takes an Android word from the outer arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+rr_hook "bash -c '$FL beta' --platform android" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r17-1 a submit inside bash -c keeps the Apple checks beside outer Android arguments" || bad "r17-1 a submit inside bash -c keeps the Apple checks beside outer Android arguments (rc=$RC)"
+rm -rf "$D"
+# R17-2 evidence split between the root and a split native app still counts, scanned as one as in 1.0.0
+D="$(mktemp -d)"; mkdir -p "$D/ios/App.xcodeproj" "$D/Shared" "$D/Native/Native.xcodeproj"
+printf '{"expo":{"name":"root"}}' > "$D/app.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/App.xcodeproj/project.pbxproj"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/Native/Native.xcodeproj/project.pbxproj"
+printf '<plist><dict></dict></plist>' > "$D/ios/Info.plist"
+printf '<plist><dict></dict></plist>' > "$D/Native/Info.plist"
+printf 'let title = "Monthly subscription"\n' > "$D/Shared/Pricing.swift"
+printf 'let cancel = "Call us to cancel"\n' > "$D/Native/Cancel.swift"
+rr_run "$D"
+rr_has 'BOTH-SUBSCRIPTION-HARD-CANCEL' && ok "r17-2 evidence split across a split native app still counts" || bad "r17-2 evidence split across a split native app still counts (rc=$RC)"
+[ "$(printf '%s' "$OUT" | grep -c 'BOTH-SUBSCRIPTION-HARD-CANCEL')" -le 1 ] && ok "r17-2b the pooled pass never lists a finding twice" || bad "r17-2b the pooled pass never lists a finding twice"
+rm -rf "$D"
+# R18 Codex round 17
+# R18-1 a submit quoted inside any shell, by path or behind env or sudo, never takes the outer Android arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "/bin/bash -c '$FL beta' --platform android" "env bash -c '$FL beta' --platform android" "sudo sh -c '$FL beta' --platform android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r18-1 a quoted submit keeps the Apple checks. $c" || bad "r18-1 a quoted submit keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R18-2 an Nx target whose options carry an env object still names its submit command
+D="$(mktemp -d)"; mkdir -p "$D/apps/x/App"
+printf '{"name":"root","private":true,"workspaces":["apps/*"]}\n' > "$D/package.json"
+printf '{"name":"x","targets":{"ship":{"executor":"nx:run-commands","options":{"env":{"NODE_ENV":"production"},"command":"%s deliver"}}}}\n' "$FL" > "$D/apps/x/project.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/x/App/Info.plist"; mkdir -p "$D/apps/x/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/x/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/x/App/A.swift"
+rr_hook "nx run x:ship" "$D"
+[ "$RC" -eq 2 ] && ok "r18-2 an Nx target with an env object is still a submit" || bad "r18-2 an Nx target with an env object is still a submit (rc=$RC)"
+rm -rf "$D"
+# R19 the guard itself on macOS bash 3.2, which reads the \001 separator as a quoting byte
+if [ -x /bin/bash ] && /bin/bash --version 2>/dev/null | grep -q 'version 3\.'; then
+  D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+  EA="eas"" submit"
+  OUT="$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$EA --platform android" | CLAUDE_PROJECT_DIR="$D" /bin/bash "$GUARD" 2>&1)"; RC=$?
+  [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "r19 bash 3.2 reads an Android submit as Android only" || bad "r19 bash 3.2 reads an Android submit as Android only (rc=$RC)"
+  rm -rf "$D"
+fi
+# R20 Codex round 18
+# R20-1 a submit inside python -c or ruby -e never takes the outer Android arguments
+D="$(mk_rr_ios '' 'import AVFoundation
+let dev = AVCaptureDevice.default(for: .video)')"
+UP="upload_to_""testflight"
+mkdir -p "$D/fastlane"; printf 'lane :beta do\n  %s\nend\n' "$UP" > "$D/fastlane/Fastfile"
+for c in "python3 -c '__import__(\"os\").system(\"$FL beta\")' --platform android" "ruby -e 'system(\"$FL beta\")' --platform android"; do
+  rr_hook "$c" "$D"
+  rr_has 'NSCameraUsageDescription' && ok "r20-1 a submit inside another program keeps the Apple checks. $c" || bad "r20-1 a submit inside another program keeps the Apple checks. $c (rc=$RC)"
+done
+rm -rf "$D"
+# R20-2 code after a closing block comment on the same line still counts
+D="$(mk_rr_ios '' 'class A { func signIn() {} }
+/* Account settings action.
+ */ func deleteAccount() { removeCurrentUserAndData() }')"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r20-2 a deletion after a closing block comment still counts" || bad "r20-2 a deletion after a closing block comment still counts (rc=$RC)"
+rm -rf "$D"
+# R21 Codex round 19
+# R21-1 an exclusion-only pnpm filter reads every other package, so the submitting one is found
+D="$(mktemp -d)"; mkdir -p "$D/apps/docs" "$D/apps/mobile/App"
+printf '{"name":"root","private":true}\n' > "$D/package.json"
+printf 'packages: ["apps/*"]\n' > "$D/pnpm-workspace.yaml"
+printf '{"name":"@acme/docs","scripts":{"ship":"echo done"}}\n' > "$D/apps/docs/package.json"
+printf '{"name":"@acme/mobile","scripts":{"ship":"%s deliver"}}\n' "$FL" > "$D/apps/mobile/package.json"
+printf '<plist><dict></dict></plist>' > "$D/apps/mobile/App/Info.plist"; mkdir -p "$D/apps/mobile/App.xcodeproj"; printf 'X=1;\n' > "$D/apps/mobile/App.xcodeproj/project.pbxproj"
+printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "$D/apps/mobile/App/A.swift"
+rr_hook "pnpm --filter '!@acme/docs' run ship" "$D"
+[ "$RC" -eq 2 ] && ok "r21-1 an exclusion-only pnpm filter still finds the submitting package" || bad "r21-1 an exclusion-only pnpm filter still finds the submitting package (rc=$RC)"
+rm -rf "$D"
+# R22 Codex round 20
+# R22-1 an escaped quote inside a string never hides a deletion written after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const s = "quote: \" // string"; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r22-1 an escaped quote never hides a deletion after it" || bad "r22-1 an escaped quote never hides a deletion after it (rc=$RC)"
+rm -rf "$D"
+# R23 Codex round 21
+# R23-1 the pooled pass keeps a critical finding that shares its id with a high one already listed
+D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/android/app/src/main" "$D/androidRelease/src/main"
+printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
+printf 'productType = "com.apple.product-type.application";\n' > "$D/ios/Main.xcodeproj/project.pbxproj"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$D/ios/Info.plist"
+printf 'import Photos\nlet lib = PHPhotoLibrary.shared()\n' > "$D/Photo.swift"
+printf "include ':app'\n" > "$D/android/settings.gradle"
+printf "plugins { id 'com.android.application' }\n" > "$D/android/app/build.gradle"
+printf '<manifest package="a.b"/>' > "$D/android/app/src/main/AndroidManifest.xml"
+printf "plugins { id 'com.android.application' }\n" > "$D/androidRelease/build.gradle"
+printf '<manifest package="a.c"/>' > "$D/androidRelease/src/main/AndroidManifest.xml"
+printf 'import AVFoundation\nlet dev = AVCaptureDevice.default(for: .video)\n' > "$D/androidRelease/Camera.swift"
+rr_hook "xcodebuild -project ios/Main.xcodeproj archive" "$D"
+rr_has 'NSCameraUsageDescription' && ok "r23-1 the pooled pass keeps a critical finding beside a high one with the same id" || bad "r23-1 the pooled pass keeps a critical finding beside a high one with the same id (rc=$RC)"
+rm -rf "$D"
+# R23-2 a quote inside a JS regex literal never hides a deletion after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const r = /"/; const s = " // "; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r23-2 a quote in a regex literal never hides a deletion" || bad "r23-2 a quote in a regex literal never hides a deletion (rc=$RC)"
+rm -rf "$D"
+# R24 Codex round 22
+# R24-1 a JS regex literal holding a quote and a space never hides a deletion after it
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'signIn(); const r = /" /; const s = " // "; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
+rr_run "$D"
+! rr_has 'NO-ACCOUNT-DELETION' && ok "r24-1 a regex literal with a space never hides a deletion" || bad "r24-1 a regex literal with a space never hides a deletion (rc=$RC)"
+rm -rf "$D"
+# R25 Codex round 23
+# R25-1 removing an inline comment never joins two words into deletion evidence
+D="$(mk_rr_ios '' 'let ready = true')"
+printf '%s\n' 'extern void sendSignup(void);' 'void createAccount(void) { sendSignup(); }' 'typedef int account;' 'account /* cache */deletion = 0;' > "$D/App/Account.m"
+rr_run "$D"
+rr_has 'NO-ACCOUNT-DELETION' && ok "r25-1 a removed comment never manufactures deletion evidence" || bad "r25-1 a removed comment never manufactures deletion evidence (rc=$RC)"
+rm -rf "$D"
+# R25-2 a regex literal after && or return never hides a deletion after it
+for js in 'signIn(); const r = true && /"/; const s = " // "; function deleteAccount() { return api.deleteUser(); }' \
+          'signIn(); function f() { return /"/; } const s = " // "; function deleteAccount() { return api.deleteUser(); }'; do
+  D="$(mk_rr_ios '' 'let ready = true')"
+  printf '%s\n' "$js" > "$D/App/account.js"
+  rr_run "$D"
+  ! rr_has 'NO-ACCOUNT-DELETION' && ok "r25-2 a regex literal after an operator never hides a deletion" || bad "r25-2 a regex literal after an operator never hides a deletion (rc=$RC)"
+  rm -rf "$D"
+done
+# R26 Qwen round 24. a regex literal after + - * < > never hides a deletion after it
+for op in '+' '-' '*' '>' '<' '%'; do
+  D="$(mk_rr_ios '' 'let ready = true')"
+  printf '%s\n' "var a = 1; signIn(); const x = a $op /\"/; const s = \" // \"; function deleteAccount() { return api.deleteUser(); }" > "$D/App/account.js"
+  rr_run "$D"
+  ! rr_has 'NO-ACCOUNT-DELETION' && ok "r26 a regex literal after $op never hides a deletion" || bad "r26 a regex literal after $op never hides a deletion (rc=$RC)"
+  rm -rf "$D"
+done
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

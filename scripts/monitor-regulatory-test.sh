@@ -111,6 +111,33 @@ if echo "$EU_JSON" | grep -q '"proposed_pull_request": null'; then
 fi
 echo "[PASS] Allowed verified Priority 1 sources successfully"
 
+# Test 8: Source trust is decided by the URL host, never by text
+echo "[TEST] Verifying host based source trust (spoofed hosts and agency words)..."
+python3 - "$MON_SCRIPT" <<'TRUSTPY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("mon", sys.argv[1])
+mon = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mon)
+cases = [
+    ("spoofed host suffix", {"title": "Rule", "description": "", "link": "https://ftc.gov.attacker.invalid/article"}, False),
+    ("agency word in title", {"title": "FTC announces a new rule", "description": "", "link": "https://news.example.invalid/story"}, False),
+    ("official domain in text only", {"title": "Rule", "description": "see ftc.gov and eur-lex.europa.eu", "link": "https://news.example.invalid/story"}, False),
+    ("userinfo trick", {"title": "Rule", "description": "", "link": "https://ftc.gov@attacker.invalid/"}, False),
+    ("legitimate subdomain", {"title": "Rule", "description": "", "link": "https://www.ftc.gov/news"}, True),
+    ("uppercase host", {"title": "Rule", "description": "", "link": "https://WWW.FTC.GOV/news"}, True),
+    ("gov top level domain", {"title": "Rule", "description": "", "link": "https://www.federalregister.gov/documents/x"}, True),
+]
+failed = 0
+for name, ann, official in cases:
+    prio, verified = mon.classify_source_and_verify(ann, None)
+    if official and (prio, verified) != (1, True):
+        print("[ERROR] %s: expected (1, True), got (%s, %s)" % (name, prio, verified)); failed += 1
+    if not official and (prio == 1 or verified):
+        print("[ERROR] %s: expected untrusted, got (%s, %s)" % (name, prio, verified)); failed += 1
+sys.exit(1 if failed else 0)
+TRUSTPY
+echo "[PASS] Source trust follows the URL host with a domain boundary match"
+
 echo ""
 echo "[SUCCESS] All tests passed successfully."
 exit 0

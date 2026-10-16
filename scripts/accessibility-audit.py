@@ -181,6 +181,54 @@ def _regex_close(content, start, hashes):
     return n
 
 
+def swift_code_lines(content):
+    """Only whole comment lines blanked, with no string state, so a misread quote never hides any code.
+    Offsets and newlines are kept."""
+    out = []
+    in_block = False
+    in_text = False
+    for line in content.split("\n"):
+        t = line.lstrip(" \t")
+        if re.search(chr(92) * 2 + "#*" + chr(92) + "(", line):
+            out.append(line)
+            continue
+        if not in_block and not in_text and t.startswith("//"):
+            # a comment line is blanked before its quotes are counted, so a quote in a comment never opens a string
+            out.append(" " * len(line))
+            continue
+        code = re.sub(chr(92) * 2 + '#*"', "", line)
+        cut = code.find("//")
+        if cut != -1 and code[:cut].count('"') % 2 == 0:
+            code = code[:cut]  # quotes after an inline // comment never open a string
+        quotes = code.count('"""')
+        if not in_block and (in_text or quotes % 2):
+            # a multiline string line is kept as is, so a /* or // inside one never blanks the code after it
+            if quotes % 2:
+                in_text = not in_text
+            out.append(line)
+            continue
+        if not in_block and t.startswith("//"):
+            out.append(" " * len(line))
+            continue
+        if in_block and not (t.startswith("*") or "*/" in line):
+            # a block comment goes on only through lines that look like comment lines, any other line is code
+            in_block = False
+            out.append(line)
+            continue
+        if in_block or t.startswith("/*"):
+            # only a block comment opened at a line start is blanked, a line led by * outside one is code
+            end = line.find("*/", len(line) - len(t) + (0 if in_block else 2))
+            if end == -1:
+                in_block = True
+                out.append(" " * len(line))
+            else:
+                in_block = False
+                out.append(" " * (end + 2) + line[end + 2:])
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def swift_code_only(content):
     """Blank comments (nested too) and string contents, keeping quotes, newlines and offsets.
     What is left is code, so a Button inside a comment or a string is never read as a control."""
@@ -315,7 +363,7 @@ IMAGE_SYMBOL = re.compile(r"\bImage\s*\(\s*systemName\s*:")
 NAMED_CONTENT = re.compile(r"\b(Text|Label)\s*\(|\baccessibilityLabel\b")
 TITLED_ARG = re.compile(r"\s*(#*\"|title\s*:)")
 LABEL_ARG = re.compile(r"\s*label\s*:")
-LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*\{")
+LABEL_CLOSURE = re.compile(r"\s*label\s*:\s*(?:[(]\s*)*\{")  # label: ({ ... }) reads too
 HIDDEN_TRUE = re.compile(r"\((?:\s*\()*\s*true\s*(?:\)\s*)*\)")
 ACC_HIDDEN = re.compile(r"\bhidden\s*:\s*(?:\(\s*)*true\b")
 ACC_LABEL = re.compile(r"\blabel\s*:")
@@ -437,27 +485,33 @@ def run_rule_scan(rule_id, ios_files, android_files):
             except Exception:
                 continue
 
-            # Find SwiftUI Image usages
-            for match in re.finditer(r"\bImage\s*\(([^)]+)\)", content):
+            # Find SwiftUI Image usages in code only, so a commented example is never read
+            # The lexer view is precise and the line view never loses code to a misread quote. Both are read.
+            seen = set()
+            code = swift_code_only(content)
+            for view in (code, swift_code_lines(content)):
+              for match in re.finditer(r"\bImage\s*\(([^)]+)\)", view):
+                if match.start() in seen:
+                    continue
+                seen.add(match.start())
                 expr = match.group(1)
                 # Ignore images explicitly defined as decorative or having system accessibility labels/hidden
                 if "decorative:" in expr or "systemName:" in expr:
                     continue
                 # Simple parsing check: does the immediate context (within 5 lines) have accessibility modifiers?
                 start_idx = match.start()
-                context = content[start_idx:start_idx + 300]
+                context = code[start_idx:start_idx + 300]
                 if not any(kw in context for kw in ["accessibilityLabel", "accessibilityIdentifier", "accessibilityHidden", "accessibilityElement"]):
                     line_no = content.count("\n", 0, start_idx) + 1
                     findings.append({
                         "file": f,
                         "line": line_no,
                         "rule_id": rule_id,
-                        "match": match.group(0),
+                        "match": content[match.start() : match.end()],
                         "message": "SwiftUI Image used without accessibilityLabel or decorative initialization.",
                         "fix": "Initialize decorative images as Image(decorative: ...) or add an explicit .accessibilityLabel(...) modifier."
                     })
 
-            code = swift_code_only(content)
             newlines = [k for k, ch in enumerate(code) if ch == "\n"]
             for offset, end in find_icon_only_buttons(code):
                 findings.append(

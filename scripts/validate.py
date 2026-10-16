@@ -197,11 +197,39 @@ def main():
         except Exception as e:
             errors.append(f"Failed to parse regulatory-deadlines.json: {e}")
 
+    check_versions()
     return finish(
         len(patterns),
         len(recipes) if "recipes" in locals() else 0,
         len(deadlines) if "deadlines" in locals() else 0,
     )
+
+
+def check_versions():
+    """VERSION, both data files and CITATION.cff must name the same release."""
+    vfile = os.environ.get("VERSION_FILE", os.path.join(ROOT, "VERSION"))
+    try:
+        with open(vfile, encoding="utf-8") as f:
+            want = f.read().strip()
+    except OSError:
+        errors.append(f"VERSION file not found at {vfile}")
+        return
+    for name in ("rejection-patterns.json", "regulatory-deadlines.json"):
+        try:
+            with open(os.path.join(ROOT, "data", name), encoding="utf-8") as f:
+                got = json.load(f).get("version")
+        except Exception:
+            continue
+        if got != want:
+            errors.append(f"data/{name} says version {got}, VERSION says {want}")
+    try:
+        with open(os.path.join(ROOT, "CITATION.cff"), encoding="utf-8") as f:
+            cff = f.read()
+    except OSError:
+        return
+    m = re.search(r"^version:\s*['\"]?([^'\"\s]+)", cff, re.M)
+    if not m or m.group(1) != want:
+        errors.append(f"CITATION.cff says version {m.group(1) if m else 'nothing'}, VERSION says {want}")
 
 
 def finish(npat=0, nrec=0, ndead=0):

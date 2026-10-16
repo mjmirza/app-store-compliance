@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import argparse
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import json
@@ -42,6 +43,9 @@ def _visible_markup(m):
 
 
 FEED_NAMESPACES = ("", "http://www.w3.org/2005/Atom", "http://purl.org/rss/1.0/")
+RSS_CONTENT_NS = "http://purl.org/rss/1.0/modules/content/"
+DC_NS = "http://purl.org/dc/elements/1.1/"
+XML_BASE = "{http://www.w3.org/XML/1998/namespace}base"
 _XHTML_INLINE = {
     "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "font", "i",
     "ins", "kbd", "label", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup",
@@ -267,6 +271,20 @@ def parse_rss_feed(url):
             def ns(e):
                 return e.tag[1:].split("}", 1)[0] if e.tag.startswith("{") else ""
 
+            parents = {c: p for p in root.iter() for c in p}
+
+            def base_of(e):
+                """The xml:base in scope at e, resolved from the fetched URL down."""
+                chain = []
+                while e is not None:
+                    chain.append(e.get(XML_BASE))
+                    e = parents.get(e)
+                base = url
+                for b in reversed(chain):
+                    if b and b.strip():
+                        base = urllib.parse.urljoin(base, b.strip())
+                return base
+
             for elem in root.iter():
                 if not isinstance(elem.tag, str):
                     continue
@@ -274,13 +292,23 @@ def parse_rss_feed(url):
                 if tag in ("item", "entry") and ns(elem) in FEED_NAMESPACES:
                     title = ""
                     desc_parts = []
-                    link = ""
-                    pub_date = ""
+                    links = []  # (preferred, href, element)
+                    dates = {}
 
                     for child in elem:
-                        if not isinstance(child.tag, str) or ns(child) != ns(elem):
-                            continue  # an extension element never stands in for the feed's own
+                        if not isinstance(child.tag, str):
+                            continue
                         ctag = clean_tag(child.tag)
+                        if ns(child) == RSS_CONTENT_NS and ctag == "encoded":
+                            part = clean_html_text(child.text or "")
+                            if part:
+                                desc_parts.append(part)  # the RSS Content module body is HTML
+                            continue
+                        if ns(child) == DC_NS and ctag == "date":
+                            dates.setdefault("dc", child.text or "")
+                            continue
+                        if ns(child) != ns(elem):
+                            continue  # an extension element never stands in for the feed's own
                         if ctag == "title":
                             title = _feed_text(child, tag == "entry", "title")
                         elif ctag in ("description", "summary", "content"):
@@ -288,13 +316,24 @@ def parse_rss_feed(url):
                             if part:
                                 desc_parts.append(part)  # summary and content both count
                         elif ctag == "link":
-                            link_val = child.get("href")
-                            if link_val:
-                                link = link_val
-                            else:
-                                link = child.text or ""
-                        elif ctag in ("pubDate", "published", "updated"):
-                            pub_date = child.text or ""
+                            href = (child.get("href") or child.text or "").strip()
+                            rel = (child.get("rel") or "alternate").strip().lower()
+                            if href:
+                                links.append((rel == "alternate", href, child))
+                        elif ctag in ("pubDate", "published"):
+                            dates.setdefault("published", child.text or "")
+                        elif ctag == "updated":
+                            dates.setdefault("updated", child.text or "")
+
+                    link = ""
+                    if links:  # alternate or no rel first, any other relation only as a fallback
+                        _, href, link_elem = next((x for x in links if x[0]), links[0])
+                        base = base_of(link_elem)
+                        link = urllib.parse.urljoin(base, href)
+                    pub_date = next(
+                        (dates[k] for k in ("published", "updated", "dc") if dates.get(k, "").strip()),
+                        "",
+                    )
 
                     items.append(
                         {

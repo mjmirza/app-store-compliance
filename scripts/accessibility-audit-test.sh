@@ -904,6 +904,127 @@ else
 fi
 rm -rf "$ISSUE_DIR" 2>/dev/null || true
 
+# Issue #1000. Edge cases from the October review.
+I1000_DIR=$(mktemp -d "/tmp/access_issue1000_XXXXXX")
+mkdir -p "$I1000_DIR/paren_label" "$I1000_DIR/comment_image" "$I1000_DIR/code_image"
+cat << 'EOF' > "$I1000_DIR/paren_label/P.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Button(action: {}, label: ({ Image(systemName: "trash") }))
+        Button(action: {}, label: (({ Image(systemName: "gear") })))
+        Button(action: {}, label: ({ Image(systemName: "star") })).accessibilityLabel("Star")
+    }
+}
+EOF
+cat << 'EOF' > "$I1000_DIR/comment_image/C.swift"
+import SwiftUI
+// Example: Image("logo")
+/* Another example, Image("banner") */
+struct V: View {
+    var body: some View {
+        Text("Hello")
+    }
+}
+EOF
+cat << 'EOF' > "$I1000_DIR/code_image/D.swift"
+import SwiftUI
+struct V: View {
+    var body: some View {
+        Image("logo") // accessibilityLabel is still missing here
+    }
+}
+EOF
+
+OUT=$($AUDIT "$I1000_DIR/paren_label" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 2 ]; then
+  ok "#1000 a label closure wrapped in parentheses is read, so the icon-only Button is reported"
+else
+  bad "#1000 a parenthesised label closure was not read. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$I1000_DIR/comment_image" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q "Clean. No accessibility compliance regressions found."; then
+  ok "#1000 an Image inside a comment is not reported as a VoiceOver finding"
+else
+  bad "#1000 the Image rule read a comment. Output:"; echo "$OUT"
+fi
+
+OUT=$($AUDIT "$I1000_DIR/code_image" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if [ "$(echo "$OUT" | grep -c "APPLE-ACCESSIBILITY-VOICEOVER  (")" -eq 1 ] && echo "$OUT" | grep -q 'Image("logo")'; then
+  ok "#1000 a real Image in code is still reported even when a comment names accessibilityLabel"
+else
+  bad "#1000 a real unlabelled Image in code was not reported. Output:"; echo "$OUT"
+fi
+rm -rf "$I1000_DIR" 2>/dev/null || true
+
+# A Swift bare regex holding a quote never hides the Image after it
+R8_DIR="$(mktemp -d)"; mkdir -p "$R8_DIR/app"
+printf '%s\n' 'import SwiftUI' 'struct V: View { var body: some View { let regex = /"/; let s = " // "; Image("logo") } }' > "$R8_DIR/app/V.swift"
+OUT=$($AUDIT "$R8_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("logo")'; then ok "an Image after a Swift regex holding a quote is still reported"; else bad "an Image after a Swift regex holding a quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R8_DIR" 2>/dev/null || true
+
+# A closed block comment at the start of a line never hides the code after it
+R9_DIR="$(mktemp -d)"; mkdir -p "$R9_DIR/app"
+printf '%s\n' 'import SwiftUI' '/* comment */ let r = /"/; let image = Image("hero")' > "$R9_DIR/app/V.swift"
+OUT=$($AUDIT "$R9_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a closed block comment and a regex is still reported"; else bad "an Image after a closed block comment and a regex was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R9_DIR" 2>/dev/null || true
+# Code between two block comments on one line is never blanked
+R10_DIR="$(mktemp -d)"; mkdir -p "$R10_DIR/app"
+printf '%s\n' 'import SwiftUI' '/* comment */ let r = /"/; let image = Image("hero") /* tail */' > "$R10_DIR/app/V.swift"
+OUT=$($AUDIT "$R10_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image between two block comments is still reported"; else bad "an Image between two block comments was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R10_DIR" 2>/dev/null || true
+# A Swift continuation line led by * (multiplication) is code, never a comment line
+R16_DIR="$(mktemp -d)"; mkdir -p "$R16_DIR/app"
+printf '%s\n' 'import SwiftUI' 'func score(_ p: Regex<Substring>) -> Double { 0.25 }' 'struct Demo: View {' '    var body: some View {' '        Color.red.opacity(2' '            * score(/"/)).overlay(Image("hero"))' '    }' '}' > "$R16_DIR/app/V.swift"
+OUT=$($AUDIT "$R16_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image on a line led by * is still reported"; else bad "an Image on a line led by * was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R16_DIR" 2>/dev/null || true
+# A /* inside a Swift multiline string never blanks the code after the string
+R17_DIR="$(mktemp -d)"; mkdir -p "$R17_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R17_DIR/app/V.swift"
+OUT=$($AUDIT "$R17_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a multiline string holding /* is still reported"; else bad "an Image after a multiline string holding /* was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R17_DIR" 2>/dev/null || true
+# An escaped triple quote inside a Swift multiline string never closes it
+R18_DIR="$(mktemp -d)"; mkdir -p "$R18_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let example = """' '\"""' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R18_DIR/app/V.swift"
+OUT=$($AUDIT "$R18_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a string holding an escaped triple quote is still reported"; else bad "an Image after a string holding an escaped triple quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R18_DIR" 2>/dev/null || true
+# A Swift raw multiline string with an escaped delimiter inside never closes early
+R20_DIR="$(mktemp -d)"; mkdir -p "$R20_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let example = #"""' '\#"""' '/*' '"""#' 'let regex = /"/; let image = Image("hero")' > "$R20_DIR/app/V.swift"
+OUT=$($AUDIT "$R20_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a raw multiline string is still reported"; else bad "an Image after a raw multiline string was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R20_DIR" 2>/dev/null || true
+# A triple quote inside a // comment never opens a string
+R21_DIR="$(mktemp -d)"; mkdir -p "$R21_DIR/app"
+printf '%s\n' 'import SwiftUI' '// """' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R21_DIR/app/V.swift"
+OUT=$($AUDIT "$R21_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after a comment holding a triple quote is still reported"; else bad "an Image after a comment holding a triple quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R21_DIR" 2>/dev/null || true
+# A triple quote after an inline // comment never opens a string
+R22_DIR="$(mktemp -d)"; mkdir -p "$R22_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let n = 1 // """' 'let example = """' '/*' '"""' 'let regex = /"/; let image = Image("hero")' > "$R22_DIR/app/V.swift"
+OUT=$($AUDIT "$R22_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an Image after an inline comment holding a triple quote is still reported"; else bad "an Image after an inline comment holding a triple quote was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R22_DIR" 2>/dev/null || true
+# An interpolated Image inside a multiline string is code, even on a line led by //
+R23_DIR="$(mktemp -d)"; mkdir -p "$R23_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let q = #"three: """ here"#' 'let text = Text("""' '// \(Image("hero"))' '""")' > "$R23_DIR/app/V.swift"
+OUT=$($AUDIT "$R23_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "an interpolated Image inside a string is still reported"; else bad "an interpolated Image inside a string was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R23_DIR" 2>/dev/null || true
+# A raw-string interpolation such as \#( is code inside a string, even on a line led by //
+R24_DIR="$(mktemp -d)"; mkdir -p "$R24_DIR/app"
+printf '%s\n' 'import SwiftUI' 'let q = #"three: """ here"#' 'let text = Text(#"""' '// \#(Image("hero"))' '"""#)' > "$R24_DIR/app/V.swift"
+OUT=$($AUDIT "$R24_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+if echo "$OUT" | grep -q 'Image("hero")'; then ok "a raw-string interpolated Image is still reported"; else bad "a raw-string interpolated Image was lost. Output:"; echo "$OUT"; fi
+rm -rf "$R24_DIR" 2>/dev/null || true
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

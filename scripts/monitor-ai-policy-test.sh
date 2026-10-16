@@ -171,6 +171,69 @@ assert not m.analyze_announcements(items, ["llm"]), "matched a word that only ap
 PY
 rm -rf "$HT"
 
+# Issue #1000. Feed edge cases found in the October review, one fixture per case.
+I1000="$(mktemp -d)"
+MOD="$(dirname "$0")/monitor-ai-policy.py"
+feed_case() {
+  # $1 label, $2 feed file, $3 python assertions over the parsed items
+  python3 - "$2" "$MOD" "$3" <<'PY' && ok "$1" || bad "$1"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("m", sys.argv[2]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+items = m.parse_rss_feed("file://" + sys.argv[1])
+exec(sys.argv[3])
+PY
+}
+cat > "$I1000/rel.atom" <<'XML'
+<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Policy</title>
+<link rel="alternate" href="https://example.invalid/news/policy"/>
+<link rel="self" href="https://example.invalid/feeds/entry/1"/>
+<summary>AI update</summary></entry>
+<entry><title>Policy two</title>
+<link rel="self" href="https://example.invalid/feeds/entry/2"/>
+<link href="https://example.invalid/news/two"/>
+<summary>AI update</summary></entry></feed>
+XML
+feed_case "#1000 an Atom citation prefers rel alternate or no rel over rel self" "$I1000/rel.atom" \
+  'assert [i["link"] for i in items] == ["https://example.invalid/news/policy", "https://example.invalid/news/two"], items'
+cat > "$I1000/base.atom" <<'XML'
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://example.invalid/news/"><entry><title>Policy</title>
+<link rel="alternate" href="policy"/><summary>AI update</summary></entry></feed>
+XML
+feed_case "#1000 an inherited xml:base resolves a relative Atom link" "$I1000/base.atom" \
+  'assert items[0]["link"] == "https://example.invalid/news/policy", items'
+mkdir -p "$I1000/feeds"
+cat > "$I1000/feeds/rel-base.atom" <<'XML'
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="../news/"><entry><title>Policy</title>
+<link rel="alternate" href="policy"/><summary>AI update</summary></entry></feed>
+XML
+feed_case "#1000 a relative xml:base resolves against the feed's own URL" "$I1000/feeds/rel-base.atom" \
+  'assert items[0]["link"] == "file://" + sys.argv[1].rsplit("/feeds/", 1)[0] + "/news/policy", items'
+cat > "$I1000/encoded.rss" <<'XML'
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>Platform news</title>
+<description>Short teaser.</description>
+<content:encoded><![CDATA[<p>Apps that call an <b>LLM</b> must disclose it.</p>]]></content:encoded>
+<link>https://example.invalid/encoded</link></item></channel></rss>
+XML
+feed_case "#1000 the RSS Content module body is read for keyword matching" "$I1000/encoded.rss" \
+  'assert "LLM" in items[0]["description"], items; assert m.analyze_announcements(items, ["llm"]), "keyword only in content:encoded was missed"'
+cat > "$I1000/dates.atom" <<'XML'
+<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>A</title>
+<published>2026-01-01T00:00:00Z</published><updated>2026-02-02T00:00:00Z</updated><summary>x</summary></entry>
+<entry><title>B</title>
+<updated>2026-02-02T00:00:00Z</updated><published>2026-01-01T00:00:00Z</published><summary>x</summary></entry>
+<entry><title>C</title><updated>2026-02-02T00:00:00Z</updated><summary>x</summary></entry></feed>
+XML
+cat > "$I1000/dc.rdf" <<'XML'
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<item rdf:about="https://example.invalid/rdf"><title>RDF item</title><link>https://example.invalid/rdf</link>
+<description>x</description><dc:date>2026-03-03T00:00:00Z</dc:date></item></rdf:RDF>
+XML
+feed_case "#1000 dates prefer published, then updated, regardless of element order" "$I1000/dates.atom" \
+  'assert [i["pubDate"] for i in items] == ["2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2026-02-02T00:00:00Z"], items'
+feed_case "#1000 an RSS 1.0 dc:date is read when no published or updated exists" "$I1000/dc.rdf" \
+  'assert items[0]["pubDate"] == "2026-03-03T00:00:00Z", items'
+rm -rf "$I1000"
+
 echo ""
 echo "AI Policy Monitor test suite: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

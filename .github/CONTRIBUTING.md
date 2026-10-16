@@ -96,6 +96,14 @@ bash agent-os/hooks/app-store-compliance-guard-test.sh
 - The doc, the JSON taxonomy, and the guard stay consistent with each other.
 - A short description of what changed and why.
 
+## Cutting a release
+
+1. Set the new version in `VERSION`, in the `version` field of `data/rejection-patterns.json` and `data/regulatory-deadlines.json`, and in `version` and `date-released` of `CITATION.cff`. `python3 scripts/validate.py` fails until all four agree.
+2. Rename `## Unreleased` in `CHANGELOG.md` to the version and date, and start a new empty `## Unreleased` above it.
+3. After the pull request is merged, tag the merge commit `v<version>` and publish a GitHub release whose notes are that changelog section.
+
+Use a major version when a change breaks something people rely on, such as a licence change or a new exit code.
+
 ## License
 
 By contributing you agree that your contributions are licensed under the OpenRoots Agent License 2.3, the licence in `LICENSE`, and that the copyright notice and licence reference stay intact in every copy. If you used an AI tool to produce a contribution, say so in the pull request and name the tool, as Section 8.4 of the licence requires.

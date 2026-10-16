@@ -683,13 +683,22 @@ HTML_MARKUP = re.compile(
 _CDATA_MARKUP = re.compile(_COMMENT + "|" + _BOGUS + "|" + _TAG, re.S | re.I | re.A)
 
 
+_TAG_NAME = re.compile(r"</?([A-Za-z][A-Za-z0-9-]*)", re.A)
+_INLINE_TAGS = {
+    "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "font", "i",
+    "ins", "kbd", "label", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup",
+    "time", "tt", "u", "var",
+}  # same set as monitor-ai-policy.py, so an unknown block can never join two words
+
+
 def _visible_markup(m):
-    """CDATA and textarea or title content is visible text. Everything else is markup."""
+    """CDATA and textarea or title content is visible text. Inline tags join, other markup separates."""
     if m.group(1) is not None:
         return " " + _CDATA_MARKUP.sub(" ", m.group(1)) + " "
     if m.group(3) is not None:
         return " " + m.group(3) + " "
-    return " "
+    t = _TAG_NAME.match(m.group(0))
+    return "" if t and t.group(1).lower() in _INLINE_TAGS else " "
 
 
 def strip_html(text):

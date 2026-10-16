@@ -7,6 +7,7 @@ Tracks 16 distinct Apple, Android, and Web privacy requirements.
 import os
 import sys
 import re
+import urllib.parse
 import argparse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -297,12 +298,27 @@ MOCK_ANNOUNCEMENTS = [
 ]
 
 
+def source_host(link):
+    """Lowercased URL hostname with userinfo and port removed, or empty."""
+    try:
+        host = urllib.parse.urlsplit((link or "").strip()).hostname or ""
+    except ValueError:
+        return ""
+    return host.rstrip(".").lower()
+
+
+def host_matches(host, domains):
+    """True only when host equals a domain or is a subdomain of it."""
+    return bool(host) and any(host == d or host.endswith("." + d) for d in domains)
+
+
 def classify_source_and_verify(announcement, all_announcements=None):
     """
     Classifies an announcement by TRUST_HIERARCHY priority (1-5) and
     verification status. Returns (priority_level, is_verified).
     """
     link = announcement.get("link", "").lower()
+    host = source_host(announcement.get("link", ""))
     title = announcement.get("title", "").lower()
     desc = announcement.get("description", "").lower()
     combined = f"{title} {desc} {link}"
@@ -314,17 +330,10 @@ def classify_source_and_verify(announcement, all_announcements=None):
         "imda.gov.sg", "pdpc.gov.sg", "anpd.gov.br", "esafety.gov.au",
         "apple.com", "developer.apple.com", "android.com", "developer.android.com", "support.google.com"
     ]
-    p1_keywords = [
-        "european commission", "eur-lex", "official journal", "enisa", "edpb",
-        "ftc", "nist", "cisa", "ico", "government publication", "imda", "pdpc",
-        "anpd", "esafety commissioner", "federal register", "apple developer", "android developer"
-    ]
 
     p2_domains = ["reuters.com", "apnews.com", "bloomberg.com"]
-    p2_keywords = ["reuters", "associated press", "bloomberg"]
 
     p3_domains = ["arxiv.org", "ssrn.com"]
-    p3_keywords = ["academic paper", "academic study", "university research", "peer-reviewed"]
 
     p4_domains = ["techcrunch.com", "wired.com", "medium.com", "blog", "randomblogsite.com"]
     p4_keywords = ["industry blog", "tech blog", "blog post", "editorial"]
@@ -334,39 +343,32 @@ def classify_source_and_verify(announcement, all_announcements=None):
 
     priority = 4  # Default to 4 if nothing matches
 
-    if any(d in link for d in p5_domains) or any(kw in combined for kw in p5_keywords):
+    # Source classification uses only the URL host, matched on a domain
+    # boundary. Text can lower trust (P4/P5 words) but never raise it.
+    p4_hosts = [d for d in p4_domains if "." in d]
+    if host_matches(host, p5_domains) or any(kw in combined for kw in p5_keywords):
         priority = 5
-    elif any(d in link for d in p4_domains) or any(kw in combined for kw in p4_keywords):
+    elif (
+        host_matches(host, p4_hosts)
+        or "blog" in host
+        or any(kw in combined for kw in p4_keywords)
+    ):
         priority = 4
-    elif any(d in link for d in p3_domains) or any(kw in combined for kw in p3_keywords) or ".edu" in link:
+    elif host_matches(host, p3_domains) or host_matches(host, ["edu"]):
         priority = 3
-    elif any(d in link for d in p2_domains) or any(kw in combined for kw in p2_keywords):
+    elif host_matches(host, p2_domains):
         priority = 2
 
-    if any(d in link for d in p1_domains) or any(kw in combined for kw in p1_keywords) or ".gov" in link:
+    if host_matches(host, p1_domains) or host_matches(host, ["gov"]):
         priority = 1
 
+    # Verification is separate. P4 and P5 need a P1-hosted announcement on
+    # the same topic. Agency names or domains in the text never count.
     is_verified = False
     if priority <= 3:
         is_verified = True
     else:
-        # Priority 4 or 5: Must be verified by a Priority 1 official source
-        has_p1_ref_in_text = False
-        for d in p1_domains:
-            if d in combined:
-                has_p1_ref_in_text = True
-                break
-        if not has_p1_ref_in_text:
-            for kw in p1_keywords:
-                if kw in combined:
-                    has_p1_ref_in_text = True
-                    break
-        if ".gov" in combined:
-            has_p1_ref_in_text = True
-
-        if has_p1_ref_in_text:
-            is_verified = True
-        elif all_announcements:
+        if all_announcements:
             words = set(re.findall(r"[a-z]+", combined))
             for other in all_announcements:
                 if other == announcement:
