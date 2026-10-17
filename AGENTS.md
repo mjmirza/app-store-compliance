@@ -24,6 +24,7 @@ Before certifying a release as clear to submit/ship, verify every item below. Ma
 
 ### 3. Screenshots
 * **Verify.** Check that screenshots in the store metadata show the app in actual use (not splash or login screens) and are accurate representation of the current features.
+* **Verify.** Creative assets (product page header and search result art) show the app or its brand, suit all audiences, and carry no prices, discounts, unverifiable claims, or references to other apps (Apple 2.3.14). No feature is hidden from review or turned on after approval (Apple 2.5.19).
 * **Playbook Mapping:**
   * Checklist: `docs/PRE-SUBMISSION-CHECKLIST.md` -> "Metadata and listing"
   * Rules Reference: `references/rules/metadata.md`

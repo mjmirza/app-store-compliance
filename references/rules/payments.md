@@ -154,7 +154,7 @@ grep -rniE 'withdrawal button|withdrawal function|withdraw from contract|distanc
 - Platform. apple
 - Guideline or policy. 3.1.1 and 3.1.3 external purchase links. US-storefront carve-out only (Apple guideline update 1 May 2025, developer.apple.com/news/?id=9txfddzf)
 - Severity. high
-- What triggers it. An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026.
+- What triggers it. An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026. Since 16 October 2026 the Music Streaming Services Entitlement is folded into the StoreKit External Purchase Link Entitlement bullet of 3.1.1(a), and the link must go to a permitted destination, which can vary by region.
 - How to fix it. Gate the external link UI on the current storefront (StoreKit Storefront.current, countryCode) and show it only where you hold the entitlement or the US carve-out applies. Outside the US keep the entitlement path and the disclosure sheet.
 - Detection signals. ExternalPurchaseLink, ExternalLink, external-purchase-link, openExternalPurchaseLink
 - Present means handled. Storefront, storefront, countryCode

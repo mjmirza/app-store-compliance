@@ -4,7 +4,16 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- Apple revised the App Review Guidelines on 16 October 2026, and the playbook follows the live text, checked on 17 October 2026 against [the revision note](https://developer.apple.com/news/?id=92th7e5i) and [Apple's safety post](https://developer.apple.com/news/?id=vvzx6cul).
+  - 1.2 now names social media, user-generated content platforms, and AI content creation apps, lists nonconsensual intimate imagery, and warns of a Developer Code of Conduct violation for missing safeguards or violations left unfixed after notice. `APPLE-1.2-UGC-24H-ACTION` and `BOTH-AI-GENERATED-CONTENT` carry the new wording, and the UGC fix no longer promises a 24 hour window the guideline does not set.
+  - Hidden, dormant, and undocumented features moved from 2.3.1 to the new 2.5.19. The 2.3.1 row in `docs/APPLE.md` and the `future_functionality` mapping now say so, and `RN-OTA-UNDECLARED` names the bait-and-switch risk.
+  - 3.1.1(a) folds the Music Streaming Services Entitlement into the StoreKit External Purchase Link bullet and requires a permitted destination. `APPLE-3.1.1-EXTERNAL-LINK-REGION-GATING` and its row say so.
+
+### Added
+
+- Three patterns, each checked by hand because the evidence lives outside the project. `APPLE-2.3.14-CREATIVE-ASSET-CONTENT` (medium), `APPLE-2.5.19-HIDDEN-OR-DORMANT-FEATURE` (critical), and `APPLE-5-TRAFFICKING-CHILD-EXPLOITATION` (critical), with matching rows in `docs/APPLE.md` and two new lines in the pre-submission checklist.
 
 ## 2.0.0 (2026-10-16)
 

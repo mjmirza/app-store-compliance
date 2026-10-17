@@ -1,6 +1,6 @@
 # Rules. Metadata and store listing
 
-10 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+11 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION
 
@@ -132,3 +132,12 @@ How to detect.
 ```bash
 python3 scripts/metadata-audit.py ./metadata
 ```
+
+## APPLE-2.3.14-CREATIVE-ASSET-CONTENT
+
+- Title. Creative asset with pricing, unverifiable claims, or misleading references
+- Platform. apple
+- Guideline or policy. 2.3.14
+- Severity. medium
+- What triggers it. A creative asset (the App Store product page header or search result artwork, new in guideline 2.3.14 on 16 October 2026) shows specific or discounted pricing, an unverifiable product claim, a reference to another app meant to mislead, content not suitable for all audiences, or art unrelated to the app's content, functionality, or brand. Checked by hand, creative assets live in App Store Connect, not in the project.
+- How to fix it. Keep creative assets about the app or its brand, appropriate for all audiences, with no prices, discounts, ranking or unverifiable claims, and no references to other apps. Follow Apple's asset guidelines. Source. https://developer.apple.com/news/?id=92th7e5i
