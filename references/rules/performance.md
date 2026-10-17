@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-29 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+30 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -82,6 +82,15 @@ How to detect.
 ```bash
 grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include='*.js' --include='*.ts' --include='*.html' . && ! grep -rn 'GDPR\|opt-in\|privacyConsent\|deletePersonalData\|exportData' .
 ```
+
+## APPLE-2.5.19-HIDDEN-OR-DORMANT-FEATURE
+
+- Title. Hidden, dormant, or undocumented feature, or bait-and-switch after review
+- Platform. apple
+- Guideline or policy. 2.5.19
+- Severity. critical
+- What triggers it. The binary carries functionality App Review cannot see or that the user is not told about, such as a server flag that turns on a different app after approval, a secret gesture or menu, or code obfuscated to hide a feature. Guideline 2.5.19, added 16 October 2026, moves this policy out of 2.3.1 and names bait-and-switch (misrepresenting functionality during review, then adding features after approval). Checked by hand, a remote flag alone is not a violation.
+- How to fix it. Ship every feature visible to review, describe each one in Notes for Review, keep remote configuration to tuning and staged rollout of reviewed features, and never obfuscate code to hide functionality. A violation is grounds for removal from the App Store and termination of the developer account. Sources. https://developer.apple.com/news/?id=92th7e5i, https://developer.apple.com/news/?id=vvzx6cul
 
 ## APPLE-2.1-DEBUG-FEATURES
 
@@ -211,7 +220,7 @@ grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-as
 - Guideline or policy. 3.3.2
 - Severity. high
 - What triggers it. package.json depends on react-native or expo, and an OTA updater (react-native-code-push, expo-updates, react-native-ota-hot-update, Stallion) is present with no App Review disclosure of bug-fix-only scope.
-- How to fix it. Name the OTA mechanism in App Review notes and restrict it to bug fixes that do not change purpose, UI, or features beyond what was reviewed (Apple 3.3.2, 2.5.2).
+- How to fix it. Name the OTA mechanism in App Review notes and restrict it to bug fixes that do not change purpose, UI, or features beyond what was reviewed (Apple 3.3.2, 2.5.2). An undisclosed update path that adds features after approval is the bait-and-switch Apple names under 2.5.19 since 16 October 2026.
 - Detection signals. react-native-code-push, CodePush., expo-updates, Stallion
 
 How to detect.

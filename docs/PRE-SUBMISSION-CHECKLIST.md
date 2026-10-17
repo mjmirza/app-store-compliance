@@ -47,6 +47,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 ### Metadata and listing
 - [ ] The app name, description, and screenshots match what the app actually does.
 - [ ] Screenshots show the app in use, not a splash or login screen.
+- [ ] Creative assets (product page header, search result art) show the app or its brand, suit all audiences, and carry no prices, discounts, unverifiable claims, or references to other apps (Apple 2.3.14, 16 October 2026).
 - [ ] No keyword stuffing in the name, subtitle, or description.
 - [ ] The age or content rating questionnaire is answered honestly.
 - [ ] No references to the other platform or to alternative marketplaces.
@@ -59,6 +60,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 ## Apple specific
 
 - [ ] Notes for Review explains every non obvious feature and every in app purchase.
+- [ ] No hidden, dormant, or undocumented feature, and no remote flag that turns on functionality App Review did not see (Apple 2.5.19, bait-and-switch, 16 October 2026).
 - [ ] Privacy nutrition labels match the app's real data collection and the SDKs.
 - [ ] App Tracking Transparency prompt is implemented before any cross app tracking.
 - [ ] Third party social login is paired with an equal privacy preserving alternative such as Sign in with Apple.

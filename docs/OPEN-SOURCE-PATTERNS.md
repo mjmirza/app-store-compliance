@@ -9,7 +9,7 @@ Other people have already turned hard won App Store and Google Play rejections i
 | precheck rule | What it catches | Maps to |
 |---|---|---|
 | `curse_words` | Profanity in the app metadata | Apple 2.3.1 accurate and appropriate metadata |
-| `future_functionality` | Describing features that do not exist yet, coming soon, beta, placeholder promises | Apple 2.3.1 hidden or dormant functionality |
+| `future_functionality` | Describing features that do not exist yet, coming soon, beta, placeholder promises | Apple 2.3.1 misleading marketing (hidden or dormant features moved to 2.5.19 on 16 October 2026) |
 | `negative_apple_sentiment` | Mentioning an iOS bug, or negative or insensitive references to Apple | Apple 2.3.1 and the Developer Code of Conduct |
 | `other_platforms` | Mentioning Android, Google Play, or another platform or marketplace in metadata or keywords | Apple 2.3.10 |
 | `unreachable_urls` | Broken or unreachable URLs in the metadata, support URL, or marketing URL | Apple 1.5 and 2.1 |

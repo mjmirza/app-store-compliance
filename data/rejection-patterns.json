@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "updated": "2026-09-05",
+  "updated": "2026-10-17",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -255,7 +255,7 @@
       "guideline": "1.2",
       "title": "User generated content without the required moderation mechanisms",
       "severity": "critical",
-      "detection": "UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline. Since 8 June 2026 guideline 1.2 states that egregious or repeated behavior is grounds for immediate removal from the App Store and from the Apple Developer Program, and 1.2.1(a) requires creator apps to gate over-rating content on verified or declared age.",
+      "detection": "UGC present without content filtering, a mechanism to report offensive content with timely responses to concerns, the ability to block abusive users, and published contact information. Verified against the live guideline 2026-08-30, which requires timely responses rather than a fixed 24 hour deadline. Since 8 June 2026 guideline 1.2 states that egregious or repeated behavior is grounds for immediate removal from the App Store and from the Apple Developer Program, and 1.2.1(a) requires creator apps to gate over-rating content on verified or declared age. Since 16 October 2026 guideline 1.2 names the app types it covers, social media, user-generated content platforms, and AI content creation apps, lists nonconsensual intimate imagery among the harms, and states that failing to implement appropriate safeguards or to remediate violations after notice may be a Developer Code of Conduct violation.",
       "signals": [
         "post",
         "comment",
@@ -270,7 +270,7 @@
         "EULA",
         "moderation"
       ],
-      "fix": "Add a zero tolerance EULA, content filtering, in app reporting, user blocking, and a process to act on reports within 24 hours. Source. real Apple Safety 1.2 rejection email."
+      "fix": "Add a zero tolerance EULA, content filtering, in app reporting, user blocking, published contact information, and a process that acts on reports and Apple notices in a timely way. Remediate every violation Apple identifies, because failing to remediate after notice may breach the Developer Code of Conduct. Source. real Apple Safety 1.2 rejection email, and https://developer.apple.com/news/?id=92th7e5i."
     },
     {
       "id": "APPLE-2.1-CLOUD-NOT-IN-PRODUCTION",
@@ -868,7 +868,7 @@
       "guideline": "Apple 1.2, Google AI Generated Content",
       "title": "Generative AI output without moderation or safeguards",
       "severity": "high",
-      "detection": "A generative AI or image generation integration is present without content filtering, reporting, blocking, age rating, or abuse safeguards. Apple applies UGC rules to AI output. Google has a dedicated AI Generated Content policy.",
+      "detection": "A generative AI or image generation integration is present without content filtering, reporting, blocking, age rating, or abuse safeguards. Apple applies UGC rules to AI output. Google has a dedicated AI Generated Content policy. Since 16 October 2026 Apple 1.2 names AI content creation apps explicitly and requires them to prevent and remove nonconsensual intimate imagery, including AI-generated imagery (https://developer.apple.com/news/?id=vvzx6cul).",
       "signals": [
         "openai",
         "anthropic",
@@ -1311,7 +1311,7 @@
         "expo-updates",
         "Stallion"
       ],
-      "fix": "Name the OTA mechanism in App Review notes and restrict it to bug fixes that do not change purpose, UI, or features beyond what was reviewed (Apple 3.3.2, 2.5.2)."
+      "fix": "Name the OTA mechanism in App Review notes and restrict it to bug fixes that do not change purpose, UI, or features beyond what was reviewed (Apple 3.3.2, 2.5.2). An undisclosed update path that adds features after approval is the bait-and-switch Apple names under 2.5.19 since 16 October 2026."
     },
     {
       "id": "RN-PRIVACY-MANIFEST-MISSING",
@@ -1583,7 +1583,7 @@
       "guideline": "3.1.1 and 3.1.3 external purchase links. US-storefront carve-out only (Apple guideline update 1 May 2025, developer.apple.com/news/?id=9txfddzf)",
       "title": "External purchase link shown on every storefront",
       "severity": "high",
-      "detection": "An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026.",
+      "detection": "An external purchase link, button, or call to action ships to all regions. The no-entitlement carve-out applies to the United States storefront only. The same UI is still a 3.1.1 violation in Japan, Canada, Australia, the UK, and most other storefronts, and App Review evaluates per region. Developers report budgeting two rejection rounds for this in 2026. Since 16 October 2026 the Music Streaming Services Entitlement is folded into the StoreKit External Purchase Link Entitlement bullet of 3.1.1(a), and the link must go to a permitted destination, which can vary by region.",
       "signals": [
         "ExternalPurchaseLink",
         "ExternalLink",
@@ -1893,6 +1893,33 @@
       "counterSignals": [],
       "fix": "Enroll and complete identity verification at least six weeks before the planned first submission, keep the government ID upload ready, accept every ADPLA update and attachment as it lands (Attachment 12 Brazil by 6 July 2026, Attachment 14 EU before 1 October 2026), and start an individual-to-organization migration a quarter ahead. Track the support case number and escalate through Developer Support phone, not only email.",
       "added": "2026-09-05"
+    },
+    {
+      "id": "APPLE-2.3.14-CREATIVE-ASSET-CONTENT",
+      "platform": "apple",
+      "guideline": "2.3.14",
+      "title": "Creative asset with pricing, unverifiable claims, or misleading references",
+      "severity": "medium",
+      "detection": "A creative asset (the App Store product page header or search result artwork, new in guideline 2.3.14 on 16 October 2026) shows specific or discounted pricing, an unverifiable product claim, a reference to another app meant to mislead, content not suitable for all audiences, or art unrelated to the app's content, functionality, or brand. Checked by hand, creative assets live in App Store Connect, not in the project.",
+      "fix": "Keep creative assets about the app or its brand, appropriate for all audiences, with no prices, discounts, ranking or unverifiable claims, and no references to other apps. Follow Apple's asset guidelines. Source. https://developer.apple.com/news/?id=92th7e5i"
+    },
+    {
+      "id": "APPLE-2.5.19-HIDDEN-OR-DORMANT-FEATURE",
+      "platform": "apple",
+      "guideline": "2.5.19",
+      "title": "Hidden, dormant, or undocumented feature, or bait-and-switch after review",
+      "severity": "critical",
+      "detection": "The binary carries functionality App Review cannot see or that the user is not told about, such as a server flag that turns on a different app after approval, a secret gesture or menu, or code obfuscated to hide a feature. Guideline 2.5.19, added 16 October 2026, moves this policy out of 2.3.1 and names bait-and-switch (misrepresenting functionality during review, then adding features after approval). Checked by hand, a remote flag alone is not a violation.",
+      "fix": "Ship every feature visible to review, describe each one in Notes for Review, keep remote configuration to tuning and staged rollout of reviewed features, and never obfuscate code to hide functionality. A violation is grounds for removal from the App Store and termination of the developer account. Sources. https://developer.apple.com/news/?id=92th7e5i, https://developer.apple.com/news/?id=vvzx6cul"
+    },
+    {
+      "id": "APPLE-5-TRAFFICKING-CHILD-EXPLOITATION",
+      "platform": "apple",
+      "guideline": "5",
+      "title": "App that facilitates human trafficking or the exploitation of children",
+      "severity": "critical",
+      "detection": "Since 16 October 2026 the Legal section states that apps found to facilitate human trafficking or the exploitation of children are reported to the authorities, removed from the App Store, and blocked from alternative distribution. The risk sits with marketplaces, classifieds, escort or companion listings, anonymous contact, and any surface where adults reach minors. Checked by hand.",
+      "fix": "Moderate listings and messaging for trafficking and child exploitation signals, verify ages where adults can reach minors, report CSAM to NCMEC as US law requires, and keep the reporting path from guideline 1.2. Sources. https://developer.apple.com/news/?id=92th7e5i, https://developer.apple.com/news/?id=vvzx6cul"
     }
   ]
 }
