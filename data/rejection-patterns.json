@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "updated": "2026-10-17",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [

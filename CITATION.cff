@@ -5,8 +5,8 @@ type: software
 authors:
   - alias: mjmirza
     name: Mirza Iqbal
-version: 2.0.0
-date-released: '2026-10-16'
+version: 2.1.0
+date-released: '2026-10-17'
 repository-code: https://github.com/mjmirza/app-store-compliance
 url: https://github.com/mjmirza/app-store-compliance
 abstract: >-
