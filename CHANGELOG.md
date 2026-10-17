@@ -4,6 +4,12 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+Nothing yet.
+
+## 2.1.0 (2026-10-17)
+
+Apple revised the App Review Guidelines on 16 October 2026. This release follows that revision. It adds three patterns and no new guard rule, so it is a minor version.
+
 ### Changed
 
 - Apple revised the App Review Guidelines on 16 October 2026, and the playbook follows the live text, checked on 17 October 2026 against [the revision note](https://developer.apple.com/news/?id=92th7e5i) and [Apple's safety post](https://developer.apple.com/news/?id=vvzx6cul).
