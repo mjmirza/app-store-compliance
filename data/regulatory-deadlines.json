@@ -1182,7 +1182,8 @@
       "mandatory_date": "2026-10-23",
       "enforcement_date": "2026-10-23",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific, docs/GAP-ANALYSIS-2026-09.md open items",
-      "priority": "high"
+      "priority": "high",
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific"
     },
     {
       "id": "APPLE-MULTISEAT-VOLUME-PURCHASING",
@@ -1194,7 +1195,8 @@
       "mandatory_date": "2026-10-22",
       "enforcement_date": "2026-10-22",
       "affected_repository_sections": "docs/APPLE.md 2026 changes you must act on",
-      "priority": "medium"
+      "priority": "medium",
+      "absorbed_into": "docs/APPLE.md 2026 changes you must act on"
     }
   ]
 }
