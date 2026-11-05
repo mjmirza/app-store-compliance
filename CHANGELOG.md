@@ -2,7 +2,9 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
-## Unreleased
+## 2.2.0 (2026-11-05)
+
+This release adds Fleet Sweep, the Waiver Ledger, the Ruling Register and an eval scorecard. Nothing that passed 2.1.0 in the single-app guard is blocked now, so it is a minor version.
 
 ### Added
 
@@ -13,7 +15,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 - The Ruling Register, `data/ruling-register.json` and `scripts/ruling-register.py`. Release requirements a code scan cannot see, each with its legal standing (in force, in force later, store policy, proposed, guidance), how it is proven (automated, owner attested, mixed), and a verbatim quoted source with the date it was read. A rule blocks only when quoted sources cover both its obligation and its start date, so a quote on one premise never verifies another. `due` lists what applies to an app, `export` writes a commit-stamped copy. 14 first entries from an adversarial gap review, covering India, the EU, the US, China, Indonesia, Vietnam and Australia. Fleet Sweep requires every app to declare its platforms, regions and features, and an applicable in-force rule without a compliant attestation, covering every proof item and country at the rule's current revision, makes the app `BLOCKED`.
 - `scripts/eval-scorecard.py` and `evals/gold-cases.json`. 32 gold scenarios across Fleet Sweep, the Waiver Ledger and the Ruling Register. Each checks the verdict, the exit code, that the fleet and app agree, and which rule ids must and must not appear. Any miss fails CI.
 - `scripts/ruling-register-test.sh`, 74 cases. A second adversarial Codex review of the register and the evals reproduced eight defects, all fixed and kept as regression cases.
-- `scripts/fleet-sweep-test.sh`, 41 cases including every defect an adversarial Codex review reproduced, wired into CI. Guide in `docs/FLEET-SWEEP.md`, templates in `templates/`.
+- `scripts/fleet-sweep-test.sh`, 42 cases including every defect an adversarial Codex review reproduced, wired into CI. Guide in `docs/FLEET-SWEEP.md`, templates in `templates/`.
 
 ## 2.1.0 (2026-10-17)
 
