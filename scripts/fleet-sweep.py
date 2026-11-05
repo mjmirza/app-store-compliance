@@ -7,11 +7,14 @@ import json
 import os
 import re
 import subprocess
+import importlib.util
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_GUARD = REPO / "agent-os" / "hooks" / "app-store-compliance-guard.sh"
+DEFAULT_REGISTER = REPO / "data" / "ruling-register.json"
+STORE_OF = {"ios": "apple", "android": "google"}
 MAX_WAIVER_DAYS = 180
 LINE = re.compile(r"^\s+\[(CRITICAL|HIGH|MEDIUM)\]\s+(\S+)\s+(.*)$")
 SUMMARY = re.compile(r"^Summary\. critical=(\d+) high=(\d+) medium=(\d+)$")
@@ -35,6 +38,16 @@ WAIVER_TEXT = (
 
 class InputError(Exception):
     pass
+
+
+def load_register_module():
+    spec = importlib.util.spec_from_file_location("ruling_register", REPO / "scripts" / "ruling-register.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+RR = load_register_module()
 
 
 def expand(path):
@@ -143,6 +156,14 @@ def validate_inputs(fleet, ledger):
             isinstance(ready, dict) and all(isinstance(v, bool) for v in ready.values())
         ):
             raise InputError(f"apps[{i}] readiness must map each step to true or false")
+        feats = app.get("features", [])
+        if not isinstance(feats, list) or any(f not in RR.FEATURES for f in feats):
+            raise InputError(f"apps[{i}] features must be a list drawn from {', '.join(RR.FEATURES)}")
+        regions = app.get("regions", [])
+        if not isinstance(regions, list) or not all(is_text(r) for r in regions):
+            raise InputError(f"apps[{i}] regions must be a list of country codes")
+        if not isinstance(app.get("attestations", {}), dict):
+            raise InputError(f"apps[{i}] attestations must map a requirement id to its attestation")
         names.append(app["name"])
     dupes = sorted({n for n in names if names.count(n) > 1})
     if dupes:
@@ -180,11 +201,48 @@ def check_waiver(w, today):
     return True, ""
 
 
+def attestation_problem(a, today):
+    """Returns why an attestation cannot be accepted, or empty when it can."""
+    if not isinstance(a, dict):
+        return "is not an object"
+    for key in ("attested_by", "attested_on", "evidence"):
+        if not is_text(a.get(key)):
+            return f"is missing {key}"
+    try:
+        on = dt.date.fromisoformat(a["attested_on"])
+    except ValueError:
+        return "attested_on is not a YYYY-MM-DD date"
+    if on > today:
+        return "attested_on is in the future"
+    if (today - on).days > 365:
+        return "is more than a year old, attest again"
+    return ""
+
+
+def register_actions(app, register, today):
+    """Owner actions from every Ruling Register requirement that applies to this app."""
+    if register is None:
+        return []
+    stores = {STORE_OF[p] for p in app.get("platforms", []) if p in STORE_OF}
+    rows = RR.due(register, {r.upper() for r in app.get("regions", [])}, stores,
+                  set(app.get("features", [])), today)
+    attested = app.get("attestations", {})
+    actions = []
+    for row in rows:
+        if not row["source_verified"]:
+            actions.append(f"{row['id']} applies but its source is unconfirmed, check it before relying on it")
+        elif row["blocks_release"] and row["needs_attestation"]:
+            problem = attestation_problem(attested[row["id"]], today) if row["id"] in attested else "is missing"
+            if problem:
+                actions.append(f"{row['id']} needs your attestation, which {problem}. {row['title']}")
+    return actions
+
+
 def fingerprint(app, finding_id, severity, file):
     return (app, finding_id, severity, file or "")
 
 
-def sweep_app(app, guard, waivers, today, timeout):
+def sweep_app(app, guard, waivers, today, timeout, register=None):
     name, path = app["name"], expand(app["path"])
     result = {
         "name": name,
@@ -226,6 +284,7 @@ def sweep_app(app, guard, waivers, today, timeout):
         )
     else:
         result["owner_actions"] += [k for k, v in ready.items() if v is not True]
+    result["owner_actions"] += register_actions(app, register, today)
 
     if not path.is_dir():
         result.update(verdict="NOT_CHECKED", note=f"path {path} is not a folder")
@@ -415,12 +474,19 @@ def main():
         help="write a GitHub code-scanning file here",
     )
     ap.add_argument("--timeout", type=int, default=300, help="seconds allowed per app")
+    ap.add_argument("--register", default=str(DEFAULT_REGISTER), help="Ruling Register file")
+    ap.add_argument("--no-register", action="store_true", help="skip the Ruling Register")
     args = ap.parse_args()
 
     try:
         fleet = load_json(args.fleet, "fleet file")
         ledger = load_json(args.waivers, "waiver ledger") if args.waivers else None
         waivers = validate_inputs(fleet, ledger)
+        register = None if args.no_register else load_json(args.register, "ruling register")
+        if register is not None:
+            problems = RR.validate(register, RR.pattern_ids())
+            if problems:
+                raise InputError(f"the ruling register is invalid. {problems[0]}")
     except InputError as exc:
         print(f"fleet-sweep. {exc}", file=sys.stderr)
         return 1
@@ -434,7 +500,7 @@ def main():
     )
     guard = Path(os.environ.get("FLEET_SWEEP_GUARD", DEFAULT_GUARD))
 
-    results = [sweep_app(a, guard, waivers, today, args.timeout) for a in fleet["apps"]]
+    results = [sweep_app(a, guard, waivers, today, args.timeout, register) for a in fleet["apps"]]
     verdict = max((r["verdict"] for r in results), key=RANK.get)
     print_report(fleet.get("fleet_name", "fleet"), results, verdict)
 

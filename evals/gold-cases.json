@@ -1,0 +1,613 @@
+{
+  "about": "Gold scenarios for Fleet Sweep, the Waiver Ledger and the Ruling Register. Run scripts/eval-scorecard.py.",
+  "eval_date": "2026-11-05",
+  "cases": [
+    {
+      "feature": "fleet",
+      "name": "clean app ships",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "READY"
+    },
+    {
+      "feature": "fleet",
+      "name": "critical finding blocks",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "high finding needs action",
+      "guard_exit": 0,
+      "report": "  [HIGH]     IOS-ATS  Arbitrary loads\n      file. ios/App/Info.plist\n      fix. Remove it\n\nSummary. critical=0 high=1 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "fleet",
+      "name": "no readiness tracked",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": null
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "fleet",
+      "name": "readiness step false",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": false
+        }
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "fleet",
+      "name": "missing summary",
+      "guard_exit": 0,
+      "report": "Coverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "missing coverage",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "hidden high count",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=4 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "exit 2 without criticals",
+      "guard_exit": 2,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "guard exit 1",
+      "guard_exit": 1,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "partial scan",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. incomplete ios=1 android=0 web=0 reason=no native project in apps/x\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "fleet",
+      "name": "declared android not found",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios",
+          "android"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": null,
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "valid waiver clears critical",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "READY"
+    },
+    {
+      "feature": "waiver",
+      "name": "expired waiver",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2026-11-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "waiver without evidence",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "waiver for a different file",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "tests/x.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "waiver at a lower severity",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "high",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "duplicate waivers cancel",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        },
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "waiver over 180 days",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2028-01-01"
+        }
+      ],
+      "expect": "BLOCKED"
+    },
+    {
+      "feature": "waiver",
+      "name": "waiver cannot rescue a partial scan",
+      "guard_exit": 2,
+      "report": "  [CRITICAL] IOS-PRIVACY-MANIFEST  Missing privacy manifest\n      file. ios/App/Info.plist\n      fix. Add it\n\nSummary. critical=1 high=0 medium=0\nCoverage. incomplete ios=1 android=0 web=0 reason=scan error\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        }
+      },
+      "waivers": [
+        {
+          "app": "app",
+          "finding_id": "IOS-PRIVACY-MANIFEST",
+          "severity": "critical",
+          "file": "ios/App/Info.plist",
+          "reason": "r",
+          "evidence": "e",
+          "reviewed_by": "Mirza",
+          "expires": "2027-01-01"
+        }
+      ],
+      "expect": "NOT_CHECKED"
+    },
+    {
+      "feature": "register",
+      "name": "AU social app without attestation",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "AU"
+        ],
+        "features": [
+          "social"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "register",
+      "name": "AU social app attested",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "AU"
+        ],
+        "features": [
+          "social"
+        ],
+        "attestations": {
+          "RR-AU-SOCIAL-MIN-AGE": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/attest.md"
+          }
+        }
+      },
+      "waivers": null,
+      "expect": "READY"
+    },
+    {
+      "feature": "register",
+      "name": "US app with no matching rule",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "US"
+        ],
+        "features": [
+          "social"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY"
+    },
+    {
+      "feature": "register",
+      "name": "India lending on Android",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=0 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "android"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "IN"
+        ],
+        "features": [
+          "lending"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "register",
+      "name": "India lending on iOS only",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "IN"
+        ],
+        "features": [
+          "lending"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY"
+    },
+    {
+      "feature": "register",
+      "name": "DE subscriptions, unconfirmed withdrawal rule",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "DE"
+        ],
+        "features": [
+          "subscriptions"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    },
+    {
+      "feature": "register",
+      "name": "AU children code is proposed only",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "AU"
+        ],
+        "features": [
+          "children"
+        ]
+      },
+      "waivers": null,
+      "expect": "READY"
+    },
+    {
+      "feature": "register",
+      "name": "stale attestation",
+      "guard_exit": 0,
+      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "AU"
+        ],
+        "features": [
+          "social"
+        ],
+        "attestations": {
+          "RR-AU-SOCIAL-MIN-AGE": {
+            "attested_by": "Mirza",
+            "attested_on": "2025-01-01",
+            "evidence": "see docs/attest.md"
+          }
+        }
+      },
+      "waivers": null,
+      "expect": "READY_WITH_ACTIONS"
+    }
+  ]
+}

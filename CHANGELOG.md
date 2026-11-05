@@ -10,6 +10,9 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 - The Waiver Ledger. A reviewed false positive can step aside for one occurrence (app, finding, severity, file) with a reason, evidence, a reviewer, and an expiry at most 180 days out. Expired, incomplete, duplicated, and stale waivers are named and the finding comes back.
 - The guard prints a `Coverage.` line before every exit (complete or incomplete, which platforms it found, and why), so a blocked run still says whether every app root was scanned.
 - A GitHub code-scanning export (`--scanning-export`, SARIF 2.1.0) that keeps each app's path, marks waived findings as suppressed with their evidence, and marks the run unsuccessful when an app was not checked. Plus a full JSON result (`--json`).
+- The Ruling Register, `data/ruling-register.json` and `scripts/ruling-register.py`. Release requirements a code scan cannot see, each with its legal standing (in force, in force later, store policy, proposed, guidance), how it is proven (automated, owner attested, mixed), and a verbatim quoted source with the date it was read. Only verified, in-force rules can block, and an unverifiable source is shown as "confirm the source". `due` lists what applies to an app, `export` writes a commit-stamped copy. 14 first entries from an adversarial gap review, covering India, the EU, the US, China, Indonesia, Vietnam and Australia. Fleet Sweep reads it and turns each unattested blocking rule into an owner action.
+- `scripts/eval-scorecard.py` and `evals/gold-cases.json`. 28 gold scenarios across Fleet Sweep, the Waiver Ledger and the Ruling Register, scored for accuracy, false passes and false blocks. Any miss fails CI.
+- `scripts/ruling-register-test.sh`, 55 cases.
 - `scripts/fleet-sweep-test.sh`, 41 cases including every defect an adversarial Codex review reproduced, wired into CI. Guide in `docs/FLEET-SWEEP.md`, templates in `templates/`.
 
 ## 2.1.0 (2026-10-17)

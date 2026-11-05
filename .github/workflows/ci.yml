@@ -51,6 +51,14 @@ jobs:
       - name: Fleet Sweep test
         run: bash scripts/fleet-sweep-test.sh
 
+      - name: Ruling Register
+        run: |
+          python3 scripts/ruling-register.py validate
+          bash scripts/ruling-register-test.sh
+
+      - name: Eval scorecard
+        run: python3 scripts/eval-scorecard.py
+
       - name: Privacy manifest validator and citation verifier tests
         run: |
           bash scripts/validate-privacy-manifest-test.sh
