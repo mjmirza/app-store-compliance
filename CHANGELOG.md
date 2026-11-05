@@ -4,7 +4,16 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Fleet Sweep, `scripts/fleet-sweep.py`. Before, the guard checked one app per run and you added the results up by hand. Now one run covers every app in a fleet file and returns one verdict, worst app wins, with exit codes 0 ready, 3 ready with open actions, 1 not checked, 2 blocked. A partial scan, a declared platform the guard did not find, a timeout, or a report whose counts or exit code contradict its findings is `NOT_CHECKED`, never ready. Account and console steps you track show as owner actions, and an app with no readiness list reports that too.
+- The Waiver Ledger. A reviewed false positive can step aside for one occurrence (app, finding, severity, file) with a reason, evidence, a reviewer, and an expiry at most 180 days out. Expired, incomplete, duplicated, and stale waivers are named and the finding comes back.
+- The guard prints a `Coverage.` line before every exit (complete or incomplete, which platforms it found, and why), so a blocked run still says whether every app root was scanned.
+- A GitHub code-scanning export (`--scanning-export`, SARIF 2.1.0) that keeps each app's path, marks waived findings as suppressed with their evidence, and marks the run unsuccessful when an app was not checked. Plus a full JSON result (`--json`).
+- The Ruling Register, `data/ruling-register.json` and `scripts/ruling-register.py`. Release requirements a code scan cannot see, each with its legal standing (in force, in force later, store policy, proposed, guidance), how it is proven (automated, owner attested, mixed), and a verbatim quoted source with the date it was read. A rule blocks only when quoted sources cover both its obligation and its start date, so a quote on one premise never verifies another. `due` lists what applies to an app, `export` writes a commit-stamped copy. 14 first entries from an adversarial gap review, covering India, the EU, the US, China, Indonesia, Vietnam and Australia. Fleet Sweep requires every app to declare its platforms, regions and features, and an applicable in-force rule without a compliant attestation, covering every proof item and country at the rule's current revision, makes the app `BLOCKED`.
+- `scripts/eval-scorecard.py` and `evals/gold-cases.json`. 32 gold scenarios across Fleet Sweep, the Waiver Ledger and the Ruling Register. Each checks the verdict, the exit code, that the fleet and app agree, and which rule ids must and must not appear. Any miss fails CI.
+- `scripts/ruling-register-test.sh`, 74 cases. A second adversarial Codex review of the register and the evals reproduced eight defects, all fixed and kept as regression cases.
+- `scripts/fleet-sweep-test.sh`, 41 cases including every defect an adversarial Codex review reproduced, wired into CI. Guide in `docs/FLEET-SWEEP.md`, templates in `templates/`.
 
 ## 2.1.0 (2026-10-17)
 

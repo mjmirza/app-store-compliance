@@ -1,0 +1,14 @@
+{
+  "waivers": [
+    {
+      "app": "Example App",
+      "finding_id": "IOS-EXAMPLE-ID",
+      "severity": "high",
+      "file": "ios/App/Tests/Fixtures/Info.plist",
+      "reason": "The flagged string is a test fixture that never ships in the release build.",
+      "evidence": "Release target excludes Tests/Fixtures, see Build Phases screenshot in docs/review/2026-11.png",
+      "reviewed_by": "Your Name",
+      "expires": "2027-02-01"
+    }
+  ]
+}

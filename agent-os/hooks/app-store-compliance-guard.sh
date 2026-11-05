@@ -1465,6 +1465,12 @@ print_deadlines
 # ===== summary and exit =====
 echo ""
 echo "Summary. critical=$CRIT high=$HIGH medium=$MED"
+# Printed before every exit, so a blocked run still says whether every app root was scanned (Fleet Sweep reads it).
+COV_WHY=""
+[ -n "$SCAN_ERROR" ] && COV_WHY="scan error"
+[ -n "$UNCHECKED" ] && COV_WHY="${COV_WHY:+$COV_WHY; }no native project in $UNCHECKED"
+{ [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] || [ "$ANY_NEEDS_NATIVE" -eq 1 ]; }; } && COV_WHY="${COV_WHY:+$COV_WHY; }no iOS or Android project found"
+echo "Coverage. $([ -n "$COV_WHY" ] && echo incomplete || echo complete) ios=$ANY_IOS android=$ANY_AND web=$ANY_WEB${COV_WHY:+ reason=$COV_WHY}"
 # Issue #658. A run killed by the hook timeout looks like a silent pass, so say how long this one took.
 SLOW_SECS="${APP_STORE_GUARD_SLOW_SECS:-45}"
 case "$SLOW_SECS" in ''|*[!0-9]*) SLOW_SECS=45 ;; esac

@@ -1,0 +1,46 @@
+{
+  "fleet_name": "My Apps",
+  "apps": [
+    {
+      "name": "Example App",
+      "path": "~/repositories/example-app",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "regions": [
+        "DE",
+        "AU",
+        "US"
+      ],
+      "readiness": {
+        "apple_developer_program_active": true,
+        "apple_agreements_signed": true,
+        "apple_privacy_answers_match_runtime": false,
+        "play_developer_verification_done": true,
+        "play_data_safety_matches_runtime": false,
+        "tested_on_a_physical_device": false
+      },
+      "features": [
+        "personal_data",
+        "subscriptions"
+      ],
+      "attestations": {
+        "RR-AU-APP1-PRIVACY-POLICY": {
+          "attested_by": "Your Name",
+          "attested_on": "2026-11-01",
+          "outcome": "compliant",
+          "revision": 1,
+          "covers": [
+            "auto-1",
+            "owner-2"
+          ],
+          "regions": [
+            "AU"
+          ],
+          "evidence": "Privacy policy reviewed against APP 1, linked in app and listing"
+        }
+      }
+    }
+  ]
+}
