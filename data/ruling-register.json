@@ -1,9 +1,10 @@
 {
-  "register_version": "1.0.0",
+  "register_version": "1.1.0",
   "about": "Release requirements with their legal standing and how each one is proven. See docs/RULING-REGISTER.md.",
   "requirements": [
     {
       "id": "RR-PLAY-LENDING-IN",
+      "revision": 1,
       "title": "Personal-loan apps in India must hold an RBI licence and appear on the RBI list of digital lending apps",
       "jurisdiction": "IN",
       "store": "google",
@@ -18,11 +19,13 @@
       "proof_items": [
         {
           "what": "The app does not request the contacts or photos permissions in the merged release manifest",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "The app is listed in the RBI DLAs deployed by Regulated Entities list and the licence is shown in the Play declaration",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Inspect the merged release manifest for contacts and photos access, then confirm the app appears on the RBI DLA list before enabling India.",
@@ -30,17 +33,24 @@
         {
           "url": "https://support.google.com/googleplay/android-developer/answer/16604194?hl=en",
           "checked_on": "2026-11-05",
-          "quote": "hold and present a valid financial services license from the Reserve Bank of India (RBI) to offer personal loans"
+          "quote": "hold and present a valid financial services license from the Reserve Bank of India (RBI) to offer personal loans",
+          "supports": [
+            "obligation"
+          ]
         },
         {
           "url": "https://support.google.com/googleplay/android-developer/answer/9876821?hl=en",
           "checked_on": "2026-11-05",
-          "quote": "lending apps are prohibited from accessing sensitive user data such as contacts or photos"
+          "quote": "lending apps are prohibited from accessing sensitive user data such as contacts or photos",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-PLAY-CRYPTO-EU",
+      "revision": 1,
       "title": "Crypto exchange and wallet apps in the EU need MiCA CASP authorisation or a documented local exemption",
       "jurisdiction": "EU",
       "store": "google",
@@ -55,7 +65,8 @@
       "proof_items": [
         {
           "what": "For each enabled EU country, the CASP authorisation or the accepted exemption and the completed Play Console declaration",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "For every enabled EU country record the service type, the legal entity, the CASP authorisation or exemption, and the Console declaration. A non-custodial wallet is assessed on its own terms, never by inheriting an exchange's answer.",
@@ -63,7 +74,10 @@
         {
           "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
           "checked_on": "2026-11-05",
-          "quote": "the developer must be authorized as a crypto-asset service provider (CASP) under the markets in crypto-assets (MiCA) regulation"
+          "quote": "the developer must be authorized as a crypto-asset service provider (CASP) under the markets in crypto-assets (MiCA) regulation",
+          "supports": [
+            "obligation"
+          ]
         }
       ],
       "open_questions": [
@@ -72,6 +86,7 @@
     },
     {
       "id": "RR-US-FDA-DEVICE-SOFTWARE",
+      "revision": 1,
       "title": "Health software that diagnoses or treats may be a regulated medical device in the US",
       "jurisdiction": "US",
       "store": null,
@@ -86,7 +101,8 @@
       "proof_items": [
         {
           "what": "A written classification for each medical function and advertised indication, with the authorisation, exemption or enforcement-discretion basis",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "List every medical function and claim, record its classification and the pathway that covers it, and keep the US listing off until each one is resolved.",
@@ -94,12 +110,16 @@
         {
           "url": "https://www.fda.gov/medical-devices/digital-health-center-excellence/device-software-functions-including-mobile-medical-applications",
           "checked_on": "2026-11-05",
-          "quote": "Software functions span a wide range of health functions, and some require FDA review."
+          "quote": "Software functions span a wide range of health functions, and some require FDA review.",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-CN-GENAI-FILING",
+      "revision": 1,
       "title": "Generative AI services with public-opinion reach in China need a security assessment and algorithm filing",
       "jurisdiction": "CN",
       "store": null,
@@ -114,7 +134,8 @@
       "proof_items": [
         {
           "what": "The filing applicability decision for each model and service role, with the filing or assessment record",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "Decide whether the service has public-opinion or social-mobilisation reach, and if so keep the security assessment and the algorithm filing on record.",
@@ -122,7 +143,10 @@
         {
           "url": "https://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm",
           "checked_on": "2026-11-05",
-          "quote": "提供具有舆论属性或者社会动员能力的生成式人工智能服务的，应当按照国家有关规定开展安全评估"
+          "quote": "提供具有舆论属性或者社会动员能力的生成式人工智能服务的，应当按照国家有关规定开展安全评估",
+          "supports": [
+            "obligation"
+          ]
         }
       ],
       "open_questions": [
@@ -131,6 +155,7 @@
     },
     {
       "id": "RR-CN-AI-LABELING",
+      "revision": 1,
       "title": "App stores in China verify the AI-content labelling materials of apps offering generated content",
       "jurisdiction": "CN",
       "store": null,
@@ -145,11 +170,13 @@
       "proof_items": [
         {
           "what": "Generated output carries a visible label and the metadata label survives download and sharing",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "The labelling materials the distribution platform asks for at listing",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Test visible labels and embedded metadata through generate, download and share, and keep the labelling materials ready for the store review.",
@@ -157,12 +184,16 @@
         {
           "url": "https://www.cac.gov.cn/2025-03/14/c_1743654684782215.htm",
           "checked_on": "2026-11-05",
-          "quote": "互联网应用程序服务提供者提供人工智能生成合成服务的，互联网应用程序分发平台应当核验其生成合成内容标识相关材料"
+          "quote": "互联网应用程序服务提供者提供人工智能生成合成服务的，互联网应用程序分发平台应当核验其生成合成内容标识相关材料",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-US-DOJ-DATA-SECURITY",
+      "revision": 1,
       "title": "Transfers of bulk US sensitive personal data to countries of concern are prohibited or restricted",
       "jurisdiction": "US",
       "store": null,
@@ -177,7 +208,8 @@
       "proof_items": [
         {
           "what": "A map of every SDK, analytics, cloud and support-access recipient to its ownership, the data categories and volumes, and the transaction type",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "Map each data recipient to ownership and control, data category and volume, then block prohibited transactions and document the security controls for restricted ones. OFAC screening does not answer this question.",
@@ -185,12 +217,17 @@
         {
           "url": "https://www.justice.gov/nsd/data-security",
           "checked_on": "2026-11-05",
-          "quote": "The Data Security Program went into effect on April 8, 2025."
+          "quote": "The Data Security Program went into effect on April 8, 2025.",
+          "supports": [
+            "obligation",
+            "date"
+          ]
         }
       ]
     },
     {
       "id": "RR-ID-PSE-REGISTRATION",
+      "revision": 1,
       "title": "Private electronic system operators serving Indonesia must register or face blocking",
       "jurisdiction": "ID",
       "store": null,
@@ -203,7 +240,8 @@
       "proof_items": [
         {
           "what": "The PSE applicability decision and, where it applies, the current registration record",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "Before enabling Indonesia, decide whether PSE registration applies and keep the registration current. Passing store review does not satisfy it.",
@@ -211,12 +249,16 @@
         {
           "url": "https://portal.komdigi.go.id/kanal-publik/berita-kini/9446",
           "checked_on": "2026-11-05",
-          "quote": "Komdigi Putus Akses Tiga PSE Lingkup Privat yang Tidak Memenuhi Kewajiban Pendaftaran"
+          "quote": "Komdigi Putus Akses Tiga PSE Lingkup Privat yang Tidak Memenuhi Kewajiban Pendaftaran",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-EU-WITHDRAWAL-FUNCTION",
+      "revision": 1,
       "title": "Online distance contracts in the EU need a withdrawal function",
       "jurisdiction": "EU",
       "store": null,
@@ -228,30 +270,37 @@
         "subscriptions"
       ],
       "proof": "mixed",
-      "pattern_ids": [
-        "BOTH-WITHDRAWAL-BUTTON-MISSING"
-      ],
       "proof_items": [
         {
           "what": "A labelled withdrawal function is reachable in the app for the whole withdrawal period",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "The national implementation, the contracting trader and the exceptions for each country you sell in",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
+      ],
+      "pattern_ids": [
+        "BOTH-WITHDRAWAL-BUTTON-MISSING"
       ],
       "check": "Walk the withdrawal flow to its durable confirmation, and keep it separate from cancelling a renewal.",
       "sources": [
         {
           "url": "https://eur-lex.europa.eu/eli/dir/2023/2673/oj/eng",
           "checked_on": "2026-11-05",
-          "unverified": "EUR-Lex refused automated fetches on 2026-11-05, so the Article 11a text and the 19 June 2026 date were not re-read today. Confirm on EUR-Lex before relying on it."
+          "unverified": "EUR-Lex refused automated fetches on 2026-11-05, so the Article 11a text and the 19 June 2026 date were not re-read today. Confirm on EUR-Lex before relying on it.",
+          "supports": [
+            "obligation",
+            "date"
+          ]
         }
       ]
     },
     {
       "id": "RR-EU-DSA-NOTICE-ACTION",
+      "revision": 1,
       "title": "Apps that host user content in the EU must run a notice and action mechanism",
       "jurisdiction": "EU",
       "store": null,
@@ -267,11 +316,13 @@
       "proof_items": [
         {
           "what": "A report-illegal-content entry point exists in the app",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "A notice is acknowledged, decided and answered with reasons, and the size-based exemptions you rely on are written down",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Send a test illegal-content notice through acknowledgement, decision and the reasons sent to the user.",
@@ -279,12 +330,16 @@
         {
           "url": "https://digital-strategy.ec.europa.eu/en/policies/dsa-notice-and-action-mechanism",
           "checked_on": "2026-11-05",
-          "quote": "The notice and action mechanism under the Digital Services Act (DSA) is a tool provided by platforms to report illegal content"
+          "quote": "The notice and action mechanism under the Digital Services Act (DSA) is a tool provided by platforms to report illegal content",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-VN-SOCIAL-AUTH",
+      "revision": 1,
       "title": "Social platforms in Vietnam must authenticate accounts before posting, and under-16 accounts are registered by a parent",
       "jurisdiction": "VN",
       "store": null,
@@ -299,11 +354,13 @@
       "proof_items": [
         {
           "what": "An unauthenticated account cannot post or share",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "The phone or identity route and the guardian sign-up for under-16s, and whether your social features are in scope",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Prove an unauthenticated account cannot publish, and walk the guardian sign-up for an under-16 user.",
@@ -311,12 +368,16 @@
         {
           "url": "https://en.baochinhphu.vn/social-media-platforms-have-to-authenticate-users-via-phone-numbers-decree-111241112173317774.htm",
           "checked_on": "2026-11-05",
-          "quote": "For children aged below 16 using social media platforms, their parents or supervisors shall use their personal information to register for accounts"
+          "quote": "For children aged below 16 using social media platforms, their parents or supervisors shall use their personal information to register for accounts",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-EU-CRA-REPORTING",
+      "revision": 1,
       "title": "Manufacturers must report actively exploited vulnerabilities within 24 and 72 hours",
       "jurisdiction": "EU",
       "store": null,
@@ -329,7 +390,8 @@
       "proof_items": [
         {
           "what": "A named reporting owner, access to the Single Reporting Platform, and a timed drill through the early warning and the full notification",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "Name the on-call reporting owner and run a timed drill: early warning inside 24 hours, notification inside 72 hours, final report inside 14 days of the fix.",
@@ -337,7 +399,18 @@
         {
           "url": "https://digital-strategy.ec.europa.eu/en/policies/cra-reporting",
           "checked_on": "2026-11-05",
-          "quote": "They need to submit an early warning within 24 hours of becoming aware, and a full notification within 72 hours."
+          "quote": "They need to submit an early warning within 24 hours of becoming aware, and a full notification within 72 hours.",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://digital-strategy.ec.europa.eu/en/policies/cra-reporting",
+          "checked_on": "2026-11-05",
+          "quote": "As of 11 September 2026, manufacturers are required to report actively exploited vulnerabilities and severe incidents",
+          "supports": [
+            "date"
+          ]
         }
       ],
       "open_questions": [
@@ -346,6 +419,7 @@
     },
     {
       "id": "RR-AU-APP1-PRIVACY-POLICY",
+      "revision": 1,
       "title": "Organisations covered by the Australian Privacy Act need a clear, current privacy policy",
       "jurisdiction": "AU",
       "store": null,
@@ -360,11 +434,13 @@
       "proof_items": [
         {
           "what": "A privacy policy is linked from the app and the store listing",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "The policy says what is collected, why, and how to access, correct or complain",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Link the policy in the app and listing, and confirm it covers collection, purpose, access, correction and complaints.",
@@ -372,12 +448,16 @@
         {
           "url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines/chapter-1-app-1-open-and-transparent-management-of-personal-information",
           "checked_on": "2026-11-05",
-          "quote": "An APP entity must have a clearly expressed and up-to-date APP Privacy Policy about how it manages personal information."
+          "quote": "An APP entity must have a clearly expressed and up-to-date APP Privacy Policy about how it manages personal information.",
+          "supports": [
+            "obligation"
+          ]
         }
       ]
     },
     {
       "id": "RR-AU-SOCIAL-MIN-AGE",
+      "revision": 1,
       "title": "Age-restricted social media platforms must stop under-16s in Australia holding accounts",
       "jurisdiction": "AU",
       "store": null,
@@ -392,11 +472,13 @@
       "proof_items": [
         {
           "what": "Sign-up runs an age-assurance step that is more than self-declaration",
-          "how": "automated"
+          "how": "automated",
+          "id": "auto-1"
         },
         {
           "what": "Whether the platform is age-restricted, the age-assurance methods chosen, and how age data is destroyed",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-2"
         }
       ],
       "check": "Decide whether the app is an age-restricted platform, then show the age-assurance waterfall and the data destruction.",
@@ -404,17 +486,24 @@
         {
           "url": "https://www.legislation.gov.au/C2024A00127/asmade/2024-12-10/text/original/epub/OEBPS/document_1/document_1.html",
           "checked_on": "2026-11-05",
-          "quote": "must take reasonable steps to prevent age-restricted users having accounts"
+          "quote": "must take reasonable steps to prevent age-restricted users having accounts",
+          "supports": [
+            "obligation"
+          ]
         },
         {
           "url": "https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions",
           "checked_on": "2026-11-05",
-          "unverified": "The Act sets the start date by ministerial instrument. The 10 December 2025 date comes from eSafety guidance, which did not load on 2026-11-05."
+          "unverified": "The Act sets the start date by ministerial instrument. The 10 December 2025 date comes from eSafety guidance, which did not load on 2026-11-05.",
+          "supports": [
+            "date"
+          ]
         }
       ]
     },
     {
       "id": "RR-AU-CHILDREN-PRIVACY-CODE",
+      "revision": 1,
       "title": "Australia's Children's Online Privacy Code is due by 10 December 2026",
       "jurisdiction": "AU",
       "store": null,
@@ -430,7 +519,8 @@
       "proof_items": [
         {
           "what": "A review of the registered code text against the app once it is published",
-          "how": "owner_attested"
+          "how": "owner_attested",
+          "id": "owner-1"
         }
       ],
       "check": "Watch for the registered code text and review the app against it once it is published.",
@@ -438,7 +528,11 @@
         {
           "url": "https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online-privacy-code",
           "checked_on": "2026-11-05",
-          "quote": "the Code will be in place by 10 December 2026"
+          "quote": "the Code will be in place by 10 December 2026",
+          "supports": [
+            "obligation",
+            "date"
+          ]
         }
       ]
     }

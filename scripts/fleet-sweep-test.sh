@@ -37,7 +37,8 @@ for spec in sys.argv[2:]:
 print(json.dumps({"fleet_name": "Test fleet", "apps": apps}))
 EOF
 }
-run() { python3 "$SWEEP" "$T/fleet.json" "$@" > "$T/out.txt" 2>&1; echo $?; }
+# The Ruling Register has its own suite, so these cases run without it.
+run() { python3 "$SWEEP" "$T/fleet.json" --no-register "$@" > "$T/out.txt" 2>&1; echo $?; }
 has() { grep -q -- "$1" "$T/out.txt"; }
 
 # Verdicts and exit codes.
@@ -119,7 +120,7 @@ has "retire this waiver" && ok || bad "stale waiver is reported"
 fleet blocked; waiver "${W/APPNAME/other}"
 [ "$(run --waivers "$T/w.json")" = 2 ] && ok || bad "a waiver for another app never applies"
 waiver "$(echo "${W/APPNAME/blocked}" | sed 's/2027-01-01/2026-11-01/')"
-FLEET_SWEEP_TESTING=0 FLEET_SWEEP_TEST_TODAY=2026-10-31 python3 "$SWEEP" "$T/fleet.json" --waivers "$T/w.json" >/dev/null 2>&1
+FLEET_SWEEP_TESTING=0 FLEET_SWEEP_TEST_TODAY=2026-10-31 python3 "$SWEEP" "$T/fleet.json" --no-register --waivers "$T/w.json" >/dev/null 2>&1
 [ $? = 2 ] && ok || bad "the clock cannot be moved outside the test suite"
 
 # Inputs are validated before any guard runs (Codex findings 3 and 11).
@@ -133,6 +134,10 @@ printf '{"apps": []}' > "$T/fleet.json"; [ "$(run)" = 1 ] && has "lists no apps"
 [ "$(python3 "$SWEEP" "$T/nope.json" >/dev/null 2>&1; echo $?)" = 1 ] && ok || bad "missing fleet file exits 1"
 FLEETDIR="$T" python3 -c 'import json;print(json.dumps({"apps":[{"name":"clean","path":"$FLEETDIR/clean","readiness":{"a":True}}]}))' > "$T/fleet.json"
 [ "$(FLEETDIR="$T" run)" = 0 ] && ok || bad "env var in path expands"
+
+# With the register on, unknown scope is an input error, never an empty set.
+fleet clean
+python3 "$SWEEP" "$T/fleet.json" > "$T/out.txt" 2>&1; [ $? = 1 ] && has "must declare platforms" && ok || bad "missing scope is refused when the register is on"
 
 # Code-scanning export (Codex finding 10).
 mkdir -p "$T/b2"; cp "$T/blocked/"* "$T/b2/"; fleet blocked b2 exit1
@@ -153,7 +158,7 @@ EOF
 
 # Real guard, end to end. An empty folder must never be READY.
 mkdir -p "$T/empty"; python3 -c "import json;print(json.dumps({'apps':[{'name':'empty','path':'$T/empty','readiness':{'a':True}}]}))" > "$T/fleet.json"
-FLEET_SWEEP_GUARD="$HERE/../agent-os/hooks/app-store-compliance-guard.sh" python3 "$SWEEP" "$T/fleet.json" > "$T/out.txt" 2>&1; rc=$?
+FLEET_SWEEP_GUARD="$HERE/../agent-os/hooks/app-store-compliance-guard.sh" python3 "$SWEEP" "$T/fleet.json" --no-register > "$T/out.txt" 2>&1; rc=$?
 [ "$rc" = 1 ] && has "NOT_CHECKED" && ok || bad "real guard on an empty folder is NOT_CHECKED (rc=$rc)"
 
 echo "fleet-sweep-test. $pass passed, $fail failed"

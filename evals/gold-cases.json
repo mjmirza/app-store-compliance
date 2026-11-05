@@ -16,7 +16,8 @@
         }
       },
       "waivers": null,
-      "expect": "READY"
+      "expect": "READY",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -32,7 +33,8 @@
         }
       },
       "waivers": null,
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -48,7 +50,8 @@
         }
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "expect": "READY_WITH_ACTIONS",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -62,7 +65,8 @@
         "readiness": null
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "expect": "READY_WITH_ACTIONS",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -78,7 +82,8 @@
         }
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "expect": "READY_WITH_ACTIONS",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -94,7 +99,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -110,7 +116,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -126,7 +133,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -142,7 +150,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -158,7 +167,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -174,7 +184,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "fleet",
@@ -191,7 +202,8 @@
         }
       },
       "waivers": null,
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -218,7 +230,8 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "READY"
+      "expect": "READY",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -245,7 +258,8 @@
           "expires": "2026-11-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -272,7 +286,8 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -299,7 +314,8 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -326,7 +342,8 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -363,7 +380,8 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -390,7 +408,8 @@
           "expires": "2028-01-01"
         }
       ],
-      "expect": "BLOCKED"
+      "expect": "BLOCKED",
+      "register": false
     },
     {
       "feature": "waiver",
@@ -417,13 +436,226 @@
           "expires": "2027-01-01"
         }
       ],
-      "expect": "NOT_CHECKED"
+      "expect": "NOT_CHECKED",
+      "register": false
     },
     {
       "feature": "register",
-      "name": "AU social app without attestation",
+      "name": "US medical app without attestation blocks",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "US"
+        ],
+        "features": [
+          "medical"
+        ]
+      },
+      "waivers": null,
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-US-FDA-DEVICE-SOFTWARE"
+      ],
+      "must_not_mention": []
+    },
+    {
+      "feature": "register",
+      "name": "US medical app attested compliant ships",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "US"
+        ],
+        "features": [
+          "medical"
+        ],
+        "attestations": {
+          "RR-US-FDA-DEVICE-SOFTWARE": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/review.md",
+            "outcome": "compliant",
+            "revision": 1,
+            "covers": [
+              "owner-1"
+            ],
+            "regions": [
+              "US"
+            ]
+          }
+        }
+      },
+      "waivers": null,
+      "register": true,
+      "expect": "READY",
+      "must_mention": [],
+      "must_not_mention": [
+        "RR-US-FDA-DEVICE-SOFTWARE"
+      ]
+    },
+    {
+      "feature": "register",
+      "name": "negative outcome still blocks",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "US"
+        ],
+        "features": [
+          "medical"
+        ],
+        "attestations": {
+          "RR-US-FDA-DEVICE-SOFTWARE": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/review.md",
+            "outcome": "not_compliant",
+            "revision": 1,
+            "covers": [
+              "owner-1"
+            ],
+            "regions": [
+              "US"
+            ]
+          }
+        }
+      },
+      "waivers": null,
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-US-FDA-DEVICE-SOFTWARE"
+      ],
+      "must_not_mention": []
+    },
+    {
+      "feature": "register",
+      "name": "mixed rule needs its automated result",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "ios"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "VN"
+        ],
+        "features": [
+          "social"
+        ],
+        "attestations": {
+          "RR-VN-SOCIAL-AUTH": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/review.md",
+            "outcome": "compliant",
+            "revision": 1,
+            "covers": [
+              "owner-2"
+            ],
+            "regions": [
+              "VN"
+            ]
+          }
+        }
+      },
+      "waivers": null,
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-VN-SOCIAL-AUTH"
+      ],
+      "must_not_mention": []
+    },
+    {
+      "feature": "register",
+      "name": "attestation must cover every EU country",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
+      "app": {
+        "platforms": [
+          "android"
+        ],
+        "readiness": {
+          "agreements": true
+        },
+        "regions": [
+          "DE",
+          "FR"
+        ],
+        "features": [
+          "crypto"
+        ],
+        "attestations": {
+          "RR-PLAY-CRYPTO-EU": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/review.md",
+            "outcome": "compliant",
+            "revision": 1,
+            "covers": [
+              "owner-1"
+            ],
+            "regions": [
+              "DE"
+            ]
+          },
+          "RR-EU-CRA-REPORTING": {
+            "attested_by": "Mirza",
+            "attested_on": "2026-10-01",
+            "evidence": "see docs/review.md",
+            "outcome": "compliant",
+            "revision": 1,
+            "covers": [
+              "owner-1"
+            ],
+            "regions": [
+              "DE",
+              "FR"
+            ]
+          }
+        }
+      },
+      "waivers": null,
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-PLAY-CRYPTO-EU"
+      ],
+      "must_not_mention": [
+        "RR-EU-CRA-REPORTING"
+      ]
+    },
+    {
+      "feature": "register",
+      "name": "AU social rule with unverified date is only flagged",
+      "guard_exit": 0,
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -439,42 +671,18 @@
         ]
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "register": true,
+      "expect": "READY_WITH_ACTIONS",
+      "must_mention": [
+        "RR-AU-SOCIAL-MIN-AGE"
+      ],
+      "must_not_mention": []
     },
     {
       "feature": "register",
-      "name": "AU social app attested",
+      "name": "US app with no matching rule ships",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
-      "app": {
-        "platforms": [
-          "ios"
-        ],
-        "readiness": {
-          "agreements": true
-        },
-        "regions": [
-          "AU"
-        ],
-        "features": [
-          "social"
-        ],
-        "attestations": {
-          "RR-AU-SOCIAL-MIN-AGE": {
-            "attested_by": "Mirza",
-            "attested_on": "2026-10-01",
-            "evidence": "see docs/attest.md"
-          }
-        }
-      },
-      "waivers": null,
-      "expect": "READY"
-    },
-    {
-      "feature": "register",
-      "name": "US app with no matching rule",
-      "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -490,13 +698,18 @@
         ]
       },
       "waivers": null,
-      "expect": "READY"
+      "register": true,
+      "expect": "READY",
+      "must_mention": [],
+      "must_not_mention": [
+        "RR-"
+      ]
     },
     {
       "feature": "register",
-      "name": "India lending on Android",
+      "name": "India lending on Android blocks",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=0 android=1 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "android"
@@ -512,13 +725,18 @@
         ]
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-PLAY-LENDING-IN"
+      ],
+      "must_not_mention": []
     },
     {
       "feature": "register",
-      "name": "India lending on iOS only",
+      "name": "India lending on iOS only is out of scope",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -534,13 +752,18 @@
         ]
       },
       "waivers": null,
-      "expect": "READY"
+      "register": true,
+      "expect": "READY",
+      "must_mention": [],
+      "must_not_mention": [
+        "RR-PLAY-LENDING-IN"
+      ]
     },
     {
       "feature": "register",
-      "name": "DE subscriptions, unconfirmed withdrawal rule",
+      "name": "DE subscriptions app, CRA reporting blocks and the withdrawal rule is only flagged",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -556,13 +779,19 @@
         ]
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-EU-WITHDRAWAL-FUNCTION",
+        "RR-EU-CRA-REPORTING"
+      ],
+      "must_not_mention": []
     },
     {
       "feature": "register",
-      "name": "AU children code is proposed only",
+      "name": "proposed AU children code never acts",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -578,13 +807,18 @@
         ]
       },
       "waivers": null,
-      "expect": "READY"
+      "register": true,
+      "expect": "READY",
+      "must_mention": [],
+      "must_not_mention": [
+        "RR-AU-CHILDREN-PRIVACY-CODE"
+      ]
     },
     {
       "feature": "register",
-      "name": "stale attestation",
+      "name": "stale attestation blocks",
       "guard_exit": 0,
-      "report": "\nSummary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\n",
+      "report": "Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\n",
       "app": {
         "platforms": [
           "ios"
@@ -593,21 +827,34 @@
           "agreements": true
         },
         "regions": [
-          "AU"
+          "US"
         ],
         "features": [
-          "social"
+          "medical"
         ],
         "attestations": {
-          "RR-AU-SOCIAL-MIN-AGE": {
+          "RR-US-FDA-DEVICE-SOFTWARE": {
             "attested_by": "Mirza",
             "attested_on": "2025-01-01",
-            "evidence": "see docs/attest.md"
+            "evidence": "see docs/review.md",
+            "outcome": "compliant",
+            "revision": 1,
+            "covers": [
+              "owner-1"
+            ],
+            "regions": [
+              "US"
+            ]
           }
         }
       },
       "waivers": null,
-      "expect": "READY_WITH_ACTIONS"
+      "register": true,
+      "expect": "BLOCKED",
+      "must_mention": [
+        "RR-US-FDA-DEVICE-SOFTWARE"
+      ],
+      "must_not_mention": []
     }
   ]
 }

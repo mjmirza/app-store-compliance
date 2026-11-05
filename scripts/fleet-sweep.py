@@ -132,8 +132,8 @@ def integrity_problem(code, findings, summaries, coverages):
     return ""
 
 
-def validate_inputs(fleet, ledger):
-    """Checks every shape before any guard runs, so a typo never aborts a half-done sweep."""
+def validate_inputs(fleet, ledger, scoped=False):
+    """Checks every shape before any guard runs. With the register on, every app must declare its scope."""
     if (
         not isinstance(fleet, dict)
         or not isinstance(fleet.get("apps"), list)
@@ -156,12 +156,22 @@ def validate_inputs(fleet, ledger):
             isinstance(ready, dict) and all(isinstance(v, bool) for v in ready.values())
         ):
             raise InputError(f"apps[{i}] readiness must map each step to true or false")
+        if scoped:
+            # Unknown scope would silently drop requirements, so it is an input error, never an empty set.
+            for key in ("platforms", "regions", "features"):
+                if key not in app:
+                    raise InputError(f"apps[{i}] must declare {key} while the Ruling Register is on")
+            if not app["platforms"] or not app["regions"]:
+                raise InputError(f"apps[{i}] platforms and regions cannot be empty while the Ruling Register is on")
         feats = app.get("features", [])
         if not isinstance(feats, list) or any(f not in RR.FEATURES for f in feats):
             raise InputError(f"apps[{i}] features must be a list drawn from {', '.join(RR.FEATURES)}")
         regions = app.get("regions", [])
-        if not isinstance(regions, list) or not all(is_text(r) for r in regions):
-            raise InputError(f"apps[{i}] regions must be a list of country codes")
+        if not isinstance(regions, list) or not all(isinstance(r, str) for r in regions):
+            raise InputError(f"apps[{i}] regions must be a list of two-letter country codes")
+        app["regions"] = [r.strip().upper() for r in regions]
+        if not all(RR.COUNTRY.match(r) for r in app["regions"]):
+            raise InputError(f"apps[{i}] regions must be two-letter country codes such as DE or AU")
         if not isinstance(app.get("attestations", {}), dict):
             raise InputError(f"apps[{i}] attestations must map a requirement id to its attestation")
         names.append(app["name"])
@@ -201,13 +211,34 @@ def check_waiver(w, today):
     return True, ""
 
 
-def attestation_problem(a, today):
+def in_scope_regions(jurisdiction, app_regions):
+    """The app's countries a rule covers, so an attestation must answer for every one of them."""
+    if jurisdiction == "GLOBAL":
+        return set(app_regions)
+    if jurisdiction == "EU":
+        return set(app_regions) & RR.EU
+    return {jurisdiction} & set(app_regions)
+
+
+def attestation_problem(a, row, app_regions, today):
     """Returns why an attestation cannot be accepted, or empty when it can."""
     if not isinstance(a, dict):
         return "is not an object"
-    for key in ("attested_by", "attested_on", "evidence"):
+    for key in ("attested_by", "attested_on", "evidence", "outcome"):
         if not is_text(a.get(key)):
             return f"is missing {key}"
+    if a["outcome"] != "compliant":
+        return f"records the outcome {a['outcome']}, only compliant clears a rule"
+    if a.get("revision") != row["revision"]:
+        return f"was made for revision {a.get('revision')}, the rule is now at revision {row['revision']}"
+    covers = a.get("covers")
+    missing_items = sorted(set(row["proof_items"]) - set(covers if isinstance(covers, list) else []))
+    if missing_items:
+        return f"does not cover proof items {', '.join(missing_items)}"
+    regions = a.get("regions")
+    missing_regions = sorted(in_scope_regions(row["jurisdiction"], app_regions) - set(regions if isinstance(regions, list) else []))
+    if missing_regions:
+        return f"does not cover {', '.join(missing_regions)}"
     try:
         on = dt.date.fromisoformat(a["attested_on"])
     except ValueError:
@@ -219,23 +250,23 @@ def attestation_problem(a, today):
     return ""
 
 
-def register_actions(app, register, today):
-    """Owner actions from every Ruling Register requirement that applies to this app."""
+def register_check(app, register, today):
+    """Returns (blockers, advisories) from every Ruling Register requirement that applies to this app."""
     if register is None:
-        return []
+        return [], []
     stores = {STORE_OF[p] for p in app.get("platforms", []) if p in STORE_OF}
-    rows = RR.due(register, {r.upper() for r in app.get("regions", [])}, stores,
-                  set(app.get("features", [])), today)
+    rows = RR.due(register, set(app.get("regions", [])), stores, set(app.get("features", [])), today)
     attested = app.get("attestations", {})
-    actions = []
+    blockers, advisories = [], []
     for row in rows:
         if not row["source_verified"]:
-            actions.append(f"{row['id']} applies but its source is unconfirmed, check it before relying on it")
-        elif row["blocks_release"] and row["needs_attestation"]:
-            problem = attestation_problem(attested[row["id"]], today) if row["id"] in attested else "is missing"
+            advisories.append(f"{row['id']} applies but its source is unconfirmed, check it before relying on it")
+        elif row["blocks_release"]:
+            a = attested.get(row["id"])
+            problem = "is missing" if a is None else attestation_problem(a, row, app.get("regions", []), today)
             if problem:
-                actions.append(f"{row['id']} needs your attestation, which {problem}. {row['title']}")
-    return actions
+                blockers.append(f"{row['id']} needs your attestation, which {problem}. {row['title']}")
+    return blockers, advisories
 
 
 def fingerprint(app, finding_id, severity, file):
@@ -253,6 +284,7 @@ def sweep_app(app, guard, waivers, today, timeout, register=None):
         "waived": [],
         "waiver_problems": [],
         "owner_actions": [],
+        "register_blockers": [],
         "coverage": None,
         "guard_exit": None,
         "note": "",
@@ -284,7 +316,9 @@ def sweep_app(app, guard, waivers, today, timeout, register=None):
         )
     else:
         result["owner_actions"] += [k for k, v in ready.items() if v is not True]
-    result["owner_actions"] += register_actions(app, register, today)
+    blockers, advisories = register_check(app, register, today)
+    result["register_blockers"] = blockers
+    result["owner_actions"] += advisories
 
     if not path.is_dir():
         result.update(verdict="NOT_CHECKED", note=f"path {path} is not a folder")
@@ -326,7 +360,7 @@ def sweep_app(app, guard, waivers, today, timeout, register=None):
         )
 
     missing = [p for p in result["platforms"] if not covered[p]]
-    blocked = any(f["severity"] == "critical" for f in result["findings"])
+    blocked = any(f["severity"] == "critical" for f in result["findings"]) or bool(result["register_blockers"])
     if blocked:
         result["verdict"] = "BLOCKED"
     elif state != "complete":
@@ -441,6 +475,8 @@ def print_report(fleet_name, results, verdict):
                 print(f"      fix. {f['fix']}")
         for w in r["waived"]:
             print(f"  waived until {w['expires']}. {w['id']} ({w['reviewed_by']})")
+        for b in r["register_blockers"]:
+            print(f"  [REGISTER] {b}")
         for p in r["waiver_problems"]:
             print(f"  waiver problem. {p}")
         for a in r["owner_actions"]:
@@ -481,12 +517,12 @@ def main():
     try:
         fleet = load_json(args.fleet, "fleet file")
         ledger = load_json(args.waivers, "waiver ledger") if args.waivers else None
-        waivers = validate_inputs(fleet, ledger)
         register = None if args.no_register else load_json(args.register, "ruling register")
         if register is not None:
             problems = RR.validate(register, RR.pattern_ids())
             if problems:
                 raise InputError(f"the ruling register is invalid. {problems[0]}")
+        waivers = validate_inputs(fleet, ledger, scoped=register is not None)
     except InputError as exc:
         print(f"fleet-sweep. {exc}", file=sys.stderr)
         return 1

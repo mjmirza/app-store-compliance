@@ -56,6 +56,9 @@ EU = {
     "SE",
 }
 ID = re.compile(r"^RR-[A-Z0-9-]+$")
+ITEM = re.compile(r"^[a-z0-9-]+$")
+COUNTRY = re.compile(r"^[A-Z]{2}$")
+SUPPORTS = ("obligation", "date")
 
 
 def text(v):
@@ -71,9 +74,13 @@ def is_date(v):
 
 
 def verified(req):
-    return any(
-        text(s.get("quote")) for s in req.get("sources", []) if isinstance(s, dict)
-    )
+    """True only when quoted sources support the obligation, and the start date if the rule has one."""
+    covered = set()
+    for s in req.get("sources", []):
+        if isinstance(s, dict) and text(s.get("quote")) and isinstance(s.get("supports"), list):
+            covered |= set(s["supports"])
+    needed = {"obligation"} | ({"date"} if req.get("takes_effect") else set())
+    return needed <= covered
 
 
 def validate(doc, pattern_ids):
@@ -100,6 +107,9 @@ def validate(doc, pattern_ids):
         elif rid in seen:
             errors.append(f"{rid}. id is used twice, a new rule gets a new id")
         seen.add(rid)
+        rev = r.get("revision")
+        if not isinstance(rev, int) or isinstance(rev, bool) or rev < 1:
+            errors.append(f"{where}. revision must be a whole number from 1, raise it when the rule changes")
         for key in ("title", "jurisdiction", "instrument", "authority", "check"):
             if not text(r.get(key)):
                 errors.append(f"{where}. {key} is missing")
@@ -131,8 +141,13 @@ def validate(doc, pattern_ids):
                 errors.append(
                     f"{where}. each proof item needs what and how (automated or owner_attested)"
                 )
+            elif not (text(item.get("id")) and ITEM.match(item["id"])):
+                errors.append(f"{where}. each proof item needs a lowercase id")
             else:
                 hows.add(item["how"])
+        item_ids = [it.get("id") for it in items if isinstance(it, dict)]
+        if len(item_ids) != len(set(item_ids)):
+            errors.append(f"{where}. proof item ids must be unique")
         proof = r.get("proof")
         if proof not in PROOFS:
             errors.append(f"{where}. proof must be one of {', '.join(PROOFS)}")
@@ -160,6 +175,9 @@ def validate(doc, pattern_ids):
                 errors.append(
                     f"{where}. source {s['url']} needs exactly one of quote or unverified"
                 )
+            sup = s.get("supports")
+            if not isinstance(sup, list) or not sup or any(x not in SUPPORTS for x in sup):
+                errors.append(f"{where}. source {s['url']} needs supports, drawn from {', '.join(SUPPORTS)}")
         for pid in r.get("pattern_ids", []):
             if pid not in pattern_ids:
                 errors.append(
@@ -203,13 +221,16 @@ def due(doc, regions, stores, features, today):
         rows.append(
             {
                 "id": r["id"],
+                "revision": r["revision"],
+                "jurisdiction": r["jurisdiction"],
+                "proof_items": [it["id"] for it in r["proof_items"]],
                 "title": r["title"],
                 "standing": r["standing"],
                 "takes_effect": r.get("takes_effect"),
                 "proof": r["proof"],
                 "blocks_release": blocking(r, today),
                 "source_verified": verified(r),
-                "needs_attestation": r["proof"] != "automated",
+                "needs_attestation": True,
                 "check": r["check"],
             }
         )
@@ -282,7 +303,7 @@ def main():
         ]
         for rid in unverified:
             print(
-                f"  NOTE. {rid} has no verified quote yet, so it can never block a release"
+                f"  NOTE. {rid} is not fully verified (its obligation, and its start date if it has one, need a quoted source), so it can never block a release"
             )
         print(
             f"ruling-register. {'FAILED' if problems else 'OK'}. {len(doc.get('requirements', []))} requirements, {len(problems)} error(s)"

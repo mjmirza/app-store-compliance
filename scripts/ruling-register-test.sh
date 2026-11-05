@@ -21,10 +21,10 @@ def check(name, cond):
     results.append(name if cond else f"FAIL {name}")
 
 check("real register is valid", rr.validate(real, pids) == [])
-base = {"id": "RR-T", "title": "t", "jurisdiction": "DE", "store": None, "instrument": "i", "authority": "a",
+base = {"id": "RR-T", "revision": 1, "title": "t", "jurisdiction": "DE", "store": None, "instrument": "i", "authority": "a",
         "standing": "in_force", "takes_effect": None, "features": [], "proof": "automated",
-        "proof_items": [{"what": "w", "how": "automated"}], "check": "c",
-        "sources": [{"url": "https://example.org/x", "checked_on": "2026-11-05", "quote": "q"}]}
+        "proof_items": [{"id": "auto-1", "what": "w", "how": "automated"}], "check": "c",
+        "sources": [{"url": "https://example.org/x", "checked_on": "2026-11-05", "quote": "q", "supports": ["obligation", "date"]}]}
 def doc(*reqs): return {"register_version": "1.0.0", "requirements": list(reqs)}
 def errs(**change):
     r = copy.deepcopy(base); r.update(change); return rr.validate(doc(r), pids)
@@ -40,12 +40,16 @@ check("mixed needs both kinds", errs(proof="mixed") != [])
 check("owner_attested with an automated item refused", errs(proof="owner_attested") != [])
 check("no proof items refused", errs(proof_items=[]) != [])
 check("no sources refused", errs(sources=[]) != [])
-check("http source refused", errs(sources=[{"url": "http://x", "checked_on": "2026-11-05", "quote": "q"}]) != [])
-check("quote and unverified together refused", errs(sources=[{"url": "https://x", "checked_on": "2026-11-05", "quote": "q", "unverified": "u"}]) != [])
-check("neither quote nor unverified refused", errs(sources=[{"url": "https://x", "checked_on": "2026-11-05"}]) != [])
-check("missing checked_on refused", errs(sources=[{"url": "https://x", "quote": "q"}]) != [])
+check("http source refused", errs(sources=[{"url": "http://x", "checked_on": "2026-11-05", "quote": "q", "supports": ["obligation"]}]) != [])
+check("quote and unverified together refused", errs(sources=[{"url": "https://x", "checked_on": "2026-11-05", "quote": "q", "unverified": "u", "supports": ["obligation"]}]) != [])
+check("neither quote nor unverified refused", errs(sources=[{"url": "https://x", "checked_on": "2026-11-05", "supports": ["obligation"]}]) != [])
+check("missing checked_on refused", errs(sources=[{"url": "https://x", "quote": "q", "supports": ["obligation"]}]) != [])
 check("unknown pattern id refused", errs(pattern_ids=["NOPE-1"]) != [])
 check("missing check refused", errs(check="") != [])
+check("missing revision refused", errs(revision=None) != [])
+check("proof item without id refused", errs(proof_items=[{"what": "w", "how": "automated"}]) != [])
+check("duplicate proof item ids refused", errs(proof_items=[{"id": "a", "what": "w", "how": "automated"}, {"id": "a", "what": "x", "how": "automated"}]) != [])
+check("source without supports refused", errs(sources=[{"url": "https://x", "checked_on": "2026-11-05", "quote": "q"}]) != [])
 check("non-object entry refused", rr.validate(doc("x"), pids) != [])
 check("bad version refused", rr.validate({"register_version": "one", "requirements": [base]}, pids) != [])
 
@@ -59,7 +63,11 @@ check("guidance never blocks", not blocks(standing="guidance"))
 check("in force later blocks once its date passes", blocks(standing="in_force_later", takes_effect="2026-11-05"))
 check("in force later waits for its date", not blocks(standing="in_force_later", takes_effect="2026-11-06"))
 check("in force with a future date waits", not blocks(takes_effect="2027-01-01"))
-check("an unverified source never blocks", not blocks(sources=[{"url": "https://x", "checked_on": "2026-11-05", "unverified": "blocked"}]))
+check("an unverified source never blocks", not blocks(sources=[{"url": "https://x", "checked_on": "2026-11-05", "unverified": "blocked", "supports": ["obligation"]}]))
+check("a quote on the obligation alone does not verify a start date", not blocks(takes_effect="2020-01-01", sources=[{"url": "https://x", "checked_on": "2026-11-05", "quote": "q", "supports": ["obligation"]}, {"url": "https://y", "checked_on": "2026-11-05", "unverified": "u", "supports": ["date"]}]))
+check("quotes on obligation and date together verify it", blocks(takes_effect="2020-01-01", sources=[{"url": "https://x", "checked_on": "2026-11-05", "quote": "q", "supports": ["obligation"]}, {"url": "https://y", "checked_on": "2026-11-05", "quote": "d", "supports": ["date"]}]))
+check("the real AU minimum-age rule does not block on its unverified date",
+      not any(r["blocks_release"] for r in rr.due(real, {"AU"}, {"apple"}, {"social"}, d) if r["id"] == "RR-AU-SOCIAL-MIN-AGE"))
 
 eu = copy.deepcopy(base); eu["jurisdiction"] = "EU"
 check("an EU country matches an EU rule", rr.applies(eu, {"DE"}, {"apple"}, set()))
@@ -80,7 +88,7 @@ print("\n".join(results))
 EOF
 while read -r line; do case "$line" in FAIL*) bad "${line#FAIL }" ;; "") ;; Traceback*|*Error*) bad "python harness. $line" ;; *) ok ;; esac; done < "$T/py.txt"
 # A harness that dies early prints few lines, which must never read as green.
-[ "$(grep -c . "$T/py.txt")" -eq 38 ] && ok || bad "python harness expected 38 checks, ran $(grep -c . "$T/py.txt") checks"
+[ "$(grep -c . "$T/py.txt")" -eq 45 ] && ok || bad "python harness expected 45 checks, ran $(grep -c . "$T/py.txt") checks"
 
 # Command line.
 python3 "$RR" validate > "$T/out.txt" 2>&1; [ $? = 0 ] && grep -q "OK" "$T/out.txt" && ok || bad "validate exits 0 on the real register"
@@ -96,32 +104,67 @@ import json,glob; f=glob.glob('$T/exp/ruling-register-v*.json'); d=json.load(ope
 assert d['source_commit'] and d['exported_on'] and len(d['requirements'])>=14" && ok || bad "export is versioned and commit-stamped"
 
 # Fleet Sweep picks up the register.
-cat > "$T/guard.sh" <<'EOF'
+cat > "$T/guard.sh" <<'EOF2'
 #!/usr/bin/env bash
-printf 'Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=0 web=0\nCLEAR.\n'
-EOF
+printf 'Summary. critical=0 high=0 medium=0\nCoverage. complete ios=1 android=1 web=0\nCLEAR.\n'
+EOF2
 mkdir -p "$T/app"
 export FLEET_SWEEP_GUARD="$T/guard.sh" FLEET_SWEEP_TESTING=1 FLEET_SWEEP_TEST_TODAY=2026-11-05
-fleet() { python3 -c "import json,sys;print(json.dumps({'apps':[dict({'name':'app','path':'$T/app','platforms':['ios'],'readiness':{'a':True}},**json.loads(sys.argv[1]))]}))" "$1" > "$T/fleet.json"; }
+fleet() { python3 -c "import json,sys;print(json.dumps({'apps':[dict({'name':'app','path':'$T/app','platforms':['ios'],'regions':['US'],'features':[],'readiness':{'a':True}},**json.loads(sys.argv[1]))]}))" "$1" > "$T/fleet.json"; }
 sweep() { python3 "$HERE/fleet-sweep.py" "$T/fleet.json" "$@" > "$T/out.txt" 2>&1; echo $?; }
 has() { grep -q -- "$1" "$T/out.txt"; }
-A='{"attested_by":"Mirza","attested_on":"2026-10-01","evidence":"Age check uses document scan, see docs/age.md"}'
+att() {  # rule-id, then python dict overrides
+  python3 - "$1" "${2:-{\}}" <<'EOF2'
+import json, sys
+a = {"attested_by": "Mirza", "attested_on": "2026-10-01", "evidence": "see docs/review.md", "outcome": "compliant",
+     "revision": 1, "covers": ["owner-1"], "regions": ["US"]}
+a.update(json.loads(sys.argv[2]))
+print(json.dumps({sys.argv[1]: a}))
+EOF2
+}
+MED='"regions":["US"],"features":["medical"]'
+fleet "{$MED}"
+[ "$(sweep)" = 2 ] && has "\[REGISTER\] RR-US-FDA-DEVICE-SOFTWARE needs your attestation, which is missing" && ok || bad "an unattested in-force rule blocks the release"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE)}"
+[ "$(sweep)" = 0 ] && ok || bad "a complete compliant attestation clears the rule"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"outcome":"not_compliant"}')}"
+[ "$(sweep)" = 2 ] && has "only compliant clears" && ok || bad "a negative outcome never clears a rule"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"outcome":null,"approved":false}')}"
+[ "$(sweep)" = 2 ] && has "missing outcome" && ok || bad "an attestation with no outcome is refused"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"revision":0}')}"
+[ "$(sweep)" = 2 ] && has "revision" && ok || bad "an attestation for an old revision is refused"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"evidence":""}')}"
+[ "$(sweep)" = 2 ] && has "missing evidence" && ok || bad "an attestation without evidence is refused"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"attested_on":"2027-01-01"}')}"
+[ "$(sweep)" = 2 ] && has "in the future" && ok || bad "a future-dated attestation is refused"
+fleet "{$MED,\"attestations\":$(att RR-US-FDA-DEVICE-SOFTWARE '{"attested_on":"2025-01-01"}')}"
+[ "$(sweep)" = 2 ] && has "more than a year old" && ok || bad "a stale attestation is refused"
+VN='"regions":["VN"],"features":["social"]'
+fleet "{$VN,\"attestations\":$(att RR-VN-SOCIAL-AUTH '{"regions":["VN"]}')}"
+[ "$(sweep)" = 2 ] && has "does not cover proof items auto-1" && ok || bad "a mixed rule needs its automated check result too"
+fleet "{$VN,\"attestations\":$(att RR-VN-SOCIAL-AUTH '{"regions":["VN"],"covers":["auto-1","owner-2"]}')}"
+[ "$(sweep)" = 0 ] && ok || bad "covering every proof item clears a mixed rule"
+CR='"platforms":["android"],"regions":["DE","FR"],"features":["crypto"]'
+fleet "{$CR,\"attestations\":$(att RR-PLAY-CRYPTO-EU '{"regions":["DE"]}' | python3 -c "import json,sys;a=json.load(sys.stdin);a.update(json.loads('$(att RR-EU-CRA-REPORTING '{"regions":["DE","FR"]}')'));print(json.dumps(a))")}"
+[ "$(sweep)" = 2 ] && has "does not cover FR" && ok || bad "an attestation must cover every country the rule reaches"
 fleet '{"regions":["AU"],"features":["social"]}'
-[ "$(sweep)" = 3 ] && has "RR-AU-SOCIAL-MIN-AGE needs your attestation, which is missing" && ok || bad "an applicable blocking rule without attestation is an owner action"
-fleet "{\"regions\":[\"AU\"],\"features\":[\"social\"],\"attestations\":{\"RR-AU-SOCIAL-MIN-AGE\":$A}}"
-sweep >/dev/null; has "RR-AU-SOCIAL-MIN-AGE" && bad "a valid attestation clears the rule" || ok
-fleet "{\"regions\":[\"AU\"],\"features\":[\"social\"],\"attestations\":{\"RR-AU-SOCIAL-MIN-AGE\":${A/\"evidence\":\"Age check uses document scan, see docs\/age.md\"/\"evidence\":\"\"}}}"
-sweep >/dev/null; has "is missing evidence" && ok || bad "an attestation without evidence is refused"
-fleet "{\"regions\":[\"AU\"],\"features\":[\"social\"],\"attestations\":{\"RR-AU-SOCIAL-MIN-AGE\":${A/2026-10-01/2027-01-01}}}"
-sweep >/dev/null; has "in the future" && ok || bad "a future-dated attestation is refused"
-fleet "{\"regions\":[\"AU\"],\"features\":[\"social\"],\"attestations\":{\"RR-AU-SOCIAL-MIN-AGE\":${A/2026-10-01/2025-01-01}}}"
-sweep >/dev/null; has "more than a year old" && ok || bad "a stale attestation is refused"
+[ "$(sweep)" = 3 ] && has "RR-AU-SOCIAL-MIN-AGE applies but its source is unconfirmed" && ok || bad "a rule with an unverified date is flagged, not blocking"
 fleet '{"regions":["DE"],"features":["subscriptions"]}'
-sweep >/dev/null; has "RR-EU-WITHDRAWAL-FUNCTION applies but its source is unconfirmed" && ok || bad "an unverified rule is flagged, not blocking"
-fleet '{"regions":["AU"],"features":["social"]}'
+sweep >/dev/null; has "RR-EU-WITHDRAWAL-FUNCTION applies but its source is unconfirmed" && ok || bad "an unverified rule is flagged"
+fleet '{"regions":[" us "],"features":["medical"]}'
+[ "$(sweep)" = 2 ] && has "RR-US-FDA-DEVICE-SOFTWARE" && ok || bad "padded lower-case regions are normalised, not dropped"
+fleet '{"regions":["USA"],"features":[]}'
+[ "$(sweep)" = 1 ] && has "two-letter" && ok || bad "a three-letter region is an input error"
+python3 -c "import json;print(json.dumps({'apps':[{'name':'app','path':'$T/app','platforms':['ios'],'features':['medical'],'readiness':{'a':True}}]}))" > "$T/fleet.json"
+[ "$(sweep)" = 1 ] && has "must declare regions" && ok || bad "missing regions is refused"
+python3 -c "import json;print(json.dumps({'apps':[{'name':'app','path':'$T/app','platforms':['ios'],'regions':['US'],'readiness':{'a':True}}]}))" > "$T/fleet.json"
+[ "$(sweep)" = 1 ] && has "must declare features" && ok || bad "missing features is refused"
+python3 -c "import json;print(json.dumps({'apps':[{'name':'app','path':'$T/app','regions':['IN'],'features':['lending'],'readiness':{'a':True}}]}))" > "$T/fleet.json"
+[ "$(sweep)" = 1 ] && has "must declare platforms" && ok || bad "missing platforms is refused"
+fleet '{"regions":["US"],"features":["medical"]}'
 [ "$(sweep --no-register)" = 0 ] && ok || bad "--no-register skips the register"
 [ "$(sweep --register "$T/bad.json")" = 1 ] && has "ruling register is invalid" && ok || bad "an invalid register stops the sweep"
-fleet '{"regions":["AU"],"features":["gaming"]}'
+fleet '{"regions":["US"],"features":["gaming"]}'
 [ "$(sweep)" = 1 ] && has "features must be" && ok || bad "an unknown app feature is an input error"
 fleet '{"regions":["US"],"features":["social"]}'
 [ "$(sweep)" = 0 ] && ok || bad "an app outside every applicable rule stays READY"

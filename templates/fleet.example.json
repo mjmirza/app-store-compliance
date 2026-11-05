@@ -10,6 +10,7 @@
       ],
       "regions": [
         "DE",
+        "AU",
         "US"
       ],
       "readiness": {
@@ -28,6 +29,15 @@
         "RR-AU-APP1-PRIVACY-POLICY": {
           "attested_by": "Your Name",
           "attested_on": "2026-11-01",
+          "outcome": "compliant",
+          "revision": 1,
+          "covers": [
+            "auto-1",
+            "owner-2"
+          ],
+          "regions": [
+            "AU"
+          ],
           "evidence": "Privacy policy reviewed against APP 1, linked in app and listing"
         }
       }

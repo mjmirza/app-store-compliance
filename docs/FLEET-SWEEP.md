@@ -8,7 +8,7 @@ You ship more than one app. Fleet Sweep runs the guard over every one of them an
 - No silent passes. The guard prints a `Coverage.` line before every exit naming what it scanned. A partial scan, a platform you declared but the guard did not find, a timeout, a missing or doubled summary, counts that do not match the findings, or an exit code that contradicts them is `NOT_CHECKED`, never `READY`. A waiver can never turn a partial scan into a pass.
 - Owner actions in the same report. Account and console steps the scan cannot see (agreements, privacy answers, Data Safety, a test on a real device) sit beside the code findings. A step set to `false`, or no readiness list at all, stays open.
 - Waivers that expire and cover one occurrence. A waiver names the app, the finding ID, its severity and its file, so it never hides the same rule firing somewhere new or at a higher severity. It needs a reason, evidence, a reviewer, and an expiry no more than 180 days out. Two waivers for the same occurrence cancel each other. An expired, incomplete, duplicated, or stale waiver is named in the report and the finding returns.
-- The release rules a scan cannot see. Give each app its `regions` and `features`, and every [Ruling Register](RULING-REGISTER.md) requirement that applies and blocks today stays an owner action until you attest to it.
+- The release rules a scan cannot see. Each app declares its `regions` and `features`, and every verified, in-force [Ruling Register](RULING-REGISTER.md) requirement that applies blocks the app until you attest to it.
 - A GitHub code-scanning file. `--scanning-export` writes findings in the SARIF 2.1.0 format GitHub requires, so they show in the Security tab and on pull requests.
 
 ## From install to first verdict
