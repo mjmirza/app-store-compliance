@@ -51,7 +51,7 @@ description: How to avoid common App Store and Google Play rejections. Rejection
 
 **Does the EU AI Act affect my app?** Possibly. Article 50 transparency duties apply from 2 August 2026, and which ones bind you depends on whether you are a provider or a deployer.
 
-More answers in the [Q&A discussions](https://github.com/mjmirza/app-store-compliance/discussions/categories/q-a).
+More answers in the [full question index](questions.md) and the [Q&A discussions](https://github.com/mjmirza/app-store-compliance/discussions/categories/q-a).
 
 ## Run the guard
 
