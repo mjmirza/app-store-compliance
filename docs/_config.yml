@@ -30,3 +30,5 @@ titles_from_headings:
   strip_title: true
 include:
   - llms.txt
+webmaster_verifications:
+  google: dHbguG3JdSMV02JY_ltLOKoI--3cG4dQEEkT2K_AnmA
