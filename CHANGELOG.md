@@ -2,6 +2,11 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Added
+- A GitHub Pages site for the docs. Before, the playbook could only be read on github.com. Now each doc is its own page on mjmirza.github.io/app-store-compliance, with a sitemap, search metadata, structured data and an llms.txt file, so search engines and AI assistants can find and cite it.
+
 ## 2.2.0 (2026-11-05)
 
 This release adds Fleet Sweep, the Waiver Ledger, the Ruling Register and an eval scorecard. Nothing that passed 2.1.0 in the single-app guard is blocked now, so it is a minor version.

@@ -1,0 +1,19 @@
+# App Store Compliance Playbook
+
+> Open playbook and pre-submission guard that stops App Store and Google Play rejections. Maps each common rejection to its guideline and fix, tracks app regulation deadlines, and runs inside AI coding tools.
+
+## Core
+- [Pre-submission checklist](https://mjmirza.github.io/app-store-compliance/PRE-SUBMISSION-CHECKLIST.html): every check before you submit
+- [Apple rejection map](https://mjmirza.github.io/app-store-compliance/APPLE.html): guideline, trigger and fix
+- [Google Play rejection map](https://mjmirza.github.io/app-store-compliance/GOOGLE-PLAY.html): policy, trigger and fix
+- [Root causes and appeal playbook](https://mjmirza.github.io/app-store-compliance/MISTAKE-PATTERNS.html)
+- [Rejection map by app type](https://mjmirza.github.io/app-store-compliance/BY-APP-TYPE.html)
+
+## Law
+- [EU rules 2026](https://mjmirza.github.io/app-store-compliance/EU-REGULATORY-2026.html)
+- [USA and worldwide rules](https://mjmirza.github.io/app-store-compliance/GLOBAL-REGULATORY-2026.html)
+- [Platform mechanics](https://mjmirza.github.io/app-store-compliance/PLATFORM-MECHANICS-2026.html)
+
+## Data
+- [Rejection patterns JSON](https://github.com/mjmirza/app-store-compliance/blob/main/data/rejection-patterns.json)
+- [Regulatory deadlines JSON](https://github.com/mjmirza/app-store-compliance/blob/main/data/regulatory-deadlines.json)
