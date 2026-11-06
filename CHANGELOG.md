@@ -4,6 +4,9 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Fixed
+- Landing page accuracy. It said every third-party SDK needs a signed privacy manifest, that Stripe can never sell digital goods, that both stores need deletion fully inside the app, and that every AI feature triggers the EU AI Act. Each now states the actual rule and its scope.
+
 ### Added
 - A GitHub Pages site for the docs. Before, the playbook could only be read on github.com. Now each doc is its own page on mjmirza.github.io/app-store-compliance, with a sitemap, search metadata, structured data and an llms.txt file, so search engines and AI assistants can find and cite it.
 
