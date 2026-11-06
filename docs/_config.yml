@@ -1,0 +1,32 @@
+title: App Store Compliance Playbook
+description: >-
+  Stop App Store and Google Play rejections. An open playbook and pre-submission guard with
+  117 rejection patterns and fixes, privacy manifest and Data safety checks, and 95 tracked
+  app regulation deadlines across 28 jurisdictions.
+url: https://mjmirza.github.io
+baseurl: /app-store-compliance
+lang: en
+theme: jekyll-theme-primer
+author: Mirza Iqbal
+github_username: mjmirza
+twitter:
+  username: MirzaJhanzaib
+social:
+  name: Mirza Iqbal
+  links:
+    - https://github.com/mjmirza
+    - https://twitter.com/MirzaJhanzaib
+    - https://next8n.com
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+relative_links:
+  enabled: true
+  collections: false
+titles_from_headings:
+  strip_title: true
+include:
+  - llms.txt
