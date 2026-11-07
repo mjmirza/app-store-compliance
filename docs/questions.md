@@ -5,9 +5,9 @@ description: Every answered question, fix recipe, guide and deadline from the Ap
 
 # App Store and Google Play compliance questions
 
-An index of 1276 answered discussions on App Store and Google Play rejections, privacy manifests, Data safety, payments, account deletion and regulatory deadlines. Each link opens the full answer on GitHub.
+An index of 1278 answered discussions on App Store and Google Play rejections, privacy manifests, Data safety, payments, account deletion and regulatory deadlines. Each link opens the full answer on GitHub.
 
-## Questions and answers (686)
+## Questions and answers (688)
 
 - [AI and generative apps apps on the App Store and Google Play. What do reviewers expect for 'A consent modal naming the AI provider and the data types before any personal data is sent to a third party AI'?](https://github.com/mjmirza/app-store-compliance/discussions/2165)
 - [AI and generative apps apps on the App Store and Google Play. What do reviewers expect for 'A reviewer demo account needs a high or unlimited quota so the feature can be exercised'?](https://github.com/mjmirza/app-store-compliance/discussions/2170)
@@ -385,6 +385,7 @@ An index of 1276 answered discussions on App Store and Google Play rejections, p
 - [How do I stop 'Sensitive tokens or credentials stored in insecure unencrypted formats' from reaching App Store and Google Play review again?](https://github.com/mjmirza/app-store-compliance/discussions/1885)
 - [How do I stop 'Setting non-essential cookies without prior cookie consent' from reaching app store review again?](https://github.com/mjmirza/app-store-compliance/discussions/1880)
 - [How do I stop 'Sign in with Apple UX violation' from reaching App Store review again?](https://github.com/mjmirza/app-store-compliance/discussions/1837)
+- [How do I stop 'Sign in with Apple relay addresses on private.icloud.com rejected by email validation' from reaching App Store review again?](https://github.com/mjmirza/app-store-compliance/discussions/2298)
 - [How do I stop 'Sign-in state not restored on a new device' from reaching Google Play review again?](https://github.com/mjmirza/app-store-compliance/discussions/1925)
 - [How do I stop 'Social media capability not declared before submission' from reaching App Store review again?](https://github.com/mjmirza/app-store-compliance/discussions/1910)
 - [How do I stop 'Structured personal data stored in IndexedDB without security controls' from reaching app store review again?](https://github.com/mjmirza/app-store-compliance/discussions/1883)
@@ -562,6 +563,7 @@ An index of 1276 answered discussions on App Store and Google Play rejections, p
 - [What gets apps rejected under Google Play 'Payments policy', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1981)
 - [What gets apps rejected under Google Play 'Payments', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1975)
 - [What gets apps rejected under Google Play 'Permissions and APIs', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1936)
+- [What gets apps rejected under Google Play 'Photo and Video Permissions', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/2299)
 - [What gets apps rejected under Google Play 'Play Console technical quality requirements, Zero-Tap Sign-In', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1994)
 - [What gets apps rejected under Google Play 'Play Console technical quality requirements, Zero-Tap Sign-In', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1995)
 - [What gets apps rejected under Google Play 'Store Listing and Promotion', and how do I avoid it?](https://github.com/mjmirza/app-store-compliance/discussions/1974)

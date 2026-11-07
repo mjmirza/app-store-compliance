@@ -25,6 +25,7 @@ description: How to avoid common App Store and Google Play rejections. Rejection
 
 ## Laws and deadlines
 
+- [Accessibility for App Store and Google Play apps](ACCESSIBILITY.md). Nutrition Labels, TalkBack and VoiceOver, ADA Title II, the static scan.
 - [EU rules for apps in 2026](EU-REGULATORY-2026.md). EU AI Act, Digital Services Act trader status, European Accessibility Act, DMA.
 - [USA and worldwide rules](GLOBAL-REGULATORY-2026.md). COPPA, state app store accountability acts, UK, Australia, Brazil and more.
 - [Regulatory timeline](REGULATORY-TIMELINE.md) and [ruling register](RULING-REGISTER.md).
