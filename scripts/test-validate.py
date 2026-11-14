@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Tests the deadline rules in validate.py (#660): a passed deadline needs an
-owner, and the effective, mandatory, and enforcement dates must be in order."""
+"""Tests the deadline rules in validate.py (#660, #661): a passed deadline needs an
+owner, the effective, mandatory, and enforcement dates must be in order, and every
+entry names its source and the day it was last read."""
 
 import json
 import os
@@ -31,6 +32,8 @@ def entry(**over):
         "enforcement_date": day(100),
         "affected_repository_sections": "docs/APPLE.md",
         "priority": "high",
+        "source_url": "https://example.org/act",
+        "verified_on": day(-1),
     }
     base.update(over)
     return base
@@ -158,6 +161,57 @@ class TestVersionsAgree(unittest.TestCase):
             rc, out = self.run_with(f.read())
         self.assertEqual(rc, 0, out)
 
+
+
+class TestSourceProvenance(unittest.TestCase):
+    def strip(self, key):
+        e = entry()
+        del e[key]
+        return e
+
+    def test_missing_source_url_fails(self):
+        rc, out = run(self.strip("source_url"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("source_url", out)
+
+    def test_missing_verified_on_fails(self):
+        rc, out = run(self.strip("verified_on"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("verified_on", out)
+
+    def test_source_url_must_be_web_address(self):
+        rc, out = run(entry(source_url="docs/APPLE.md"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("not a web address", out)
+
+    def test_bad_verified_on_format_fails(self):
+        rc, out = run(entry(verified_on="14 Nov 2026"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("verified_on", out)
+
+    def test_future_verified_on_fails(self):
+        rc, out = run(entry(verified_on=day(3)))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("in the future", out)
+
+    def test_stale_source_warns_but_passes(self):
+        rc, out = run(entry(verified_on=day(-181)))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Re-read", out)
+
+    def test_source_read_exactly_180_days_ago_is_quiet(self):
+        rc, out = run(entry(verified_on=day(-180)))
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("Re-read", out)
+
+    def test_empty_source_note_fails(self):
+        rc, out = run(entry(source_note="  "))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("source_note", out)
+
+    def test_source_note_is_optional(self):
+        rc, out = run(entry())
+        self.assertEqual(rc, 0, out)
 
 if __name__ == "__main__":
     unittest.main()

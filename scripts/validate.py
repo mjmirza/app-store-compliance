@@ -16,6 +16,8 @@ DEADLINES = os.environ.get(
 )
 # a passed deadline with no absorbed_into is a warning for this many days, then an error
 PASSED_GRACE_DAYS = 7
+# a source read longer ago than this is flagged for a re-read (#661)
+SOURCE_STALE_DAYS = 180
 
 REQUIRED_PATTERN = [
     "id",
@@ -40,6 +42,8 @@ REQUIRED_DEADLINE = [
     "enforcement_date",
     "affected_repository_sections",
     "priority",
+    "source_url",
+    "verified_on",
 ]
 
 errors = []
@@ -72,6 +76,28 @@ def validate_section_paths(d, did):
     for path in SECTION_PATH.findall(str(d.get("affected_repository_sections") or "")):
         if not os.path.exists(os.path.join(ROOT, path)):
             errors.append(f"deadline '{did}' points at {path}, which does not exist")
+
+
+def validate_provenance(d, did, today):
+    """Every deadline names its source and the day it was last read (#661)."""
+    url = str(d.get("source_url") or "").strip()
+    if url and not url.startswith(("https://", "http://")):
+        errors.append(f"deadline '{did}' has source_url '{url}', which is not a web address")
+    note = d.get("source_note")
+    if note is not None and not str(note).strip():
+        errors.append(f"deadline '{did}' has an empty source_note. Remove it or say what was read")
+    raw = d.get("verified_on")
+    if raw is None:
+        return
+    seen = parse_day(raw)
+    if not seen:
+        errors.append(f"deadline '{did}' has invalid verified_on '{raw}', must be YYYY-MM-DD format")
+    elif seen > today:
+        errors.append(f"deadline '{did}' has verified_on {seen} in the future")
+    elif (today - seen).days > SOURCE_STALE_DAYS:
+        warnings.append(
+            f"deadline '{did}' source was last read {(today - seen).days} days ago on {seen}. Re-read {url}"
+        )
 
 
 def validate_deadline_dates(d, did, today):
@@ -191,9 +217,9 @@ def main():
                         val = d.get(date_field)
                         if val and val != "none":
                             validate_date(val, date_field, did)
-                    validate_deadline_dates(
-                        d, did, datetime.datetime.now(datetime.timezone.utc).date()
-                    )
+                    today = datetime.datetime.now(datetime.timezone.utc).date()
+                    validate_deadline_dates(d, did, today)
+                    validate_provenance(d, did, today)
         except Exception as e:
             errors.append(f"Failed to parse regulatory-deadlines.json: {e}")
 

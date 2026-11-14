@@ -5,9 +5,11 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 ## Unreleased
 
 ### Fixed
+- The India DPDP rule 4 Consent Manager deadline (13 November 2026) is absorbed, and section 3.6 cites the Gazette copy MeitY hosts instead of a mirror.
 - Landing page accuracy. It said every third-party SDK needs a signed privacy manifest, that Stripe can never sell digital goods, that both stores need deletion fully inside the app, and that every AI feature triggers the EU AI Act. Each now states the actual rule and its scope.
 
 ### Added
+- Every regulatory deadline now names its source and the day it was last read. Before, a reader followed two hops from the entry to a doc section to find the source, and nothing could tell a fresh entry from a stale one. Now each of the 95 entries carries `source_url` and `verified_on`, plus `source_note` on the 27 read through a mirror, an archive, a secondary summary, or the Publications Office CELLAR record. 92 sources were fetched and confirmed on 14 November 2026. The two Ofcom pages refuse scripted reads and keep the date they were last read in a browser. `scripts/validate.py` fails an entry missing either field and warns after 180 days, and `scripts/verify-citations.py` already sweeps the new URLs.
 - A GitHub Pages site for the docs. Before, the playbook could only be read on github.com. Now each doc is its own page on mjmirza.github.io/app-store-compliance, with a sitemap, search metadata, structured data and an llms.txt file, so search engines and AI assistants can find and cite it.
 
 ## 2.2.0 (2026-11-05)

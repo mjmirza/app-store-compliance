@@ -14,7 +14,10 @@
       "enforcement_date": "2025-02-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32024R1689."
     },
     {
       "id": "EU-AI-ACT-ART-5",
@@ -27,7 +30,10 @@
       "enforcement_date": "2025-02-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.4, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32024R1689."
     },
     {
       "id": "EU-AI-ACT-ART-50",
@@ -40,7 +46,10 @@
       "enforcement_date": "2026-08-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.2, references/guidelines/by-app-type/ai-and-generative-apps.md",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32024R1689."
     },
     {
       "id": "EU-AI-ACT-GPAI",
@@ -53,7 +62,10 @@
       "enforcement_date": "2025-08-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, section 1.6",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.1, section 1.6"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.1, section 1.6",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32024R1689."
     },
     {
       "id": "EU-AI-ACT-HIGH-RISK-ANNEX-III",
@@ -65,7 +77,10 @@
       "mandatory_date": "2027-12-02",
       "enforcement_date": "2027-12-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force",
+      "verified_on": "2026-11-14",
+      "source_note": "Commission notice of the AI omnibus amendment. The consolidated amended text was not read."
     },
     {
       "id": "EU-AI-ACT-HIGH-RISK-ANNEX-I",
@@ -77,7 +92,10 @@
       "mandatory_date": "2028-08-02",
       "enforcement_date": "2028-08-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force",
+      "verified_on": "2026-11-14",
+      "source_note": "Commission notice of the AI omnibus amendment. The consolidated amended text was not read."
     },
     {
       "id": "EU-DMA-EXTERNAL-PURCHASE",
@@ -90,7 +108,9 @@
       "enforcement_date": "2024-03-07",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 2",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 2"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 2",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/news/commission-finds-apple-and-meta-breach-digital-markets-act",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-DSA-TRADER-STATUS",
@@ -103,7 +123,9 @@
       "enforcement_date": "2025-02-17",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 3, references/rules/metadata.md",
+      "source_url": "https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-EAA-ACCESSIBILITY",
@@ -116,7 +138,10 @@
       "enforcement_date": "2025-06-28",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 4, references/rules/design.md",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 4, references/rules/design.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 4, references/rules/design.md",
+      "source_url": "https://eur-lex.europa.eu/eli/dir/2019/882/oj",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32019L0882."
     },
     {
       "id": "EU-DATA-ACT-CORE",
@@ -129,7 +154,10 @@
       "enforcement_date": "2025-09-12",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
       "priority": "medium",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202302854",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023R2854."
     },
     {
       "id": "EU-DATA-ACT-DESIGN",
@@ -142,7 +170,10 @@
       "enforcement_date": "2026-09-12",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
       "priority": "medium",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202302854",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023R2854."
     },
     {
       "id": "EU-CRA-REPORTING",
@@ -155,7 +186,9 @@
       "enforcement_date": "2026-09-11",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
       "priority": "medium",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-CRA-MAIN",
@@ -167,7 +200,9 @@
       "mandatory_date": "2027-12-11",
       "enforcement_date": "2027-12-11",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-COPPA-AMENDED",
@@ -180,7 +215,9 @@
       "enforcement_date": "2026-04-22",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md",
+      "source_url": "https://www.ftc.gov/news-events/news/press-releases/2025/01/ftc-finalizes-changes-childrens-privacy-rule-limiting-companies-ability-monetize-kids-data",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-FTC-HEALTH-BREACH",
@@ -193,7 +230,9 @@
       "enforcement_date": "2024-06-25",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/guidelines/by-app-type/health-fitness-and-medical.md",
+      "source_url": "https://www.ftc.gov/news-events/news/press-releases/2024/04/ftc-finalizes-changes-health-breach-notification-rule",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-TX-ASAA",
@@ -206,7 +245,10 @@
       "enforcement_date": "2026-06-04",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md",
+      "source_url": "https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary comparison by the Future of Privacy Forum. The enrolled Texas bill was not read."
     },
     {
       "id": "US-UT-ASAA",
@@ -218,7 +260,9 @@
       "mandatory_date": "2027-05-06",
       "enforcement_date": "2027-05-06",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://le.utah.gov/Session/2026/bills/enrolled/HB0498.pdf",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-LA-ASAA",
@@ -230,7 +274,10 @@
       "mandatory_date": "2027-07-01",
       "enforcement_date": "2027-07-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 1, section 2.2, references/rules/privacy.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary comparison by the Future of Privacy Forum. The enrolled Louisiana Act was not read."
     },
     {
       "id": "US-AL-ASAA",
@@ -242,7 +289,10 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.2, references/rules/privacy.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary comparison by the Future of Privacy Forum. The enrolled Alabama bill was not read."
     },
     {
       "id": "US-CA-CPRA",
@@ -255,7 +305,9 @@
       "enforcement_date": "2026-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md",
+      "source_url": "https://cppa.ca.gov/regulations/ccpa_updates.html",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-IL-BIPA",
@@ -268,7 +320,10 @@
       "enforcement_date": "2008-06-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/privacy.md",
+      "source_url": "https://www.recordinglaw.com/us-laws/data-privacy-laws/bipa/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary summary. The statute on ilga.gov was not read."
     },
     {
       "id": "UK-OSA-CHILD-SAFETY",
@@ -281,7 +336,10 @@
       "enforcement_date": "2025-07-25",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/safety.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/safety.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/safety.md",
+      "source_url": "https://www.ofcom.org.uk/online-safety/protecting-children/age-checks-to-protect-children-online",
+      "verified_on": "2026-07-13",
+      "source_note": "Ofcom serves a browser challenge to scripted reads. This date is when the citation was added after a headed browser read, re-read it at the next sweep."
     },
     {
       "id": "UK-ICO-CHILDREN-CODE",
@@ -294,7 +352,9 @@
       "enforcement_date": "2021-09-02",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md",
+      "source_url": "https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/introduction-to-the-childrens-code/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "AU-SOCIAL-MEDIA-MIN-AGE",
@@ -307,7 +367,9 @@
       "enforcement_date": "2025-12-10",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md",
+      "source_url": "https://www.esafety.gov.au/about-us/industry-regulation/social-media-age-restrictions",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "BR-DIGITAL-ECA",
@@ -320,7 +382,10 @@
       "enforcement_date": "2026-03-17",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md",
+      "source_url": "https://inplp.com/latest-news/article/the-digital-eca-brazils-new-age-verification-framework-and-enforcement-timeline/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary source. The primary instrument was not read."
     },
     {
       "id": "KR-TELECOM-BUSINESS-ACT",
@@ -333,7 +398,9 @@
       "enforcement_date": "2022-03-15",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/payments.md",
+      "source_url": "https://developer.apple.com/support/storekit-external-entitlement-kr/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "IN-DPDPA-RULES",
@@ -345,7 +412,9 @@
       "mandatory_date": "2027-05-13",
       "enforcement_date": "2027-05-13",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/guidelines/by-app-type/kids-category-and-families.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.meity.gov.in/static/uploads/2025/11/53450e6e5dc0bfa85ebd78686cadad39.pdf",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "SG-IMDA-ONLINE-SAFETY",
@@ -358,7 +427,10 @@
       "enforcement_date": "2026-04-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.7, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.7, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.7, references/rules/privacy.md",
+      "source_url": "https://www.twobirds.com/en/insights/2026/singapore/app-stores-in-singapore-required-to-implement-age-assurance-measures",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary source. The primary instrument was not read."
     },
     {
       "id": "CN-MOBILE-APP-FILING",
@@ -371,7 +443,10 @@
       "enforcement_date": "2024-03-31",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.9, references/rules/metadata.md",
+      "source_url": "https://appinchina.co/blog/the-complete-guide-to-chinas-mobile-app-filing/",
+      "verified_on": "2026-11-14",
+      "source_note": "Secondary guide. The MIIT notice was not read."
     },
     {
       "id": "APPLE-AGE-RATING-QUESTIONNAIRE",
@@ -384,7 +459,9 @@
       "enforcement_date": "2026-01-31",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 6, references/rules/metadata.md",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 6, references/rules/metadata.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 6, references/rules/metadata.md",
+      "source_url": "https://developer.apple.com/news/?id=ey6d8onl",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-XCODE-26-SDK-REQ",
@@ -397,7 +474,9 @@
       "enforcement_date": "2026-04-28",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 6, docs/PLATFORM-MECHANICS-2026.md section 1.6",
+      "source_url": "https://developer.apple.com/visionos/submit/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-SDK-27-REQ",
@@ -409,7 +488,9 @@
       "mandatory_date": "2027-04-01",
       "enforcement_date": "2027-04-01",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.6, docs/APPLE.md 2026 changes, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://developer.apple.com/news/?id=k1mtkt1k",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-IPHONE-DUO-SCREENSHOTS-REQ",
@@ -421,7 +502,9 @@
       "mandatory_date": "2027-04-01",
       "enforcement_date": "2027-04-01",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://developer.apple.com/news/?id=kkphp5qo",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-18-PLUS-BLOCK",
@@ -434,7 +517,9 @@
       "enforcement_date": "2026-02-24",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 1, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 1, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 1, references/rules/privacy.md",
+      "source_url": "https://developer.apple.com/news/?id=f5zj08ey",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-BILLING-V8",
@@ -447,7 +532,9 @@
       "enforcement_date": "2026-08-31",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md",
       "priority": "critical",
-      "absorbed_into": "GOOGLE-PLAY-BILLING-V8-REQUIRED"
+      "absorbed_into": "GOOGLE-PLAY-BILLING-V8-REQUIRED",
+      "source_url": "https://developer.android.com/google/play/billing/deprecation-faq",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-TARGET-API-35",
@@ -460,7 +547,9 @@
       "enforcement_date": "2025-08-31",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md",
       "priority": "critical",
-      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md"
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md",
+      "source_url": "https://developer.android.com/google/play/requirements/target-sdk",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-TARGET-API-36",
@@ -473,7 +562,9 @@
       "enforcement_date": "2026-08-31",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.5, references/rules/android.md",
       "priority": "high",
-      "absorbed_into": "GOOGLE-TARGET-API"
+      "absorbed_into": "GOOGLE-TARGET-API",
+      "source_url": "https://developer.android.com/google/play/requirements/target-sdk",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "ANDROID-DEVELOPER-VERIFICATION",
@@ -486,7 +577,9 @@
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
       "priority": "critical",
-      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md"
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
+      "source_url": "https://android-developers.googleblog.com/2026/06/android-developer-verification.html",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-PHOTO-VIDEO-PERM",
@@ -499,7 +592,9 @@
       "enforcement_date": "2025-05-28",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.9, references/rules/android.md",
       "priority": "critical",
-      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.9, references/rules/android.md"
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.9, references/rules/android.md",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/14115180?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-CHILD-SAFETY",
@@ -512,7 +607,9 @@
       "enforcement_date": "2025-03-19",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md",
       "priority": "critical",
-      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md"
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 3.2, references/rules/android.md",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/14747720?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-E-EVIDENCE-REGULATION",
@@ -525,7 +622,10 @@
       "enforcement_date": "2026-08-18",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2023/1543/oj",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023R1543."
     },
     {
       "id": "EU-WITHDRAWAL-BUTTON-DIRECTIVE",
@@ -538,7 +638,10 @@
       "enforcement_date": "2026-06-19",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md",
       "priority": "high",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 5, references/rules/payments.md",
+      "source_url": "https://eur-lex.europa.eu/eli/dir/2023/2673/oj",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023L2673."
     },
     {
       "id": "EU-GPSR-SAFETY",
@@ -551,7 +654,10 @@
       "enforcement_date": "2024-12-13",
       "affected_repository_sections": "docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md",
       "priority": "high",
-      "absorbed_into": "docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md"
+      "absorbed_into": "docs/REGULATORY-GAP-REPORT-2026.md section 1, references/rules/safety.md",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2023/988/oj",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023R0988."
     },
     {
       "id": "GOOGLE-PLAY-CHARGEBACK-COST-SHIFT",
@@ -564,7 +670,9 @@
       "enforcement_date": "2026-08-03",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md Payments rows, references/rules/payments.md",
       "priority": "high",
-      "absorbed_into": "GOOGLE-PLAY-CHARGEBACK-LIABILITY"
+      "absorbed_into": "GOOGLE-PLAY-CHARGEBACK-LIABILITY",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17068375",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-ORG-REGISTRATION-REGULATED-CATEGORIES",
@@ -577,7 +685,9 @@
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md",
       "priority": "critical",
-      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md"
+      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/10788890?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-APP-PACKAGE-REGISTRATION",
@@ -590,7 +700,9 @@
       "enforcement_date": "2026-09-30",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2",
       "priority": "critical",
-      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2"
+      "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17134731",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-US-ALT-BILLING-FEE-REPORTING",
@@ -603,7 +715,9 @@
       "enforcement_date": "2026-10-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.3, docs/GOOGLE-PLAY.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.3, docs/GOOGLE-PLAY.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.3, docs/GOOGLE-PLAY.md",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/16497028?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-CATALOG-ACCESS-DEFAULT",
@@ -616,7 +730,9 @@
       "enforcement_date": "2026-07-22",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds",
       "priority": "high",
-      "absorbed_into": "GOOGLE-PLAY-APP-REGISTRATION-MISSING"
+      "absorbed_into": "GOOGLE-PLAY-APP-REGISTRATION-MISSING",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17117200?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-CONTACTS-LOCATION-FGS-API37",
@@ -628,7 +744,9 @@
       "mandatory_date": "2027-01-27",
       "enforcement_date": "2027-01-27",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/16909972?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-TECH-QUALITY-FEB-2027",
@@ -640,7 +758,9 @@
       "mandatory_date": "2027-02-01",
       "enforcement_date": "2027-02-01",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/performance.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17492799?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-RESTORE-CREDENTIALS-APR-2027",
@@ -652,7 +772,9 @@
       "mandatory_date": "2027-04-01",
       "enforcement_date": "2027-04-01",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/design.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17492799?hl=en",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-ANON-CHAT-CHILD-SAFETY-2026",
@@ -665,7 +787,9 @@
       "enforcement_date": "2026-08-26",
       "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/safety.md",
       "priority": "critical",
-      "absorbed_into": "GOOGLE-ANON-CHAT-MINOR-BLOCK"
+      "absorbed_into": "GOOGLE-ANON-CHAT-MINOR-BLOCK",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17036597",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-SOCIAL-MEDIA-DECLARATION-GATE",
@@ -678,7 +802,9 @@
       "enforcement_date": "2026-09-01",
       "affected_repository_sections": "docs/APPLE.md Section 2 and the 2026 changes list, references/rules/metadata.md",
       "priority": "critical",
-      "absorbed_into": "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION"
+      "absorbed_into": "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION",
+      "source_url": "https://developer.apple.com/news/?id=0d2gpmml",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-DMA-UNIFIED-TERMS-2026",
@@ -691,7 +817,9 @@
       "enforcement_date": "2026-10-01",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 2.3",
       "priority": "critical",
-      "absorbed_into": "docs/EU-REGULATORY-2026.md section 2.3, docs/APPLE.md 2026 changes you must act on"
+      "absorbed_into": "docs/EU-REGULATORY-2026.md section 2.3, docs/APPLE.md 2026 changes you must act on",
+      "source_url": "https://developer.apple.com/news/?id=gmws0jgp",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-ADPLA-ATTACHMENT-12-BRAZIL",
@@ -704,7 +832,9 @@
       "enforcement_date": "2026-07-06",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.3",
       "priority": "critical",
-      "absorbed_into": "APPLE-ENROLLMENT-VERIFICATION-PENDING, docs/GLOBAL-REGULATORY-2026.md section 3.3"
+      "absorbed_into": "APPLE-ENROLLMENT-VERIFICATION-PENDING, docs/GLOBAL-REGULATORY-2026.md section 3.3",
+      "source_url": "https://developer.apple.com/news/?id=dhwadr2x",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-REGION-AGE-RATINGS-AU-VN-2026",
@@ -717,7 +847,9 @@
       "enforcement_date": "2026-06-18",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md sections 3.2 and 3.10",
       "priority": "high",
-      "absorbed_into": "APPLE-2.3-AGE-RATING-2026, docs/GLOBAL-REGULATORY-2026.md section 3.2 and 3.10"
+      "absorbed_into": "APPLE-2.3-AGE-RATING-2026, docs/GLOBAL-REGULATORY-2026.md section 3.2 and 3.10",
+      "source_url": "https://developer.apple.com/news/?id=yrrb45pw",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "GOOGLE-PLAY-BILLING-V8-EXISTING-2027",
@@ -729,7 +861,9 @@
       "mandatory_date": "2027-08-31",
       "enforcement_date": "2027-11-01",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.4, references/rules/payments.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://developer.android.com/google/play/billing/deprecation-faq",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-ADA-TITLE-II-WCAG-2027",
@@ -741,7 +875,9 @@
       "mandatory_date": "2027-04-26",
       "enforcement_date": "2027-04-26",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.8, references/rules/design.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2026-04-20/html/2026-07663.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-ADA-TITLE-II-WCAG-2028",
@@ -753,7 +889,9 @@
       "mandatory_date": "2028-04-26",
       "enforcement_date": "2028-04-26",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.8, references/rules/design.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2026-04-20/html/2026-07663.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-HHS-504-WCAG-2027",
@@ -765,7 +903,9 @@
       "mandatory_date": "2027-05-11",
       "enforcement_date": "2027-05-11",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.8, references/guidelines/by-app-type/health-fitness-and-medical.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2026-05-11/html/2026-09266.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-HHS-504-WCAG-2028",
@@ -777,7 +917,9 @@
       "mandatory_date": "2028-05-10",
       "enforcement_date": "2028-05-10",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.8, references/guidelines/by-app-type/health-fitness-and-medical.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://www.govinfo.gov/content/pkg/FR-2026-05-11/html/2026-09266.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-FTC-COPPA-AGE-VERIFICATION-POLICY",
@@ -790,7 +932,9 @@
       "enforcement_date": "2026-02-25",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.1, references/guidelines/by-app-type/kids-category-and-families.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.1"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.1",
+      "source_url": "https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "UK-DUAA-COMPLAINTS-PROCESS-2026",
@@ -803,7 +947,9 @@
       "enforcement_date": "2026-06-19",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md",
       "priority": "medium",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1",
+      "source_url": "https://www.legislation.gov.uk/uksi/2026/82/made",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "UK-ICO-STORAGE-ACCESS-GUIDANCE-2026",
@@ -816,7 +962,9 @@
       "enforcement_date": "2026-04-29",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/privacy.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.1",
+      "source_url": "https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/2026/04/final-storage-and-access-technologies-guidance-published/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "UK-DMCCA-SUBSCRIPTIONS-2027",
@@ -828,7 +976,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/rules/payments.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.gov.uk/government/news/pm-starts-roll-out-of-everyday-fixes-on-the-cost-of-living-ending-rip-off-discounts-and-subscription-traps",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "UK-OSA-APP-STORES-REPORT-2027",
@@ -840,7 +990,10 @@
       "mandatory_date": "2027-01-31",
       "enforcement_date": "2027-01-31",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://www.ofcom.org.uk/online-safety/illegal-and-harmful-content/roadmap-to-regulation",
+      "verified_on": "2026-09-05",
+      "source_note": "Ofcom serves a browser challenge to scripted reads. This date is when the citation was added after a headed browser read, re-read it at the next sweep."
     },
     {
       "id": "UK-UNDER16-SOCIAL-MEDIA-2027",
@@ -852,7 +1005,9 @@
       "mandatory_date": "2027-03-01",
       "enforcement_date": "2027-03-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.1, references/guidelines/by-app-type/social-and-user-generated-content.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://www.gov.uk/government/collections/growing-up-in-the-online-world",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-AI-ACT-MARKING-RETROFIT-2026",
@@ -864,7 +1019,10 @@
       "mandatory_date": "2026-12-02",
       "enforcement_date": "2026-12-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force",
+      "verified_on": "2026-11-14",
+      "source_note": "Commission notice of the AI omnibus amendment. The consolidated amended text was not read."
     },
     {
       "id": "EU-PRODUCT-LIABILITY-SOFTWARE-2026",
@@ -876,7 +1034,9 @@
       "mandatory_date": "2026-12-09",
       "enforcement_date": "2026-12-09",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/safety.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202402853",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "EU-DATA-ACT-SWITCHING-2027",
@@ -888,7 +1048,10 @@
       "mandatory_date": "2027-01-12",
       "enforcement_date": "2027-01-12",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202302854",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32023R2854."
     },
     {
       "id": "EU-EIDAS-WALLET-ACCEPTANCE-2027",
@@ -900,7 +1063,10 @@
       "mandatory_date": "2027-12-24",
       "enforcement_date": "2027-12-24",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/privacy.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02014R0910-20241018",
+      "verified_on": "2026-11-14",
+      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 02014R0910-20241018."
     },
     {
       "id": "EU-CSAM-EPRIVACY-DEROGATION-EXPIRY-2028",
@@ -912,7 +1078,9 @@
       "mandatory_date": "2028-04-03",
       "enforcement_date": "2028-04-03",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 5, references/rules/safety.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202601881",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "KR-PIPA-AMENDMENT-2026",
@@ -925,7 +1093,9 @@
       "enforcement_date": "2026-09-11",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
+      "source_url": "https://law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010102&lsId=011357",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "CN-AI-COMPANION-MINORS-2026",
@@ -938,7 +1108,9 @@
       "enforcement_date": "2026-07-15",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.9, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.9"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.9",
+      "source_url": "https://www.cac.gov.cn/2026-04/10/c_1777558395078289.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "SG-OSRAA-COMMENCEMENT-2026",
@@ -951,7 +1123,9 @@
       "enforcement_date": "2026-06-29",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.7",
       "priority": "high",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.7"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.7",
+      "source_url": "https://www.mddi.gov.sg/newsroom/online-safety-commission-and-online-safety--relief-and-accountability--act-2025-to-start-on-29-june-2026/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "IN-DPDPA-CONSENT-MANAGERS-2026",
@@ -964,7 +1138,9 @@
       "enforcement_date": "2026-11-13",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/rules/privacy.md",
       "priority": "medium",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/rules/privacy.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/rules/privacy.md",
+      "source_url": "https://www.meity.gov.in/static/uploads/2025/11/53450e6e5dc0bfa85ebd78686cadad39.pdf",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "JP-APPI-AMENDMENT-2028",
@@ -976,7 +1152,9 @@
       "mandatory_date": "2028-07-16",
       "enforcement_date": "2028-07-16",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.8, references/rules/privacy.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.ppc.go.jp/personalinfo/legal/r8kaiseihogohou/",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "AU-ADS-CODE-AGE-ASSURANCE-2026",
@@ -989,7 +1167,10 @@
       "enforcement_date": "2026-09-09",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/safety.md",
+      "source_url": "https://web.archive.org/web/2026/https://www.esafety.gov.au/industry/codes",
+      "verified_on": "2026-11-14",
+      "source_note": "Wayback Machine capture of the eSafety codes register. The live register was not read."
     },
     {
       "id": "AU-PRIVACY-ADM-DISCLOSURE-2026",
@@ -1001,7 +1182,9 @@
       "mandatory_date": "2026-12-10",
       "enforcement_date": "2026-12-10",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/rules/privacy.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "AU-CHILDRENS-ONLINE-PRIVACY-CODE-2026",
@@ -1013,7 +1196,9 @@
       "mandatory_date": "2026-12-10",
       "enforcement_date": "2026-12-10",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.2, references/guidelines/by-app-type/kids-category-and-families.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.oaic.gov.au/privacy/australian-privacy-principles/australian-privacy-principles-guidelines",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "BR-DECRETO-12880-AGE-SIGNALS-2026",
@@ -1026,7 +1211,9 @@
       "enforcement_date": "2026-03-18",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.3"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.3",
+      "source_url": "https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2026/decreto/D12880.htm",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "BR-ANPD-ECA-ENFORCEMENT-2027",
@@ -1038,7 +1225,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.3, references/rules/privacy.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://www.gov.br/anpd/pt-br/assuntos/eca-digital",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-TAKE-IT-DOWN-ACT-2026",
@@ -1051,7 +1240,9 @@
       "enforcement_date": "2026-05-19",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.6, references/rules/safety.md",
       "priority": "critical",
-      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6"
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 2.6",
+      "source_url": "https://www.ftc.gov/business-guidance/blog/2026/05/take-it-down-act-enforcement-starts-now-what-know-about-ftc-tida",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CA-AB1043-AGE-SIGNAL-2027",
@@ -1063,7 +1254,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1043",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CA-SB976-ADDICTIVE-FEEDS-2027",
@@ -1075,7 +1268,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-and-user-generated-content.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://oag.ca.gov/sb976",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CA-AB56-WARNING-LABEL-2027",
@@ -1087,7 +1282,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/guidelines/by-app-type/social-and-user-generated-content.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB56",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CA-CPPA-ADMT-2027",
@@ -1099,7 +1296,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.4, references/rules/privacy.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://cppa.ca.gov/regulations/ccpa_updates.html",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CA-SB243-COMPANION-CHATBOT-2027",
@@ -1111,7 +1310,9 @@
       "mandatory_date": "2027-07-01",
       "enforcement_date": "2027-07-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB243",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-NY-SAFE-FOR-KIDS-2027",
@@ -1123,7 +1324,10 @@
       "mandatory_date": "2027-01-25",
       "enforcement_date": "2027-01-25",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/social-and-user-generated-content.md",
-      "priority": "critical"
+      "priority": "critical",
+      "source_url": "https://ag.ny.gov/",
+      "verified_on": "2026-11-14",
+      "source_note": "Attorney General home page. The deep link to the final rules was not recorded."
     },
     {
       "id": "US-VT-AADC-2027",
@@ -1135,7 +1339,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/kids-category-and-families.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://ago.vermont.gov/vermont-age-appropriate-design-code-rulemaking",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-WA-HB2225-COMPANION-CHATBOT-2027",
@@ -1147,7 +1353,9 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "priority": "high"
+      "priority": "high",
+      "source_url": "https://app.leg.wa.gov/billsummary?BillNumber=2225&Year=2026",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-CO-SB26-051-AGE-SIGNAL-2028",
@@ -1159,7 +1367,9 @@
       "mandatory_date": "2028-07-01",
       "enforcement_date": "2028-07-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/rules/privacy.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://leg.colorado.gov/bills/sb26-051",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "US-OK-SB546-PRIVACY-2027",
@@ -1171,7 +1381,10 @@
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.5, references/rules/privacy.md",
-      "priority": "medium"
+      "priority": "medium",
+      "source_url": "https://okhouse.gov/posts/news-20260323_2",
+      "verified_on": "2026-11-14",
+      "source_note": "Oklahoma House press release. The enrolled bill was not read."
     },
     {
       "id": "APPLE-IPHONE-DUO-LAUNCH",
@@ -1184,7 +1397,9 @@
       "enforcement_date": "2026-10-23",
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific, docs/GAP-ANALYSIS-2026-09.md open items",
       "priority": "high",
-      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific"
+      "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 1.8, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific",
+      "source_url": "https://developer.apple.com/news/?id=kkphp5qo",
+      "verified_on": "2026-11-14"
     },
     {
       "id": "APPLE-MULTISEAT-VOLUME-PURCHASING",
@@ -1197,7 +1412,9 @@
       "enforcement_date": "2026-10-22",
       "affected_repository_sections": "docs/APPLE.md 2026 changes you must act on",
       "priority": "medium",
-      "absorbed_into": "docs/APPLE.md 2026 changes you must act on"
+      "absorbed_into": "docs/APPLE.md 2026 changes you must act on",
+      "source_url": "https://developer.apple.com/news/?id=likeohx4",
+      "verified_on": "2026-11-14"
     }
   ]
 }
