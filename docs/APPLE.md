@@ -107,10 +107,13 @@ About one in four submissions is rejected. A large share fail on privacy and sta
 
 ## 2026 changes you must act on
 
-Verified against Apple's own pages on 30 September 2026, and the guideline revision below on 17 October 2026.
+Verified against Apple's own pages on 30 September 2026, the guideline revision below on 17 October 2026, and the November items on 14 November 2026.
 
 - App Review Guidelines revised 16 October 2026. 1.2 now names social media, user-generated content platforms, and AI content creation apps, and warns of a Developer Code of Conduct violation for missing safeguards or unremediated violations. New 2.3.14 covers creative assets. New 2.5.19 takes hidden, dormant, and undocumented features out of 2.3.1 and names bait-and-switch. 3.1.1(a) folds the Music Streaming Services Entitlement into the StoreKit External Purchase Link bullet. Section 5 removes apps that facilitate human trafficking or child exploitation and blocks them from alternative distribution. [Apple](https://developer.apple.com/news/?id=92th7e5i), [Apple](https://developer.apple.com/news/?id=vvzx6cul)
 
+- New age rating descriptors, 2 November 2026. From 16 November 2026 the questionnaire asks about Shared Location and Dating and Relationships, every app must answer both by 12 January 2027, and Dating and Relationships sets a minimum 18+ rating. [Apple](https://developer.apple.com/news/?id=yxkh08us)
+- Developer Program License Agreement updated 13 October 2026. Sign in to accept. It changes the security requirements (3.2), adds terms for the Live Assistance API and the App Replacement Entitlement, and covers Volume Purchasing subscriptions and tax data reporting. [Apple](https://developer.apple.com/news/?id=17mwd36z)
+- Taiwan. The standard commission on iOS and iPadOS drops from 30 to 26 percent from 31 October 2026, with no signature needed to receive it. [Apple](https://developer.apple.com/news/?id=w9mxlhek)
 - Social media capability declaration is a submission gate since September 2026 (minimum 13+, Declared Age Range for under-13). [Apple](https://developer.apple.com/news/?id=0d2gpmml)
 - Age assurance needs the iOS 26.2 SDK with Xcode 26.2 (17C52) or later, and RESCIND_CONSENT must be handled. [Apple](https://developer.apple.com/support/age-assurance)
 - Sign in with Apple relay addresses now also arrive from private.icloud.com. [Apple](https://developer.apple.com/news/?id=1ptvdtcm)

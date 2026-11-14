@@ -110,12 +110,16 @@ New personal developer accounts created after the policy change must run a close
 
 Most Google rejections are not about a forbidden feature. They are about a mismatch between what the app does and what the developer declared. The Data Safety form says no data is collected while an analytics SDK ships location. The listing promises a feature the app does not have. A permission is requested with no matching core feature. Close every one of these gaps by auditing actual runtime behavior, including every third party SDK, against every declaration before you submit.
 
-## 2026 policy rounds you must act on (verified 5 September 2026)
+## 2026 policy rounds you must act on (verified 5 September 2026, updated 14 November 2026)
 
 Google restructured the Developer Program Policy on 26 August 2026 into one consolidated document with a standalone AI-generated content and blockchain section. Re-anchor policy links to the new pages. Every item below was read on Google's own page.
 
 | Deadline | Change | What to do | Source |
 |---|---|---|---|
+| 1 December 2026 | Developers selling into or out of Japan must complete the payments authorization form in Play Console, or payments are held globally (announced 29 October 2026) | Complete the authorization form | [Policy announcement, 29 October 2026](https://support.google.com/googleplay/android-developer/answer/18100766) |
+| 27 January 2027 | Subscriptions with ongoing eligibility-based discounts, such as student plans, disclose eligibility criteria, the verification process, and post-eligibility pricing | Add the three disclosures to the offer | [Play Policy Deadlines](https://support.google.com/googleplay/android-developer/table/12921780) |
+| 14 April 2027 | New AppFunctions API policy. AppFunctions must not deceive or manipulate AI agents, bypass security controls, or interfere with other apps | Review every exposed AppFunction | [Play Policy Deadlines](https://support.google.com/googleplay/android-developer/table/12921780) |
+| 25 August 2027 | Local Network and Manage Contacts permissions restricted to core functionality, each with a Play Console declaration (Local Network for apps targeting API 37+) | File the declarations or move to pickers and scoped intents | [Play Policy Deadlines](https://support.google.com/googleplay/android-developer/table/12921780) |
 | 30 September 2026 | Organization account required for financial products, health apps, VpnService apps, and government apps, with a D-U-N-S number matching the Dun and Bradstreet profile | Migrate the app to an organization account through the official Transfer ownership workflow (7-day cool-down) | [Play Console requirements](https://support.google.com/googleplay/android-developer/answer/10788890?hl=en), [preview](https://support.google.com/googleplay/android-developer/answer/17125096?hl=en) |
 | 30 September 2026 | Register every Play app package name in Play Console for Android developer verification. Global, separate from the Brazil, Indonesia, Singapore, Thailand sideloading leg. Non-registration risks global removal | Complete developer verification and register each distributed applicationId | [Policy announcement, 15 July 2026](https://support.google.com/googleplay/android-developer/answer/17134731) |
 | 1 October 2026 | US alternative billing and external links. transaction and download reporting plus the Play service fee begin | Wire reporting before the date if enrolled | [US alternative billing](https://support.google.com/googleplay/android-developer/answer/16497028?hl=en) |

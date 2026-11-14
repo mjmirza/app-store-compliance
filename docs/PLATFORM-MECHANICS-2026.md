@@ -8,6 +8,7 @@ This document covers the platform-mechanics and newer-policy gaps that sit along
 
 An app distributed with a Developer ID (not through the Mac App Store) must be notarized or Gatekeeper blocks it. The four steps. build with every executable and dylib signed. sign with a Developer ID certificate plus a secure timestamp and the hardened runtime. submit with `xcrun notarytool` and wait for the ticket. staple with `xcrun stapler`. A bare executable cannot be notarized. it is wrapped in a ZIP, DMG, or PKG container first.
 
+- The original Developer ID Certification Authority expires on 1 February 2027 and certificates it issued stop working that day. Create a replacement from the Developer ID Certification Authority (G2) and re-sign installer packages before then. [Apple](https://developer.apple.com/news/?id=w4atic4c)
 - Hardened runtime is a notarization prerequisite (enable the capability and declare the needed entitlements).
 - The signing form is `codesign --options runtime --timestamp -s "Developer ID Application: NAME (TEAMID)" <App>` (the `--options runtime` flag is the hardened runtime, `--timestamp` is the secure timestamp).
 - Submit `xcrun notarytool submit <container> --apple-id ... --team-id TEAMID --password <app-specific-password> --wait`, then `xcrun stapler staple <App>`.
