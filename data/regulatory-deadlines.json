@@ -963,7 +963,8 @@
       "mandatory_date": "2026-11-13",
       "enforcement_date": "2026-11-13",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/rules/privacy.md",
-      "priority": "medium"
+      "priority": "medium",
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.6, references/rules/privacy.md"
     },
     {
       "id": "JP-APPI-AMENDMENT-2028",
