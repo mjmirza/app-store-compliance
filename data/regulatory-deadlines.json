@@ -578,7 +578,7 @@
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
       "priority": "critical",
       "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
-      "source_url": "https://android-developers.googleblog.com/2026/06/android-developer-verification.html",
+      "source_url": "https://developer.android.com/developer-verification",
       "verified_on": "2026-11-14"
     },
     {
@@ -970,7 +970,7 @@
       "id": "UK-DMCCA-SUBSCRIPTIONS-2027",
       "jurisdiction": "United Kingdom (UK)",
       "law": "Digital Markets, Competition and Consumers Act 2024, Part 4 Chapter 2 subscription contracts regime",
-      "requirement": "Auto-renewing subscription apps sold to UK consumers need pre-contract information, renewal reminders, two cooling-off periods, an easy cancellation path, and the new refund rules. Government announced on 9 August 2026 that the regime commences in January 2027 (exact day not yet published), superseding the earlier spring 2027 estimate.",
+      "requirement": "Auto-renewing subscription apps sold to UK consumers need pre-contract information, renewal reminders, two cooling-off periods, an easy cancellation path, and the new refund rules. Government announced on 9 August 2026 that the regime commences in January 2027 (exact day not yet published), superseding the earlier spring 2027 estimate. The draft commencement instrument, The Consumer Subscription Contracts (Cancellation and Information) Regulations 2026, states 1 January 2027 but had not been made on 14 November 2026, so the day stays provisional until it is.",
       "effective_date": "2027-01-01",
       "grace_period": "none",
       "mandatory_date": "2027-01-01",
@@ -1098,6 +1098,21 @@
       "verified_on": "2026-11-14"
     },
     {
+      "id": "KR-PIPA-MANDATORY-CERTIFICATION-2027",
+      "jurisdiction": "South Korea",
+      "law": "Personal Information Protection Act, Act No. 21445 (10 March 2026), Article 32-2(1) proviso and Article 75(2)(15)",
+      "requirement": "From 1 July 2027 a personal information handler that meets the threshold set by Presidential Decree, by revenue and the scale of personal information processed, must hold the Personal Information Protection Commission's privacy certification, and failing to obtain it carries an administrative fine. The decree threshold had not been published on 14 November 2026, so check whether your Korean operation falls under it once it is.",
+      "effective_date": "2027-07-01",
+      "grace_period": "none",
+      "mandatory_date": "2027-07-01",
+      "enforcement_date": "2027-07-01",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
+      "priority": "medium",
+      "source_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283839&efYd=20270701",
+      "verified_on": "2026-11-14",
+      "source_note": "law.go.kr loads the statute body by script. The 1 July 2027 text and Supplementary Provisions Article 1 were read from its body endpoint for the same lsiSeq."
+    },
+    {
       "id": "CN-AI-COMPANION-MINORS-2026",
       "jurisdiction": "China",
       "law": "Interim Measures for AI Anthropomorphic Interactive Services, CAC Order No. 21",
@@ -1145,8 +1160,8 @@
     {
       "id": "JP-APPI-AMENDMENT-2028",
       "jurisdiction": "Japan",
-      "law": "Act on the Protection of Personal Information amendment, promulgated 17 July 2026 (Act No. 56 of 2026, number from secondary sources)",
-      "requirement": "Rebuild consent, children's data, and biometric handling for the amended APPI, including a new under-16 threshold where the legal representative is the party for consent, notice, and use-stop requests, plus a surcharge regime. Effective within two years of promulgation, exact day set by cabinet order.",
+      "law": "Act on the Protection of Personal Information amendment, promulgated 17 July 2026 (Act No. 56 of 2026, number from secondary sources), Act No. 56 of 2026 (令和8年法律第56号)",
+      "requirement": "Rebuild consent, children's data, and biometric handling for the amended APPI, including a new under-16 threshold where the legal representative is the party for consent, notice, and use-stop requests, plus a surcharge regime. Effective within two years of promulgation, exact day set by cabinet order. The amended penal provisions (Articles 176 and 178 to 186) apply from the day six months after promulgation under Supplementary Provisions Article 1 item 3, which is 17 January 2027 by calculation since the law states no calendar day. The surcharge regime waits for a Cabinet Order within two years of promulgation.",
       "effective_date": "2028-07-16",
       "grace_period": "none",
       "mandatory_date": "2028-07-16",

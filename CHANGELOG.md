@@ -5,6 +5,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 ## Unreleased
 
 ### Fixed
+- Unverified dates from the September sweep re-read against primary sources. Korea's mandatory privacy certification (1 July 2027, PIPA Article 32-2(1) proviso) is a new deadline. The Japan APPI amendment now carries its law number and the penal-provision start. The UK subscription regime cites its draft commencement regulations. Android developer verification cites developer.android.com, where Google keeps the rollout current. Items that still have no published day keep their first-of-month placeholder.
 - The India DPDP rule 4 Consent Manager deadline (13 November 2026) is absorbed, and section 3.6 cites the Gazette copy MeitY hosts instead of a mirror.
 - Landing page accuracy. It said every third-party SDK needs a signed privacy manifest, that Stripe can never sell digital goods, that both stores need deletion fully inside the app, and that every AI feature triggers the EU AI Act. Each now states the actual rule and its scope.
 
