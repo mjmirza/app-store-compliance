@@ -2,7 +2,9 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
-## Unreleased
+## 2.3.0 (2026-11-15)
+
+This release adds source provenance to every regulatory deadline, ten new deadlines (six from the November sweep, three from its Asia-Pacific follow-up, and Korea's privacy certification from the September re-read), and a GitHub Pages site. A deadline entry now needs `source_url` and `verified_on` to validate, which changes the data schema but blocks nothing in the guard, so it is a minor version.
 
 ### Fixed
 - Unverified dates from the September sweep re-read against primary sources. Korea's mandatory privacy certification (1 July 2027, PIPA Article 32-2(1) proviso) is a new deadline. The Japan APPI amendment now carries its law number and the penal-provision start. The UK subscription regime cites its draft commencement regulations. Android developer verification cites developer.android.com, where Google keeps the rollout current. Items that still have no published day keep their first-of-month placeholder.
