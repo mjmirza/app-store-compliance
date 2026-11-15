@@ -3255,6 +3255,11 @@ gs_check "abi-13 a removed 64-bit ABI no longer counts" "$D" 'ANDROID-64BIT-ABI-
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 17.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 12.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13-8 a framework target below 13 beside an iOS 17 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+# Round 8 attack regression. abiFilters.remove() and .clear() remove ABIs.
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("armeabi-v7a", "arm64-v8a")\n abiFilters.remove("arm64-v8a")\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

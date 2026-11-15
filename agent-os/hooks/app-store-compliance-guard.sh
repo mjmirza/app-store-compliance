@@ -1320,7 +1320,10 @@ def groups(text):
             if "debug" not in stack:
                 stmt = text[i:end]
                 bucket = found.setdefault(tuple(stack), set())
-                if stmt[len("abiFilters"):].lstrip().startswith("-="):
+                rest = stmt[len("abiFilters"):].lstrip()
+                if rest.startswith(".clear"):
+                    bucket.clear()
+                elif rest.startswith(("-=", ".remove")):
                     bucket.difference_update(ABI_RE.findall(stmt))
                 else:
                     bucket.update(ABI_RE.findall(stmt))
