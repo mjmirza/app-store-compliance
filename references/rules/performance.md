@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-30 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+34 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -91,6 +91,22 @@ grep -rn 'processData\|personalData\|submitForm\|registerWeb\|webForm' --include
 - Severity. critical
 - What triggers it. The binary carries functionality App Review cannot see or that the user is not told about, such as a server flag that turns on a different app after approval, a secret gesture or menu, or code obfuscated to hide a feature. Guideline 2.5.19, added 16 October 2026, moves this policy out of 2.3.1 and names bait-and-switch (misrepresenting functionality during review, then adding features after approval). Checked by hand, a remote flag alone is not a violation.
 - How to fix it. Ship every feature visible to review, describe each one in Notes for Review, keep remote configuration to tuning and staged rollout of reviewed features, and never obfuscate code to hide functionality. A violation is grounds for removal from the App Store and termination of the developer account. Sources. https://developer.apple.com/news/?id=92th7e5i, https://developer.apple.com/news/?id=vvzx6cul
+
+## ANDROID-DEBUGGABLE-RELEASE
+
+- Title. Debuggable build uploaded to Play
+- Platform. google
+- Guideline or policy. Play Console upload validation
+- Severity. critical
+- What triggers it. Play Console refuses an APK or app bundle marked debuggable. Hardcoding android:debuggable="true" in the manifest ships it in the release build.
+- How to fix it. Remove android:debuggable from the manifest and let the release build type keep it false.
+- Detection signals. android:debuggable="true"
+
+How to detect.
+
+```bash
+grep -rnE "android:debuggable *= *[\"']true" --include='AndroidManifest.xml' . | grep -vE '/src/(debug|test|androidTest)'
+```
 
 ## APPLE-2.1-DEBUG-FEATURES
 
@@ -336,7 +352,7 @@ grep -rn 'ActivityKit\|Activity\.request\|LiveActivity' {S} .   # then review ev
 - Platform. apple
 - Guideline or policy. On-Demand Resources deprecation (WWDC26 App Store guide)
 - Severity. high
-- What triggers it. Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets.
+- What triggers it. Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets. From early 2027 App Store Connect will no longer accept uploads containing On-Demand Resources from new apps or apps that have never used this feature (release notes, 12 November 2026).
 - How to fix it. Migrate tagged resources to the Background Assets framework before the iOS 27 family becomes the submission floor.
 - Detection signals. NSBundleResourceRequest, OnDemandResources, on-demand-resource
 - Present means handled. BackgroundAssets, BAManagedDownloader
@@ -378,6 +394,23 @@ How to detect.
 
 ```bash
 echo 'manual. open developer.apple.com/account, confirm Membership is Active, every agreement and attachment is accepted, and no migration is pending, at least six weeks before the first submission'
+```
+
+## APPLE-MIN-DEPLOYMENT-TARGET-IOS13
+
+- Title. iOS deployment target below iOS 13
+- Platform. apple
+- Guideline or policy. App Store Connect upload requirement (Upcoming Requirements)
+- Severity. high
+- What triggers it. Apple's Upcoming Requirements page states that iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later. An IPHONEOS_DEPLOYMENT_TARGET or Podfile platform below 13 is refused at upload. A dependency or test target below 13 does not block the upload on its own, so the guard reports this as high rather than blocking.
+- How to fix it. Raise the deployment target to iOS 13.0 or later in the project, the app target and the Podfile.
+- Detection signals. IPHONEOS_DEPLOYMENT_TARGET = 12, platform :ios, '12
+- Present means handled. IPHONEOS_DEPLOYMENT_TARGET = 13, IPHONEOS_DEPLOYMENT_TARGET = 1[4-9]
+
+How to detect.
+
+```bash
+grep -rnE 'IPHONEOS_DEPLOYMENT_TARGET *= *"?(8|9|10|11|12)[.;]|platform :ios, .(8|9|10|11|12)[.\x27]' --include='*.pbxproj' --include='*.xcconfig' --include='Podfile' .
 ```
 
 ## APPLE-ACCESSIBILITY-COLORCONTRAST
@@ -474,4 +507,37 @@ How to detect.
 
 ```bash
 python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+```
+
+## APPLE-2.5.5-IPV4-ONLY-NETWORKING
+
+- Title. IPv4-only networking fails on the IPv6-only review network
+- Platform. apple
+- Guideline or policy. 2.5.5
+- Severity. medium
+- What triggers it. App Review tests on an IPv6-only NAT64 network. Code that resolves or connects with inet_addr, inet_aton or gethostbyname works on IPv4 and fails during review, so the app looks broken (2.5.5, apps must be fully functional on IPv6-only networks).
+- How to fix it. Use getaddrinfo, Network.framework or URLSession, avoid hardcoded IPv4 literals, and test on a NAT64 network created with Mac Internet Sharing.
+- Detection signals. inet_addr(, inet_aton(, gethostbyname(
+- Present means handled. getaddrinfo, NWConnection, URLSession
+
+How to detect.
+
+```bash
+grep -rnE '(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' --include='*.swift' --include='*.m' --include='*.mm' --include='*.c' --include='*.h' .
+```
+
+## APPLE-5.1.3-HEALTH-DATA-ICLOUD
+
+- Title. Health data may reach iCloud
+- Platform. apple
+- Guideline or policy. 5.1.3(ii)
+- Severity. medium
+- What triggers it. Guideline 5.1.3(ii) bars storing personal health information in iCloud. An app that reads HealthKit and also writes to CloudKit, NSUbiquitousKeyValueStore or an NSPersistentCloudKitContainer needs a check that no health data takes that path.
+- How to fix it. Keep HealthKit and other health data on device or in a backend you control, and exclude it from any CloudKit or iCloud key-value sync.
+- Detection signals. HKHealthStore, CKContainer, NSUbiquitousKeyValueStore, NSPersistentCloudKitContainer
+
+How to detect.
+
+```bash
+grep -rqE 'HKHealthStore' --include='*.swift' --include='*.m' . && grep -rnE 'CKContainer|CKDatabase|NSUbiquitousKeyValueStore|NSPersistentCloudKitContainer' --include='*.swift' --include='*.m' .
 ```

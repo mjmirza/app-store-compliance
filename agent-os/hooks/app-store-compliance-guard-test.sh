@@ -3127,6 +3127,139 @@ for op in '+' '-' '*' '>' '<' '%'; do
   ! rr_has 'NO-ACCOUNT-DELETION' && ok "r26 a regex literal after $op never hides a deletion" || bad "r26 a regex literal after $op never hides a deletion (rc=$RC)"
   rm -rf "$D"
 done
+# App Store Connect CLIs that upload or submit for review (Helm, asc, Codemagic CLI tools).
+D="$(mk_ios_bad)"
+n=0
+for c in 'helm-asc apps 123 builds upload --platform iOS --file a.ipa --submit' '/Applications/Helm.app/Contents/Helpers/helm-asc apps 1 builds upload --file a.ipa' 'helm-asc apps 1 versions 2 --submit' 'asc builds upload --file a.ipa' 'asc submissions create --app 1' 'app-store-connect publish --path a.ipa'; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "2" ] && ok "asc-$n blocked. $c" || bad "asc-$n blocked. $c (rc=$RC)"
+done
+for c in 'helm-asc apps list' 'helm-asc apps 1 builds list' 'asc apps list' 'brew install asc' 'echo "helm-asc builds upload"' 'app-store-connect fetch-signing-files com.x'; do
+  n=$((n+1)); RC="$(hook_rc "$c" "$D")"
+  [ "$RC" = "0" ] && ok "asc-$n silent. $c" || bad "asc-$n silent. $c (rc=$RC)"
+done
+rm -rf "$D"
+# Gap sweep 2026-11-15. iOS 13 floor, IPv6 (2.5.5), HealthKit and iCloud (5.1.3), debuggable, specialUse, 64-bit ABI.
+gs_ios() {  # $1 extra file name relative to App, $2 its content
+  local d; d="$(mk_rr_ios '' 'let ready = true')"
+  printf '%s\n' "$2" > "$d/App/$1"
+  echo "$d"
+}
+gs_check() {  # $1 label, $2 dir, $3 id, $4 expect present (1) or absent (0)
+  rr_run "$2"
+  if [ "$4" = "1" ]; then
+    rr_has "$3" && ok "gs $1" || bad "gs $1 (rc=$RC)"
+  else
+    ! rr_has "$3" && ok "gs $1" || bad "gs $1 (rc=$RC)"
+  fi
+  rm -rf "$2"
+}
+mkdir_proj() {  # one app build configuration carrying $2
+  mkdir -p "$1/App.xcodeproj"
+  printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\t%s\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t\tname = Release;\n\t\t};\n}\n' "$2" > "$1/App.xcodeproj/project.pbxproj"
+}
+
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 12.0;'
+gs_check "ios13-1 a 12.0 deployment target is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; printf "platform :ios, '11.0'\n" > "$D/Podfile"
+gs_check "ios13-2 a Podfile platform 11.0 is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 13.0;'
+gs_check "ios13-3 a 13.0 target stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 17.0;'
+gs_check "ios13-4 a 17.0 target stays silent (no 1x prefix match)" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+
+D="$(gs_ios Net.m 'in_addr_t a = inet_addr("10.0.0.1");')"
+gs_check "ipv6-1 inet_addr is flagged" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1
+D="$(gs_ios Net.swift 'let r = getaddrinfo(host, nil, &hints, &res)')"
+gs_check "ipv6-2 getaddrinfo stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
+D="$(gs_ios Net.swift 'let my_inet_addr_label = "x"')"
+gs_check "ipv6-3 a word containing inet_addr without a call stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
+
+D="$(gs_ios H.swift 'let s = HKHealthStore()
+let c = CKContainer.default()')"
+gs_check "health-1 HealthKit plus CloudKit is flagged" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 1
+D="$(gs_ios H.swift 'let s = HKHealthStore()')"
+gs_check "health-2 HealthKit alone stays silent" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 0
+
+D="$(mk_android_perm '<application android:debuggable="true"/>')"
+gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1
+D="$(mk_android_perm '<application android:debuggable="false"/>')"
+gs_check "dbg-2 debuggable false stays silent" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 0
+
+D="$(mk_android_perm '<application><service android:name=".S" android:foregroundServiceType="specialUse"/></application>')"
+gs_check "fgs-1 specialUse without the subtype property is flagged" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".S" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="sync"/></service></application>')"
+gs_check "fgs-2 specialUse with the subtype property stays silent" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 0
+
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n defaultConfig { ndk { abiFilters 'armeabi-v7a' } } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-1 armeabi-v7a only is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n defaultConfig { ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' } } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-2 armeabi-v7a with arm64-v8a stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+D="$(gs_ios Net.c 'int a = inet_addr("1.2.3.4");')"
+gs_check "ipv6-4 a C source is scanned" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 12.0\n' > "$D/Config/Base.xcconfig"
+gs_check "ios13-5 an xcconfig 12.0 target is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+# Round 2 attack regressions (gap sweep 2026-11-15).
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = 12.0\n' > "$D/Config/Base.xcconfig"
+gs_check "ios13-6 an sdk-qualified xcconfig 12.0 target is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 12.0 // minimum\n' > "$D/Config/Base.xcconfig"
+gs_check "ios13-7 a commented xcconfig 12.0 target is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/ThirdParty/curl"; printf 'int a = inet_addr("1.2.3.4");\n' > "$D/ThirdParty/curl/x.c"
+gs_check "ipv6-5 vendored C under ThirdParty stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/ThirdParty/curl"; printf '/* signIn via OAuth bearer, createAccount */\nint CRYPTO_THREAD_ID;\n' > "$D/ThirdParty/curl/oauth2.c"
+gs_check "vendor-1 vendored C never raises the account deletion finding" "$D" 'NO-ACCOUNT-DELETION' 0
+D="$(mk_android_perm "<application android:debuggable='true'/>")"
+gs_check "dbg-3 single-quoted debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1
+D="$(mk_android_perm '')"; mkdir -p "$D/android/app/src/debug"; printf '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:debuggable="true"/></manifest>' > "$D/android/app/src/debug/AndroidManifest.xml"
+gs_check "dbg-4 a debug-only manifest stays silent" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 0
+D="$(mk_android_perm '<application><service android:name=".A" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="sync"/></service><service android:name=".B" android:foregroundServiceType="dataSync|specialUse"/></application>')"
+gs_check "fgs-3 a second specialUse service without its own property is flagged" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".A" tools:foregroundServiceType="specialUse"/></application>')"
+gs_check "fgs-4 a tools: override stays silent" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 0
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n buildTypes { debug { ndk { abiFilters 'arm64-v8a' } }\n release { ndk { abiFilters 'armeabi-v7a' } } } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-3 a debug arm64 filter never hides a 32-bit only release filter" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk { abiFilters += listOf("x86") } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-4 an x86 only Kotlin DSL filter is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk { abiFilters += listOf("x86", "x86_64") } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-5 x86 with x86_64 stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+# Round 3 attack regressions (gap sweep 2026-11-15).
+D="$(mk_android_perm "<application><service android:name='.S' android:foregroundServiceType='specialUse'/></application>")"
+gs_check "fgs-5 single-quoted specialUse without a property is flagged" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf(\n "armeabi-v7a"\n )\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-6 a multi-line 32-bit only setOf is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("armeabi-v7a",\n "arm64-v8a")\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-7 a pair split across lines stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n defaultConfig { ndk { abiFilters 'armeabi-v7a' // TODO add 'arm64-v8a'\n } } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-8 a comment naming arm64-v8a never hides a 32-bit only filter" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# Round 4 attack regressions (gap sweep 2026-11-15). Parsed, not pattern matched.
+D="$(mk_android_perm '<!-- android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE --><application><service android:name=".A" android:foregroundServiceType="specialUse"/></application>')"
+gs_check "fgs-6 a property named only in a comment never satisfies the check" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".A" android:foregroundServiceType="specialUse"/><service android:name=".B"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="x"/></service></application>')"
+gs_check "fgs-7 another service's property never satisfies the check" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".A" android:foregroundServiceType=
+"specialUse"/></application>')"
+gs_check "fgs-8 an attribute value on the next line is still read" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk 36\n defaultConfig { ndk { abiFilters "armeabi-v7a" /* TODO "arm64-v8a" */ } } }\n' > "$D/android/app/build.gradle"
+gs_check "abi-9 a block comment naming arm64-v8a never hides a 32-bit only filter" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk 36\n defaultConfig { ndk {\n /* abiFilters "armeabi-v7a" */\n abiFilters "arm64-v8a" } } }\n' > "$D/android/app/build.gradle"
+gs_check "abi-10 a commented-out filter stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += "armeabi-v7a"\n abiFilters += "arm64-v8a"\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-11 consecutive += statements in one block are merged" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+# Round 5 attack regression. getByName blocks keep their own scope.
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n buildTypes {\n getByName('release') { ndk { abiFilters 'armeabi-v7a' } }\n getByName('benchmark') { ndk { abiFilters 'arm64-v8a' } }\n } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-12 another build type's 64-bit ABI never hides release" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# Round 6 attack regression. abiFilters -= removes an ABI.
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += "armeabi-v7a"\n abiFilters += "arm64-v8a"\n abiFilters -= "arm64-v8a"\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-13 a removed 64-bit ABI no longer counts" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# Round 7 attack regression. a framework target below 13 beside an iOS 17 app stays silent.
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 17.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 12.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-8 a framework target below 13 beside an iOS 17 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+# Round 8 attack regression. abiFilters.remove() and .clear() remove ABIs.
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("armeabi-v7a", "arm64-v8a")\n abiFilters.remove("arm64-v8a")\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

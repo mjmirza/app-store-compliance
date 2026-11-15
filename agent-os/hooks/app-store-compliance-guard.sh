@@ -221,7 +221,7 @@ ta
 s/(fastlane)[[:space:]]+--?[A-Za-z][A-Za-z0-9_-]*/\1/
 ta'; }
   CMD_MATCH="$(fl_norm "$CMD_MATCH")"
-  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build'
+  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build|helm-asc[^;&|]*([[:space:]]builds?[[:space:]]+upload|--submit|[[:space:]]submissions?[[:space:]]+(create|submit)|[[:space:]]review-submissions?)|(^|[[:space:]/])asc[[:space:]]+(builds?[[:space:]]+upload|submissions?[[:space:]]+(create|submit)|review-submissions?)|app-store-connect[[:space:]]+publish'
   UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
   # A custom fastlane lane submits when a word in its name says so, when its Fastfile block calls an
   # upload action, or when the lane is a variable the guard cannot read (scanned, never assumed safe).
@@ -892,6 +892,86 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
+  # A Podfile has no extension, so it is outside the source list. Read it directly.
+  podfile_below_ios13() {
+    find "$DIR" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules \) -prune \) -o -name Podfile -type f -print 2>/dev/null \
+      | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep -q hit
+  }
+  # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
+  pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local pf
+    pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
+    [ -n "$pf" ] || return 1
+    printf '%s\n' "$pf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PBXPY'
+import re
+import sys
+
+BLOCK_RE = re.compile(
+    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
+)
+DT_RE = re.compile(
+    r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+)
+DEPENDENCY_MARKERS = (
+    "SKIP_INSTALL = YES",
+    "DYLIB_INSTALL_NAME_BASE",
+    "TEST_HOST",
+    "BUNDLE_LOADER",
+    "MACH_O_TYPE",
+    "TEST_TARGET_NAME",
+)
+
+
+def below(settings):
+    return [int(v) < 13 for v in DT_RE.findall(settings)]
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    app, project = [], []
+    for settings in BLOCK_RE.findall(text):
+        flags = below(settings)
+        if not flags:
+            continue
+        if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
+            if not any(marker in settings for marker in DEPENDENCY_MARKERS):
+                app.extend(flags)
+        else:
+            project.extend(flags)
+    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
+    if (app and any(app)) or (not app and any(project)):
+        sys.exit(0)
+sys.exit(1)
+PBXPY
+)" 2>/dev/null
+  }
+  xcconfig_below_ios13() {
+    [ -s "$FILELIST" ] || return 1
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep -q .
+  }
+  if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
+    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
+  fi
+  # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
+  # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.
+  native_ipv4_only() {
+    find "$DIR" -maxdepth 8 \( -type d \( -name Pods -o -name node_modules -o -name vendor -o -name Vendor -o -name ThirdParty -o -name third_party -o -name external -o -name External -o -name Carthage -o -name build -o -name .git \) -prune \) \
+      -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.mm' \) -print 2>/dev/null | head -2000 \
+      | tr '\n' '\0' | xargs -0 grep -EIls -e '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' 2>/dev/null | grep -q .
+  }
+  if native_ipv4_only || grep_has '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('; then
+    finding medium "APPLE-2.5.5-IPV4-ONLY-NETWORKING" "IPv4-only socket API in use" "Replace inet_addr, inet_aton and gethostbyname with getaddrinfo or Network.framework, and test on an IPv6-only NAT64 network (Mac Internet Sharing, Create NAT64 Network)." src '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('
+  fi
+  # 5.1.3(ii). personal health information may not be stored in iCloud.
+  if grep_has 'HKHealthStore' && grep_has 'NSUbiquitousKeyValueStore|CKContainer|CKDatabase|NSPersistentCloudKitContainer|cloudKitContainerOptions'; then
+    finding medium "APPLE-5.1.3-HEALTH-DATA-ICLOUD" "HealthKit and iCloud storage in the same app" "Confirm no HealthKit or other health data is written to iCloud, CloudKit or iCloud key-value storage (5.1.3(ii)). Keep health data on device or in a compliant backend you control." src 'NSUbiquitousKeyValueStore|CKContainer|CKDatabase|NSPersistentCloudKitContainer|cloudKitContainerOptions'
+  fi
   # Since September 2026 the social media capability question gates every submission (Apple news 0d2gpmml).
   if grep_has 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'; then
     finding medium "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION" "Social features detected, confirm the social media capability declaration in App Store Connect" "Answer the social media question before submitting. it sets a 13+ minimum and requires Declared Age Range for under-13 users." src 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'
@@ -1115,6 +1195,161 @@ if [ "$IS_AND" -eq 1 ]; then
     if ! grep_has 'assetlinks.json'; then
       finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." src 'android:scheme'
     fi
+  fi
+  # Play Console refuses a debuggable APK or app bundle.
+  release_manifest_debuggable() {
+    [ -s "$FILELIST" ] || return 1
+    grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/' | tr '\n' '\0' \
+      | xargs -0 grep -EIls -e "android:debuggable[[:space:]]*=[[:space:]]*[\"']true[\"']" 2>/dev/null | grep -q .
+  }
+  if release_manifest_debuggable; then
+    finding critical "ANDROID-DEBUGGABLE-RELEASE" "android:debuggable is true in the manifest" "Remove android:debuggable from the manifest and let the build type set it. Play Console rejects a debuggable APK or app bundle." manifest 'android:debuggable'
+  fi
+  # A specialUse foreground service needs its subtype property and a Play Console declaration.
+  special_use_undeclared() {  # XML parse per service, so comments and other services never count
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local mf
+    mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
+    [ -n "$mf" ] || return 1
+    printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'FGSPY'
+import sys
+import xml.etree.ElementTree as ET
+
+A = "{http://schemas.android.com/apk/res/android}"
+SUBTYPE = "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+for path in sys.argv[1:]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        continue
+    for svc in root.iter("service"):
+        types = svc.get(A + "foregroundServiceType", "")
+        if "specialUse" not in [t.strip() for t in types.split("|")]:
+            continue
+        if not any(p.get(A + "name") == SUBTYPE for p in svc.iter("property")):
+            sys.exit(0)
+sys.exit(1)
+FGSPY
+)" 2>/dev/null
+  }
+  if special_use_undeclared; then
+    finding high "ANDROID-FGS-SPECIAL-USE-UNDECLARED" "specialUse foreground service without a subtype property" "Add a property named android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE inside the service, and justify the use in the Play Console foreground service declaration." manifest 'android:foregroundServiceType=.*specialUse'
+  fi
+  # Play requires a 64-bit build of every native library that ships a 32-bit ABI.
+  abi_missing_64() {  # comment-aware, brace-scoped, skips debug blocks, merges += statements per block
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local gf
+    gf="$(grep -E '[.](gradle|kts)$' "$FILELIST")"
+    [ -n "$gf" ] || return 1
+    printf '%s\n' "$gf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ABIPY'
+import re
+import sys
+
+ABI_RE = re.compile(r"[\"'](armeabi-v7a|arm64-v8a|x86_64|x86)[\"']")
+NAME_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*(\([^(){}]*\))?\s*$")
+
+
+def strip_comments(src):
+    out, i, n, quote = [], 0, len(src), None
+    while i < n:
+        c = src[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(src[i + 1])
+                i += 2
+                continue
+            if c == quote or c == "\n":
+                quote = None
+            i += 1
+            continue
+        if c in "\"'":
+            quote = c
+            out.append(c)
+            i += 1
+        elif src.startswith("//", i):
+            j = src.find("\n", i)
+            i = n if j < 0 else j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            out.append(" ")
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def statement_end(text, start):
+    depth, i = 0, start
+    while i < len(text):
+        c = text[i]
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "}" and depth <= 0:
+            return i
+        elif (
+            c == "\n"
+            and depth <= 0
+            and not text[start:i].rstrip().endswith((",", "(", "+=", "="))
+        ):
+            return i
+        i += 1
+    return i
+
+
+def groups(text):
+    found, stack, i = {}, [], 0
+    while i < len(text):
+        c = text[i]
+        if c == "{":
+            m = NAME_RE.search(text[max(0, i - 80) : i])
+            label = (m.group(0) if m else "").lower()
+            stack.append(
+                "debug" if "debug" in label else (" ".join(label.split()) or "?")
+            )
+        elif c == "}":
+            if stack:
+                stack.pop()
+        elif text.startswith("abiFilters", i):
+            end = statement_end(text, i)
+            if "debug" not in stack:
+                stmt = text[i:end]
+                bucket = found.setdefault(tuple(stack), set())
+                rest = stmt[len("abiFilters"):].lstrip()
+                if rest.startswith(".clear"):
+                    bucket.clear()
+                elif rest.startswith(("-=", ".remove")):
+                    bucket.difference_update(ABI_RE.findall(stmt))
+                else:
+                    bucket.update(ABI_RE.findall(stmt))
+            i = end
+            continue
+        i += 1
+    return found
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = strip_comments(fh.read())
+    except OSError:
+        continue
+    for abis in groups(text).values():
+        if ("armeabi-v7a" in abis and "arm64-v8a" not in abis) or (
+            "x86" in abis and "x86_64" not in abis
+        ):
+            sys.exit(0)
+sys.exit(1)
+ABIPY
+)" 2>/dev/null
+  }
+  if abi_missing_64; then
+    finding high "ANDROID-64BIT-ABI-MISSING" "abiFilters ship a 32-bit ABI without its 64-bit pair" "Add arm64-v8a, and x86_64 when x86 ships, to abiFilters. Google Play requires a 64-bit version of every native library." src 'abiFilters'
   fi
   if grep_has 'QUERY_ALL_PACKAGES'; then
     finding high "ANDROID-QUERY-ALL-PACKAGES" "QUERY_ALL_PACKAGES without a permitted use case" "Declare specific packages with a queries element, or qualify for a permitted use case." src 'QUERY_ALL_PACKAGES'

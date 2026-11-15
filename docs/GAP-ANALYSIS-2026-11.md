@@ -54,3 +54,14 @@ The regional pass for Asia-Pacific, Canada, Australia, and Brazil was still runn
 - The UK under-16 social media regulations, reported to be laid in December 2026 for spring 2027. Secondary only.
 - The Alabama App Store Accountability Act challenge (CCIA, reported 28 October 2026). No docket found.
 - Korea MyData expansion dates and the Australia App Distribution Services Code on the live eSafety register, carried over from [#659](https://github.com/mjmirza/app-store-compliance/issues/659).
+
+## 7. Follow-up, 15 November 2026
+
+A second pass read the App Store Connect release notes and the Upcoming Requirements page line by line, which the first pass had only skimmed.
+
+| Change | Source | Repo action |
+|---|---|---|
+| From early 2027 App Store Connect will no longer accept uploads containing On-Demand Resources from new apps or apps that have never used the feature (release notes, 12 November 2026) | [release notes](https://developer.apple.com/help/app-store-connect/release-notes/) | APPLE-ODR-UPLOAD-BLOCK-2027, APPLE-ODR-DEPRECATED-27 expanded |
+| iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later | [Upcoming Requirements](https://developer.apple.com/news/upcoming-requirements/) | APPLE-MIN-DEPLOYMENT-TARGET-IOS13, new guard check |
+
+Checked and not encoded. The INSTALLS analytics report deprecation in App Store Connect API 4.6 affects reporting, not review. The Republic of Korea consent schedule for converting subscription offers to standard paid subscriptions (30 September 2026) is tracked for the next sweep, because its detail page failed to load on the first read.

@@ -1,6 +1,6 @@
 {
   "version": "2.3.0",
-  "updated": "2026-09-13",
+  "updated": "2026-11-15",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -1560,6 +1560,35 @@
       "source_url": "https://www.law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010102&lsId=011357",
       "verified_on": "2026-11-15",
       "source_note": "Read on the law.go.kr revision-reasons page for Act No. 21910, whose header gives promulgation 8 September 2026 and enforcement 9 March 2027. The Supplementary Provisions text of 21910 was not readable by script."
+    },
+    {
+      "id": "APPLE-ODR-UPLOAD-BLOCK-2027",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "App Store Connect release notes, 12 November 2026",
+      "requirement": "Starting in early 2027, App Store Connect will no longer accept uploads containing On-Demand Resources from new apps or apps that have never used this feature. Migrating to Background Assets is recommended. Apple has published no exact day, so 1 January 2027 is the earliest possible date, kept only as a reminder to migrate early. It is not Apple's enforcement date. From that day the deadline checker lists it as passed, which is the intended prompt to confirm the real date, and the entry must be replaced when Apple names one. Apps that already use On-Demand Resources are not named in the block.",
+      "effective_date": "2026-11-12",
+      "grace_period": "until early 2027",
+      "mandatory_date": "2027-01-01",
+      "enforcement_date": "2027-01-01",
+      "affected_repository_sections": "docs/APPLE.md, data/rejection-patterns.json APPLE-ODR-DEPRECATED-27",
+      "priority": "high",
+      "source_url": "https://developer.apple.com/help/app-store-connect/release-notes/",
+      "verified_on": "2026-11-15"
+    },
+    {
+      "id": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple Upcoming Requirements page",
+      "requirement": "iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later. Already in force. The pre-submission guard flags a lower IPHONEOS_DEPLOYMENT_TARGET or Podfile platform.",
+      "effective_date": "2026-09-09",
+      "grace_period": "none",
+      "mandatory_date": "2026-09-09",
+      "enforcement_date": "2026-09-09",
+      "affected_repository_sections": "docs/APPLE.md, data/rejection-patterns.json APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
+      "priority": "critical",
+      "absorbed_into": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
+      "source_url": "https://developer.apple.com/news/upcoming-requirements/",
+      "verified_on": "2026-11-15"
     }
   ]
 }

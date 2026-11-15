@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-35 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+37 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## ANDROID-HEALTH-PERMISSIONS
 
@@ -480,6 +480,40 @@ How to detect.
 
 ```bash
 echo 'manual. open Play Console, App content, Content rating, and confirm the questionnaire is complete and current'
+```
+
+## ANDROID-FGS-SPECIAL-USE-UNDECLARED
+
+- Title. specialUse foreground service without a subtype
+- Platform. google
+- Guideline or policy. Foreground service types policy
+- Severity. high
+- What triggers it. A foreground service of type specialUse must declare the PROPERTY_SPECIAL_USE_FGS_SUBTYPE property and be justified in the Play Console foreground service declaration. Without it Play review asks for the justification and can reject the update.
+- How to fix it. Add the subtype property inside the service and complete the Play Console declaration, or move to a specific service type.
+- Detection signals. foregroundServiceType="specialUse"
+- Present means handled. PROPERTY_SPECIAL_USE_FGS_SUBTYPE
+
+How to detect.
+
+```bash
+grep -rn 'specialUse' --include='AndroidManifest.xml' . && ! grep -rq 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE' --include='AndroidManifest.xml' .
+```
+
+## ANDROID-64BIT-ABI-MISSING
+
+- Title. 32-bit native ABI without a 64-bit build
+- Platform. google
+- Guideline or policy. Google Play 64-bit requirement
+- Severity. high
+- What triggers it. Google Play requires a 64-bit version of every native library. An abiFilters list with armeabi-v7a but no arm64-v8a fails the requirement.
+- How to fix it. Add arm64-v8a, and x86_64 when x86 ships, to abiFilters.
+- Detection signals. abiFilters, armeabi-v7a
+- Present means handled. arm64-v8a
+
+How to detect.
+
+```bash
+grep -rn 'abiFilters' --include='*.gradle' --include='*.kts' . | grep armeabi-v7a | grep -v arm64-v8a
 ```
 
 ## ANDROID-ACCESSIBILITY-FONTSCALING
