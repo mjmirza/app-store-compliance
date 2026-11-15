@@ -1261,9 +1261,12 @@ def groups(text):
         elif text.startswith("abiFilters", i):
             end = statement_end(text, i)
             if "debug" not in stack:
-                found.setdefault(tuple(stack), set()).update(
-                    ABI_RE.findall(text[i:end])
-                )
+                stmt = text[i:end]
+                bucket = found.setdefault(tuple(stack), set())
+                if stmt[len("abiFilters"):].lstrip().startswith("-="):
+                    bucket.difference_update(ABI_RE.findall(stmt))
+                else:
+                    bucket.update(ABI_RE.findall(stmt))
             i = end
             continue
         i += 1
