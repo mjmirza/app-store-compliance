@@ -192,6 +192,8 @@ Neither rule is a general developer duty. Both bind the entity that provides the
 
 - Apple, October 2026. Two content descriptors move from an age rating of All to 12+ on the App Store in Korea, alongside the GRAC rating-certificate (RCN) override announced 12 August 2026. Source. [Apple, age rating updates for Korea](https://developer.apple.com/news/?id=oj3r9pvw).
 
+- AI development reuse from 9 March 2027. Act No. 21910, promulgated 8 September 2026, lets a handler reuse lawfully collected personal information to develop AI when anonymous or pseudonymous processing would make development difficult, the purpose is public interest or similar, and the PIPC deliberates and resolves on it. A prior risk-factor assessment of the impact on data subjects is required. Source. [law.go.kr, revision reasons for Act No. 21910](https://www.law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010102&lsId=011357).
+
 - Personal Information Protection Act amendment (Act No. 21445), effective 11 September 2026. The CEO and representative are the final accountable parties, a board-approved chief privacy officer is required at qualifying scale, punitive surcharges and widened breach notification apply. A further Telecommunications Business Act and Network Act amendment passed on 12 March 2026 with an unconfirmed effective date. Source. [law.go.kr PIPA amendment history](https://law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010102&lsId=011357).
 
 ### 3.6 India
@@ -219,9 +221,15 @@ Neither rule is a general developer duty. Both bind the entity that provides the
 
 - Interim Measures for AI Anthropomorphic Interactive Services (CAC Order No. 21), effective 15 July 2026. Identify minor users, switch them into minors mode automatically, obtain guardian consent under 14, and never offer virtual companion or virtual kin services to a minor. Any chat, companion, or roleplay app in China is in scope. The minors online-content classification measures (effective 1 March 2026) ban surfacing harmful content on the home screen, pop-ups, hot searches, rankings, and recommendations, and ban algorithmic push to minors. The personal-information compliance audit measures (effective 1 May 2025) require handlers above 10 million people to complete a first audit within the first two-year cycle (by 30 April 2027, derived) and repeat at least every two years. Sources. [CAC, AI anthropomorphic services measures](https://www.cac.gov.cn/2026-04/10/c_1777558395078289.htm), [CAC minors content classification](https://www.cac.gov.cn/2026-01/23/c_1770728781060093.htm), [CAC compliance audit measures](https://www.cac.gov.cn/2025-02/14/c_1741233507681519.htm).
 
+- Platforms with a large minor audience. A CAC notice of 19 October 2026 asks platforms with 10 million or more registered minor users, 1 million or more monthly active minor users, or a significant impact on minors to file designation materials and a self-assessment with the provincial cyberspace office within 20 working days, which closes around 16 November 2026 (derived). A qualifying platform that misses it is told to file. Source. [CAC notice, 19 October 2026](https://www.cac.gov.cn/2026-10/19/c_1794086281588959.htm).
+
 ### 3.10 Vietnam
 
 - Decree 147, Article 38. From 18 June 2026 apps available on the App Store in Vietnam require a region-specific age rating. App Store Connect exposes a 00+ value (ZERO_ZERO in the App Store Connect API) for the Vietnam classification. Source. [Apple, age rating updates for Australia and Vietnam, 21 May 2026](https://developer.apple.com/news/?id=yrrb45pw), [App Store Connect API 4.4 release notes](https://developer.apple.com/documentation/appstoreconnectapi/app-store-connect-api-4-4-release-notes).
+
+### 3.11 Indonesia
+
+- PP TUNAS (Government Regulation No. 17 of 2025) on child protection in electronic systems, with Minister Regulation No. 9 of 2026 setting the self-assessment and verification detail. Every electronic system operator completes the self-assessment for each product, service, and feature by 31 December 2026. Kemkomdigi says it can designate a product that misses the date as high-risk directly. Source. [Kemkomdigi, six-month PP TUNAS evaluation, 14 September 2026](https://portal.komdigi.go.id/kanal-publik/berita-kini/10541).
 
 ## 4. Alternative app stores (distinct requirements only)
 
