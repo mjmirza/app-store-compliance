@@ -1253,7 +1253,7 @@ def groups(text):
             m = NAME_RE.search(text[max(0, i - 80) : i])
             label = (m.group(0) if m else "").lower()
             stack.append(
-                "debug" if "debug" in label else (m.group(1).lower() if m else "?")
+                "debug" if "debug" in label else (" ".join(label.split()) or "?")
             )
         elif c == "}":
             if stack:

@@ -3242,6 +3242,9 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk 36\n defaultConfig { ndk
 gs_check "abi-10 a commented-out filter stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += "armeabi-v7a"\n abiFilters += "arm64-v8a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-11 consecutive += statements in one block are merged" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+# Round 5 attack regression. getByName blocks keep their own scope.
+D="$(mk_android_perm '')"; printf "android { compileSdk 36\n buildTypes {\n getByName('release') { ndk { abiFilters 'armeabi-v7a' } }\n getByName('benchmark') { ndk { abiFilters 'arm64-v8a' } }\n } }\n" > "$D/android/app/build.gradle"
+gs_check "abi-12 another build type's 64-bit ABI never hides release" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
