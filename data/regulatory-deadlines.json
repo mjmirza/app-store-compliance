@@ -1514,6 +1514,52 @@
       "priority": "medium",
       "source_url": "https://support.google.com/googleplay/android-developer/table/12921780",
       "verified_on": "2026-11-14"
+    },
+    {
+      "id": "CN-CAC-MINOR-PLATFORM-FILING-2026",
+      "jurisdiction": "China",
+      "law": "CAC notice of 19 October 2026 on designating network platforms with a very large number of minor users or a significant impact on minors",
+      "requirement": "A platform with 10 million or more registered minor users, or 1 million or more monthly active minor users (or 10 million registered and 1 million monthly active users for a service aimed at minors), or with a significant impact on minors, files its designation materials and a self-assessment report with the provincial cyberspace office within 20 working days of the notice. That window closes around 16 November 2026 (derived). A platform that qualifies and did not file will be told to file by the designation committee.",
+      "effective_date": "2026-10-19",
+      "grace_period": "20 working days",
+      "mandatory_date": "2026-11-16",
+      "enforcement_date": "2026-11-16",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.9",
+      "priority": "low",
+      "absorbed_into": "docs/GLOBAL-REGULATORY-2026.md section 3.9",
+      "source_url": "https://www.cac.gov.cn/2026-10/19/c_1794086281588959.htm",
+      "verified_on": "2026-11-15",
+      "source_note": "The notice sets 20 working days from publication. The 16 November 2026 close counts working days from 20 October and is derived, not stated."
+    },
+    {
+      "id": "ID-PP-TUNAS-SELF-ASSESSMENT-2026",
+      "jurisdiction": "Indonesia",
+      "law": "Government Regulation No. 17 of 2025 (PP TUNAS) and Minister of Communication and Digital Regulation No. 9 of 2026",
+      "requirement": "Every electronic system operator must complete the child-protection self-assessment for each product, service, and feature by 31 December 2026. Kemkomdigi says it can designate a product that misses the deadline as high-risk directly, which brings the stricter high-risk obligations.",
+      "effective_date": "2026-12-31",
+      "grace_period": "none",
+      "mandatory_date": "2026-12-31",
+      "enforcement_date": "2026-12-31",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.11, references/rules/safety.md",
+      "priority": "high",
+      "source_url": "https://portal.komdigi.go.id/kanal-publik/berita-kini/10541",
+      "verified_on": "2026-11-15",
+      "source_note": "Kemkomdigi press release of 14 September 2026. The portal serves a bot check to scripted reads, so it was read through a browser-equivalent fetch."
+    },
+    {
+      "id": "KR-PIPA-AI-DATA-REUSE-2027",
+      "jurisdiction": "South Korea",
+      "law": "Personal Information Protection Act, Act No. 21910 (8 September 2026)",
+      "requirement": "From 9 March 2027 personal information collected lawfully for another purpose may be reused to develop AI technology when anonymous or pseudonymous processing would make that development difficult, the use serves a public interest or similar purpose, every statutory requirement is met, and the Personal Information Protection Commission deliberates and resolves on it. The handler must first run a risk-factor assessment of the impact on data subjects. An app that trains or tunes models on Korean user data plans the assessment before relying on this route.",
+      "effective_date": "2027-03-09",
+      "grace_period": "none",
+      "mandatory_date": "2027-03-09",
+      "enforcement_date": "2027-03-09",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
+      "priority": "medium",
+      "source_url": "https://www.law.go.kr/LSW/lsRvsRsnListP.do?chrClsCd=010102&lsId=011357",
+      "verified_on": "2026-11-15",
+      "source_note": "Read on the law.go.kr revision-reasons page for Act No. 21910, whose header gives promulgation 8 September 2026 and enforcement 9 March 2027. The Supplementary Provisions text of 21910 was not readable by script."
     }
   ]
 }

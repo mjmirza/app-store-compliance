@@ -45,7 +45,7 @@ The same announcement says trader status must be declared in Play Console starti
 
 ## 5. Asia-Pacific, Canada, Australia, Brazil, verified deltas
 
-The regional pass for Asia-Pacific, Canada, Australia, and Brazil was still running when this sweep merged. Its findings land as a follow-up change after each item is read on its primary source. Items already confirmed in [#659](https://github.com/mjmirza/app-store-compliance/issues/659) on 14 November 2026. Korea's mandatory privacy certification from 1 July 2027, Japan's APPI amendment as Act No. 56 of 2026, and the India DPDP rule 4 Consent Manager date.
+The regional pass for Asia-Pacific, Canada, Australia, and Brazil was still running when this sweep merged. Its findings landed in a follow-up change on 15 November 2026 after each item was read on its primary source. Korea's AI development reuse rule (Act No. 21910, from 9 March 2027), Indonesia's PP TUNAS self-assessment deadline (31 December 2026), and China's CAC filing window for platforms with a large minor audience (closing around 16 November 2026). Items already confirmed in [#659](https://github.com/mjmirza/app-store-compliance/issues/659) on 14 November 2026. Korea's mandatory privacy certification from 1 July 2027, Japan's APPI amendment as Act No. 56 of 2026, and the India DPDP rule 4 Consent Manager date.
 
 ## 6. Unverified, deliberately not encoded
 
