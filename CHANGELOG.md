@@ -2,9 +2,9 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
-## Unreleased
+## 2.4.0 (2026-11-15)
 
-This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Three model reviews attacked the changes before release. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.
+This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Eight adversarial review rounds attacked the changes before release, and every reproduced bug became a test. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.
 
 ### Added
 - The guard now scans uploads made through `helm-asc` (builds upload and `--submit`), the `asc` CLI, and the Codemagic `app-store-connect publish` command. Before, these reached App Store Connect without a scan.
