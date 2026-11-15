@@ -898,7 +898,64 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
       | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep -q hit
   }
   # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
-  if podfile_below_ios13 || grep_has 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'; then
+  pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local pf
+    pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
+    [ -n "$pf" ] || return 1
+    printf '%s\n' "$pf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PBXPY'
+import re
+import sys
+
+BLOCK_RE = re.compile(
+    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
+)
+DT_RE = re.compile(
+    r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+)
+DEPENDENCY_MARKERS = (
+    "SKIP_INSTALL = YES",
+    "DYLIB_INSTALL_NAME_BASE",
+    "TEST_HOST",
+    "BUNDLE_LOADER",
+    "MACH_O_TYPE",
+    "TEST_TARGET_NAME",
+)
+
+
+def below(settings):
+    return [int(v) < 13 for v in DT_RE.findall(settings)]
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    app, project = [], []
+    for settings in BLOCK_RE.findall(text):
+        flags = below(settings)
+        if not flags:
+            continue
+        if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
+            if not any(marker in settings for marker in DEPENDENCY_MARKERS):
+                app.extend(flags)
+        else:
+            project.extend(flags)
+    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
+    if (app and any(app)) or (not app and any(project)):
+        sys.exit(0)
+sys.exit(1)
+PBXPY
+)" 2>/dev/null
+  }
+  xcconfig_below_ios13() {
+    [ -s "$FILELIST" ] || return 1
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep -q .
+  }
+  if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.

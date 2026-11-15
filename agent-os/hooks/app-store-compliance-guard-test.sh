@@ -3154,7 +3154,10 @@ gs_check() {  # $1 label, $2 dir, $3 id, $4 expect present (1) or absent (0)
   fi
   rm -rf "$2"
 }
-mkdir_proj() { mkdir -p "$1/App.xcodeproj"; printf '%s\n' "$2" > "$1/App.xcodeproj/project.pbxproj"; }
+mkdir_proj() {  # one app build configuration carrying $2
+  mkdir -p "$1/App.xcodeproj"
+  printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\t%s\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t\tname = Release;\n\t\t};\n}\n' "$2" > "$1/App.xcodeproj/project.pbxproj"
+}
 
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 12.0;'
 gs_check "ios13-1 a 12.0 deployment target is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
@@ -3248,6 +3251,10 @@ gs_check "abi-12 another build type's 64-bit ABI never hides release" "$D" 'ANDR
 # Round 6 attack regression. abiFilters -= removes an ABI.
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += "armeabi-v7a"\n abiFilters += "arm64-v8a"\n abiFilters -= "arm64-v8a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-13 a removed 64-bit ABI no longer counts" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# Round 7 attack regression. a framework target below 13 beside an iOS 17 app stays silent.
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 17.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 12.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-8 a framework target below 13 beside an iOS 17 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
