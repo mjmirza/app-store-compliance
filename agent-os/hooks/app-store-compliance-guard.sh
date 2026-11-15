@@ -1149,39 +1149,141 @@ if [ "$IS_AND" -eq 1 ]; then
     finding critical "ANDROID-DEBUGGABLE-RELEASE" "android:debuggable is true in the manifest" "Remove android:debuggable from the manifest and let the build type set it. Play Console rejects a debuggable APK or app bundle." manifest 'android:debuggable'
   fi
   # A specialUse foreground service needs its subtype property and a Play Console declaration.
-  special_use_undeclared() {
+  special_use_undeclared() {  # XML parse per service, so comments and other services never count
     [ -s "$FILELIST" ] || return 1
-    local m su pr
-    while IFS= read -r m; do
-      [ -f "$m" ] || continue
-      su="$(grep -oE '(^|[^A-Za-z:])android:foregroundServiceType[[:space:]]*=[[:space:]]*["'\''][^"'\'']*specialUse' "$m" | wc -l | tr -d ' ')"
-      pr="$(grep -oE 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE' "$m" | wc -l | tr -d ' ')"
-      [ "$su" -gt "$pr" ] && return 0
-    done <<SUMANIFESTS
-$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')
-SUMANIFESTS
-    return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local mf
+    mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
+    [ -n "$mf" ] || return 1
+    printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'FGSPY'
+import sys
+import xml.etree.ElementTree as ET
+
+A = "{http://schemas.android.com/apk/res/android}"
+SUBTYPE = "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+for path in sys.argv[1:]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        continue
+    for svc in root.iter("service"):
+        types = svc.get(A + "foregroundServiceType", "")
+        if "specialUse" not in [t.strip() for t in types.split("|")]:
+            continue
+        if not any(p.get(A + "name") == SUBTYPE for p in svc.iter("property")):
+            sys.exit(0)
+sys.exit(1)
+FGSPY
+)" 2>/dev/null
   }
   if special_use_undeclared; then
     finding high "ANDROID-FGS-SPECIAL-USE-UNDECLARED" "specialUse foreground service without a subtype property" "Add a property named android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE inside the service, and justify the use in the Play Console foreground service declaration." manifest 'android:foregroundServiceType=.*specialUse'
   fi
   # Play requires a 64-bit build of every native library that ships a 32-bit ABI.
-  abi_missing_64() {  # joins a multi-line abiFilters declaration and drops // comments first
+  abi_missing_64() {  # comment-aware, brace-scoped, skips debug blocks, merges += statements per block
     [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
     local gf
-    while IFS= read -r gf; do
-      [ -f "$gf" ] || continue
-      awk '{ sub(/\/\/.*/, "") }
-      /abiFilters/ { buf = ""; on = 1; depth = 0 }
-      on { buf = buf " " $0; o = gsub(/\(/, "("); c = gsub(/\)/, ")"); depth += o - c;
-           if (depth <= 0 && $0 !~ /,[[:space:]]*$/) { on = 0;
-             if (buf ~ /armeabi-v7a/ && buf !~ /arm64-v8a/) f = 1;
-             if (buf ~ /["\047]x86["\047]/ && buf !~ /x86_64/) f = 1 } }
-      END { exit f ? 0 : 1 }' "$gf" 2>/dev/null && return 0
-    done <<ABIFILES
-$(grep -E '[.](gradle|kts)$' "$FILELIST")
-ABIFILES
-    return 1
+    gf="$(grep -E '[.](gradle|kts)$' "$FILELIST")"
+    [ -n "$gf" ] || return 1
+    printf '%s\n' "$gf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ABIPY'
+import re
+import sys
+
+ABI_RE = re.compile(r"[\"'](armeabi-v7a|arm64-v8a|x86_64|x86)[\"']")
+NAME_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*(\([^(){}]*\))?\s*$")
+
+
+def strip_comments(src):
+    out, i, n, quote = [], 0, len(src), None
+    while i < n:
+        c = src[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(src[i + 1])
+                i += 2
+                continue
+            if c == quote or c == "\n":
+                quote = None
+            i += 1
+            continue
+        if c in "\"'":
+            quote = c
+            out.append(c)
+            i += 1
+        elif src.startswith("//", i):
+            j = src.find("\n", i)
+            i = n if j < 0 else j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            out.append(" ")
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def statement_end(text, start):
+    depth, i = 0, start
+    while i < len(text):
+        c = text[i]
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth -= 1
+        elif c == "}" and depth <= 0:
+            return i
+        elif (
+            c == "\n"
+            and depth <= 0
+            and not text[start:i].rstrip().endswith((",", "(", "+=", "="))
+        ):
+            return i
+        i += 1
+    return i
+
+
+def groups(text):
+    found, stack, i = {}, [], 0
+    while i < len(text):
+        c = text[i]
+        if c == "{":
+            m = NAME_RE.search(text[max(0, i - 80) : i])
+            label = (m.group(0) if m else "").lower()
+            stack.append(
+                "debug" if "debug" in label else (m.group(1).lower() if m else "?")
+            )
+        elif c == "}":
+            if stack:
+                stack.pop()
+        elif text.startswith("abiFilters", i):
+            end = statement_end(text, i)
+            if "debug" not in stack:
+                found.setdefault(tuple(stack), set()).update(
+                    ABI_RE.findall(text[i:end])
+                )
+            i = end
+            continue
+        i += 1
+    return found
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = strip_comments(fh.read())
+    except OSError:
+        continue
+    for abis in groups(text).values():
+        if ("armeabi-v7a" in abis and "arm64-v8a" not in abis) or (
+            "x86" in abis and "x86_64" not in abis
+        ):
+            sys.exit(0)
+sys.exit(1)
+ABIPY
+)" 2>/dev/null
   }
   if abi_missing_64; then
     finding high "ANDROID-64BIT-ABI-MISSING" "abiFilters ship a 32-bit ABI without its 64-bit pair" "Add arm64-v8a, and x86_64 when x86 ships, to abiFilters. Google Play requires a 64-bit version of every native library." src 'abiFilters'

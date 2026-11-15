@@ -3228,6 +3228,20 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { n
 gs_check "abi-7 a pair split across lines stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
 D="$(mk_android_perm '')"; printf "android { compileSdk 36\n defaultConfig { ndk { abiFilters 'armeabi-v7a' // TODO add 'arm64-v8a'\n } } }\n" > "$D/android/app/build.gradle"
 gs_check "abi-8 a comment naming arm64-v8a never hides a 32-bit only filter" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# Round 4 attack regressions (gap sweep 2026-11-15). Parsed, not pattern matched.
+D="$(mk_android_perm '<!-- android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE --><application><service android:name=".A" android:foregroundServiceType="specialUse"/></application>')"
+gs_check "fgs-6 a property named only in a comment never satisfies the check" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".A" android:foregroundServiceType="specialUse"/><service android:name=".B"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="x"/></service></application>')"
+gs_check "fgs-7 another service's property never satisfies the check" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '<application><service android:name=".A" android:foregroundServiceType=
+"specialUse"/></application>')"
+gs_check "fgs-8 an attribute value on the next line is still read" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk 36\n defaultConfig { ndk { abiFilters "armeabi-v7a" /* TODO "arm64-v8a" */ } } }\n' > "$D/android/app/build.gradle"
+gs_check "abi-9 a block comment naming arm64-v8a never hides a 32-bit only filter" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+D="$(mk_android_perm '')"; printf 'android { compileSdk 36\n defaultConfig { ndk {\n /* abiFilters "armeabi-v7a" */\n abiFilters "arm64-v8a" } } }\n' > "$D/android/app/build.gradle"
+gs_check "abi-10 a commented-out filter stays silent" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
+D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += "armeabi-v7a"\n abiFilters += "arm64-v8a"\n } } }\n' > "$D/android/app/build.gradle.kts"
+gs_check "abi-11 consecutive += statements in one block are merged" "$D" 'ANDROID-64BIT-ABI-MISSING' 0
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
