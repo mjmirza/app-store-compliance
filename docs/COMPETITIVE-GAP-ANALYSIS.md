@@ -78,6 +78,39 @@ The first pass of this analysis honestly noted two places the most popular repos
 
 What remains is not a capability gap, it is adoption. The most popular repository has the stars. That is earned over time through the launch, shares, and contributions, and the on ramp for that is in place.
 
+## Second survey, 15 November 2026
+
+The survey was repeated a month later. Of the six repositories above, only `truongduy2611/app-store-preflight-skills` changed (a sync with the 16 October 2026 guidelines, which this playbook already carries). New repositories read through the GitHub API on 15 November 2026.
+
+| Repository | Stars | Last push | What it publishes |
+|---|---|---|---|
+| RevylAI/greenlight | 2474 | 2026-08-05 | Go scanner over source, privacy manifests, built IPA and AAB files, App Store Connect metadata, with SARIF output and runtime flow checks |
+| safaiyeh/app-store-review-skill | 454 | 2026-10-17 | Agent skill with rules split by guideline section |
+| devsemih/appstore-review-skill | 106 | 2026-11-11 | iOS and Play audit with build inspection, fixes, and rejection reply drafting |
+| dabodamjan/app-store-rejection-checker | 88 | 2026-11-05 | Skill with a rejection taxonomy and a recent changes file |
+| berkayturk/appstore-precheck | 12 | 2026-10-22 | Bash gate with a weekly guideline drift workflow |
+| wajahatkarim3/play-data-safety-skill | 11 | 2026-11-13 | Generates the Play Data safety CSV from a per SDK evidence map |
+| RobertoJoseph/appstore-rejections-mcp | 16 | 2026-02-15 | MCP server over real rejection cases |
+
+### Adopted in 2.4.0
+
+- Upload paths the guard missed. `helm-asc` uploads and `--submit`, the `asc` CLI, and the Codemagic `app-store-connect publish` command now trigger the scan.
+- IPv6 only review network (2.5.5). `inet_addr`, `inet_aton` and `gethostbyname` are flagged, and C and C++ sources are now scanned so native code is no longer invisible.
+- Debuggable Android builds, `specialUse` foreground services without their subtype property, and `abiFilters` that ship `armeabi-v7a` without `arm64-v8a`.
+- HealthKit and iCloud storage in the same app (5.1.3(ii)), reported for a human to confirm, because co-occurrence alone does not prove health data reaches iCloud.
+
+### Considered and not adopted, with the reason
+
+- A 200 MB cellular download limit as a rejection rule. It is not an upload rejection threshold, so encoding it would block valid apps.
+- A launch storyboard requirement. `UILaunchScreen` in Info.plist is an accepted alternative, so a storyboard check would misfire.
+- Keyword blocking of trial toggles, countdowns and permission priming screens. These are not violations on their own, and `APPLE-3.1.2-MISLEADING-PRICING` already covers deceptive pricing.
+
+### Open, larger work tracked for later releases
+
+- Inspecting the built IPA, APK and AAB, including the merged Android manifest, 16 KB ELF and ZIP alignment, and embedded framework privacy manifests and signatures.
+- Runtime proof that account deletion, restore purchases and Sign in with Apple work, with free XCUITest or Maestro flows.
+- A Data safety CSV generator, rejection message to reply drafting, an MCP server over the pattern data, and a weekly guideline page diff.
+
 ## The standing process
 
 This analysis is repeatable. When a new comparable repository appears, read it through the API, extract its structure and unique rules, diff against this playbook, and fold in the net new patterns. Contributions that bring a pattern from another open source list are welcome, with a link to the source.

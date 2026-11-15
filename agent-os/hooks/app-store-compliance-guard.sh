@@ -221,7 +221,7 @@ ta
 s/(fastlane)[[:space:]]+--?[A-Za-z][A-Za-z0-9_-]*/\1/
 ta'; }
   CMD_MATCH="$(fl_norm "$CMD_MATCH")"
-  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build'
+  SUBMIT_RE='fastlane[[:space:]]+(run[[:space:]]+)?(deliver|pilot|supply|submit|appstore|testflight|upload_to_app_store|upload_to_testflight|upload_to_play_store)([^A-Za-z0-9_]|$)|eas([[:space:]]+--?[A-Za-z][A-Za-z0-9-]*([=[:space:]][^-[:space:]][^[:space:]]*)?)*[[:space:]]+(submit|build)|xcrun[[:space:]]+(altool|notarytool)|transporter|gradlew?[^&|;]*(bundleRelease|assembleRelease|publish[A-Za-z]*(Bundle|Apk|Apps)|promote[A-Za-z]*Artifact)|bundletool|xcodebuild[^&|;]*archive|flutter[[:space:]]+build[[:space:]]+(ipa|appbundle|apk|ios)|(npx[[:space:]]+)?(expo[[:space:]]+(prebuild|run:ios|run:android|submit|upload:(ios|android)|build:(ios|android))|cap[[:space:]]+(sync|build|run|copy|open)|react-native[[:space:]]+run-(ios|android))|ionic[[:space:]]+capacitor[[:space:]]+(build|run)|cordova[[:space:]]+build([[:space:]]+--release)?|(^|[^A-Za-z0-9_])unity(-editor|\.exe)?[[:space:]][^;&|]*-buildtarget[[:space:]]+(ios|android)|dotnet[[:space:]]+publish[^;&|]*(-f|--framework)[[:space:]=]+net[0-9.]+-(ios|android)|tauri[[:space:]]+(ios|android)[[:space:]]+build|helm-asc[^;&|]*([[:space:]]builds?[[:space:]]+upload|--submit|[[:space:]]submissions?[[:space:]]+(create|submit)|[[:space:]]review-submissions?)|(^|[[:space:]/])asc[[:space:]]+(builds?[[:space:]]+upload|submissions?[[:space:]]+(create|submit)|review-submissions?)|app-store-connect[[:space:]]+publish'
   UPLOAD_ACTION_RE='(^|[^A-Za-z0-9_])(upload_to_app_store|upload_to_testflight|upload_to_play_store|deliver|pilot|supply|appstore|testflight)([^A-Za-z0-9_]|$)'
   # A custom fastlane lane submits when a word in its name says so, when its Fastfile block calls an
   # upload action, or when the lane is a variable the guard cannot read (scanned, never assumed safe).
@@ -892,6 +892,29 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
+  # A Podfile has no extension, so it is outside the source list. Read it directly.
+  podfile_below_ios13() {
+    find "$DIR" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules \) -prune \) -o -name Podfile -type f -print 2>/dev/null \
+      | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep -q hit
+  }
+  # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
+  if podfile_below_ios13 || grep_has 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'; then
+    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
+  fi
+  # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
+  # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.
+  native_ipv4_only() {
+    find "$DIR" -maxdepth 8 \( -type d \( -name Pods -o -name node_modules -o -name vendor -o -name Vendor -o -name ThirdParty -o -name third_party -o -name external -o -name External -o -name Carthage -o -name build -o -name .git \) -prune \) \
+      -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.mm' \) -print 2>/dev/null | head -2000 \
+      | tr '\n' '\0' | xargs -0 grep -EIls -e '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' 2>/dev/null | grep -q .
+  }
+  if native_ipv4_only || grep_has '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('; then
+    finding medium "APPLE-2.5.5-IPV4-ONLY-NETWORKING" "IPv4-only socket API in use" "Replace inet_addr, inet_aton and gethostbyname with getaddrinfo or Network.framework, and test on an IPv6-only NAT64 network (Mac Internet Sharing, Create NAT64 Network)." src '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('
+  fi
+  # 5.1.3(ii). personal health information may not be stored in iCloud.
+  if grep_has 'HKHealthStore' && grep_has 'NSUbiquitousKeyValueStore|CKContainer|CKDatabase|NSPersistentCloudKitContainer|cloudKitContainerOptions'; then
+    finding medium "APPLE-5.1.3-HEALTH-DATA-ICLOUD" "HealthKit and iCloud storage in the same app" "Confirm no HealthKit or other health data is written to iCloud, CloudKit or iCloud key-value storage (5.1.3(ii)). Keep health data on device or in a compliant backend you control." src 'NSUbiquitousKeyValueStore|CKContainer|CKDatabase|NSPersistentCloudKitContainer|cloudKitContainerOptions'
+  fi
   # Since September 2026 the social media capability question gates every submission (Apple news 0d2gpmml).
   if grep_has 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'; then
     finding medium "APPLE-2.3.6-SOCIAL-MEDIA-DECLARATION" "Social features detected, confirm the social media capability declaration in App Store Connect" "Answer the social media question before submitting. it sets a 13+ minimum and requires Declared Age Range for under-13 users." src 'newsFeed|NewsFeed|followers|chatRoom|ChatRoom|DirectMessage|liveStream|LiveStream'
@@ -1115,6 +1138,53 @@ if [ "$IS_AND" -eq 1 ]; then
     if ! grep_has 'assetlinks.json'; then
       finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." src 'android:scheme'
     fi
+  fi
+  # Play Console refuses a debuggable APK or app bundle.
+  release_manifest_debuggable() {
+    [ -s "$FILELIST" ] || return 1
+    grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/' | tr '\n' '\0' \
+      | xargs -0 grep -EIls -e "android:debuggable[[:space:]]*=[[:space:]]*[\"']true[\"']" 2>/dev/null | grep -q .
+  }
+  if release_manifest_debuggable; then
+    finding critical "ANDROID-DEBUGGABLE-RELEASE" "android:debuggable is true in the manifest" "Remove android:debuggable from the manifest and let the build type set it. Play Console rejects a debuggable APK or app bundle." manifest 'android:debuggable'
+  fi
+  # A specialUse foreground service needs its subtype property and a Play Console declaration.
+  special_use_undeclared() {
+    [ -s "$FILELIST" ] || return 1
+    local m su pr
+    while IFS= read -r m; do
+      [ -f "$m" ] || continue
+      su="$(grep -oE '(^|[^A-Za-z:])android:foregroundServiceType[[:space:]]*=[[:space:]]*["'\''][^"'\'']*specialUse' "$m" | wc -l | tr -d ' ')"
+      pr="$(grep -oE 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE' "$m" | wc -l | tr -d ' ')"
+      [ "$su" -gt "$pr" ] && return 0
+    done <<SUMANIFESTS
+$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')
+SUMANIFESTS
+    return 1
+  }
+  if special_use_undeclared; then
+    finding high "ANDROID-FGS-SPECIAL-USE-UNDECLARED" "specialUse foreground service without a subtype property" "Add a property named android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE inside the service, and justify the use in the Play Console foreground service declaration." manifest 'android:foregroundServiceType=.*specialUse'
+  fi
+  # Play requires a 64-bit build of every native library that ships a 32-bit ABI.
+  abi_missing_64() {  # joins a multi-line abiFilters declaration and drops // comments first
+    [ -s "$FILELIST" ] || return 1
+    local gf
+    while IFS= read -r gf; do
+      [ -f "$gf" ] || continue
+      awk '{ sub(/\/\/.*/, "") }
+      /abiFilters/ { buf = ""; on = 1; depth = 0 }
+      on { buf = buf " " $0; o = gsub(/\(/, "("); c = gsub(/\)/, ")"); depth += o - c;
+           if (depth <= 0 && $0 !~ /,[[:space:]]*$/) { on = 0;
+             if (buf ~ /armeabi-v7a/ && buf !~ /arm64-v8a/) f = 1;
+             if (buf ~ /["\047]x86["\047]/ && buf !~ /x86_64/) f = 1 } }
+      END { exit f ? 0 : 1 }' "$gf" 2>/dev/null && return 0
+    done <<ABIFILES
+$(grep -E '[.](gradle|kts)$' "$FILELIST")
+ABIFILES
+    return 1
+  }
+  if abi_missing_64; then
+    finding high "ANDROID-64BIT-ABI-MISSING" "abiFilters ship a 32-bit ABI without its 64-bit pair" "Add arm64-v8a, and x86_64 when x86 ships, to abiFilters. Google Play requires a 64-bit version of every native library." src 'abiFilters'
   fi
   if grep_has 'QUERY_ALL_PACKAGES'; then
     finding high "ANDROID-QUERY-ALL-PACKAGES" "QUERY_ALL_PACKAGES without a permitted use case" "Declare specific packages with a queries element, or qualify for a permitted use case." src 'QUERY_ALL_PACKAGES'

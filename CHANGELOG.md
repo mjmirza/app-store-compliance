@@ -2,6 +2,21 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Three model reviews attacked the changes before release. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.
+
+### Added
+- The guard now scans uploads made through `helm-asc` (builds upload and `--submit`), the `asc` CLI, and the Codemagic `app-store-connect publish` command. Before, these reached App Store Connect without a scan.
+- `APPLE-MIN-DEPLOYMENT-TARGET-IOS13`. App Store Connect refuses uploads that target below iOS 13. The guard reads the project, xcconfig files (including `[sdk=...]` qualifiers) and the Podfile. Reported as high, because a dependency or test target below 13 does not block an upload on its own.
+- `APPLE-2.5.5-IPV4-ONLY-NETWORKING`. App Review runs on an IPv6 only network, so `inet_addr`, `inet_aton` and `gethostbyname` are flagged, including in the app's own C, C++ and Objective-C++ files. Vendored native code is skipped.
+- `APPLE-5.1.3-HEALTH-DATA-ICLOUD`. HealthKit plus CloudKit or iCloud key-value storage is reported for a human to confirm that no health data reaches iCloud.
+- `ANDROID-DEBUGGABLE-RELEASE` (critical). A release manifest with `android:debuggable` set to true. Debug-only manifests are ignored.
+- `ANDROID-FGS-SPECIAL-USE-UNDECLARED`. A `specialUse` foreground service without its own subtype property, counted per manifest.
+- `ANDROID-64BIT-ABI-MISSING`. An `abiFilters` line that ships `armeabi-v7a` without `arm64-v8a`, or `x86` without `x86_64`.
+- `APPLE-ODR-UPLOAD-BLOCK-2027`. From early 2027 App Store Connect will no longer accept On-Demand Resources uploads from new apps or apps that have never used the feature. Tracked from the earliest possible date as a reminder, not as Apple's enforcement date.
+- `docs/COMPETITIVE-GAP-ANALYSIS.md` records the second survey, what was adopted, what was rejected and why, and the larger work left for later releases (built artifact inspection, runtime flow proof, a Data safety CSV generator).
+
 ## 2.3.0 (2026-11-15)
 
 This release adds source provenance to every regulatory deadline, ten new deadlines (six from the November sweep, three from its Asia-Pacific follow-up, and Korea's privacy certification from the September re-read), and a GitHub Pages site. A deadline entry now needs `source_url` and `verified_on` to validate, which changes the data schema but blocks nothing in the guard, so it is a minor version.

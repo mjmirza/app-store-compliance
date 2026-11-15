@@ -1,6 +1,6 @@
 {
   "version": "2.3.0",
-  "updated": "2026-10-17",
+  "updated": "2026-11-15",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -1620,7 +1620,7 @@
       "guideline": "On-Demand Resources deprecation (WWDC26 App Store guide)",
       "title": "On-Demand Resources still in use",
       "severity": "high",
-      "detection": "Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets.",
+      "detection": "Apple deprecated On-Demand Resources starting in iOS 27, iPadOS 27, tvOS 27, and visionOS 27. Apps that rely on NSBundleResourceRequest tags will lose the download path in a future release and should migrate to Background Assets. From early 2027 App Store Connect will no longer accept uploads containing On-Demand Resources from new apps or apps that have never used this feature (release notes, 12 November 2026).",
       "signals": [
         "NSBundleResourceRequest",
         "OnDemandResources",
@@ -1920,6 +1920,108 @@
       "severity": "critical",
       "detection": "Since 16 October 2026 the Legal section states that apps found to facilitate human trafficking or the exploitation of children are reported to the authorities, removed from the App Store, and blocked from alternative distribution. The risk sits with marketplaces, classifieds, escort or companion listings, anonymous contact, and any surface where adults reach minors. Checked by hand.",
       "fix": "Moderate listings and messaging for trafficking and child exploitation signals, verify ages where adults can reach minors, report CSAM to NCMEC as US law requires, and keep the reporting path from guideline 1.2. Sources. https://developer.apple.com/news/?id=92th7e5i, https://developer.apple.com/news/?id=vvzx6cul"
+    },
+    {
+      "id": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
+      "platform": "apple",
+      "guideline": "App Store Connect upload requirement (Upcoming Requirements)",
+      "title": "iOS deployment target below iOS 13",
+      "severity": "high",
+      "detection": "Apple's Upcoming Requirements page states that iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later. An IPHONEOS_DEPLOYMENT_TARGET or Podfile platform below 13 is refused at upload. A dependency or test target below 13 does not block the upload on its own, so the guard reports this as high rather than blocking.",
+      "signals": [
+        "IPHONEOS_DEPLOYMENT_TARGET = 12",
+        "platform :ios, '12"
+      ],
+      "counterSignals": [
+        "IPHONEOS_DEPLOYMENT_TARGET = 13",
+        "IPHONEOS_DEPLOYMENT_TARGET = 1[4-9]"
+      ],
+      "fix": "Raise the deployment target to iOS 13.0 or later in the project, the app target and the Podfile.",
+      "added": "2026-11-15"
+    },
+    {
+      "id": "APPLE-2.5.5-IPV4-ONLY-NETWORKING",
+      "platform": "apple",
+      "guideline": "2.5.5",
+      "title": "IPv4-only networking fails on the IPv6-only review network",
+      "severity": "medium",
+      "detection": "App Review tests on an IPv6-only NAT64 network. Code that resolves or connects with inet_addr, inet_aton or gethostbyname works on IPv4 and fails during review, so the app looks broken (2.5.5, apps must be fully functional on IPv6-only networks).",
+      "signals": [
+        "inet_addr(",
+        "inet_aton(",
+        "gethostbyname("
+      ],
+      "counterSignals": [
+        "getaddrinfo",
+        "NWConnection",
+        "URLSession"
+      ],
+      "fix": "Use getaddrinfo, Network.framework or URLSession, avoid hardcoded IPv4 literals, and test on a NAT64 network created with Mac Internet Sharing.",
+      "added": "2026-11-15"
+    },
+    {
+      "id": "APPLE-5.1.3-HEALTH-DATA-ICLOUD",
+      "platform": "apple",
+      "guideline": "5.1.3(ii)",
+      "title": "Health data may reach iCloud",
+      "severity": "medium",
+      "detection": "Guideline 5.1.3(ii) bars storing personal health information in iCloud. An app that reads HealthKit and also writes to CloudKit, NSUbiquitousKeyValueStore or an NSPersistentCloudKitContainer needs a check that no health data takes that path.",
+      "signals": [
+        "HKHealthStore",
+        "CKContainer",
+        "NSUbiquitousKeyValueStore",
+        "NSPersistentCloudKitContainer"
+      ],
+      "counterSignals": [],
+      "fix": "Keep HealthKit and other health data on device or in a backend you control, and exclude it from any CloudKit or iCloud key-value sync.",
+      "added": "2026-11-15"
+    },
+    {
+      "id": "ANDROID-DEBUGGABLE-RELEASE",
+      "platform": "google",
+      "guideline": "Play Console upload validation",
+      "title": "Debuggable build uploaded to Play",
+      "severity": "critical",
+      "detection": "Play Console refuses an APK or app bundle marked debuggable. Hardcoding android:debuggable=\"true\" in the manifest ships it in the release build.",
+      "signals": [
+        "android:debuggable=\"true\""
+      ],
+      "counterSignals": [],
+      "fix": "Remove android:debuggable from the manifest and let the release build type keep it false.",
+      "added": "2026-11-15"
+    },
+    {
+      "id": "ANDROID-FGS-SPECIAL-USE-UNDECLARED",
+      "platform": "google",
+      "guideline": "Foreground service types policy",
+      "title": "specialUse foreground service without a subtype",
+      "severity": "high",
+      "detection": "A foreground service of type specialUse must declare the PROPERTY_SPECIAL_USE_FGS_SUBTYPE property and be justified in the Play Console foreground service declaration. Without it Play review asks for the justification and can reject the update.",
+      "signals": [
+        "foregroundServiceType=\"specialUse\""
+      ],
+      "counterSignals": [
+        "PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+      ],
+      "fix": "Add the subtype property inside the service and complete the Play Console declaration, or move to a specific service type.",
+      "added": "2026-11-15"
+    },
+    {
+      "id": "ANDROID-64BIT-ABI-MISSING",
+      "platform": "google",
+      "guideline": "Google Play 64-bit requirement",
+      "title": "32-bit native ABI without a 64-bit build",
+      "severity": "high",
+      "detection": "Google Play requires a 64-bit version of every native library. An abiFilters list with armeabi-v7a but no arm64-v8a fails the requirement.",
+      "signals": [
+        "abiFilters",
+        "armeabi-v7a"
+      ],
+      "counterSignals": [
+        "arm64-v8a"
+      ],
+      "fix": "Add arm64-v8a, and x86_64 when x86 ships, to abiFilters.",
+      "added": "2026-11-15"
     }
   ]
 }
