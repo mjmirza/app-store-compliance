@@ -166,6 +166,11 @@ def decide_status(findings, problems):
     return "PASSED", 0
 
 
+def python_cmd(script, *args):
+    """The interpreter running this audit, never a guessed name like python3 (#2333)."""
+    return [sys.executable, script, *args]
+
+
 def run_command(args, cwd=ROOT):
     try:
         res = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
@@ -394,7 +399,7 @@ def main():
     # --- Step 1. Run Internal Validation and Test Engines ---
     print("Step 1 of 2. Checking the playbook itself first. This takes about two minutes.", flush=True)
 
-    val_code, val_out, val_err = run_command(["python3", "scripts/validate.py"])
+    val_code, val_out, val_err = run_command(python_cmd("scripts/validate.py"))
     if val_code != 0:
         print("  ERROR: validate.py failed")
         print(val_out)
@@ -433,7 +438,7 @@ def main():
     # Run metadata-audit.py
     # The pulled listing from --metadata when given, otherwise the app folder itself
     meta_code, meta_out, meta_err = run_command(
-        ["python3", "scripts/metadata-audit.py", meta_dir or target_dir]
+        python_cmd("scripts/metadata-audit.py", meta_dir or target_dir)
     )
 
     patterns_dict = load_patterns()

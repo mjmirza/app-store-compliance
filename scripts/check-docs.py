@@ -134,14 +134,16 @@ def main():
     files = markdown_files()
     for path in files:
         problems.extend(check_file(path))
-    syntax = subprocess.run(
-        ["bash", "-n", os.path.join(ROOT, "scripts", "install.sh")], capture_output=True
-    )
-    if (
-        os.path.exists(os.path.join(ROOT, "scripts", "install.sh"))
-        and syntax.returncode != 0
-    ):
-        problems.append("scripts/install.sh does not parse")
+    # A Windows checkout is CRLF, and an absolute Windows path is not a path bash can
+    # open, so parse the source from stdin with LF endings instead of naming a file.
+    # The bytes go in as bytes: text mode would rewrite every LF back to CRLF on Windows.
+    install_sh = os.path.join(ROOT, "scripts", "install.sh")
+    if os.path.exists(install_sh):
+        with open(install_sh, encoding="utf-8") as f:
+            source = f.read().replace("\r\n", "\n").encode("utf-8")
+        syntax = subprocess.run(["bash", "-n"], input=source, capture_output=True)
+        if syntax.returncode != 0:
+            problems.append("scripts/install.sh does not parse")
     for problem in problems:
         print(problem)
     print(f"check-docs. {len(files)} files, {len(problems)} problem(s)")
