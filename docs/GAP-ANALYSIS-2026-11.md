@@ -65,3 +65,7 @@ A second pass read the App Store Connect release notes and the Upcoming Requirem
 | iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later | [Upcoming Requirements](https://developer.apple.com/news/upcoming-requirements/) | APPLE-MIN-DEPLOYMENT-TARGET-IOS13, new guard check |
 
 Checked and not encoded. The INSTALLS analytics report deprecation in App Store Connect API 4.6 affects reporting, not review. The Republic of Korea consent schedule for converting subscription offers to standard paid subscriptions (30 September 2026) is tracked for the next sweep, because its detail page failed to load on the first read.
+
+## 8. Follow-up, 19 November 2026
+
+The 29 October 2026 announcement says trader status must be declared in Play Console starting in November 2026. Section 3 above treated that line as already covered. The linked Play Console page (answer 17594752), read on 19 November 2026, states two dates the announcement does not. Existing accounts must declare trader or non-trader status by 1 February 2027, and the EEA and UK online marketplace display starts 1 March 2027. Those are `GOOGLE-PLAY-TRADER-STATUS-2027` and `GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027`. They are not the February 2027 technical quality deadline (`GOOGLE-TECH-QUALITY-FEB-2027`) and not Apple's DSA trader duty (`EU-DSA-TRADER-STATUS`).

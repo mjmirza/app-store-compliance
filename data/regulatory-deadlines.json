@@ -1,13 +1,13 @@
 {
   "version": "2.5.0",
-  "updated": "2026-11-21",
+  "updated": "2026-11-22",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
       "id": "EU-AI-ACT-ART-4",
       "jurisdiction": "European Union (EU)",
-      "law": "EU AI Act, Regulation (EU) 2024/1689",
-      "requirement": "Article 4 AI Literacy. Providers and deployers must take measures to ensure a sufficient level of AI literacy, proportionate to context. A written policy, induction, and log are pragmatic evidence, not a stated legal mandate.",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 as amended by Regulation (EU) 2026/1744, Article 4",
+      "requirement": "Article 4 AI literacy, as replaced on 27 July 2026. Providers and deployers take measures to support the development of AI literacy of their staff and other persons dealing with the operation and use of AI systems on their behalf, taking into account their technical knowledge, experience, education and training, the context the systems are used in, and the persons or groups on whom the systems are used. The obligation does not require guaranteeing any specific level of AI literacy of any individual. A written policy, induction, and log are pragmatic evidence, not a stated legal mandate.",
       "effective_date": "2024-08-01",
       "grace_period": "6 months",
       "mandatory_date": "2025-02-02",
@@ -15,9 +15,10 @@
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "high",
       "absorbed_into": "docs/EU-REGULATORY-2026.md section 1.3, references/guidelines/by-app-type/ai-and-generative-apps.md",
-      "source_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
-      "verified_on": "2026-11-14",
-      "source_note": "EUR-Lex serves scripted clients an empty page, so the text was read through the Publications Office CELLAR record for CELEX 32024R1689."
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+      "verified_on": "2026-11-19",
+      "source_note": "EUR-Lex HTML and PDF for CELEX 02024R1689-20260727 return a bot challenge. The consolidated Article 4 (Consolidated TEXT: 32024R1689, EN, 27.07.2026) was read on 19 November 2026 through the Publications Office CELLAR xhtml record http://publications.europa.eu/resource/celex/02024R1689-20260727.ENG (cellar:b1730fb2-8f1c-11f1-9262-01aa75ed71a1). It matches Regulation (EU) 2026/1744 Article 1(5), read the same day at http://data.europa.eu/eli/reg/2026/1744/oj.",
+      "history": "2026-11-19. Obligation narrowed in place. The 2 February 2025 application date is unchanged. Before Regulation (EU) 2026/1744 replaced Article 4, the entry required measures to ensure a sufficient level of AI literacy."
     },
     {
       "id": "EU-AI-ACT-ART-5",
@@ -1012,17 +1013,18 @@
     {
       "id": "EU-AI-ACT-MARKING-RETROFIT-2026",
       "jurisdiction": "European Union (EU)",
-      "law": "EU AI Act, Regulation (EU) 2024/1689 as amended by Regulation (EU) 2026/1744, Article 111(4) and Article 5(1)(ba) and (bb)",
-      "requirement": "Retrofit Article 50(2) machine-readable AI-content marking onto any generative audio, image, video, or text system already on the market before 2 August 2026, and stop operating any AI system whose intended or reasonably foreseeable output is non-consensual intimate imagery or child sexual abuse material.",
+      "law": "EU AI Act, Regulation (EU) 2024/1689 as amended by Regulation (EU) 2026/1744, Article 111(4) and Article 5(1)(ba), (bb), (1a) and (1b)",
+      "requirement": "Article 111(4). Providers of AI systems, including general-purpose AI systems, that generate synthetic audio, image, video or text and were placed on the market before 2 August 2026 take the necessary steps to comply with Article 50(2) by 2 December 2026. From the same date, Article 5(1a) prohibits placing on the market or putting into service an AI system that generates or manipulates non-consensual intimate material (Article 5(1)(ba)) or child sexual abuse material or performance (Article 5(1)(bb), Directive 2011/93/EU Article 2(c) and (e)) only where that generation or manipulation is the intended purpose, or where the system's design, training, architecture, capabilities or user-facing functionalities make it a reasonably foreseeable and reproducible outcome without significant technical modification and the system lacks reasonable and adequate technical safety measures and other safeguards to reliably prevent it, taking into account reasonably foreseeable misuse, and to correct observed or reported misuse. Use is prohibited only where the deployer uses the system for that purpose. Article 5(1b): a manipulation that does not increase the exposure of any depicted intimate parts or alter the nature of any depicted sexually explicit activities is not manipulation under point (ba).",
       "effective_date": "2026-12-02",
       "grace_period": "none",
       "mandatory_date": "2026-12-02",
       "enforcement_date": "2026-12-02",
       "affected_repository_sections": "docs/EU-REGULATORY-2026.md section 1.1, references/guidelines/by-app-type/ai-and-generative-apps.md",
       "priority": "high",
-      "source_url": "https://digital-strategy.ec.europa.eu/en/news/ai-omnibus-enters-force",
-      "verified_on": "2026-11-14",
-      "source_note": "Commission notice of the AI omnibus amendment. The consolidated amended text was not read."
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+      "verified_on": "2026-11-19",
+      "source_note": "EUR-Lex HTML and PDF for CELEX 02024R1689-20260727 return a bot challenge. The consolidated text (Consolidated TEXT: 32024R1689, EN, 27.07.2026) was read on 19 November 2026 through the Publications Office CELLAR xhtml record http://publications.europa.eu/resource/celex/02024R1689-20260727.ENG (cellar:b1730fb2-8f1c-11f1-9262-01aa75ed71a1). Article 111(4), Article 5(1)(ba), (bb), (1a) and (1b), and the Article 113 application date of 2 December 2026 match Regulation (EU) 2026/1744 Article 1(7), (39)(b) and (40)(a), read the same day at http://data.europa.eu/eli/reg/2026/1744/oj.",
+      "history": "2026-11-19. Requirement corrected in place. The 2 December 2026 date is unchanged. The previous text told operators to stop operating any AI system whose intended or reasonably foreseeable output is non-consensual intimate imagery or child sexual abuse material. Article 5(1a) limits placing on the market and putting into service to an intended purpose, or to a reasonably foreseeable and reproducible outcome where safeguards and misuse correction are missing, and limits the use ban to a deployer who uses the system for that purpose."
     },
     {
       "id": "EU-PRODUCT-LIABILITY-SOFTWARE-2026",
@@ -1589,6 +1591,36 @@
       "absorbed_into": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
       "source_url": "https://developer.apple.com/news/upcoming-requirements/",
       "verified_on": "2026-11-15"
+    },
+    {
+      "id": "GOOGLE-PLAY-TRADER-STATUS-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Play Console trader status declaration under EEA and UK law (Play Console Help answer 17594752)",
+      "requirement": "Every active developer account must declare trader or non-trader status under EEA and UK law in Play Console, regardless of where its apps are targeted or distributed. An account that does not distribute in the EEA or the UK may declare non-trader. New accounts declare on creation. Existing accounts must declare by 1 February 2027. A trader self-certifies compliance with applicable laws, provides each app's terms of service link, and on a personal account provides a contact phone number (the address is displayed). Missing the date may block updates and remove the app from Play globally. A false non-trader declaration may result in global removal, and misrepresenting status to bypass verification or self-certification may suspend or terminate the account globally.",
+      "effective_date": "2026-10-29",
+      "grace_period": "until 1 February 2027 for existing accounts",
+      "mandatory_date": "2027-02-01",
+      "enforcement_date": "2027-02-01",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/EU-REGULATORY-2026.md section 3",
+      "priority": "critical",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17594752?hl=en",
+      "verified_on": "2026-11-19",
+      "source_note": "Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 policy announcement (answer 18100766) links to that page and says only that trader status must be declared in Play Console starting in November 2026. It publishes no day in November and does not state 1 February 2027, so effective_date is the announcement date, not a guessed 1 November. New accounts have no grace: the trader page says they declare immediately on creation. This is not GOOGLE-TECH-QUALITY-FEB-2027 and not EU-DSA-TRADER-STATUS."
+    },
+    {
+      "id": "GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Play Console online marketplace model and trader information display for the EEA and the UK (Play Console Help answer 17594752)",
+      "requirement": "From 1 March 2027 Google Play uses an online marketplace model in the EEA and the UK. From that date, where the account has declared as a trader, users everywhere see the trader's contact details (a phone number and address for an individual account), the D-U-N-S number in App support, and a Terms of Service link when one was provided. Users in the EEA and the UK also see the developer or trader name in place of Google in the Offered by field, and the self-certification that products or services comply with local laws.",
+      "effective_date": "2027-03-01",
+      "grace_period": "none",
+      "mandatory_date": "2027-03-01",
+      "enforcement_date": "2027-03-01",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/EU-REGULATORY-2026.md section 3",
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17594752?hl=en",
+      "verified_on": "2026-11-19",
+      "source_note": "Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 policy announcement does not state 1 March 2027. This is the date the store starts displaying trader information, not a second declaration deadline. Existing accounts declare by the date in GOOGLE-PLAY-TRADER-STATUS-2027."
     },
     {
       "id": "APPLE-CALIFORNIA-SALES-TAX-DIGITAL-2027",
