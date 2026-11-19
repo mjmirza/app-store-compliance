@@ -92,7 +92,11 @@ def trust_of(host):
 
 
 def fingerprint(body):
-    return hashlib.sha256(body[:200000]).hexdigest()[:16]
+    # A soft-404 often is one shared index with a rotating cache-buster on an
+    # asset URL (Apple news stamps sf-symbol.js?###########). Strip long numeric
+    # query strings so two fetches of that same page still compare equal.
+    sample = re.sub(br"\?\d{8,}", b"", body[:200000])
+    return hashlib.sha256(sample).hexdigest()[:16]
 
 
 def fetch(url):

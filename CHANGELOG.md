@@ -2,6 +2,21 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Added
+
+- `GOOGLE-PLAY-TRADER-STATUS-2027`. Every active Google Play developer account must declare trader or non-trader status. Existing accounts must do so by 1 February 2027. A missing declaration may block updates and remove the app globally. Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 announcement (answer 18100766) says the declaration starts in November 2026 and does not state this date. This is separate from `EU-DSA-TRADER-STATUS` (Apple, enforced 17 February 2025) and from `GOOGLE-TECH-QUALITY-FEB-2027`.
+- `GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027`. From 1 March 2027 Play uses an online marketplace model in the EEA and the UK. Where the account declared as a trader, users everywhere see contact details, the D-U-N-S number, and a terms link if one was provided. EEA and UK users also see the trader name in place of Google in Offered by. Same Play Console page.
+
+### Changed
+
+- `docs/EU-REGULATORY-2026.md` section 3 no longer says Google Play's trader deadline is unverified. The Play Console dates replace that sentence. The older claim that Google enforced only with reduced discoverability was not on the page and is dropped.
+
+### Fixed
+
+- `scripts/verify-citations.py` ignores a long numeric cache-buster on an asset URL when it compares a page with the soft-404 control. Apple's news index rotates that query string between fetches, which made the same index look like two pages and let a fabricated news id pass.
+
 ## 2.4.0 (2026-11-15)
 
 This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Eight adversarial review rounds attacked the changes before release, and every reproduced bug became a test. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.

@@ -1,6 +1,6 @@
 {
   "version": "2.4.0",
-  "updated": "2026-11-15",
+  "updated": "2026-11-19",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -1589,6 +1589,36 @@
       "absorbed_into": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
       "source_url": "https://developer.apple.com/news/upcoming-requirements/",
       "verified_on": "2026-11-15"
+    },
+    {
+      "id": "GOOGLE-PLAY-TRADER-STATUS-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Play Console trader status declaration under EEA and UK law (Play Console Help answer 17594752)",
+      "requirement": "Every active developer account must declare trader or non-trader status under EEA and UK law in Play Console, regardless of where its apps are targeted or distributed. An account that does not distribute in the EEA or the UK may declare non-trader. New accounts declare on creation. Existing accounts must declare by 1 February 2027. A trader self-certifies compliance with applicable laws, provides each app's terms of service link, and on a personal account provides a contact phone number (the address is displayed). Missing the date may block updates and remove the app from Play globally. A false non-trader declaration may result in global removal, and misrepresenting status to bypass verification or self-certification may suspend or terminate the account globally.",
+      "effective_date": "2026-10-29",
+      "grace_period": "until 1 February 2027 for existing accounts",
+      "mandatory_date": "2027-02-01",
+      "enforcement_date": "2027-02-01",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/EU-REGULATORY-2026.md section 3",
+      "priority": "critical",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17594752?hl=en",
+      "verified_on": "2026-11-19",
+      "source_note": "Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 policy announcement (answer 18100766) links to that page and says only that trader status must be declared in Play Console starting in November 2026. It publishes no day in November and does not state 1 February 2027, so effective_date is the announcement date, not a guessed 1 November. New accounts have no grace: the trader page says they declare immediately on creation. This is not GOOGLE-TECH-QUALITY-FEB-2027 and not EU-DSA-TRADER-STATUS."
+    },
+    {
+      "id": "GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Play Console online marketplace model and trader information display for the EEA and the UK (Play Console Help answer 17594752)",
+      "requirement": "From 1 March 2027 Google Play uses an online marketplace model in the EEA and the UK. From that date, where the account has declared as a trader, users everywhere see the trader's contact details (a phone number and address for an individual account), the D-U-N-S number in App support, and a Terms of Service link when one was provided. Users in the EEA and the UK also see the developer or trader name in place of Google in the Offered by field, and the self-certification that products or services comply with local laws.",
+      "effective_date": "2027-03-01",
+      "grace_period": "none",
+      "mandatory_date": "2027-03-01",
+      "enforcement_date": "2027-03-01",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/EU-REGULATORY-2026.md section 3",
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/17594752?hl=en",
+      "verified_on": "2026-11-19",
+      "source_note": "Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 policy announcement does not state 1 March 2027. This is the date the store starts displaying trader information, not a second declaration deadline. Existing accounts declare by the date in GOOGLE-PLAY-TRADER-STATUS-2027."
     }
   ]
 }
