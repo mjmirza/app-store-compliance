@@ -132,7 +132,7 @@ def main():
         return finish()
 
     try:
-        data = json.load(open(PATTERNS))
+        data = json.load(open(PATTERNS, encoding="utf-8"))
     except Exception as e:
         errors.append(f"Failed to parse rejection-patterns.json: {e}")
         return finish()
@@ -158,7 +158,7 @@ def main():
     # 2. Validate recipes
     if os.path.exists(RECIPES):
         try:
-            recipes = json.load(open(RECIPES)).get("recipes", {})
+            recipes = json.load(open(RECIPES, encoding="utf-8")).get("recipes", {})
             for rid in recipes:
                 if rid not in ids:
                     errors.append(
@@ -182,7 +182,7 @@ def main():
         errors.append(f"File not found: {DEADLINES}")
     else:
         try:
-            deadline_data = json.load(open(DEADLINES))
+            deadline_data = json.load(open(DEADLINES, encoding="utf-8"))
             deadlines = deadline_data.get("deadlines", [])
             if not deadlines:
                 errors.append("regulatory-deadlines.json has no deadlines list")

@@ -111,13 +111,13 @@ def esc(s):
 def load_recipes():
     path = os.path.join(ROOT, "data", "detection-recipes.json")
     try:
-        return json.load(open(path)).get("recipes", {})
+        return json.load(open(path, encoding="utf-8")).get("recipes", {})
     except Exception:
         return {}
 
 
 def write_rules():
-    data = json.load(open(PATTERNS))
+    data = json.load(open(PATTERNS, encoding="utf-8"))
     patterns = data["patterns"]
     recipes = load_recipes()
     buckets = {slug: [] for slug, _t, _k in CATEGORIES}
@@ -165,14 +165,14 @@ def write_rules():
                 lines.append("```")
             lines.append("")
         path = os.path.join(RULES_DIR, f"{slug}.md")
-        open(path, "w").write("\n".join(lines))
+        open(path, "w", encoding="utf-8").write("\n".join(lines))
         written.append((slug, titles[slug], len(items)))
     return written
 
 
 def write_by_app_type():
     os.makedirs(BAT_DIR, exist_ok=True)
-    text = open(BY_APP_TYPE).read()
+    text = open(BY_APP_TYPE, encoding="utf-8").read()
     # split on H2 sections
     parts = re.split(r"\n## ", text)
     written = []
@@ -183,7 +183,7 @@ def write_by_app_type():
         if not slug:
             continue
         content = f"# {title}\n\n{body.strip()}\n"
-        open(os.path.join(BAT_DIR, f"{slug}.md"), "w").write(content)
+        open(os.path.join(BAT_DIR, f"{slug}.md"), "w", encoding="utf-8").write(content)
         written.append((slug, title))
     return written
 
@@ -217,7 +217,7 @@ def write_index(rule_files, app_types):
         "Full context beats a checklist. Loading the right slices of this tree gives the agent what it needs to decide.",
         "",
     ]
-    open(os.path.join(REF, "README.md"), "w").write("\n".join(lines))
+    open(os.path.join(REF, "README.md"), "w", encoding="utf-8").write("\n".join(lines))
 
 
 if __name__ == "__main__":

@@ -187,5 +187,66 @@ class TestDeadlineDayBoundary(unittest.TestCase):
         self.assertNotIn("Due Today Act", overdue_part)
 
 
+class TestDatabaseReadAsUtf8(unittest.TestCase):
+    """#2330: the database is read as UTF-8 whatever the platform default is, the
+    report survives a law name outside ASCII on a cp1252 pipe, and a database that
+    cannot be read still fails open."""
+
+    SCRIPT = os.path.join(ROOT, "scripts", "deadline-checker.py")
+
+    def _run(self, db_bytes, **env_extra):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "deadlines.json")
+            with open(path, "wb") as f:
+                f.write(db_bytes)
+            env = dict(os.environ, DEADLINES_FILE=path, **env_extra)
+            result = subprocess.run(
+                [sys.executable, self.SCRIPT], capture_output=True, env=env
+            )
+        return (
+            result.returncode,
+            result.stdout.decode("utf-8", "replace"),
+            result.stderr.decode("utf-8", "replace"),
+        )
+
+    def _upcoming(self, law):
+        day = (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%d")
+        row = {
+            "id": "TEST-UTF8",
+            "jurisdiction": "Test",
+            "law": law,
+            "requirement": "Fixture",
+            "effective_date": day,
+            "grace_period": "none",
+            "mandatory_date": day,
+            "enforcement_date": day,
+            "affected_repository_sections": "docs/APPLE.md",
+            "priority": "high",
+        }
+        return json.dumps({"deadlines": [row]}, ensure_ascii=False).encode("utf-8")
+
+    def test_non_ascii_law_name_survives_a_cp1252_pipe(self):
+        rc, out, err = self._run(
+            self._upcoming("Act 17 July 2026 改正 第56号"), PYTHONIOENCODING="cp1252"
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertIn("改正 第56号", out)
+
+    def test_no_default_encoding_warning(self):
+        rc, out, err = self._run(
+            self._upcoming("Test Act"), PYTHONWARNDEFAULTENCODING="1"
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn("EncodingWarning", out + err)
+
+    def test_database_that_is_not_utf8_still_fails_open(self):
+        db = b'{"deadlines": [{"law": "bad ' + bytes([255]) + b' byte"}]}'
+        rc, out, err = self._run(db)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("Error loading deadlines", err)
+
+
 if __name__ == "__main__":
     unittest.main()
