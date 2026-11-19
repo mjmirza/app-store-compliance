@@ -2,6 +2,12 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Fixed
+
+- `EU-AI-ACT-MARKING-RETROFIT-2026` and `EU-AI-ACT-ART-4` now follow the consolidated AI Act, CELEX 02024R1689-20260727, read on 19 November 2026. The 2 December 2026 date is unchanged. Article 111(4) still requires Article 50(2) marking on generative systems placed on the market before 2 August 2026. Article 5(1a) prohibits placing on the market or putting into service only where non-consensual intimate material or child sexual abuse material is the intended purpose, or a reasonably foreseeable and reproducible outcome and the system lacks reasonable and adequate safeguards and a process to correct observed or reported misuse. Use is prohibited only where the deployer uses the system for that purpose. Article 4 requires measures to support the development of AI literacy and does not require guaranteeing a specific level. The previous entries told operators to stop any system whose output was reasonably foreseeable, and to ensure a sufficient level of literacy. `docs/EU-REGULATORY-2026.md` sections 1.1 and 1.3, the AI app-type guideline, and the generated timeline carry the same wording.
+
 ## 2.4.0 (2026-11-15)
 
 This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Eight adversarial review rounds attacked the changes before release, and every reproduced bug became a test. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.
