@@ -213,5 +213,38 @@ class TestSourceProvenance(unittest.TestCase):
         rc, out = run(entry())
         self.assertEqual(rc, 0, out)
 
+
+def run_with(db_path, **env_extra):
+    env = dict(os.environ, DEADLINES_FILE=db_path, **env_extra)
+    cmd = [sys.executable, os.path.join(ROOT, "scripts", "validate.py")]
+    result = subprocess.run(cmd, capture_output=True, env=env)
+    return result.returncode, (result.stdout + result.stderr).decode("utf-8", "replace")
+
+
+class TestDataFilesReadAsUtf8(unittest.TestCase):
+    """#2330: validate.py opens the data files as UTF-8, not the platform default."""
+
+    def _db(self, tmp, law):
+        path = os.path.join(tmp, "deadlines.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(
+                {"deadlines": [entry(law=law)]}, f, ensure_ascii=False, indent=2
+            )
+        return path
+
+    def test_non_ascii_entry_validates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, out = run_with(self._db(tmp, "Act 改正 第56号"))
+        self.assertEqual(rc, 0, out)
+
+    def test_no_default_encoding_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rc, out = run_with(
+                self._db(tmp, "Test Act"), PYTHONWARNDEFAULTENCODING="1"
+            )
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("EncodingWarning", out)
+
+
 if __name__ == "__main__":
     unittest.main()

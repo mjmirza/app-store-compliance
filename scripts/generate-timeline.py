@@ -25,7 +25,7 @@ def load_deadlines():
         print(f"Error: Deadlines database not found at {DEADLINES_FILE}", file=sys.stderr)
         return []
     try:
-        with open(DEADLINES_FILE, "r") as f:
+        with open(DEADLINES_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             return data.get("deadlines", [])
     except Exception as e:
@@ -166,7 +166,7 @@ def main():
         md_lines.append("")
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-    with open(OUTPUT_FILE, "w") as f:
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
     print(f"Compiled {len(parsed_items)} deadlines to {OUTPUT_FILE}")
