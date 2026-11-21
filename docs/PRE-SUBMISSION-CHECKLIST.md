@@ -25,12 +25,16 @@ Then work down the page. Do Shared first, then the store you ship to. Skip any s
 - [ ] The production backend is live and reachable for the entire review window.
 - [ ] A working demo account is provided, or a demo mode exists, for any feature behind login.
 - [ ] All in app purchases are live, visible, and complete a real transaction in the review build.
+- [ ] The review notes give the tap path to every feature behind login, region, or payment, so the reviewer never has to search.
+- [ ] These checks are recorded in `.app-review-readiness.json` at the project root, so the guard reads them and blocks on a recorded fail. See [what the scan proves](WHAT-THE-SCAN-PROVES.md).
 
 ### Privacy and data
 - [ ] A privacy policy is published, reachable from inside the app, and accurate.
 - [ ] Every data collection has user consent before it happens.
 - [ ] Every permission has a specific reason string that names the real feature using it.
 - [ ] Account creating apps offer in app account deletion.
+- [ ] Account deletion tested on a real device. delete the account, then try to sign in with it again. The sign-in must fail.
+- [ ] A custom screen before a permission alert has one button titled Continue or Next, never Allow, and no Close or Cancel (Apple HIG Privacy, 5.1.1(iv)).
 - [ ] Users can withdraw consent and the app still works for non core features.
 - [ ] Every third party SDK and its data behavior is known and declared.
 
@@ -47,6 +51,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 ### Metadata and listing
 - [ ] The app name, description, and screenshots match what the app actually does.
 - [ ] Screenshots show the app in use, not a splash or login screen.
+- [ ] Screenshots are captured from this build on every device family you support, iPad included if the app runs on iPad.
 - [ ] Creative assets (product page header, search result art) show the app or its brand, suit all audiences, and carry no prices, discounts, unverifiable claims, or references to other apps (Apple 2.3.14, 16 October 2026).
 - [ ] No keyword stuffing in the name, subtitle, or description.
 - [ ] The age or content rating questionnaire is answered honestly.
@@ -55,6 +60,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 ### Monetization
 - [ ] Digital goods use the official store billing.
 - [ ] Subscription terms, renewal, charges, and cancellation are disclosed before purchase.
+- [ ] Free trial or intro offer wording shows only to users who are still eligible (StoreKit 2 `isEligibleForIntroOffer`), and states what is charged after the trial.
 - [ ] Loot boxes or random rewards disclose odds before purchase.
 
 ## Apple specific

@@ -3260,6 +3260,54 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { n
 gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# X feedback, November 2026. a custom pre-permission button titled Allow, per Apple HIG Privacy.
+D="$(gs_ios Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Allow Location") { CLLocationManager().requestWhenInUseAuthorization() } } }')"
+gs_check "pp-1 an Allow button beside a permission request is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
+D="$(gs_ios Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Continue") { CLLocationManager().requestWhenInUseAuthorization() } } }')"
+gs_check "pp-2 a Continue button stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Allow Location") { } } }')"
+gs_check "pp-3 an Allow button with no permission request in the file stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Pre.kt 'Button(onClick = { launcher.launch(Manifest.permission.CAMERA); req.launchPermissionRequest() }) { Text("Allow") }')"
+gs_check "pp-4 a Compose Text Allow beside launchPermissionRequest is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
+
+# Every report names its rule pack and date, so a stale checklist is visible.
+D="$(gs_ios ok.swift 'let a = 1')"; rr_run "$D"
+rr_has 'Rule pack. v[0-9]' && ok "rp-1 the report names its rule pack version" || bad "rp-1 the report names its rule pack version (rc=$RC)"
+OUT="$(APP_STORE_GUARD_STALE_DAYS=0 bash "$GUARD" "$D" 2>&1)"
+if printf '%s\n' "$OUT" | grep -q 'sources last verified [0-9-]* (0 days ago)'; then ok "rp-2 stale flag skipped, data verified today"
+else printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-2 a zero-day window marks the pack stale" || bad "rp-2 a zero-day window marks the pack stale"; fi
+SP="$(mktemp -d)"; mkdir -p "$SP/agent-os/hooks" "$SP/data"; cp "$HERE/app-store-compliance-guard.sh" "$SP/agent-os/hooks/"
+printf '9.9.9\n' > "$SP/VERSION"; printf '{"deadlines":[{"verified_on": "2020-01-01"}]}\n' > "$SP/data/regulatory-deadlines.json"
+OUT="$(bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"
+printf '%s\n' "$OUT" | grep -q 'Rule pack. v9.9.9, sources last verified 2020-01-01' && printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-4 an old rule pack is marked stale" || bad "rp-4 an old rule pack is marked stale"
+rm -rf "$SP"
+OUT="$(APP_STORE_GUARD_STALE_DAYS=abc bash "$GUARD" "$D" 2>&1)"
+printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && bad "rp-3 a non-numeric window falls back to 60" || ok "rp-3 a non-numeric window falls back to 60"
+
+# Manual readiness. what a scan cannot prove, recorded by the team.
+rr_has 'Manual checks. Not attested' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
+OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'MANUAL-READINESS-MISSING' && [ "$RC" -eq 2 ] && ok "rd-2 required readiness with no file blocks" || bad "rd-2 required readiness with no file blocks (rc=$RC)"
+TODAY="$(date +%Y-%m-%d)"
+printf '{"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"fail","live_backend":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && ok "rd-3 a failed demo account blocks" || bad "rd-3 a failed demo account blocks (rc=$RC)"
+printf '{"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
+rr_run "$D"
+! rr_has 'UNVERIFIED' && [ "$RC" -eq 0 ] && ok "rd-4 open items without enforce only inform" || bad "rd-4 open items without enforce only inform (rc=$RC)"
+printf '{"enforce":true,"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has 'MANUAL-LIVE-BACKEND-UNVERIFIED' && [ "$RC" -eq 2 ] && ok "rd-5 enforce turns an open item into a block" || bad "rd-5 enforce turns an open item into a block (rc=$RC)"
+printf '{"checks": [1,2' > "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 0 ] && ok "rd-6 broken JSON is named, never crashes" || bad "rd-6 broken JSON is named, never crashes (rc=$RC)"
+printf '{"build":"1.0 (1)","checked_on":"2020-01-01","checks":{"demo_account":"pass","live_backend":"pass","review_notes":"pass","screenshots_match_build":"pass","account_deletion_device_test":"n/a","privacy_labels_match_runtime":"pass","iap_reachable_by_reviewer":"n/a"}}' > "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has '7 of 7 attested' && rr_has 'MANUAL-READINESS-STALE' && ok "rd-7 an old attestation is flagged stale" || bad "rd-7 an old attestation is flagged stale (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

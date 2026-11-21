@@ -741,6 +741,18 @@ echo ""
 if grep_has 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'; then
   finding critical "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED" "Pipeline calls a removed App Store Connect API age-rating endpoint" "Switch to the current age-rating declaration read and update endpoints (ASC API 4.4 release notes)." src 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'
 fi
+# Apple HIG, Privacy. a custom screen before a system permission alert titles its one button Continue or Next,
+# never Allow. Fires only when the Allow button sits in a file that also requests the permission.
+PERM_REQ_RE='requestWhenInUseAuthorization|requestAlwaysAuthorization|requestTrackingAuthorization|requestAuthorization[(]|requestAccess[(]|requestRecordPermission|requestPermissions?[(]|RequestPermission|PermissionsAndroid[.]request|request[A-Za-z]*PermissionsAsync|[.]request[(][)]|launchPermissionRequest'
+ALLOW_BTN_RE='(Button[(]|setTitle[(]|title[:=][[:space:]]*[{]?|Text[(]|label[:=][[:space:]]*)[[:space:]]*(LocalizedStringKey[(]|NSLocalizedString[(]|String[(]localized:[[:space:]]*)?["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]|>[[:space:]]*Allow([[:space:]][A-Za-z ]{0,30})?[[:space:]]*</'
+if [ "$IS_IOS" -eq 1 ] && [ -s "$FILELIST" ]; then
+  PRE_PROMPT_HIT="$(grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EnH -m1 -e "$ALLOW_BTN_RE" 2>/dev/null | head -1)"
+  if [ -n "$PRE_PROMPT_HIT" ]; then
+    PRE_PROMPT_AT="${PRE_PROMPT_HIT#"${DIR%/}"/}"
+    PRE_PROMPT_AT="$(printf '%s' "$PRE_PROMPT_AT" | cut -d: -f1-2)"
+    finding high "APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON" "A custom screen before a permission alert titles its button Allow" "Title the single button Continue or Next, give it no Close or Cancel, and let the system alert ask (Apple HIG Privacy, pre-alert screens; Guideline 5.1.1(iv)). At $PRE_PROMPT_AT"
+  fi
+fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
@@ -1608,6 +1620,30 @@ if [ -n "$STDIN_JSON" ]; then
   if [ -z "$REPORT" ] && [ "$IS_CURSOR" -eq 1 ]; then exec 3>&1; exec 1>&2; CURSOR_FD=1; fi
 fi
 
+# A stale checklist gives false confidence. Every report names its rule pack version and the newest
+# verified_on date, and warns when that is older than APP_STORE_GUARD_STALE_DAYS (default 60).
+rule_pack_line() {
+  local hd root="" c ver="unknown" newest="" age="" stale="${APP_STORE_GUARD_STALE_DAYS:-60}"
+  case "$stale" in ''|*[!0-9]*) stale=60 ;; esac
+  hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  for c in "$hd/../.." "$hd/../skills/app-store-compliance" "${HOME:-}/.agents/skills/app-store-compliance"; do
+    if [ -f "$c/data/regulatory-deadlines.json" ]; then root="$(cd "$c" && pwd)"; break; fi
+  done
+  if [ -z "$root" ]; then
+    echo "Rule pack. unknown. The guard runs without its data folder, so its rule dates cannot be shown. Reinstall with scripts/install.sh."
+    return 0
+  fi
+  [ -f "$root/VERSION" ] && ver="$(tr -d '[:space:]' < "$root/VERSION")"
+  newest="$(grep -oE '"verified_on":[[:space:]]*"[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$root/data/regulatory-deadlines.json" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort | tail -1)"
+  if [ -n "$newest" ] && tool_ok python3 -c pass; then
+    age="$(python3 -c 'import sys,datetime;print((datetime.date.today()-datetime.date.fromisoformat(sys.argv[1])).days)' "$newest" 2>/dev/null)"
+  fi
+  echo "Rule pack. v$ver, sources last verified ${newest:-unknown}${age:+ ($age days ago)}. The checks run against this dated snapshot, not the live guideline pages."
+  if [ -n "$age" ] && [ "$age" -gt "$stale" ]; then
+    echo "Rule pack STALE. Older than $stale days, so a rule Apple or Google changed since then is not checked. Update with git -C \"$root\" pull, or reinstall."
+  fi
+}
+
 # The deadline list prints after the findings, and only for the stores this project ships to (issue #842).
 print_deadlines() {
   local hd py="" c plats=""
@@ -1625,6 +1661,8 @@ print_deadlines() {
 
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
+rule_pack_line
+SCAN_ROOT="${DIR%/}"
 ROOTS="$(app_roots)"
 if [ -n "$ROOTS" ]; then
   PROJECT_ROOT="${DIR%/}"
@@ -1696,6 +1734,78 @@ else
   flush_findings
 fi
 print_deadlines
+
+
+# What a code scan cannot prove. A team records it in .app-review-readiness.json at the project root.
+# A check marked fail always blocks. With "enforce": true, or APP_STORE_GUARD_REQUIRE_READINESS=1, todo blocks too.
+readiness_check() {
+  local f="$SCAN_ROOT/.app-review-readiness.json" sev id title fix
+  echo ""
+  if [ ! -f "$f" ]; then
+    echo "Manual checks. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, or privacy labels that match runtime. Copy templates/app-review-readiness.json to your project root and record each one."
+    if [ "${APP_STORE_GUARD_REQUIRE_READINESS:-0}" = "1" ]; then
+      finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json, and readiness is required" "Copy templates/app-review-readiness.json to the project root, test each item on the release build, and record pass, fail, or n/a."
+    fi
+    flush_findings
+    return 0
+  fi
+  if ! tool_ok python3 -c pass; then echo "Manual checks. .app-review-readiness.json found, not read. python3 not found."; return 0; fi
+  while IFS='|' read -r sev id title fix; do
+    case "$sev" in
+      info) echo "$id" ;;
+      critical|high|medium) finding "$sev" "$id" "$title" "$fix" ;;
+    esac
+  done < <(python3 - "$f" "${APP_STORE_GUARD_REQUIRE_READINESS:-0}" <<'PYR'
+import json, sys, datetime
+REQUIRED = {
+    "demo_account": ("A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
+    "live_backend": ("The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
+    "review_notes": ("Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
+    "screenshots_match_build": ("Screenshots show this build, in use, on every device size you support", "Capture screenshots from the release build, show the app in use, and cover the iPad and iPhone Duo sizes you support (Apple 2.3.3, 2.3.14)."),
+    "account_deletion_device_test": ("Account deletion works end to end on a real device", "Delete an account on a real device, then try to sign back in with it. The sign-in must fail (Apple 5.1.1(v), Google Play account deletion)."),
+    "privacy_labels_match_runtime": ("Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data)."),
+    "iap_reachable_by_reviewer": ("A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
+}
+path, req = sys.argv[1], sys.argv[2] == "1"
+try:
+    with open(path, encoding="utf-8") as fh:
+        d = json.load(fh)
+    checks = d.get("checks", {})
+    if not isinstance(checks, dict):
+        raise ValueError("checks is not an object")
+except (OSError, ValueError, AttributeError):
+    print("high|MANUAL-READINESS-UNREADABLE|.app-review-readiness.json is not valid JSON with a checks object|Fix the file using templates/app-review-readiness.json as the shape.")
+    sys.exit(0)
+enforce = req or d.get("enforce") is True
+passed, todo = [], []
+for key, (title, fix) in REQUIRED.items():
+    v = str(checks.get(key, "missing")).strip().lower()
+    tag = key.upper().replace("_", "-")
+    if v in ("pass", "n/a", "na"):
+        passed.append(key)
+    elif v == "fail":
+        print("critical|MANUAL-%s-FAILED|%s, recorded as failed|%s" % (tag, title, fix))
+    else:
+        todo.append(key)
+        if enforce:
+            print("critical|MANUAL-%s-UNVERIFIED|%s, not verified yet (%s)|%s" % (tag, title, v, fix))
+when = d.get("checked_on")
+try:
+    age = (datetime.date.today() - datetime.date.fromisoformat(str(when))).days
+except ValueError:
+    age = None
+build = str(d.get("build") or "an unnamed build").replace("|", "/")
+print("info|Manual checks. %d of %d attested for %s%s.%s" % (
+    len(passed), len(REQUIRED), build,
+    (", checked %s" % when) if when else ", no checked_on date",
+    (" Still open. " + ", ".join(todo) + ".") if todo else ""))
+if age is None or age > 30:
+    print("high|MANUAL-READINESS-STALE|.app-review-readiness.json is %s|Re-run the manual checks on the build you are submitting and update checked_on." % ("older than 30 days" if age is not None else "missing a valid checked_on date"))
+PYR
+)
+  flush_findings
+}
+readiness_check
 
 # ===== summary and exit =====
 echo ""

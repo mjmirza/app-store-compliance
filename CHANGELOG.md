@@ -2,6 +2,19 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## 2.5.0 (2026-11-21)
+
+This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. Nothing that passed 2.4.0 is blocked by default. A new check is high, and the readiness file blocks only on a check a team records as failed, or when the team opts in. It is a minor version.
+
+### Added
+- Every report now opens with a `Rule pack.` line naming the version and the newest `verified_on` date in the data, and says the checks run against a dated snapshot. Past 60 days it prints `Rule pack STALE` and the update command. Tune with `APP_STORE_GUARD_STALE_DAYS`.
+- `.app-review-readiness.json`, read by the guard from the project root. It records the checks a scan cannot prove. demo account, live backend, review notes, screenshots of this build, account deletion on a real device, privacy labels against runtime, and a reachable in-app purchase. A check marked `fail` blocks. With `"enforce": true` or `APP_STORE_GUARD_REQUIRE_READINESS=1`, an open check blocks too. A file older than 30 days is flagged. With no file, the report says which checks it could not see. Template in `templates/app-review-readiness.json`.
+- `APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON` (high). A custom pre-permission screen whose button is titled Allow, in a file that also requests the permission. Apple's Human Interface Guidelines ask for Continue or Next.
+- `docs/WHAT-THE-SCAN-PROVES.md`. What the scan proves and what only a person can, how current the rules are, Apple and Play coverage side by side, what a scan can and cannot do about 4.3, reported rejections mapped to the check that catches them (or marked as a gap), Apple's own review time figures, and what the scripts do on your machine.
+- Deadlines. California sales and use tax on five app tax categories from 1 January 2027, and price changes in Botswana, Colombia, Egypt, Rwanda, and Türkiye on 3 December 2026 (Apple Developer news 4o5ie73a, read 21 November 2026).
+- `docs/APPLE.md` gains the 17 November tax update, the macOS 27.3 Device Control and Full Disk Access change, the license agreement acceptance date from Apple's account notice, and the subscription retention and group purchase features.
+- Checklist. account deletion tested by signing back in, the pre-permission button wording, screenshots per device family, review notes with tap paths, and intro offer eligibility.
+
 ## 2.4.0 (2026-11-15)
 
 This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Eight adversarial review rounds attacked the changes before release, and every reproduced bug became a test. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.

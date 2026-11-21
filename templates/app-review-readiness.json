@@ -1,0 +1,14 @@
+{
+  "build": "1.0.0 (1)",
+  "checked_on": "2026-11-21",
+  "enforce": false,
+  "checks": {
+    "demo_account": "todo",
+    "live_backend": "todo",
+    "review_notes": "todo",
+    "screenshots_match_build": "todo",
+    "account_deletion_device_test": "todo",
+    "privacy_labels_match_runtime": "todo",
+    "iap_reachable_by_reviewer": "todo"
+  }
+}
