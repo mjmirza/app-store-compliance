@@ -1,6 +1,6 @@
 # Rules. Privacy and data
 
-18 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+19 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-5.1.1-MISSING-PRIVACY-POLICY
 
@@ -297,3 +297,12 @@ How to detect.
 ```bash
 grep -rqn 'DeclaredAgeRange\|AgeRangeService' . && ! grep -rqn 'RESCIND_CONSENT\|rescindConsent' .
 ```
+
+## APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON
+
+- Title. Custom screen before a permission alert has a button titled Allow
+- Platform. apple
+- Guideline or policy. 5.1.1(iv)
+- Severity. high
+- What triggers it. A custom pre-permission screen, window, or view titles its button Allow or Allow plus a noun (Allow Location, Allow permissions), or offers a way to leave without seeing the system alert. Apple's Human Interface Guidelines say people do not allow anything in a pre-alert screen, and that a custom screen that takes advantage of quick taps to influence the choice leads to rejection. The guard flags an Allow-titled button in a source file that also requests a permission.
+- How to fix it. Give the pre-alert screen one button titled Continue or Next that opens the system alert, with no Close, Cancel, or Not Now, no incentive, and no image of the alert. Where possible, offer a way to use the app without the permission (5.1.1(iv)). Sources. https://developer.apple.com/design/human-interface-guidelines/privacy, https://developer.apple.com/app-store/review/guidelines/#5.1.1
