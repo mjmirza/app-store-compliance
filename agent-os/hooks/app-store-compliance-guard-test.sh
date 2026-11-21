@@ -3435,6 +3435,12 @@ TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
 if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
 rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-42 without SIGALRM a stalled read still blocks within its deadline" || bad "rd-42 without SIGALRM a stalled read still blocks within its deadline (rc=$RC, $((SECONDS - T0))s)"
 rm -rf "$STALL" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$D/.app-review-readiness.json"
+SLOWEXIT="$(mktemp -d)"
+printf 'import atexit, signal, time\ndel signal.SIGALRM\natexit.register(time.sleep, 12)\n' > "$SLOWEXIT/sitecustomize.py"
+OUT="$(PYTHONPATH="$SLOWEXIT" bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has '7 of 7 attested' && ! rr_has 'within 10 seconds' && [ "$RC" -eq 0 ] && ok "rd-43 a slow exit after a clean read never reports a false timeout" || bad "rd-43 a slow exit after a clean read never reports a false timeout (rc=$RC)"
+rm -rf "$SLOWEXIT" "$D/.app-review-readiness.json"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
@@ -3484,6 +3490,14 @@ D="$(mk_ios_bad)"
 PAYLOAD="$(python3 -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "fastlane deliver\n" + "echo harmless\n" * 20000}}))')"
 OUT="$(printf '%s' "$PAYLOAD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && rr_has 'App Store Compliance Guard' && ok "hk-1 a submit followed by 20000 lines is still scanned and blocked" || bad "hk-1 a submit followed by 20000 lines is still scanned and blocked (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# A Podfile below iOS 13 is found even when other Podfiles in the tree are fine.
+D="$(mk_ios_clean)"; mkdir -p "$D/a" "$D/b" "$D/c" "$D/d"
+printf "platform :ios, '11.0'\n" > "$D/a/Podfile"
+for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
 rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

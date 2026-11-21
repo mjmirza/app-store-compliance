@@ -951,7 +951,7 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   # A Podfile has no extension, so it is outside the source list. Read it directly.
   podfile_below_ios13() {
     find "$DIR" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules \) -prune \) -o -name Podfile -type f -print 2>/dev/null \
-      | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep_q hit
+      | awk 'NR <= 5' | while IFS= read -r pf; do if grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf"; then echo hit; fi; done | grep_q hit
   }
   # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
   pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
@@ -1018,7 +1018,7 @@ PBXPY
   # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.
   native_ipv4_only() {
     find "$DIR" -maxdepth 8 \( -type d \( -name Pods -o -name node_modules -o -name vendor -o -name Vendor -o -name ThirdParty -o -name third_party -o -name external -o -name External -o -name Carthage -o -name build -o -name .git \) -prune \) \
-      -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.mm' \) -print 2>/dev/null | head -2000 \
+      -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.mm' \) -print 2>/dev/null | awk 'NR <= 2000' \
       | tr '\n' '\0' | xargs -0 grep -EIls -e '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' 2>/dev/null | grep . >/dev/null
   }
   if native_ipv4_only || grep_has '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('; then
@@ -1811,8 +1811,14 @@ def late(signum, frame):
     raise Late()
 
 
+FINISH = threading.Lock()
+WATCHDOGS = []
+
+
 def give_up():
-    # Without SIGALRM a blocked read cannot be interrupted, so report it and end the process.
+    # Without SIGALRM a blocked read cannot be interrupted. Whichever side takes FINISH first owns END.
+    if not FINISH.acquire(False):
+        return
     emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json could not be read within %d seconds, so a fail inside it cannot be seen" % READ_DEADLINE, "Move it to a local disk as a regular file shaped like templates/app-review-readiness.json.")
     sys.stdout.write("END\n")
     sys.stdout.flush()
@@ -1829,6 +1835,7 @@ def run():
     else:
         watchdog = threading.Timer(READ_DEADLINE, give_up)
         watchdog.daemon = True
+        WATCHDOGS.append(watchdog)
         watchdog.start()
     try:
         # Non-blocking open and fstat on the same descriptor, so a file swapped for a FIFO cannot hang the read.
@@ -1927,6 +1934,10 @@ except Exception:
 finally:
     if hasattr(signal, "SIGALRM"):
         signal.alarm(0)
+    for watchdog in WATCHDOGS:
+        watchdog.cancel()
+    if not FINISH.acquire(False):
+        threading.Event().wait()
 sys.stdout.write("END\n")
 PYR
 )"; rc=$?
