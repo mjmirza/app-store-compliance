@@ -4,7 +4,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## 2.5.0 (2026-11-21)
 
-This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. The new check is medium. A project without a readiness file and without the opt-in sees no new kind of block, though some existing checks now fire reliably where timing used to hide them (see Fixed). Once a team adds a readiness file, it blocks on a check recorded as failed, on a file the guard cannot read, and, when the team opts in, on an open check. Eight Codex review rounds attacked the changes before release, and every reproduced problem became a test. It is a minor version.
+This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. The new check is medium. A project without a readiness file and without the opt-in sees no new kind of block, though some existing checks now fire reliably where timing used to hide them (see Fixed). Once a team adds a readiness file, it blocks on a check recorded as failed, on a file the guard cannot read, and, when the team opts in, on an open check. Fourteen Codex review rounds attacked the changes before release, until a round found nothing. Every reproduced problem became a test. It is a minor version.
 
 ### Added
 - Every report now opens with a `Rule pack.` line naming the version and the oldest and newest `verified_on` dates in the data, counts the sources older than the window, and says the checks run against a dated snapshot. When even the newest source is past 60 days it prints `Rule pack STALE` and the update command. Tune with `APP_STORE_GUARD_STALE_DAYS`.
@@ -20,6 +20,7 @@ This release answers the most repeated requests from about 300 replies on X afte
 
 - A hook command that put a submit first and then many more lines could pass without a scan, because the submit detector read it through `grep -q` under `pipefail` and lost the match to SIGPIPE. Every piped `grep -q` in the guard now reads all its input. Found in review, reproduced with 20,000 trailing lines, and pinned by a test.
 - A demo app in an `examples`, `demos`, `samples` or `playground` folder could be scanned as its own app on Linux. The check used `grep -q` inside a pipeline under `pipefail`, which can report a miss when grep stops reading early. The other pipelines of the same shape now read all their input, so the result no longer depends on timing.
+- An iOS 12 or older Podfile deployment target was missed when the project had more than one Podfile and the last one read was newer, because the loop's exit status came from that last file. Each match is now kept, and the first five Podfiles are read in full.
 - The release audit test prints the failing guard cases when its report is missing, so a failure that only happens on the CI runner shows its cause.
 
 ### Thanks
