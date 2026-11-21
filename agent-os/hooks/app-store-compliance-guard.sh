@@ -32,7 +32,7 @@ elif [ ! -t 0 ]; then
 fi
 # Cursor beforeShellExecution reads a permission object on stdout, prose there is a schema error (cursor.com/docs/hooks).
 IS_CURSOR=0; CURSOR_SENT=0; CURSOR_FD=0; CURSOR_IDS=""
-printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -qE '"hook_event_name"[[:space:]]*:[[:space:]]*"beforeShellExecution"' && IS_CURSOR=1
+printf '%s' "$STDIN_JSON" | tr -d '\n\r' | grep -E '"hook_event_name"[[:space:]]*:[[:space:]]*"beforeShellExecution"' >/dev/null && IS_CURSOR=1
 cursor_reply() {  # $1 exit code about to be returned. Prints the permission JSON once, on the real stdout
   [ "$IS_CURSOR" -eq 1 ] && [ "$CURSOR_SENT" -eq 0 ] || return 0
   CURSOR_SENT=1
@@ -231,11 +231,11 @@ ta'; }
     [ -z "$lane" ] && return 1
     case "$lane" in '$'*|'`'*) return 0 ;; esac
     case "$lane" in *[!A-Za-z0-9_]*) return 1 ;; esac
-    printf '%s' "$lane" | tr '_' '\n' | grep -qixE 'release|beta|deploy|production|prod|publish|submit|upload|appstore|playstore|testflight|distribute' && return 0
+    printf '%s' "$lane" | tr '_' '\n' | grep -ixE 'release|beta|deploy|production|prod|publish|submit|upload|appstore|playstore|testflight|distribute' >/dev/null && return 0
     while IFS= read -r ff; do
       [ -f "$ff" ] || continue
       awk -v n="$lane" '$0 ~ "lane[[:space:]]+:" n "([^A-Za-z0-9_]|$)" { on=1; next } on && /^[[:space:]]*(private_)?lane[[:space:]]+:/ { on=0 } on' "$ff" 2>/dev/null \
-        | grep -qE "$UPLOAD_ACTION_RE" && return 0
+        | grep -E "$UPLOAD_ACTION_RE" >/dev/null && return 0
     done <<FASTFILES
 $(find "$DIR" -maxdepth 3 -name Fastfile -not -path '*/node_modules/*' 2>/dev/null | head -5)
 FASTFILES
@@ -282,7 +282,7 @@ FASTFILES
           one="$(printf '%s\n' "$files" | while IFS= read -r f; do
             [ -n "$f" ] || continue; d="$(dirname "$f")"
             if [ "$scoped" -eq 0 ] && { [ "${d##*/}" = "$base" ] || [ "${d%/$s2}" != "$d" ]; }; then echo "$f"; continue; fi
-            tr -d '\n' < "$f" 2>/dev/null | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"$pat\"" && echo "$f"
+            tr -d '\n' < "$f" 2>/dev/null | grep -E "\"name\"[[:space:]]*:[[:space:]]*\"$pat\"" >/dev/null && echo "$f"
           done)"
           if [ -z "$one" ]; then pick="$files"; break; fi
           pick="$pick
@@ -1007,7 +1007,7 @@ PBXPY
   }
   xcconfig_below_ios13() {
     [ -s "$FILELIST" ] || return 1
-    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep -q .
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
@@ -1017,7 +1017,7 @@ PBXPY
   native_ipv4_only() {
     find "$DIR" -maxdepth 8 \( -type d \( -name Pods -o -name node_modules -o -name vendor -o -name Vendor -o -name ThirdParty -o -name third_party -o -name external -o -name External -o -name Carthage -o -name build -o -name .git \) -prune \) \
       -o -type f \( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.mm' \) -print 2>/dev/null | head -2000 \
-      | tr '\n' '\0' | xargs -0 grep -EIls -e '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' 2>/dev/null | grep -q .
+      | tr '\n' '\0' | xargs -0 grep -EIls -e '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\(' 2>/dev/null | grep . >/dev/null
   }
   if native_ipv4_only || grep_has '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('; then
     finding medium "APPLE-2.5.5-IPV4-ONLY-NETWORKING" "IPv4-only socket API in use" "Replace inet_addr, inet_aton and gethostbyname with getaddrinfo or Network.framework, and test on an IPv6-only NAT64 network (Mac Internet Sharing, Create NAT64 Network)." src '(^|[^A-Za-z0-9_])(inet_addr|inet_aton|gethostbyname)[[:space:]]*\('
@@ -1254,7 +1254,7 @@ if [ "$IS_AND" -eq 1 ]; then
   release_manifest_debuggable() {
     [ -s "$FILELIST" ] || return 1
     grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/' | tr '\n' '\0' \
-      | xargs -0 grep -EIls -e "android:debuggable[[:space:]]*=[[:space:]]*[\"']true[\"']" 2>/dev/null | grep -q .
+      | xargs -0 grep -EIls -e "android:debuggable[[:space:]]*=[[:space:]]*[\"']true[\"']" 2>/dev/null | grep . >/dev/null
   }
   if release_manifest_debuggable; then
     finding critical "ANDROID-DEBUGGABLE-RELEASE" "android:debuggable is true in the manifest" "Remove android:debuggable from the manifest and let the build type set it. Play Console rejects a debuggable APK or app bundle." manifest 'android:debuggable'
@@ -1564,7 +1564,7 @@ bare_native_apart() {  # $1 candidate dir below $DIR
   local rel="${1#"${DIR%/}"/}" f
   case "$rel" in ios|ios/*|android|android/*) return 1 ;; esac
   # A folder named exactly demo, example, sample, or playground (or plural) holds a repo demo, so it stays in the root scan.
-  printf '%s' "$rel" | tr '[:upper:]' '[:lower:]' | tr '/' '\n' | grep -qxE 'demos?|examples?|samples?|playgrounds?' && return 1
+  printf '%s' "$rel" | tr '[:upper:]' '[:lower:]' | tr '/' '\n' | grep -xE 'demos?|examples?|samples?|playgrounds?' >/dev/null && return 1
   find "$1" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules -o -name build \) -prune \) \
     -o \( -name 'Info.plist' -o -name 'AndroidManifest.xml' \) -print 2>/dev/null | grep . >/dev/null || return 1
   # Only a shippable app splits off. a library module or a local native module stays with the app that uses it.
@@ -1737,7 +1737,7 @@ readiness_check() {  # $1 app root, $2 workspace root
     flush_findings; return 0
   fi
   out="$(python3 - "$f" "$req" "$from" <<'PYR'
-import datetime, json, os, re, stat, sys
+import datetime, json, os, re, signal, stat, sys
 
 CHECKS = [
     ("demo_account", True, "A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
@@ -1797,9 +1797,25 @@ def emit(*fields):
     sys.stdout.write("\t".join(clean(f) for f in fields) + "\n")
 
 
+READ_LIMIT = 8 * 1024 * 1024
+READ_DEADLINE = 10
+
+
+class Late(Exception):
+    pass
+
+
+def late(signum, frame):
+    raise Late()
+
+
 def run():
     path, required, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
     raw = b""
+    # A stalled read or a FIFO where O_NONBLOCK is missing must end in a finding, never a hang.
+    if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, late)
+        signal.alarm(READ_DEADLINE)
     try:
         # Non-blocking open and fstat on the same descriptor, so a file swapped for a FIFO cannot hang the read.
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
@@ -1810,11 +1826,17 @@ def run():
             fh = os.fdopen(fd, "rb")
             fd = -1
             with fh:
-                raw = fh.read()
+                raw = fh.read(READ_LIMIT + 1)
+            if len(raw) > READ_LIMIT:
+                emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is larger than 8 MiB, so it was not read and a fail inside it cannot be seen", "Keep it to the shape of templates/app-review-readiness.json, which is under 1 KB.")
+                return
         finally:
             if fd >= 0:
                 os.close(fd)
         data = json.loads(raw, object_pairs_hook=keep_dups)
+    except Late:
+        emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json could not be read within %d seconds, so a fail inside it cannot be seen" % READ_DEADLINE, "Move it to a local disk as a regular file shaped like templates/app-review-readiness.json.")
+        return
     except (OSError, ValueError, RecursionError):
         data = None
     dups = isinstance(data, dict) and any(isinstance(v, Dup) for v in data.values())
@@ -1888,6 +1910,9 @@ try:
     run()
 except Exception:
     sys.stdout.write("CRASH\n")
+finally:
+    if hasattr(signal, "SIGALRM"):
+        signal.alarm(0)
 sys.stdout.write("END\n")
 PYR
 )"; rc=$?
@@ -1930,7 +1955,7 @@ if [ -n "$ROOTS" ]; then
   echo "Apps. $(printf '%s\n' "$ROOTS" | grep -c .) app roots, each scanned on its own"
   echo ""
   POOL_FW=""; SPLIT_NATIVE=""
-  if printf '%s\n' "$ROOTS" | sed 's:/$::' | grep -qxF "$PROJECT_ROOT"; then
+  if printf '%s\n' "$ROOTS" | sed 's:/$::' | grep -xF "$PROJECT_ROOT" >/dev/null; then
     NESTED_PRUNE=()
     while IFS= read -r OTHER; do
       [ -n "$OTHER" ] && [ "${OTHER%/}" != "$PROJECT_ROOT" ] || continue

@@ -16,6 +16,11 @@ This release answers the most repeated requests from about 300 replies on X afte
 - `docs/APPLE.md` gains the 17 November tax update, the macOS 27.3 Device Control and Full Disk Access change, the license agreement acceptance step, and the subscription retention and group purchase features.
 - Checklist. account deletion tested after its completion time, the pre-permission wording split into Apple and Google Play items, screenshots per device family, review notes with tap paths, and intro offer eligibility.
 
+### Fixed
+
+- A demo app in an `examples`, `demos`, `samples` or `playground` folder could be scanned as its own app on Linux. The check used `grep -q` inside a pipeline under `pipefail`, which can report a miss when grep stops reading early. Eight other pipelines of the same shape now read all their input, so the result no longer depends on timing.
+- The release audit test prints the failing guard cases when its report is missing, so a failure that only happens on the CI runner shows its cause.
+
 ## 2.4.0 (2026-11-15)
 
 This release closes gaps found by a second survey of comparable open source repositories, a line by line read of the App Store Connect release notes, and an internal audit of the guard. Eight adversarial review rounds attacked the changes before release, and every reproduced bug became a test. The new findings are high or medium except the debuggable Android build, which Play refuses at upload, so nothing that passed 2.3.0 is blocked unless it carries a debuggable release manifest. It is a minor version.

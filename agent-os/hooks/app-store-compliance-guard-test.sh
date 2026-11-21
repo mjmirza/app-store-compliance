@@ -3418,6 +3418,16 @@ TO="$(command -v timeout || command -v gtimeout || true)"
 if [ -n "$TO" ]; then OUT="$(PATH="$PYSHIM:$PATH" "$TO" 30 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PATH="$PYSHIM:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
 rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs" || bad "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs (rc=$RC)"
 rm -rf "$PYSHIM" "$D/.app-review-readiness.json" "$D/.app-review-readiness.json.saved"
+python3 -c 'import sys; open(sys.argv[1], "wb").write(b"{\"checks\":{\"demo_account\":\"fail\"},\"pad\":\"" + b"x" * (9 * 1024 * 1024) + b"\"}")' "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has 'larger than 8 MiB' && [ "$RC" -eq 2 ] && ok "rd-40 a readiness file over 8 MiB blocks without being parsed" || bad "rd-40 a readiness file over 8 MiB blocks without being parsed (rc=$RC)"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+STALL="$(mktemp -d)"
+printf 'import os, time\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(60)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$STALL/sitecustomize.py"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-41 a stalled read ends in a block within its deadline" || bad "rd-41 a stalled read ends in a block within its deadline (rc=$RC, $((SECONDS - T0))s)"
+rm -rf "$STALL" "$D/.app-review-readiness.json"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
