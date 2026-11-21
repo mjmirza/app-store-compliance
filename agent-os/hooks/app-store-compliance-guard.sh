@@ -1764,16 +1764,24 @@ def keep_dups(pairs):
     return out
 
 
+def flat(value):
+    if isinstance(value, Dup):
+        for item in value:
+            yield from flat(item)
+    else:
+        yield value
+
+
 def merge_checks(value):
-    if not isinstance(value, Dup):
-        return value
+    """Every checks object is read, and every value kept, so a fail is never lost."""
+    parts = list(flat(value))
+    good = [p for p in parts if isinstance(p, dict)]
     merged = {}
-    for part in value:
-        if not isinstance(part, dict):
-            return None
+    for part in good:
         for key, item in part.items():
-            merged[key] = Dup((merged[key] if isinstance(merged.get(key), Dup) else ([merged[key]] if key in merged else [])) + [item])
-    return {k: (v if len(v) > 1 else v[0]) for k, v in merged.items()}
+            merged.setdefault(key, []).extend(flat(item))
+    checks = {k: (Dup(v) if len(v) > 1 else v[0]) for k, v in merged.items()} if good else None
+    return checks, len(good) < len(parts)
 
 
 def clean(value, limit=300):
@@ -1797,7 +1805,9 @@ def run():
     dups = isinstance(data, dict) and any(isinstance(v, Dup) for v in data.values())
     if isinstance(data, dict):
         if isinstance(data.get("checks"), Dup):
-            data["checks"] = merge_checks(data["checks"])
+            data["checks"], bad_part = merge_checks(data["checks"])
+            if bad_part and data["checks"] is not None:
+                emit("high", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json repeats checks and one of them is not an object, so only the others were read", "Keep one checks object, as in templates/app-review-readiness.json.")
         strict = required or (data.get("enforce") is True if not isinstance(data.get("enforce"), Dup) else any(v is True for v in data["enforce"]))
     else:
         # Only an unparsed file falls back to the raw text, to stay on the safe side.
@@ -1818,7 +1828,7 @@ def run():
         value = checks.get(key, "missing")
         if isinstance(value, Dup):
             dups = True
-            seen = {v.strip().lower() if isinstance(v, str) else "invalid" for v in value}
+            seen = {v.strip().lower() if isinstance(v, str) else "invalid" for v in flat(value)}
             value = "fail" if "fail" in seen else (seen.pop() if len(seen) == 1 else "conflicting")
         value = value.strip().lower() if isinstance(value, str) else "invalid"
         reason = notes.get(key)

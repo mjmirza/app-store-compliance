@@ -3390,6 +3390,9 @@ rd_case "rd-22 bad checks with an escaped top-level enforce blocks" "{\"en${BS}u
 rd_case "rd-27 a repeated key never hides a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rr_has 'MANUAL-READINESS-DUPLICATE-KEY' && ok "rd-27b the repeated key is named" || bad "rd-27b the repeated key is named"
 rd_case "rd-28 a repeated checks object keeps the first object's fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-29 repeats at both levels keep a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-30 a malformed repeated checks entry keeps the valid fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":[]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-UNREADABLE' && ok "rd-30b the malformed entry is named" || bad "rd-30b the malformed entry is named"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
