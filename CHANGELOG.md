@@ -2,7 +2,7 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
-## 2.5.0 (2026-11-21)
+## 2.5.0 (2026-11-22)
 
 This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. The new check is medium. A project without a readiness file and without the opt-in sees no new kind of block, though some existing checks now fire reliably where timing used to hide them (see Fixed). Once a team adds a readiness file, it blocks on a check recorded as failed, on a file the guard cannot read, and, when the team opts in, on an open check. Fourteen Codex review rounds attacked the changes before release, until a round found nothing. Every reproduced problem became a test. It is a minor version.
 
