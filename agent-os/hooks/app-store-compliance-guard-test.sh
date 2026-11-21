@@ -3265,11 +3265,13 @@ gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-6
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 # X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
-# Every case must also finish its report with a verdict, so a crashing guard cannot pass a silence test.
+# Clean fixtures, so a pass means exit 0, CLEAR, and the finding at MEDIUM or absent.
+PP_KEYS='<key>NSLocationWhenInUseUsageDescription</key><string>Shows the nearest mosque on the map.</string><key>NSCameraUsageDescription</key><string>Scans a QR code to join a group.</string>'
 pp_case() {  # $1 label, $2 file name in App, $3 content, $4 expect the finding (1) or not (0)
-  local d has=0; d="$(gs_ios "$2" "$3")"; rr_run "$d"
+  local d has=0 sev=1; d="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; printf '%s\n' "$3" > "$d/App/$2"; rr_run "$d"
   rr_has 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' && has=1
-  if { [ "$RC" -eq 0 ] || [ "$RC" -eq 2 ]; } && rr_has '^Summary\. critical=' && rr_has '^\(CLEAR\|BLOCKED\)\.' && [ "$has" = "$4" ]; then ok "$1"; else bad "$1 (rc=$RC has=$has)"; fi
+  [ "$has" = "1" ] && ! rr_has '\[MEDIUM\][[:space:]]*APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' && sev=0
+  if [ "$RC" -eq 0 ] && rr_has '^CLEAR\.' && [ "$has" = "$4" ] && [ "$sev" = "1" ]; then ok "$1"; else bad "$1 (rc=$RC has=$has)"; fi
   rm -rf "$d"
 }
 pp_case "pp-1 an Allow button beside a permission request is flagged" Pre.swift 'import SwiftUI
@@ -3301,6 +3303,33 @@ pp_case "pp-14 a SwiftUI action and label button titled Allow is flagged" Pre.sw
 }' 1
 pp_case "pp-15 a URL string before the button does not hide it" Pre.swift 'let u = "https://x.io/a"; Button("Allow") { m.requestWhenInUseAuthorization() }' 1
 
+pp_case "pp-16 a button inside a nested Swift comment stays silent" Pre.swift '/* outer
+   /* nested */
+   Button("Allow") { m.requestWhenInUseAuthorization() }
+*/
+let k = 1' 0
+pp_case "pp-17 a comment marker inside a multiline string does not hide the button" Pre.swift 'let explanation = """
+Show /* to describe a wildcard.
+"""
+Button("Allow") { m.requestWhenInUseAuthorization() }' 1
+pp_case "pp-18 an Allow text outside the button closure stays silent" Pre.swift 'Button(action: { m.requestWhenInUseAuthorization() }) {
+    Text("Continue")
+}
+Text("Allow Location")' 0
+pp_case "pp-19 an Allow label nested deep in the button closure is flagged" Pre.swift 'Button(action: {
+    manager.requestWhenInUseAuthorization()
+}) {
+    VStack {
+        Image(systemName: "location")
+        Text("Allow Location")
+    }
+}' 1
+pp_case "pp-20 an Objective-C title with a space after the colon is flagged" Pre.m '[button setTitle: @"Allow" forState:UIControlStateNormal];
+[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                       completionHandler:^(BOOL g){}];' 1
+BIG="$(printf 'Button("Allow") { m.requestWhenInUseAuthorization() }\n'; seq 1 100000 | sed 's/^/let v/;s/$/ = 1/')"
+pp_case "pp-21 a match early in a very large file is not lost" Big.swift "$BIG" 1
+
 # Every report names its rule pack and the range of source dates, so a stale checklist is visible.
 D="$(gs_ios ok.swift 'let a = 1')"; rr_run "$D"
 rr_has 'Rule pack. v[0-9]' && rr_has 'dated sources were verified between' && [ "$RC" -eq 0 ] && ok "rp-1 the report names its rule pack and date range" || bad "rp-1 the report names its rule pack and date range (rc=$RC)"
@@ -3319,6 +3348,11 @@ rr_has 'Rule pack freshness not checked' && [ "$RC" -eq 0 ] && ok "rp-4 an unrea
 rm -rf "$SP"; rp_pack "{\"deadlines\":[{\"verified_on\": \"$(date +%Y-%m-%d)\"},{\"verified_on\": \"2020-01-01\"}]}"; rp_run X=1
 rr_has '1 of 2 dated sources were last verified more than 60 days ago' && ! rr_has 'Rule pack STALE' && [ "$RC" -eq 0 ] && ok "rp-5 one fresh source cannot hide an old one" || bad "rp-5 one fresh source cannot hide an old one (rc=$RC)"
 rm -rf "$SP"
+
+SHIM="$(mktemp -d)"; printf '#!/bin/sh\ncase "$1" in -v*|-d) exit 1 ;; esac\nexec /bin/date "$@"\n' > "$SHIM/date"; chmod +x "$SHIM/date"
+OUT="$(PATH="$SHIM:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'Rule pack freshness not checked' && ! rr_has 'days ago' && [ "$RC" -eq 0 ] && ok "rp-6 a failing date step reads as not checked, never as a number" || bad "rp-6 a failing date step reads as not checked, never as a number (rc=$RC)"
+rm -rf "$SHIM"
 
 # Manual readiness. what a scan cannot prove, recorded by the team.
 TODAY="$(date +%Y-%m-%d)"; TOMORROW="$(python3 -c 'import datetime; print(datetime.date.today() + datetime.timedelta(days=1))')"
@@ -3357,6 +3391,8 @@ rd_case "rd-17 an escaped enforce key still enforces" "{\"en${BS}u0066orce\":tru
 rd_case "rd-18 enforce inside notes does not enforce" "{\"checked_on\":\"$TODAY\",\"checks\":{},\"notes\":{\"enforce\":true}}" "" 0 '0 of 7 attested' 'UNVERIFIED'
 rd_case "rd-19 malformed notes never hide a recorded failure" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"notes\":[1]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rr_has 'MANUAL-READINESS-NOTES-INVALID' && ok "rd-19b the malformed notes are named" || bad "rd-19b the malformed notes are named"
+rd_case "rd-21 bad checks with enforce only inside notes stays high" '{"checks":[],"notes":{"enforce":true}}' "" 0 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-22 bad checks with an escaped top-level enforce blocks" "{\"en${BS}u0066orce\":true,\"checks\":[]}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
@@ -3377,6 +3413,22 @@ printf 'let a = 1\n' > "$M/apps/mobile/App/A.swift"
 printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
 rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && rr_has 'Manual checks for apps/mobile' && [ "$RC" -eq 2 ] && ok "rd-20 a single nested app has its readiness file read" || bad "rd-20 a single nested app has its readiness file read (rc=$RC)"
+rm -rf "$M"
+# A readiness file in a dependency or the docs never counts, and nothing deep or late is cut off.
+M="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; mkdir -p "$M/node_modules/pkg"
+printf '{"checks":{"demo_account":"fail"}}' > "$M/node_modules/pkg/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && rr_has '^CLEAR\.' && ! rr_has 'MANUAL-DEMO' && ok "rd-23 a readiness file inside node_modules is never read" || bad "rd-23 a readiness file inside node_modules is never read (rc=$RC)"
+rm -rf "$M/node_modules"; mkdir -p "$M/docs"; printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/docs/.app-review-readiness.json"
+OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && rr_has 'MANUAL-READINESS-MISSING' && ok "rd-24 a passing file in docs never stands in for the app" || bad "rd-24 a passing file in docs never stands in for the app (rc=$RC)"
+rm -rf "$M"
+M="$(mktemp -d)"; R="$M/apps/team/products/mobile/release"; mkdir -p "$R/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$R/App/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$R/App/PrivacyInfo.xcprivacy"; printf 'let a = 1\n' > "$R/App/A.swift"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$R/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && ok "rd-25 a failure recorded six folders deep still blocks" || bad "rd-25 a failure recorded six folders deep still blocks (rc=$RC)"
 rm -rf "$M"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

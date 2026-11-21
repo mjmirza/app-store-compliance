@@ -752,15 +752,22 @@ fi
 # Apple HIG, Privacy. a custom pre-alert screen titles its one button Continue or Next, never Allow.
 # A button and a permission request in one Apple source file is evidence, so it is reported as possible.
 PERM_REQ_RE='requestWhenInUseAuthorization|requestAlwaysAuthorization|requestTrackingAuthorization|requestAuthorization[(:]|requestAuthorizationWithOptions|requestAccess[(:]|requestAccessForMediaType|requestRecordPermission|request[(][[:space:]]*PERMISSIONS[.]IOS|requestMultiple[(][[:space:]]*[[]?[[:space:]]*PERMISSIONS[.]IOS|request[A-Za-z]*PermissionsAsync|Permission[.][A-Za-z]+[.]request[(]'
-ALLOW_BTN_RE='(Button[(][[:space:]]*(LocalizedStringKey[(]|String[(]localized:[[:space:]]*|NSLocalizedString[(])?|setTitle[(]|setTitle:@|<Button[^>]*title=[{]?)["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]'
+ALLOW_BTN_RE='(Button[(][[:space:]]*(LocalizedStringKey[(]|String[(]localized:[[:space:]]*|NSLocalizedString[(])?|setTitle[(]|setTitle:[[:space:]]*@|<Button[^>]*title=[{]?)["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]'
 ANDROID_SRC_RE='(^|/)android/|[.]android[.][A-Za-z]+$|[.](kt|kts|java)$'
 strip_comments() {  # $1 file. Blanks // and /* */ comments outside strings, keeping line numbers
-  awk 'BEGIN { inb = 0 }
+  local nest=0
+  case "$1" in *.swift) nest=1 ;; esac
+  awk -v nest="$nest" 'BEGIN { inb = 0; ml = 0 }
   { o = ""; q = ""; n = length($0); i = 1
     while (i <= n) {
       c = substr($0, i, 1); t = substr($0, i, 2)
-      if (inb) { if (t == "*/") { inb = 0; i += 2 } else i++; continue }
+      if (ml) { o = o c; if (substr($0, i, 3) == "\"\"\"") { o = o "\"\""; ml = 0; i += 3 } else i++; continue }
+      if (inb) {
+        if (t == "*/") { inb--; i += 2 } else if (nest && t == "/*") { inb++; i += 2 } else i++
+        continue
+      }
       if (q != "") { o = o c; if (c == "\\") { o = o substr($0, i + 1, 1); i += 2; continue }; if (c == q) q = ""; i++; continue }
+      if (substr($0, i, 3) == "\"\"\"") { o = o "\"\"\""; ml = 1; i += 3; continue }
       if (t == "/*") { inb = 1; i += 2; continue }
       if (t == "//") break
       if (c == "\"" || c == "`" || c == "'"'"'") q = c
@@ -772,9 +779,25 @@ pre_prompt_hit() {  # prints path:line of an Allow button in an Apple source fil
   local f src hit
   while IFS= read -r f <&4; do
     src="$(strip_comments "$f")"
-    printf '%s\n' "$src" | grep -Eq -e "$PERM_REQ_RE" || continue
+    # grep without -q reads all its input, so a large file never loses the match to SIGPIPE under pipefail.
+    printf '%s\n' "$src" | grep -E -e "$PERM_REQ_RE" >/dev/null || continue
     hit="$(printf '%s\n' "$src" | grep -En -e "$ALLOW_BTN_RE" | head -1 | cut -d: -f1)"
-    [ -z "$hit" ] && hit="$(printf '%s\n' "$src" | awk '/Toggle/ { b = 0 } /Button[[:space:]]*([(][[:space:]]*action:|[{])/ { b = NR } b && NR - b <= 4 && /Text[(][[:space:]]*"Allow[ A-Za-z]*"/ { print NR; exit }')"
+    [ -z "$hit" ] && hit="$(printf '%s\n' "$src" | awk '
+      !inb && match($0, /Button[[:space:]]*([(][[:space:]]*action:[[:space:]]*|[{])/) {
+        inb = 1; bal = 0; closures = 0; seg = substr($0, RSTART, RLENGTH)
+        expect = (seg ~ /action:[[:space:]]*$/ && substr($0, RSTART + RLENGTH, 1) != "{") ? 1 : 2
+        start = RSTART
+      }
+      inb {
+        n = length($0); i = (start ? start : 1); start = 0
+        while (i <= n && inb) {
+          c = substr($0, i, 1)
+          if (closures == expect - 1 && bal > 0 && substr($0, i) ~ /^Text[(][[:space:]]*"Allow[ A-Za-z]*"/) { print NR; exit }
+          if (c == "{") bal++
+          else if (c == "}") { bal--; if (bal == 0) { closures++; if (closures >= expect) inb = 0 } }
+          i++
+        }
+      }')"
     if [ -n "$hit" ]; then printf '%s:%s\n' "$f" "$hit"; return 0; fi
   done 4< <(grep -E "$SRC_EXT_RE" "$FILELIST" | grep -Ev "$ANDROID_SRC_RE" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -l -e 'Allow' 2>/dev/null)
   return 1
@@ -1673,9 +1696,14 @@ rule_pack_line() {
     total="$(printf '%s\n' "$dates" | wc -l | tr -d ' ')"
     now_s="$(date +%s 2>/dev/null)"
     then_s="$(date -j -f %Y-%m-%d "$newest" +%s 2>/dev/null || date -d "$newest" +%s 2>/dev/null)"
-    case "$now_s$then_s" in ''|*[!0-9]*) ;; *) [ -n "$then_s" ] && age=$(( (now_s - then_s) / 86400 )) ;; esac
     cutoff="$(date -v-"${stale}"d +%Y-%m-%d 2>/dev/null || date -d "-$stale days" +%Y-%m-%d 2>/dev/null)"
-    [ -n "$cutoff" ] && old="$(printf '%s\n' "$dates" | awk -v c="$cutoff" '$0 < c' | wc -l | tr -d ' ')"
+    case "$now_s" in ''|*[!0-9]*) now_s="" ;; esac
+    case "$then_s" in ''|*[!0-9]*) then_s="" ;; esac
+    case "$cutoff" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) cutoff="" ;; esac
+    if [ -n "$now_s" ] && [ -n "$then_s" ] && [ -n "$cutoff" ] && [ "$now_s" -ge "$then_s" ]; then
+      age=$(( (now_s - then_s) / 86400 ))
+      old="$(printf '%s\n' "$dates" | awk -v c="$cutoff" '$0 < c' | wc -l | tr -d ' ')"
+    fi
   fi
   if [ -n "$newest" ]; then
     echo "Rule pack. v$ver. Its $total dated sources were verified between $oldest and $newest${age:+ (newest $age days ago)}. The checks run against this dated snapshot, not the live guideline pages."
@@ -1729,7 +1757,7 @@ CHECKS = [
     ("live_backend", True, "The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
     ("review_notes", True, "Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
     ("screenshots_match_build", True, "Screenshots show this build, in use, for each device family you support", "Capture screenshots from the release build with the app in use, and upload the required sizes for each device family you support, iPad included if the app runs there. App Store Connect scales the smaller sizes, so check those layouts on a device (Apple 2.3.3, 2.3.14)."),
-    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device. After the completion time you tell users, check that the account, its sessions, and its data are gone, and that signing in again does not bring the old account back (Apple 5.1.1(v), Google Play account deletion)."),
+    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device. After the completion time you tell users, check that the account and its sessions are gone, that its data is deleted except records the law requires you to keep and you disclose, and that signing in again does not bring the old account back (Apple 5.1.1(v), Google Play account deletion)."),
     ("privacy_labels_match_runtime", False, "Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data). Every app has this check, so n/a is not accepted."),
     ("iap_reachable_by_reviewer", True, "A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
 ]
@@ -1751,14 +1779,16 @@ def run():
         with open(path, "rb") as fh:
             raw = fh.read()
         data = json.loads(raw.decode("utf-8"))
-        if not isinstance(data, dict) or not isinstance(data.get("checks"), dict):
-            raise ValueError("the file must be an object with a checks object")
     except (OSError, ValueError, RecursionError):
-        # The file cannot be decoded, so a raw enforce flag is honoured to stay on the safe side.
-        strict = required or re.search(rb'"enforce"\s*:\s*true', raw) is not None
+        data = None
+    if isinstance(data, dict):
+        strict = required or data.get("enforce") is True
+    else:
+        # Only an unparsed file falls back to the raw text, to stay on the safe side.
+        strict = required or (data is None and re.search(rb'"enforce"\s*:\s*true', raw) is not None)
+    if not isinstance(data, dict) or not isinstance(data.get("checks"), dict):
         emit("critical" if strict else "high", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
         return
-    strict = required or data.get("enforce") is True
     checks = data["checks"]
     notes = data.get("notes")
     if notes is None:
@@ -1825,6 +1855,10 @@ READINESS_EOF
 }
 
 # The deadline list prints after the findings, and only for the stores this project ships to (issue #842).
+app_marker_under() {  # $1 folder. prints one app marker below it, so a stray readiness file is never read
+  find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build \) -prune \) -o \
+    \( -name '*.xcodeproj' -o -name AndroidManifest.xml -o -name Info.plist -o -name pubspec.yaml -o -name app.json -o -name 'build.gradle*' \) -print 2>/dev/null | head -1
+}
 print_deadlines() {
   local hd py="" c plats=""
   hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1916,11 +1950,17 @@ EOF
 else
   scan_tree
   flush_findings
-  RD_FILES="$(find "$DIR" -mindepth 2 -maxdepth 5 \( -name node_modules -o -name Pods -o -name .git -o -name build -o -name .build -o -name DerivedData \) -prune -o -name .app-review-readiness.json -type f -print 2>/dev/null | sort | head -20)"
+  RD_FILES=""
+  if [ ! -f "$DIR/.app-review-readiness.json" ]; then
+    while IFS= read -r RD_FILE <&4; do
+      [ -n "$RD_FILE" ] || continue
+      [ -n "$(app_marker_under "$(dirname "$RD_FILE")")" ] && RD_FILES="$RD_FILES$RD_FILE
+"
+    done 4< <(find "$DIR" -mindepth 1 \( -type d \( -name node_modules -o -name Pods -o -name Carthage -o -name .git -o -name build -o -name .build -o -name DerivedData -o -name dist -o -name vendor -o -name Vendor -o -name .gradle -o -name .dart_tool -o -name .expo -o -name third_party -o -name ThirdParty -o -name test -o -name tests -o -name __tests__ -o -name fixtures -o -name docs -o -name examples \) -prune \) -o -name .app-review-readiness.json -type f -print 2>/dev/null | sort)
+  fi
   if [ -z "$RD_FILES" ]; then readiness_check "$DIR" "$DIR"
   else
-    [ -f "$DIR/.app-review-readiness.json" ] && readiness_check "$DIR" "$DIR"
-    while IFS= read -r RD_FILE <&4; do readiness_check "$(dirname "$RD_FILE")" "$DIR"; done 4<<RD_EOF
+    while IFS= read -r RD_FILE <&4; do [ -n "$RD_FILE" ] && readiness_check "$(dirname "$RD_FILE")" "$DIR"; done 4<<RD_EOF
 $RD_FILES
 RD_EOF
   fi

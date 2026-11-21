@@ -45,7 +45,7 @@ bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-gua
 
 Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. Keep the quotes, they keep a folder name with a space in it whole. To get the path without typing it, drag the folder from Finder or your file manager into the terminal window. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. Findings print first, critical ones on top, each with the file and line that triggered it when there is one. The last lines tell you where you stand.
 
-| Last line starts with | It means | Do next |
+| Verdict line starts with | It means | Do next |
 |---|---|---|
 | `BLOCKED.` | A critical rejection risk was found | Fix each `[CRITICAL]` line using the `fix.` line under it, then run the same command again |
 | `CLEAR.` | No critical risk in your code. Not an approval, the reviewer still checks what a scan cannot see | Do the account and listing checks in [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md), then record them in `.app-review-readiness.json` ([why](docs/WHAT-THE-SCAN-PROVES.md)) |
