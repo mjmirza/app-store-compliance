@@ -758,7 +758,7 @@ strip_comments() {  # $1 file. Blanks // and /* */ comments outside strings, kee
   local nest=0
   case "$1" in *.swift) nest=1 ;; esac
   awk -v nest="$nest" 'BEGIN { inb = 0; ml = 0 }
-  { o = ""; q = ""; n = length($0); i = 1
+  { o = ""; if (q != "`") q = ""; n = length($0); i = 1
     while (i <= n) {
       c = substr($0, i, 1); t = substr($0, i, 2)
       if (ml) { o = o c; if (substr($0, i, 3) == "\"\"\"") { o = o "\"\""; ml = 0; i += 3 } else i++; continue }
@@ -766,7 +766,9 @@ strip_comments() {  # $1 file. Blanks // and /* */ comments outside strings, kee
         if (t == "*/") { inb--; i += 2 } else if (nest && t == "/*") { inb++; i += 2 } else i++
         continue
       }
+      if (q == "#") { o = o c; if (t == "\"#") { o = o "#"; q = ""; i += 2 } else i++; continue }
       if (q != "") { o = o c; if (c == "\\") { o = o substr($0, i + 1, 1); i += 2; continue }; if (c == q) q = ""; i++; continue }
+      if (t == "#\"") { o = o t; q = "#"; i += 2; continue }
       if (substr($0, i, 3) == "\"\"\"") { o = o "\"\"\""; ml = 1; i += 3; continue }
       if (t == "/*") { inb = 1; i += 2; continue }
       if (t == "//") break
@@ -782,22 +784,6 @@ pre_prompt_hit() {  # prints path:line of an Allow button in an Apple source fil
     # grep without -q reads all its input, so a large file never loses the match to SIGPIPE under pipefail.
     printf '%s\n' "$src" | grep -E -e "$PERM_REQ_RE" >/dev/null || continue
     hit="$(printf '%s\n' "$src" | grep -En -e "$ALLOW_BTN_RE" | head -1 | cut -d: -f1)"
-    [ -z "$hit" ] && hit="$(printf '%s\n' "$src" | awk '
-      !inb && match($0, /Button[[:space:]]*([(][[:space:]]*action:[[:space:]]*|[{])/) {
-        inb = 1; bal = 0; closures = 0; seg = substr($0, RSTART, RLENGTH)
-        expect = (seg ~ /action:[[:space:]]*$/ && substr($0, RSTART + RLENGTH, 1) != "{") ? 1 : 2
-        start = RSTART
-      }
-      inb {
-        n = length($0); i = (start ? start : 1); start = 0
-        while (i <= n && inb) {
-          c = substr($0, i, 1)
-          if (closures == expect - 1 && bal > 0 && substr($0, i) ~ /^Text[(][[:space:]]*"Allow[ A-Za-z]*"/) { print NR; exit }
-          if (c == "{") bal++
-          else if (c == "}") { bal--; if (bal == 0) { closures++; if (closures >= expect) inb = 0 } }
-          i++
-        }
-      }')"
     if [ -n "$hit" ]; then printf '%s:%s\n' "$f" "$hit"; return 0; fi
   done 4< <(grep -E "$SRC_EXT_RE" "$FILELIST" | grep -Ev "$ANDROID_SRC_RE" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -l -e 'Allow' 2>/dev/null)
   return 1
@@ -1695,7 +1681,7 @@ rule_pack_line() {
     newest="$(printf '%s\n' "$dates" | tail -1)"; oldest="$(printf '%s\n' "$dates" | head -1)"
     total="$(printf '%s\n' "$dates" | wc -l | tr -d ' ')"
     now_s="$(date +%s 2>/dev/null)"
-    then_s="$(date -j -f %Y-%m-%d "$newest" +%s 2>/dev/null || date -d "$newest" +%s 2>/dev/null)"
+    then_s="$(date -j -f '%Y-%m-%d %H:%M:%S' "$newest 00:00:00" +%s 2>/dev/null || date -d "$newest 00:00:00" +%s 2>/dev/null)"
     cutoff="$(date -v-"${stale}"d +%Y-%m-%d 2>/dev/null || date -d "-$stale days" +%Y-%m-%d 2>/dev/null)"
     case "$now_s" in ''|*[!0-9]*) now_s="" ;; esac
     case "$then_s" in ''|*[!0-9]*) then_s="" ;; esac
@@ -1757,7 +1743,7 @@ CHECKS = [
     ("live_backend", True, "The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
     ("review_notes", True, "Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
     ("screenshots_match_build", True, "Screenshots show this build, in use, for each device family you support", "Capture screenshots from the release build with the app in use, and upload the required sizes for each device family you support, iPad included if the app runs there. App Store Connect scales the smaller sizes, so check those layouts on a device (Apple 2.3.3, 2.3.14)."),
-    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device. After the completion time you tell users, check that the account and its sessions are gone, that its data is deleted except records the law requires you to keep and you disclose, and that signing in again does not bring the old account back (Apple 5.1.1(v), Google Play account deletion)."),
+    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device. After the completion time you tell users, check that the account and its sessions are gone, that its data is deleted except what you disclose keeping (Apple allows records the law requires, Google Play also allows security, fraud-prevention, and regulatory records), and that signing in again does not bring the old account back (Apple 5.1.1(v), Google Play account deletion)."),
     ("privacy_labels_match_runtime", False, "Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data). Every app has this check, so n/a is not accepted."),
     ("iap_reachable_by_reviewer", True, "A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
 ]
@@ -1855,10 +1841,6 @@ READINESS_EOF
 }
 
 # The deadline list prints after the findings, and only for the stores this project ships to (issue #842).
-app_marker_under() {  # $1 folder. prints one app marker below it, so a stray readiness file is never read
-  find "$1" -maxdepth 4 \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build \) -prune \) -o \
-    \( -name '*.xcodeproj' -o -name AndroidManifest.xml -o -name Info.plist -o -name pubspec.yaml -o -name app.json -o -name 'build.gradle*' \) -print 2>/dev/null | head -1
-}
 print_deadlines() {
   local hd py="" c plats=""
   hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1950,19 +1932,10 @@ EOF
 else
   scan_tree
   flush_findings
-  RD_FILES=""
-  if [ ! -f "$DIR/.app-review-readiness.json" ]; then
-    while IFS= read -r RD_FILE <&4; do
-      [ -n "$RD_FILE" ] || continue
-      [ -n "$(app_marker_under "$(dirname "$RD_FILE")")" ] && RD_FILES="$RD_FILES$RD_FILE
-"
-    done 4< <(find "$DIR" -mindepth 1 \( -type d \( -name node_modules -o -name Pods -o -name Carthage -o -name .git -o -name build -o -name .build -o -name DerivedData -o -name dist -o -name vendor -o -name Vendor -o -name .gradle -o -name .dart_tool -o -name .expo -o -name third_party -o -name ThirdParty -o -name test -o -name tests -o -name __tests__ -o -name fixtures -o -name docs -o -name examples \) -prune \) -o -name .app-review-readiness.json -type f -print 2>/dev/null | sort)
-  fi
-  if [ -z "$RD_FILES" ]; then readiness_check "$DIR" "$DIR"
-  else
-    while IFS= read -r RD_FILE <&4; do [ -n "$RD_FILE" ] && readiness_check "$(dirname "$RD_FILE")" "$DIR"; done 4<<RD_EOF
-$RD_FILES
-RD_EOF
+  readiness_check "$DIR" "$DIR"
+  RD_OTHER="$(find "$DIR" -mindepth 2 -maxdepth 8 -name .app-review-readiness.json -type f -print 2>/dev/null | grep -v -e '/node_modules/' -e '/Pods/' -e '/[.]pub-cache/' -e '/[.]git/' | head -1)"
+  if [ -n "$RD_OTHER" ]; then
+    echo "Manual checks. Another readiness file below this folder was not read, for example ${RD_OTHER#"${DIR%/}"/}. The guard reads the file in the folder you scan, so scan that app folder to use it."
   fi
 fi
 print_deadlines

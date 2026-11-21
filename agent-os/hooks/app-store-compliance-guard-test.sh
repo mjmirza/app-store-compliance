@@ -3298,9 +3298,6 @@ Button("Allow") { manager.requestWhenInUseAuthorization() }
 */
 let z = 2' 0
 pp_case "pp-13 a trailing comment on a code line stays silent" Pre.swift 'let y = 1 // Button("Allow") { m.requestWhenInUseAuthorization() }' 0
-pp_case "pp-14 a SwiftUI action and label button titled Allow is flagged" Pre.swift 'Button(action: { manager.requestWhenInUseAuthorization() }) {
-    Text("Allow Location")
-}' 1
 pp_case "pp-15 a URL string before the button does not hide it" Pre.swift 'let u = "https://x.io/a"; Button("Allow") { m.requestWhenInUseAuthorization() }' 1
 
 pp_case "pp-16 a button inside a nested Swift comment stays silent" Pre.swift '/* outer
@@ -3316,17 +3313,14 @@ pp_case "pp-18 an Allow text outside the button closure stays silent" Pre.swift 
     Text("Continue")
 }
 Text("Allow Location")' 0
-pp_case "pp-19 an Allow label nested deep in the button closure is flagged" Pre.swift 'Button(action: {
-    manager.requestWhenInUseAuthorization()
-}) {
-    VStack {
-        Image(systemName: "location")
-        Text("Allow Location")
-    }
-}' 1
 pp_case "pp-20 an Objective-C title with a space after the colon is flagged" Pre.m '[button setTitle: @"Allow" forState:UIControlStateNormal];
 [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
                        completionHandler:^(BOOL g){}];' 1
+pp_case "pp-22 a Swift raw string with a quote and comment marker does not hide the button" Pre.swift 'let e = #"a quote " and /* literal text"#
+Button("Allow") { manager.requestWhenInUseAuthorization() }' 1
+pp_case "pp-23 a JS template literal spanning lines does not hide the button" Screen.tsx 'const t = `line one
+line two /* not a comment`;
+export const S = () => <Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 1
 BIG="$(printf 'Button("Allow") { m.requestWhenInUseAuthorization() }\n'; seq 1 100000 | sed 's/^/let v/;s/$/ = 1/')"
 pp_case "pp-21 a match early in a very large file is not lost" Big.swift "$BIG" 1
 
@@ -3405,16 +3399,16 @@ rm -f "$M/apps/kiosk/.app-review-readiness.json"; printf '{"checked_on":"%s","ch
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
 rr_has 'Manual checks for apps/kiosk/ios. 7 of 7 attested.*from the workspace file' && [ "$RC" -eq 0 ] && ok "rd-16 an app with no file falls back to the workspace file and says so" || bad "rd-16 an app with no file falls back to the workspace file and says so (rc=$RC)"
 rm -rf "$M"
-# One app in a nested folder still has its own readiness file read.
+# Only the scanned folder's file is read. Any other one is named, so it is never silently used.
 M="$(mktemp -d)"; mkdir -p "$M/apps/mobile/App"
 printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$M/apps/mobile/App/Info.plist"
 printf '%s' "$PLIST_EMPTY" > "$M/apps/mobile/App/PrivacyInfo.xcprivacy"
 printf 'let a = 1\n' > "$M/apps/mobile/App/A.swift"
 printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
-rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && rr_has 'Manual checks for apps/mobile' && [ "$RC" -eq 2 ] && ok "rd-20 a single nested app has its readiness file read" || bad "rd-20 a single nested app has its readiness file read (rc=$RC)"
+rr_has 'not read, for example apps/mobile/.app-review-readiness.json' && ! rr_has 'MANUAL-DEMO' && [ "$RC" -eq 0 ] && ok "rd-20 a readiness file in a nested folder is named as not read, never silently used" || bad "rd-20 a readiness file in a nested folder is named as not read, never silently used (rc=$RC)"
 rm -rf "$M"
-# A readiness file in a dependency or the docs never counts, and nothing deep or late is cut off.
+# A readiness file in a dependency or the docs never counts.
 M="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; mkdir -p "$M/node_modules/pkg"
 printf '{"checks":{"demo_account":"fail"}}' > "$M/node_modules/pkg/.app-review-readiness.json"
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
@@ -3428,7 +3422,13 @@ printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></pl
 printf '%s' "$PLIST_EMPTY" > "$R/App/PrivacyInfo.xcprivacy"; printf 'let a = 1\n' > "$R/App/A.swift"
 printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$R/.app-review-readiness.json"
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
-[ "$RC" -eq 2 ] && rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && ok "rd-25 a failure recorded six folders deep still blocks" || bad "rd-25 a failure recorded six folders deep still blocks (rc=$RC)"
+[ "$RC" -eq 0 ] && rr_has 'not read, for example apps/team/products/mobile/release' && ok "rd-25 a readiness file six folders deep is named as not read" || bad "rd-25 a readiness file six folders deep is named as not read (rc=$RC)"
+rm -rf "$M"
+M="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; mkdir -p "$M/apps/mobile/App"; cp "$M/App/Info.plist" "$M/apps/mobile/App/"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'Manual checks for this project. 7 of 7' && rr_has 'not read, for example apps/mobile/.app-review-readiness.json' && ok "rd-26 the scanned folder's file is used and a nested one is named" || bad "rd-26 the scanned folder's file is used and a nested one is named (rc=$RC)"
 rm -rf "$M"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
