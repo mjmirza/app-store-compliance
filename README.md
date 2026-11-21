@@ -4,7 +4,7 @@
 
 # App Store Compliance Playbook
 
-Stop getting your iOS and Android apps rejected. The enterprise reference and automated guard that turns App Store and Google Play rejection into a designed out failure mode.
+Catch App Store and Google Play rejection causes before the reviewer does. A reference and a pre-submission guard for iOS and Android apps that is plain about what a scan can prove and what still needs a person. It does not guarantee approval.
 
 Read it as a website at [mjmirza.github.io/app-store-compliance](https://mjmirza.github.io/app-store-compliance/).
 

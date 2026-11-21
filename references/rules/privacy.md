@@ -300,9 +300,9 @@ grep -rqn 'DeclaredAgeRange\|AgeRangeService' . && ! grep -rqn 'RESCIND_CONSENT\
 
 ## APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON
 
-- Title. Custom screen before a permission alert has a button titled Allow
+- Title. Possible pre-permission screen with a button titled Allow
 - Platform. apple
 - Guideline or policy. 5.1.1(iv)
-- Severity. high
-- What triggers it. A custom pre-permission screen, window, or view titles its button Allow or Allow plus a noun (Allow Location, Allow permissions), or offers a way to leave without seeing the system alert. Apple's Human Interface Guidelines say people do not allow anything in a pre-alert screen, and that a custom screen that takes advantage of quick taps to influence the choice leads to rejection. The guard flags an Allow-titled button in a source file that also requests a permission.
-- How to fix it. Give the pre-alert screen one button titled Continue or Next that opens the system alert, with no Close, Cancel, or Not Now, no incentive, and no image of the alert. Where possible, offer a way to use the app without the permission (5.1.1(iv)). Sources. https://developer.apple.com/design/human-interface-guidelines/privacy, https://developer.apple.com/app-store/review/guidelines/#5.1.1
+- Severity. medium
+- What triggers it. A custom pre-permission screen, window, or view titles its button Allow or Allow plus a noun (Allow Location, Allow permissions), or offers a way to leave without seeing the system alert. Apple's Human Interface Guidelines say people do not allow anything in a pre-alert screen, and that a custom screen that takes advantage of quick taps to influence the choice leads to rejection. The guard flags an Allow-titled button (SwiftUI, UIKit, Objective-C, or a React Native Button title) in an Apple source file that also requests a permission, skipping comments and Android-only files. A button and a request in one file is evidence, not proof, so the finding is reported as possible. A permission requested from another file is not seen.
+- How to fix it. Give the pre-alert screen one button titled Continue or Next that opens the system alert, with no incentive and no image of the alert. Do not offer Close or Cancel there, unless the screen also collects legally required consent, which Apple allows. Where possible, offer a way to use the app without the permission (5.1.1(iv)). A Settings toggle or a plain label that says Allow is fine. Sources. https://developer.apple.com/design/human-interface-guidelines/privacy, https://developer.apple.com/app-store/review/guidelines/#5.1.1

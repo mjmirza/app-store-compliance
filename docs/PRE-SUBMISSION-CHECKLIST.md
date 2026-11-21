@@ -26,7 +26,8 @@ Then work down the page. Do Shared first, then the store you ship to. Skip any s
 - [ ] A working demo account is provided, or a demo mode exists, for any feature behind login.
 - [ ] All in app purchases are live, visible, and complete a real transaction in the review build.
 - [ ] The review notes give the tap path to every feature behind login, region, or payment, so the reviewer never has to search.
-- [ ] These checks are recorded in `.app-review-readiness.json` at the project root, so the guard reads them and blocks on a recorded fail. See [what the scan proves](WHAT-THE-SCAN-PROVES.md).
+- [ ] The first launch works on the oldest and smallest device you support, signed out, on a slow network. A short screen recording of that first minute attached to the review notes answers most reviewer questions before they are asked.
+- [ ] These checks are recorded in `.app-review-readiness.json` in the app folder, so the guard reads them and blocks on a recorded fail. See [what the scan proves](WHAT-THE-SCAN-PROVES.md).
 
 ### Privacy and data
 - [ ] A privacy policy is published, reachable from inside the app, and accurate.
@@ -52,6 +53,8 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 - [ ] The app name, description, and screenshots match what the app actually does.
 - [ ] Screenshots show the app in use, not a splash or login screen.
 - [ ] Screenshots are captured from this build on every device family you support, iPad included if the app runs on iPad.
+- [ ] Every price shown in a screenshot, preview, or description matches the price the store and your backend charge today.
+- [ ] App previews use only screen captures of the app itself, no filmed hands and no footage from outside the app (Apple 2.3.4). Developers report rejections for previews wrapped in device frames, so leave them out.
 - [ ] Creative assets (product page header, search result art) show the app or its brand, suit all audiences, and carry no prices, discounts, unverifiable claims, or references to other apps (Apple 2.3.14, 16 October 2026).
 - [ ] No keyword stuffing in the name, subtitle, or description.
 - [ ] The age or content rating questionnaire is answered honestly.

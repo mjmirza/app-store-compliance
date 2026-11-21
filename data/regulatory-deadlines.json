@@ -1608,7 +1608,7 @@
       "id": "APPLE-PRICE-EQUALIZATION-2026-12-03",
       "jurisdiction": "Apple App Store (Botswana, Colombia, Egypt, Rwanda, Türkiye)",
       "law": "Apple tax and price update, 17 November 2026 (Apple Developer news 4o5ie73a)",
-      "requirement": "On 3 December 2026 Apple updates app and In-App Purchase prices in Botswana, Colombia, Egypt, Rwanda, and Türkiye unless one of them is the base storefront, after introducing 14 percent VAT in Botswana and 18 percent VAT in Rwanda (Exhibit B of the Paid Applications Agreement now lists Apple as collecting tax there). Auto-renewable subscriptions and manually managed storefront prices do not change. Check any price hard-coded in screenshots, promotional text, or in-app copy for those storefronts.",
+      "requirement": "On 3 December 2026 Apple updates app and In-App Purchase prices in Botswana, Colombia, Egypt, Rwanda, and Türkiye, after introducing 14 percent VAT in Botswana and 18 percent VAT in Rwanda (Exhibit B of the Paid Applications Agreement now lists Apple as collecting tax there). If one of these five is your base storefront, its price stays as you set it, and Apple adjusts your prices on the other automatically equalized storefronts to keep them in line with that base price. Auto-renewable subscriptions and storefronts where you manage prices manually do not change. Check any price hard-coded in screenshots, promotional text, or in-app copy for affected storefronts.",
       "effective_date": "2026-11-17",
       "grace_period": "none",
       "mandatory_date": "2026-12-03",

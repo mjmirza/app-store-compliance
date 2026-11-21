@@ -1727,6 +1727,10 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q 'expo prebuild' && ok "verdict-3 an Expo app with no native folders is told to prebuild" || bad "verdict-3 an Expo app with no native folders is told to prebuild (rc=$RC)"
 ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$ERR" | grep -q 'NOT CHECKED' && ok "verdict-4 as a hook an unscannable project is reported and never blocked" || bad "verdict-4 as a hook an unscannable project is reported and never blocked (rc=$RC)"
+ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | APP_STORE_GUARD_BLOCK_UNCHECKED=1 CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && echo "$ERR" | grep -q 'APP_STORE_GUARD_BLOCK_UNCHECKED=1' && ok "verdict-5 as a hook an unscannable project blocks when BLOCK_UNCHECKED is set" || bad "verdict-5 as a hook an unscannable project blocks when BLOCK_UNCHECKED is set (rc=$RC)"
+OUT="$(APP_STORE_GUARD_BLOCK_UNCHECKED=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "verdict-6 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1" || bad "verdict-6 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
@@ -3260,7 +3264,7 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { n
 gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
-# X feedback, November 2026. a custom pre-permission button titled Allow, per Apple HIG Privacy.
+# X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
 D="$(gs_ios Pre.swift 'import SwiftUI
 struct P: View { var body: some View { Button("Allow Location") { CLLocationManager().requestWhenInUseAuthorization() } } }')"
 gs_check "pp-1 an Allow button beside a permission request is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
@@ -3270,44 +3274,82 @@ gs_check "pp-2 a Continue button stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLO
 D="$(gs_ios Pre.swift 'import SwiftUI
 struct P: View { var body: some View { Button("Allow Location") { } } }')"
 gs_check "pp-3 an Allow button with no permission request in the file stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Pre.kt 'Button(onClick = { launcher.launch(Manifest.permission.CAMERA); req.launchPermissionRequest() }) { Text("Allow") }')"
-gs_check "pp-4 a Compose Text Allow beside launchPermissionRequest is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
+D="$(gs_ios Pre.kt 'Button(onClick = { req.launchPermissionRequest() }) { Text("Allow") }')"
+gs_check "pp-4 Kotlin source never raises the Apple rule" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Settings.swift 'import SwiftUI
+struct S: View { @State var on = false
+var body: some View { Toggle(isOn: $on) { Text("Allow notifications") } } }
+func ask() { CLLocationManager().requestWhenInUseAuthorization() }')"
+gs_check "pp-5 a Settings toggle labelled Allow stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Pre.swift '// Button("Allow") { manager.requestWhenInUseAuthorization() }
+let x = 1')"
+gs_check "pp-6 an Allow button inside a comment stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Screen.android.tsx '<Button title="Allow" onPress={() => PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA)} />')"
+gs_check "pp-7 an .android.tsx screen never raises the Apple rule" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+D="$(gs_ios Screen.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />')"
+gs_check "pp-8 a React Native Allow button beside request(PERMISSIONS.IOS) is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
+D="$(gs_ios Pre.m '[button setTitle:@"Allow" forState:UIControlStateNormal];
+[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL g){}];')"
+gs_check "pp-9 an Objective-C Allow title beside requestAccessForMediaType is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
+D="$(gs_ios Net.swift 'let b = Button("Allow") { api.request() }')"
+gs_check "pp-10 a generic api.request() is not a permission request" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
 
 # Every report names its rule pack and date, so a stale checklist is visible.
 D="$(gs_ios ok.swift 'let a = 1')"; rr_run "$D"
 rr_has 'Rule pack. v[0-9]' && ok "rp-1 the report names its rule pack version" || bad "rp-1 the report names its rule pack version (rc=$RC)"
-OUT="$(APP_STORE_GUARD_STALE_DAYS=0 bash "$GUARD" "$D" 2>&1)"
-if printf '%s\n' "$OUT" | grep -q 'sources last verified [0-9-]* (0 days ago)'; then ok "rp-2 stale flag skipped, data verified today"
-else printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-2 a zero-day window marks the pack stale" || bad "rp-2 a zero-day window marks the pack stale"; fi
+OUT="$(APP_STORE_GUARD_STALE_DAYS=abc bash "$GUARD" "$D" 2>&1)"
+printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && bad "rp-2 a non-numeric window falls back to 60" || ok "rp-2 a non-numeric window falls back to 60"
 SP="$(mktemp -d)"; mkdir -p "$SP/agent-os/hooks" "$SP/data"; cp "$HERE/app-store-compliance-guard.sh" "$SP/agent-os/hooks/"
 printf '9.9.9\n' > "$SP/VERSION"; printf '{"deadlines":[{"verified_on": "2020-01-01"}]}\n' > "$SP/data/regulatory-deadlines.json"
 OUT="$(bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"
-printf '%s\n' "$OUT" | grep -q 'Rule pack. v9.9.9, sources last verified 2020-01-01' && printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-4 an old rule pack is marked stale" || bad "rp-4 an old rule pack is marked stale"
+printf '%s\n' "$OUT" | grep -q 'Rule pack. v9.9.9, sources last verified 2020-01-01' && printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-3 an old rule pack is marked stale" || bad "rp-3 an old rule pack is marked stale"
+printf '{"deadlines":[{"verified_on": "not-a-date"}]}\n' > "$SP/data/regulatory-deadlines.json"
+OUT="$(bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"
+printf '%s\n' "$OUT" | grep -q 'Rule pack freshness not checked' && ok "rp-4 an unreadable date says freshness was not checked" || bad "rp-4 an unreadable date says freshness was not checked"
 rm -rf "$SP"
-OUT="$(APP_STORE_GUARD_STALE_DAYS=abc bash "$GUARD" "$D" 2>&1)"
-printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && bad "rp-3 a non-numeric window falls back to 60" || ok "rp-3 a non-numeric window falls back to 60"
 
 # Manual readiness. what a scan cannot prove, recorded by the team.
-rr_has 'Manual checks. Not attested' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
+TODAY="$(date +%Y-%m-%d)"
+ALLPASS='"demo_account":"pass","live_backend":"pass","review_notes":"pass","screenshots_match_build":"pass","account_deletion_device_test":"pass","privacy_labels_match_runtime":"pass","iap_reachable_by_reviewer":"pass"'
+rd_case() {  # $1 label, $2 json, $3 env assignment or "", $4 expected rc, $5 grep that must match, $6 grep that must not match
+  printf '%s' "$2" > "$D/.app-review-readiness.json"
+  if [ -n "$3" ]; then OUT="$(env "$3" bash "$GUARD" "$D" 2>&1)"; RC=$?; else rr_run "$D"; fi
+  if [ "$RC" -eq "$4" ] && { [ -z "$5" ] || rr_has "$5"; } && { [ -z "$6" ] || ! rr_has "$6"; }; then ok "$1"; else bad "$1 (rc=$RC)"; fi
+}
+rm -f "$D/.app-review-readiness.json"; rr_run "$D"
+rr_has 'Manual checks for this project. Not attested' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
 OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'MANUAL-READINESS-MISSING' && [ "$RC" -eq 2 ] && ok "rd-2 required readiness with no file blocks" || bad "rd-2 required readiness with no file blocks (rc=$RC)"
-TODAY="$(date +%Y-%m-%d)"
-printf '{"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"fail","live_backend":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
-rr_run "$D"
-rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && ok "rd-3 a failed demo account blocks" || bad "rd-3 a failed demo account blocks (rc=$RC)"
-printf '{"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
-rr_run "$D"
-! rr_has 'UNVERIFIED' && [ "$RC" -eq 0 ] && ok "rd-4 open items without enforce only inform" || bad "rd-4 open items without enforce only inform (rc=$RC)"
-printf '{"enforce":true,"build":"1.0 (1)","checked_on":"%s","checks":{"demo_account":"pass"}}' "$TODAY" > "$D/.app-review-readiness.json"
-rr_run "$D"
-rr_has 'MANUAL-LIVE-BACKEND-UNVERIFIED' && [ "$RC" -eq 2 ] && ok "rd-5 enforce turns an open item into a block" || bad "rd-5 enforce turns an open item into a block (rc=$RC)"
-printf '{"checks": [1,2' > "$D/.app-review-readiness.json"
-rr_run "$D"
-rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 0 ] && ok "rd-6 broken JSON is named, never crashes" || bad "rd-6 broken JSON is named, never crashes (rc=$RC)"
-printf '{"build":"1.0 (1)","checked_on":"2020-01-01","checks":{"demo_account":"pass","live_backend":"pass","review_notes":"pass","screenshots_match_build":"pass","account_deletion_device_test":"n/a","privacy_labels_match_runtime":"pass","iap_reachable_by_reviewer":"n/a"}}' > "$D/.app-review-readiness.json"
-rr_run "$D"
-rr_has '7 of 7 attested' && rr_has 'MANUAL-READINESS-STALE' && ok "rd-7 an old attestation is flagged stale" || bad "rd-7 an old attestation is flagged stale (rc=$RC)"
+rd_case "rd-3 a failed demo account blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-4 open items without enforce only inform" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 0 'Still open' 'UNVERIFIED'
+rd_case "rd-5 enforce turns an open item into a block" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-LIVE-BACKEND-UNVERIFIED' ''
+rd_case "rd-6 broken JSON is named and does not block when optional" '{"checks": [1,2' "" 0 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-7 an old attestation is flagged stale" "{\"checked_on\":\"2020-01-01\",\"checks\":{$ALLPASS}}" "" 0 '7 of 7 attested' ''
+rr_has 'MANUAL-READINESS-STALE' && ok "rd-7b the stale attestation names itself" || bad "rd-7b the stale attestation names itself"
+rd_case "rd-8 required readiness with an empty checks list blocks" '{"checks":[]}' "APP_STORE_GUARD_REQUIRE_READINESS=1" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-9 enforce in a broken file still blocks" '{"enforce":true,"checks":[]}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+J="$(python3 -c 'import json,sys; print(json.dumps({"enforce": True, "checked_on": sys.argv[1], "checks": {"demo_account": chr(0xd800), "live_backend": "fail"}}))' "$TODAY")"
+rd_case "rd-10 a lone surrogate never hides a recorded failure" "$J" "" 2 'MANUAL-LIVE-BACKEND-FAILED' ''
+J="$(python3 -c 'import json,sys; nl=chr(10); c={k: "pass" for k in sys.argv[1].split(",")}; print(json.dumps({"build": "ok"+nl+"critical"+nl, "checked_on": "2026-11-21"+nl+"critical|MANUAL-INJECTED|x|y", "checks": c}))' "demo_account,live_backend,review_notes,screenshots_match_build,account_deletion_device_test,privacy_labels_match_runtime,iap_reachable_by_reviewer")"
+rd_case "rd-11 newlines in build or checked_on never forge a finding" "$J" "" 0 '7 of 7 attested' 'MANUAL-INJECTED'
+rr_has '^  \[CRITICAL\]' && bad "rd-11b no critical line appears" || ok "rd-11b no critical line appears"
+rd_case "rd-12 enforce rejects n/a on the privacy check" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"n/a\",\"live_backend\":\"n/a\",\"review_notes\":\"n/a\",\"screenshots_match_build\":\"n/a\",\"account_deletion_device_test\":\"n/a\",\"privacy_labels_match_runtime\":\"n/a\",\"iap_reachable_by_reviewer\":\"n/a\"}}" "" 2 'MANUAL-PRIVACY-LABELS-MATCH-RUNTIME-UNVERIFIED' ''
+rr_has 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' && ok "rd-12b n/a without a reason is not accepted" || bad "rd-12b n/a without a reason is not accepted"
+NA_IAP="${ALLPASS%\"iap_reachable_by_reviewer\":\"pass\"}\"iap_reachable_by_reviewer\":\"n/a\""
+rd_case "rd-13 n/a with a reason in notes is accepted" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"notes\":{\"iap_reachable_by_reviewer\":\"no in-app purchases\"},\"checks\":{$NA_IAP}}" "" 0 '7 of 7 attested' 'UNVERIFIED'
+rd_case "rd-14 a future checked_on is flagged" "{\"checked_on\":\"2099-01-01\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
 rm -rf "$D"
+
+# Readiness is read per app in a monorepo, with the workspace file as the fallback.
+M="$(mk_expo_mono)"; rm -f "$M/apps/app/ios/App/A.swift"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/apps/app/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/kiosk/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED.*apps/kiosk' && rr_has 'Manual checks for apps/app. 7 of 7' && [ "$RC" -eq 2 ] && ok "rd-15 a failure recorded for one app in a monorepo blocks and names it" || bad "rd-15 a failure recorded for one app in a monorepo blocks and names it (rc=$RC)"
+rm -f "$M/apps/kiosk/.app-review-readiness.json"; printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"
+rr_has 'Manual checks for apps/kiosk/ios. 7 of 7 attested.*from the workspace file' && ok "rd-16 an app with no file falls back to the workspace file and says so" || bad "rd-16 an app with no file falls back to the workspace file and says so"
+rm -rf "$M"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

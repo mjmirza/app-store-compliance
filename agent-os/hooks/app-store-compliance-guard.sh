@@ -741,16 +741,17 @@ echo ""
 if grep_has 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'; then
   finding critical "APPLE-ASCAPI-AGERATING-ENDPOINT-REMOVED" "Pipeline calls a removed App Store Connect API age-rating endpoint" "Switch to the current age-rating declaration read and update endpoints (ASC API 4.4 release notes)." src 'appStoreVersions/[^ "]*/ageRatingDeclaration|relationships/ageRatingDeclaration'
 fi
-# Apple HIG, Privacy. a custom screen before a system permission alert titles its one button Continue or Next,
-# never Allow. Fires only when the Allow button sits in a file that also requests the permission.
-PERM_REQ_RE='requestWhenInUseAuthorization|requestAlwaysAuthorization|requestTrackingAuthorization|requestAuthorization[(]|requestAccess[(]|requestRecordPermission|requestPermissions?[(]|RequestPermission|PermissionsAndroid[.]request|request[A-Za-z]*PermissionsAsync|[.]request[(][)]|launchPermissionRequest'
-ALLOW_BTN_RE='(Button[(]|setTitle[(]|title[:=][[:space:]]*[{]?|Text[(]|label[:=][[:space:]]*)[[:space:]]*(LocalizedStringKey[(]|NSLocalizedString[(]|String[(]localized:[[:space:]]*)?["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]|>[[:space:]]*Allow([[:space:]][A-Za-z ]{0,30})?[[:space:]]*</'
-if [ "$IS_IOS" -eq 1 ] && [ -s "$FILELIST" ]; then
-  PRE_PROMPT_HIT="$(grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EnH -m1 -e "$ALLOW_BTN_RE" 2>/dev/null | head -1)"
+# Apple HIG, Privacy. a custom pre-alert screen titles its one button Continue or Next, never Allow.
+# A button and a permission request in one Apple source file is evidence, so it is reported as possible.
+PERM_REQ_RE='requestWhenInUseAuthorization|requestAlwaysAuthorization|requestTrackingAuthorization|requestAuthorization[(:]|requestAuthorizationWithOptions|requestAccess[(:]|requestAccessForMediaType|requestRecordPermission|request[(][[:space:]]*PERMISSIONS[.]IOS|requestMultiple[(][[:space:]]*[[]?[[:space:]]*PERMISSIONS[.]IOS|request[A-Za-z]*PermissionsAsync|Permission[.][A-Za-z]+[.]request[(]'
+ALLOW_BTN_RE='(Button[(][[:space:]]*(LocalizedStringKey[(]|String[(]localized:[[:space:]]*|NSLocalizedString[(])?|setTitle[(]|setTitle:@|<Button[^>]*title=[{]?)["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]'
+ANDROID_SRC_RE='(^|/)android/|[.]android[.][A-Za-z]+$|[.](kt|kts|java)$'
+if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && [ -s "$FILELIST" ]; then
+  PRE_PROMPT_HIT="$(grep -E "$SRC_EXT_RE" "$FILELIST" | grep -Ev "$ANDROID_SRC_RE" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EnH -e "$ALLOW_BTN_RE" 2>/dev/null | grep -Ev '^[^:]*:[0-9]+:[[:space:]]*(//|/[*]|[*]|#)' | head -1)"
   if [ -n "$PRE_PROMPT_HIT" ]; then
     PRE_PROMPT_AT="${PRE_PROMPT_HIT#"${DIR%/}"/}"
     PRE_PROMPT_AT="$(printf '%s' "$PRE_PROMPT_AT" | cut -d: -f1-2)"
-    finding high "APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON" "A custom screen before a permission alert titles its button Allow" "Title the single button Continue or Next, give it no Close or Cancel, and let the system alert ask (Apple HIG Privacy, pre-alert screens; Guideline 5.1.1(iv)). At $PRE_PROMPT_AT"
+    finding medium "APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON" "Possible pre-permission screen with a button titled Allow, at $PRE_PROMPT_AT" "If this screen comes before a system permission alert, title its one button Continue or Next and let the alert ask. Add another action only to collect legally required consent (Apple HIG Privacy, Guideline 5.1.1(iv)). A Settings toggle or a plain label is fine."
   fi
 fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
@@ -1623,7 +1624,7 @@ fi
 # A stale checklist gives false confidence. Every report names its rule pack version and the newest
 # verified_on date, and warns when that is older than APP_STORE_GUARD_STALE_DAYS (default 60).
 rule_pack_line() {
-  local hd root="" c ver="unknown" newest="" age="" stale="${APP_STORE_GUARD_STALE_DAYS:-60}"
+  local hd root="" c ver="unknown" newest="" age="" then_s now_s stale="${APP_STORE_GUARD_STALE_DAYS:-60}"
   case "$stale" in ''|*[!0-9]*) stale=60 ;; esac
   hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   for c in "$hd/../.." "$hd/../skills/app-store-compliance" "${HOME:-}/.agents/skills/app-store-compliance"; do
@@ -1635,13 +1636,139 @@ rule_pack_line() {
   fi
   [ -f "$root/VERSION" ] && ver="$(tr -d '[:space:]' < "$root/VERSION")"
   newest="$(grep -oE '"verified_on":[[:space:]]*"[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$root/data/regulatory-deadlines.json" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort | tail -1)"
-  if [ -n "$newest" ] && tool_ok python3 -c pass; then
-    age="$(python3 -c 'import sys,datetime;print((datetime.date.today()-datetime.date.fromisoformat(sys.argv[1])).days)' "$newest" 2>/dev/null)"
+  if [ -n "$newest" ]; then
+    now_s="$(date +%s 2>/dev/null)"
+    then_s="$(date -j -f %Y-%m-%d "$newest" +%s 2>/dev/null || date -d "$newest" +%s 2>/dev/null)"
+    case "$now_s$then_s" in ''|*[!0-9]*) ;; *) [ -n "$then_s" ] && age=$(( (now_s - then_s) / 86400 )) ;; esac
   fi
   echo "Rule pack. v$ver, sources last verified ${newest:-unknown}${age:+ ($age days ago)}. The checks run against this dated snapshot, not the live guideline pages."
-  if [ -n "$age" ] && [ "$age" -gt "$stale" ]; then
+  if [ -z "$age" ]; then
+    echo "Rule pack freshness not checked. The verified date could not be read or compared, so treat these rules as possibly stale."
+  elif [ "$age" -gt "$stale" ]; then
     echo "Rule pack STALE. Older than $stale days, so a rule Apple or Google changed since then is not checked. Update with git -C \"$root\" pull, or reinstall."
   fi
+}
+
+# What a code scan cannot prove, recorded per app in .app-review-readiness.json (else the workspace's).
+# A recorded fail blocks. "enforce": true or APP_STORE_GUARD_REQUIRE_READINESS=1 makes an open check block too.
+readiness_check() {  # $1 app root, $2 workspace root
+  local app="${1%/}" ws="${2%/}" d f="" from="" label req="${APP_STORE_GUARD_REQUIRE_READINESS:-0}" strict=0 out rc sev id title fix
+  label="${app#"$ws"/}"; [ "$app" = "$ws" ] && label="this project"
+  d="$app"
+  while :; do
+    if [ -f "$d/.app-review-readiness.json" ]; then f="$d/.app-review-readiness.json"; break; fi
+    case "$d/" in "$ws"/*) ;; *) break ;; esac
+    { [ "$d" = "$ws" ] || [ "$d" = "/" ] || [ -z "$d" ]; } && break
+    d="$(dirname "$d")"
+  done
+  [ -z "$f" ] && [ -f "$ws/.app-review-readiness.json" ] && f="$ws/.app-review-readiness.json"
+  if [ -n "$f" ] && [ "$f" != "$app/.app-review-readiness.json" ]; then
+    from=", from ${f#"$ws"/}"; [ "$f" = "$ws/.app-review-readiness.json" ] && from=", from the workspace file"
+  fi
+  echo ""
+  if [ -z "$f" ]; then
+    echo "Manual checks for $label. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, or privacy labels that match runtime. Copy templates/app-review-readiness.json to the app folder and record each one."
+    [ "$req" = "1" ] && finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json for $label, and readiness is required" "Copy templates/app-review-readiness.json to the app folder, test each item on the release build, and record pass, fail, or n/a with a reason."
+    flush_findings; return 0
+  fi
+  { [ "$req" = "1" ] || grep -Eqs '"enforce"[[:space:]]*:[[:space:]]*true' "$f"; } && strict=1
+  if ! tool_ok python3 -c pass; then
+    if [ "$strict" -eq 1 ]; then finding critical "MANUAL-READINESS-UNREAD" "Readiness is required for $label, but python3 is not available to read it" "Install python3, then run the guard again."
+    else echo "Manual checks for $label. .app-review-readiness.json found, not read. python3 not found."; fi
+    flush_findings; return 0
+  fi
+  out="$(python3 - "$f" "$strict" "$from" <<'PYR'
+import datetime, json, sys
+
+CHECKS = [
+    ("demo_account", True, "A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
+    ("live_backend", True, "The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
+    ("review_notes", True, "Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
+    ("screenshots_match_build", True, "Screenshots show this build, in use, on every device size you support", "Capture screenshots from the release build, show the app in use, and cover the iPad and iPhone Duo sizes you support (Apple 2.3.3, 2.3.14)."),
+    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device, then try to sign back in with it. The sign-in must fail (Apple 5.1.1(v), Google Play account deletion)."),
+    ("privacy_labels_match_runtime", False, "Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data). Every app has this check, so n/a is not accepted."),
+    ("iap_reachable_by_reviewer", True, "A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
+]
+
+
+def clean(value, limit=300):
+    text = str(value).encode("ascii", "replace").decode("ascii")
+    return "".join(c if c.isprintable() and c not in "\t" else " " for c in text)[:limit]
+
+
+def emit(*fields):
+    sys.stdout.write("\t".join(clean(f) for f in fields) + "\n")
+
+
+def run():
+    path, strict, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
+    unreadable_sev = "critical" if strict else "high"
+    try:
+        with open(path, "rb") as fh:
+            data = json.loads(fh.read().decode("utf-8"))
+        checks = data.get("checks")
+        notes = data.get("notes") or {}
+        if not isinstance(checks, dict) or not isinstance(notes, dict):
+            raise ValueError("checks and notes must be objects")
+    except (OSError, ValueError, AttributeError, RecursionError):
+        emit(unreadable_sev, "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
+        return
+    passed, still_open = 0, []
+    for key, na_ok, title, fix in CHECKS:
+        tag = "MANUAL-" + key.upper().replace("_", "-")
+        value = checks.get(key, "missing")
+        value = value.strip().lower() if isinstance(value, str) else "invalid"
+        reason = notes.get(key)
+        has_reason = isinstance(reason, str) and reason.strip() != ""
+        if value == "pass" or (value in ("n/a", "na") and na_ok and has_reason):
+            passed += 1
+            continue
+        if value == "fail":
+            emit("critical", tag + "-FAILED", title + ", recorded as failed", fix)
+            continue
+        if value in ("n/a", "na"):
+            value = "n/a not accepted" if not na_ok else "n/a with no reason in notes"
+        still_open.append(key)
+        if strict:
+            emit("critical", tag + "-UNVERIFIED", "%s, not verified (%s)" % (title, value), fix)
+    when = data.get("checked_on")
+    try:
+        age = (datetime.date.today() - datetime.date.fromisoformat(str(when))).days
+    except ValueError:
+        age = None
+    build = data.get("build") or "an unnamed build"
+    emit("info", "Manual checks. %d of %d attested for %s%s%s.%s" % (
+        passed, len(CHECKS), build, (", checked %s" % when) if age is not None else ", no valid checked_on date", src,
+        (" Still open. " + ", ".join(still_open) + ".") if still_open else ""))
+    if age is None:
+        emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json has no valid checked_on date", "Re-run the manual checks on the build you are submitting and set checked_on to that day, as YYYY-MM-DD.")
+    elif age < -1:
+        emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json has a checked_on date in the future", "Set checked_on to the day the manual checks were actually run.")
+    elif age > 30:
+        emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json is older than 30 days", "Re-run the manual checks on the build you are submitting and update checked_on.")
+
+
+try:
+    run()
+except Exception:
+    sys.stdout.write("CRASH\n")
+sys.stdout.write("END\n")
+PYR
+)"; rc=$?
+  if [ "$rc" -ne 0 ] || [ "$(printf '%s\n' "$out" | tail -n 1)" != "END" ] || printf '%s\n' "$out" | grep -qx 'CRASH'; then
+    if [ "$strict" -eq 1 ]; then sev=critical; else sev=high; fi
+    finding "$sev" "MANUAL-READINESS-UNREADABLE" ".app-review-readiness.json for $label could not be read" "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done."
+    flush_findings; return 0
+  fi
+  while IFS="$(printf '\t')" read -r sev id title fix; do
+    case "$sev" in
+      info) echo "${id/Manual checks./Manual checks for $label.}" ;;
+      critical|high|medium) case "$id" in MANUAL-[A-Z-]*) finding "$sev" "$id" "$title ($label)" "$fix" ;; esac ;;
+    esac
+  done <<READINESS_EOF
+$out
+READINESS_EOF
+  flush_findings
 }
 
 # The deadline list prints after the findings, and only for the stores this project ships to (issue #842).
@@ -1662,7 +1789,6 @@ print_deadlines() {
 echo "== App Store Compliance Guard =="
 echo "Project. $DIR"
 rule_pack_line
-SCAN_ROOT="${DIR%/}"
 ROOTS="$(app_roots)"
 if [ -n "$ROOTS" ]; then
   PROJECT_ROOT="${DIR%/}"
@@ -1712,6 +1838,11 @@ EOF2
     # The project root scanned only beside a linked app, with no marker and nothing found, is not an app (#657).
     if [ "${ROOT%/}" = "$PROJECT_ROOT" ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && [ "$IS_WEB" -eq 0 ] && [ "$NEEDS_NATIVE" -eq 0 ] && ! dir_has_app_marker "$PROJECT_ROOT"; then
       :
+    else
+      readiness_check "$ROOT" "$PROJECT_ROOT"
+    fi
+    if [ "${ROOT%/}" = "$PROJECT_ROOT" ] && [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && [ "$IS_WEB" -eq 0 ] && [ "$NEEDS_NATIVE" -eq 0 ] && ! dir_has_app_marker "$PROJECT_ROOT"; then
+      :
     elif [ "$IS_IOS" -eq 0 ] && [ "$IS_AND" -eq 0 ] && { [ "$IS_WEB" -eq 0 ] || [ "$NEEDS_NATIVE" -eq 1 ]; }; then
       UNCHECKED="${UNCHECKED:+$UNCHECKED, }${ROOT#"$PROJECT_ROOT"/}"
     fi
@@ -1732,80 +1863,10 @@ EOF
 else
   scan_tree
   flush_findings
+  readiness_check "$DIR" "$DIR"
 fi
 print_deadlines
 
-
-# What a code scan cannot prove. A team records it in .app-review-readiness.json at the project root.
-# A check marked fail always blocks. With "enforce": true, or APP_STORE_GUARD_REQUIRE_READINESS=1, todo blocks too.
-readiness_check() {
-  local f="$SCAN_ROOT/.app-review-readiness.json" sev id title fix
-  echo ""
-  if [ ! -f "$f" ]; then
-    echo "Manual checks. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, or privacy labels that match runtime. Copy templates/app-review-readiness.json to your project root and record each one."
-    if [ "${APP_STORE_GUARD_REQUIRE_READINESS:-0}" = "1" ]; then
-      finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json, and readiness is required" "Copy templates/app-review-readiness.json to the project root, test each item on the release build, and record pass, fail, or n/a."
-    fi
-    flush_findings
-    return 0
-  fi
-  if ! tool_ok python3 -c pass; then echo "Manual checks. .app-review-readiness.json found, not read. python3 not found."; return 0; fi
-  while IFS='|' read -r sev id title fix; do
-    case "$sev" in
-      info) echo "$id" ;;
-      critical|high|medium) finding "$sev" "$id" "$title" "$fix" ;;
-    esac
-  done < <(python3 - "$f" "${APP_STORE_GUARD_REQUIRE_READINESS:-0}" <<'PYR'
-import json, sys, datetime
-REQUIRED = {
-    "demo_account": ("A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
-    "live_backend": ("The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
-    "review_notes": ("Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
-    "screenshots_match_build": ("Screenshots show this build, in use, on every device size you support", "Capture screenshots from the release build, show the app in use, and cover the iPad and iPhone Duo sizes you support (Apple 2.3.3, 2.3.14)."),
-    "account_deletion_device_test": ("Account deletion works end to end on a real device", "Delete an account on a real device, then try to sign back in with it. The sign-in must fail (Apple 5.1.1(v), Google Play account deletion)."),
-    "privacy_labels_match_runtime": ("Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data)."),
-    "iap_reachable_by_reviewer": ("A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
-}
-path, req = sys.argv[1], sys.argv[2] == "1"
-try:
-    with open(path, encoding="utf-8") as fh:
-        d = json.load(fh)
-    checks = d.get("checks", {})
-    if not isinstance(checks, dict):
-        raise ValueError("checks is not an object")
-except (OSError, ValueError, AttributeError):
-    print("high|MANUAL-READINESS-UNREADABLE|.app-review-readiness.json is not valid JSON with a checks object|Fix the file using templates/app-review-readiness.json as the shape.")
-    sys.exit(0)
-enforce = req or d.get("enforce") is True
-passed, todo = [], []
-for key, (title, fix) in REQUIRED.items():
-    v = str(checks.get(key, "missing")).strip().lower()
-    tag = key.upper().replace("_", "-")
-    if v in ("pass", "n/a", "na"):
-        passed.append(key)
-    elif v == "fail":
-        print("critical|MANUAL-%s-FAILED|%s, recorded as failed|%s" % (tag, title, fix))
-    else:
-        todo.append(key)
-        if enforce:
-            print("critical|MANUAL-%s-UNVERIFIED|%s, not verified yet (%s)|%s" % (tag, title, v, fix))
-when = d.get("checked_on")
-try:
-    age = (datetime.date.today() - datetime.date.fromisoformat(str(when))).days
-except ValueError:
-    age = None
-build = str(d.get("build") or "an unnamed build").replace("|", "/")
-print("info|Manual checks. %d of %d attested for %s%s.%s" % (
-    len(passed), len(REQUIRED), build,
-    (", checked %s" % when) if when else ", no checked_on date",
-    (" Still open. " + ", ".join(todo) + ".") if todo else ""))
-if age is None or age > 30:
-    print("high|MANUAL-READINESS-STALE|.app-review-readiness.json is %s|Re-run the manual checks on the build you are submitting and update checked_on." % ("older than 30 days" if age is not None else "missing a valid checked_on date"))
-PYR
-)
-  flush_findings
-}
-readiness_check
 
 # ===== summary and exit =====
 echo ""
@@ -1835,11 +1896,17 @@ if [ "$CRIT" -gt 0 ]; then
   [ "${REPORT_DEGRADED:-0}" = "1" ] && echo "BLOCKED. $CRIT critical rejection risk(s). Full report on stdout (no temp file available for buffering)." >&2
   emit_report 2; exit 2
 fi
+# A hook lets an unchecked submit through by default. APP_STORE_GUARD_BLOCK_UNCHECKED=1 stops it instead.
+block_unchecked() {
+  [ "${APP_STORE_GUARD_BLOCK_UNCHECKED:-0}" = "1" ] || return 0
+  echo "BLOCKED. Nothing was checked, and APP_STORE_GUARD_BLOCK_UNCHECKED=1 is set."
+  emit_report 2; echo "$1 Blocked because APP_STORE_GUARD_BLOCK_UNCHECKED=1." >&2; exit 2
+}
 # A scan buffer that failed mid-run leaves the result unknown, never CLEAR.
 if [ -n "$SCAN_ERROR" ]; then
   NOTE="NOT CHECKED. The scan could not run because $SCAN_ERROR."
   echo ""; echo "$NOTE"
-  if [ -n "$STDIN_JSON" ]; then emit_report 0; echo "$NOTE" >&2; exit 0; fi
+  if [ -n "$STDIN_JSON" ]; then block_unchecked "$NOTE"; emit_report 0; echo "$NOTE" >&2; exit 0; fi
   exit 1
 fi
 # A verdict line every time. Exit 0 with nothing scanned reads as a pass, so it is named and, run by hand, exits 1.
@@ -1853,7 +1920,7 @@ if [ -n "$UNCHECKED" ] || { [ "$ANY_NATIVE" -eq 0 ] && { [ "$ANY_WEB" -eq 0 ] ||
   elif [ "$ANY_NEEDS_NATIVE" -eq 1 ]; then NEXT="Next. This app has no ios or android folder yet. Run $NATIVE_HINT, then run the guard again."
   else NEXT="Next. Point the guard at the folder that holds your Xcode project or your Android app folder."; fi
   echo ""; echo "$NOTE"; echo "$NEXT"
-  if [ -n "$STDIN_JSON" ]; then emit_report 0; echo "$NOTE $NEXT" >&2; exit 0; fi
+  if [ -n "$STDIN_JSON" ]; then block_unchecked "$NOTE $NEXT"; emit_report 0; echo "$NOTE $NEXT" >&2; exit 0; fi
   exit 1
 fi
 echo ""

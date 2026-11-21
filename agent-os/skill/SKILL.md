@@ -118,7 +118,7 @@ If time is short, verify these two first, because they cause the majority of rej
 1. A working demo account with a live backend.
 2. A privacy declaration that matches actual runtime behavior, including every SDK.
 
-The scan cannot prove either one. Ask the team to record them, with the other manual checks, in `.app-review-readiness.json` at the project root (template in `templates/app-review-readiness.json`). The guard reads it, blocks on any check marked `fail`, and lists what is still open. Report scanner findings and manual checks as two separate halves, and quote the `Rule pack.` line from the guard so the reader knows how current the rules are. See `docs/WHAT-THE-SCAN-PROVES.md`.
+The scan cannot prove either one. Ask the team to record them, with the other manual checks, in `.app-review-readiness.json` in the app folder (template in `templates/app-review-readiness.json`). The guard reads it, blocks on any check marked `fail`, and lists what is still open. Report scanner findings and manual checks as two separate halves, and quote the `Rule pack.` line from the guard so the reader knows how current the rules are. See `docs/WHAT-THE-SCAN-PROVES.md`.
 
 ## Output contract
 
