@@ -3402,6 +3402,15 @@ rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && ok "rd-34 a UTF-16 fil
 python3 -c 'import sys; n = 600; open(sys.argv[1], "w").write("{\"checks\":{\"demo_account\":\"fail\"},\"build\":" + "{\"x\":" * n + "0" + ",\"x\":0}" * n + "}")' "$D/.app-review-readiness.json"
 rr_run "$D"
 [ "$RC" -eq 2 ] && rr_has '\[CRITICAL\][[:space:]]*MANUAL-' && ok "rd-35 a deeply nested build value never hides a recorded fail" || bad "rd-35 a deeply nested build value never hides a recorded fail (rc=$RC)"
+rm -f "$D/.app-review-readiness.json"; mkdir "$D/.app-review-readiness.json"; rr_run "$D"; rmdir "$D/.app-review-readiness.json"
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-36 a folder named like the readiness file blocks, never reads as absent" || bad "rd-36 a folder named like the readiness file blocks, never reads as absent (rc=$RC)"
+ln -s missing-target.json "$D/.app-review-readiness.json"; rr_run "$D"; rm -f "$D/.app-review-readiness.json"
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-37 a broken symlink named like the readiness file blocks" || bad "rd-37 a broken symlink named like the readiness file blocks (rc=$RC)"
+python3 -c 'import sys; open(sys.argv[1], "wb").write(b"{\"checks\":{\"demo_account\":\"fail\"}," + b"\"x\":0," * 200000 + b"\"x\":0}")' "$D/.app-review-readiness.json"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$("$TO" 45 bash "$GUARD" "$D" 2>&1)"; RC=$?; else rr_run "$D"; fi
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 45 ] && ok "rd-38 200000 repeated keys still block quickly" || bad "rd-38 200000 repeated keys still block quickly (rc=$RC, $((SECONDS - T0))s)"
+rm -f "$D/.app-review-readiness.json"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.

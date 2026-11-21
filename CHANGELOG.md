@@ -4,7 +4,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## 2.5.0 (2026-11-21)
 
-This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. Nothing that passed 2.4.0 is blocked by default. The new check is medium, and a readiness file blocks only on a check a team records as failed, or when the team opts in. Five Codex review rounds attacked the changes before release, and every reproduced problem became a test. It is a minor version.
+This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. Nothing that passed 2.4.0 is blocked by default. The new check is medium. A project without a readiness file and without the opt-in sees no new block. Once a team adds a readiness file, it blocks on a check recorded as failed, on a file the guard cannot read, and, when the team opts in, on an open check. Eight Codex review rounds attacked the changes before release, and every reproduced problem became a test. It is a minor version.
 
 ### Added
 - Every report now opens with a `Rule pack.` line naming the version and the oldest and newest `verified_on` dates in the data, counts the sources older than the window, and says the checks run against a dated snapshot. When even the newest source is past 60 days it prints `Rule pack STALE` and the update command. Tune with `APP_STORE_GUARD_STALE_DAYS`.

@@ -1713,12 +1713,12 @@ readiness_check() {  # $1 app root, $2 workspace root
   label="${app#"$ws"/}"; [ "$app" = "$ws" ] && label="this project"
   d="$app"
   while :; do
-    if [ -f "$d/.app-review-readiness.json" ]; then f="$d/.app-review-readiness.json"; break; fi
+    if [ -e "$d/.app-review-readiness.json" ] || [ -L "$d/.app-review-readiness.json" ]; then f="$d/.app-review-readiness.json"; break; fi
     case "$d/" in "$ws"/*) ;; *) break ;; esac
     { [ "$d" = "$ws" ] || [ "$d" = "/" ] || [ -z "$d" ]; } && break
     d="$(dirname "$d")"
   done
-  [ -z "$f" ] && [ -f "$ws/.app-review-readiness.json" ] && f="$ws/.app-review-readiness.json"
+  [ -z "$f" ] && { [ -e "$ws/.app-review-readiness.json" ] || [ -L "$ws/.app-review-readiness.json" ]; } && f="$ws/.app-review-readiness.json"
   if [ -n "$f" ] && [ "$f" != "$app/.app-review-readiness.json" ]; then
     from=", from ${f#"$ws"/}"; [ "$f" = "$ws/.app-review-readiness.json" ] && from=", from the workspace file"
   fi
@@ -1726,6 +1726,10 @@ readiness_check() {  # $1 app root, $2 workspace root
   if [ -z "$f" ]; then
     echo "Manual checks for $label. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, privacy labels that match runtime, or an in-app purchase the reviewer can reach. Copy templates/app-review-readiness.json to the app folder and record each one."
     [ "$req" = "1" ] && finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json for $label, and readiness is required" "Copy templates/app-review-readiness.json to the app folder, test each item on the release build, and record pass, fail, or n/a with a reason."
+    flush_findings; return 0
+  fi
+  if [ ! -f "$f" ] || [ ! -r "$f" ]; then
+    finding critical "MANUAL-READINESS-UNREADABLE" ".app-review-readiness.json for $label${from} exists but is not a readable file, so a fail inside it cannot be seen" "Replace it with a regular file shaped like templates/app-review-readiness.json, or remove it."
     flush_findings; return 0
   fi
   if ! tool_ok python3 -c pass; then
@@ -1755,7 +1759,10 @@ def keep_dups(pairs):
     for key, value in pairs:
         if key in out:
             prev = out[key]
-            out[key] = Dup((prev if isinstance(prev, Dup) else [prev]) + [value])
+            if isinstance(prev, Dup):
+                prev.append(value)
+            else:
+                out[key] = Dup([prev, value])
         else:
             out[key] = value
     return out
