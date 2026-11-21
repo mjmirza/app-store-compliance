@@ -1709,7 +1709,7 @@ rule_pack_line() {
 # What a code scan cannot prove, recorded per app in .app-review-readiness.json (else the workspace's).
 # A recorded fail blocks. "enforce": true or APP_STORE_GUARD_REQUIRE_READINESS=1 makes an open check block too.
 readiness_check() {  # $1 app root, $2 workspace root
-  local app="${1%/}" ws="${2%/}" d f="" from="" label req="${APP_STORE_GUARD_REQUIRE_READINESS:-0}" strict=0 out rc sev id title fix
+  local app="${1%/}" ws="${2%/}" d f="" from="" label req="${APP_STORE_GUARD_REQUIRE_READINESS:-0}" out rc sev id title fix
   label="${app#"$ws"/}"; [ "$app" = "$ws" ] && label="this project"
   d="$app"
   while :; do
@@ -1728,11 +1728,8 @@ readiness_check() {  # $1 app root, $2 workspace root
     [ "$req" = "1" ] && finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json for $label, and readiness is required" "Copy templates/app-review-readiness.json to the app folder, test each item on the release build, and record pass, fail, or n/a with a reason."
     flush_findings; return 0
   fi
-  # Only for the no-python and crash paths, where the file cannot be decoded. Python decides from the real field.
-  { [ "$req" = "1" ] || grep -Eqs '"enforce"[[:space:]]*:[[:space:]]*true' "$f"; } && strict=1
   if ! tool_ok python3 -c pass; then
-    if [ "$strict" -eq 1 ]; then finding critical "MANUAL-READINESS-UNREAD" "Readiness is required for $label, but python3 is not available to read it" "Install python3, then run the guard again."
-    else echo "Manual checks for $label. .app-review-readiness.json found, not read. python3 not found."; fi
+    finding critical "MANUAL-READINESS-UNREAD" ".app-review-readiness.json exists for $label, but python3 is not available to read it" "Install python3, then run the guard again."
     flush_findings; return 0
   fi
   out="$(python3 - "$f" "$req" "$from" <<'PYR'
@@ -1799,7 +1796,7 @@ def run():
     try:
         with open(path, "rb") as fh:
             raw = fh.read()
-        data = json.loads(raw.decode("utf-8"), object_pairs_hook=keep_dups)
+        data = json.loads(raw, object_pairs_hook=keep_dups)
     except (OSError, ValueError, RecursionError):
         data = None
     dups = isinstance(data, dict) and any(isinstance(v, Dup) for v in data.values())
@@ -1807,13 +1804,13 @@ def run():
         if isinstance(data.get("checks"), Dup):
             data["checks"], bad_part = merge_checks(data["checks"])
             if bad_part and data["checks"] is not None:
-                emit("high", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json repeats checks and one of them is not an object, so only the others were read", "Keep one checks object, as in templates/app-review-readiness.json.")
+                emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json repeats checks and one of them is not an object, so a fail inside it cannot be ruled out", "Keep one checks object, as in templates/app-review-readiness.json.")
         strict = required or (data.get("enforce") is True if not isinstance(data.get("enforce"), Dup) else any(v is True for v in data["enforce"]))
     else:
         # Only an unparsed file falls back to the raw text, to stay on the safe side.
         strict = required or (data is None and re.search(rb'"enforce"\s*:\s*true', raw) is not None)
     if not isinstance(data, dict) or not isinstance(data.get("checks"), dict):
-        emit("critical" if strict else "high", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
+        emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object, so a fail inside it cannot be seen", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
         return
     checks = data["checks"]
     notes = data.get("notes")
@@ -1828,9 +1825,13 @@ def run():
         value = checks.get(key, "missing")
         if isinstance(value, Dup):
             dups = True
-            seen = {v.strip().lower() if isinstance(v, str) else "invalid" for v in flat(value)}
-            value = "fail" if "fail" in seen else (seen.pop() if len(seen) == 1 else "conflicting")
-        value = value.strip().lower() if isinstance(value, str) else "invalid"
+        values = list(flat(value))
+        if any(not isinstance(v, str) for v in values):
+            emit("critical", tag + "-INVALID", "%s, recorded as something other than text, so a fail inside it cannot be ruled out" % title, "Write pass, fail, n/a, or todo as plain text, as in templates/app-review-readiness.json.")
+            still_open.append(key)
+            continue
+        seen = {v.strip().lower() for v in values}
+        value = "fail" if "fail" in seen else (seen.pop() if len(seen) == 1 else "conflicting")
         reason = notes.get(key)
         has_reason = isinstance(reason, str) and reason.strip() != ""
         if value == "pass" or (value in ("n/a", "na") and na_ok and has_reason):
@@ -1847,11 +1848,13 @@ def run():
     if dups:
         emit("high", "MANUAL-READINESS-DUPLICATE-KEY", ".app-review-readiness.json repeats a key, so the guard kept every value and a recorded fail still counts", "Keep each key once, as in templates/app-review-readiness.json.")
     when = data.get("checked_on")
+    when = when if isinstance(when, str) else None
     try:
         age = (datetime.date.today() - datetime.date.fromisoformat(str(when))).days
-    except ValueError:
+    except (TypeError, ValueError):
         age = None
-    build = data.get("build") or "an unnamed build"
+    build = data.get("build")
+    build = build if isinstance(build, str) and build.strip() else "an unnamed build"
     emit("info", "Manual checks. %d of %d attested for %s%s%s.%s" % (
         passed, len(CHECKS), build, (", checked %s" % when) if age is not None else ", no valid checked_on date", src,
         (" Still open. " + ", ".join(still_open) + ".") if still_open else ""))
@@ -1871,8 +1874,7 @@ sys.stdout.write("END\n")
 PYR
 )"; rc=$?
   if [ "$rc" -ne 0 ] || [ "$(printf '%s\n' "$out" | tail -n 1)" != "END" ] || printf '%s\n' "$out" | grep -qx 'CRASH'; then
-    if [ "$strict" -eq 1 ]; then sev=critical; else sev=high; fi
-    finding "$sev" "MANUAL-READINESS-UNREADABLE" ".app-review-readiness.json for $label could not be read" "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done."
+    finding critical "MANUAL-READINESS-UNREADABLE" ".app-review-readiness.json for $label could not be read" "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done."
     flush_findings; return 0
   fi
   while IFS="$(printf '\t')" read -r sev id title fix; do

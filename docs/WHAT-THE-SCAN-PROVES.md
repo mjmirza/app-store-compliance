@@ -16,7 +16,8 @@ A clean scan and a ready submission are different things. The guard reads your p
 Since version 2.5.0 the guard prints both halves on every run. With no readiness file it says plainly which checks it could not see. Copy [the template](../templates/app-review-readiness.json) into your app folder, test each item on the release build, write `pass`, `fail`, `n/a`, or `todo`, and set `checked_on` to that day.
 
 - A check marked `fail` always blocks, so a broken demo login stops the submission the same way a missing purpose string does.
-- Set `"enforce": true` in the file, or `APP_STORE_GUARD_REQUIRE_READINESS=1`, and any check still `todo` blocks too. So does a file the guard cannot read. Use this in CI.
+- Set `"enforce": true` in the file, or `APP_STORE_GUARD_REQUIRE_READINESS=1`, and any check still `todo` blocks too. Use this in CI.
+- A readiness file that exists but cannot be read always blocks, whatever the settings, because a fail inside it cannot be seen. That covers broken JSON, a check value that is not plain text, and a machine with no python3. A file saved as UTF-8 with a byte order mark, UTF-16, or UTF-32 is read normally.
 - `n/a` counts only with a reason under `notes` for that check. The privacy labels check never accepts `n/a`, because every app has one.
 - A `checked_on` date older than 30 days, missing, or in the future is flagged, because a pass on last month's build says nothing about this one.
 - In a monorepo each app is read on its own. The guard uses the nearest file above each app, up to the workspace root, and names the file it used. In a single app tree it reads only the file in the folder you scan. If another readiness file sits up to eight folders below it, outside node_modules, Pods, .pub-cache, and .git, the report names one as not read, so scan that app folder to use it. A repeated key in the file is reported, and a recorded fail among its values still counts.

@@ -3363,7 +3363,7 @@ rr_has 'MANUAL-READINESS-MISSING' && [ "$RC" -eq 2 ] && ok "rd-2 required readin
 rd_case "rd-3 a failed demo account blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rd_case "rd-4 open items without enforce only inform" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 0 'Still open' 'UNVERIFIED'
 rd_case "rd-5 enforce turns an open item into a block" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-LIVE-BACKEND-UNVERIFIED' ''
-rd_case "rd-6 broken JSON is named and does not block when optional" '{"checks": [1,2' "" 0 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-6 a readiness file that cannot be read blocks, since a fail inside it cannot be seen" '{"checks": [1,2' "" 2 'MANUAL-READINESS-UNREADABLE' ''
 rd_case "rd-7 an old attestation is flagged stale" "{\"checked_on\":\"2020-01-01\",\"checks\":{$ALLPASS}}" "" 0 '7 of 7 attested' ''
 rr_has 'MANUAL-READINESS-STALE' && ok "rd-7b the stale attestation names itself" || bad "rd-7b the stale attestation names itself"
 rd_case "rd-8 required readiness with an empty checks list blocks" '{"checks":[]}' "APP_STORE_GUARD_REQUIRE_READINESS=1" 2 'MANUAL-READINESS-UNREADABLE' ''
@@ -3385,7 +3385,7 @@ rd_case "rd-17 an escaped enforce key still enforces" "{\"en${BS}u0066orce\":tru
 rd_case "rd-18 enforce inside notes does not enforce" "{\"checked_on\":\"$TODAY\",\"checks\":{},\"notes\":{\"enforce\":true}}" "" 0 '0 of 7 attested' 'UNVERIFIED'
 rd_case "rd-19 malformed notes never hide a recorded failure" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"notes\":[1]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rr_has 'MANUAL-READINESS-NOTES-INVALID' && ok "rd-19b the malformed notes are named" || bad "rd-19b the malformed notes are named"
-rd_case "rd-21 bad checks with enforce only inside notes stays high" '{"checks":[],"notes":{"enforce":true}}' "" 0 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-21 a checks list instead of an object blocks" '{"checks":[],"notes":{"enforce":true}}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
 rd_case "rd-22 bad checks with an escaped top-level enforce blocks" "{\"en${BS}u0066orce\":true,\"checks\":[]}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
 rd_case "rd-27 a repeated key never hides a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rr_has 'MANUAL-READINESS-DUPLICATE-KEY' && ok "rd-27b the repeated key is named" || bad "rd-27b the repeated key is named"
@@ -3393,6 +3393,15 @@ rd_case "rd-28 a repeated checks object keeps the first object's fail" "{\"check
 rd_case "rd-29 repeats at both levels keep a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rd_case "rd-30 a malformed repeated checks entry keeps the valid fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":[]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rr_has 'MANUAL-READINESS-UNREADABLE' && ok "rd-30b the malformed entry is named" || bad "rd-30b the malformed entry is named"
+rd_case "rd-31 a trailing comma never hides a recorded fail" '{"checks":{"demo_account":"fail"},}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-32 a fail wrapped in a list blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":[\"fail\"],\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-INVALID' ''
+rd_case "rd-33 a checks list repeated with an object blocks" "{\"checked_on\":\"$TODAY\",\"checks\":[{\"demo_account\":\"fail\"}],\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
+python3 -c 'import sys; open(sys.argv[1], "wb").write(("{\"checked_on\":\"%s\",\"checks\":{\"demo_account\":\"fail\"}}" % sys.argv[2]).encode("utf-16"))' "$D/.app-review-readiness.json" "$TODAY"
+rr_run "$D"
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && ok "rd-34 a UTF-16 file is read and its fail blocks" || bad "rd-34 a UTF-16 file is read and its fail blocks (rc=$RC)"
+python3 -c 'import sys; n = 600; open(sys.argv[1], "w").write("{\"checks\":{\"demo_account\":\"fail\"},\"build\":" + "{\"x\":" * n + "0" + ",\"x\":0}" * n + "}")' "$D/.app-review-readiness.json"
+rr_run "$D"
+[ "$RC" -eq 2 ] && rr_has '\[CRITICAL\][[:space:]]*MANUAL-' && ok "rd-35 a deeply nested build value never hides a recorded fail" || bad "rd-35 a deeply nested build value never hides a recorded fail (rc=$RC)"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
