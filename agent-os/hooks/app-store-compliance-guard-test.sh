@@ -3428,6 +3428,13 @@ TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
 if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
 rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-41 a stalled read ends in a block within its deadline" || bad "rd-41 a stalled read ends in a block within its deadline (rc=$RC, $((SECONDS - T0))s)"
 rm -rf "$STALL" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+STALL="$(mktemp -d)"
+printf 'import os, signal, time\ndel signal.SIGALRM\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(60)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$STALL/sitecustomize.py"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-42 without SIGALRM a stalled read still blocks within its deadline" || bad "rd-42 without SIGALRM a stalled read still blocks within its deadline (rc=$RC, $((SECONDS - T0))s)"
+rm -rf "$STALL" "$D/.app-review-readiness.json"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
@@ -3471,6 +3478,13 @@ printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/app
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
 rr_has 'Manual checks for this project. 7 of 7' && rr_has 'not read, for example apps/mobile/.app-review-readiness.json' && ok "rd-26 the scanned folder's file is used and a nested one is named" || bad "rd-26 the scanned folder's file is used and a nested one is named (rc=$RC)"
 rm -rf "$M"
+
+# A long multi-line hook command cannot hide its submit from the detector.
+D="$(mk_ios_bad)"
+PAYLOAD="$(python3 -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "fastlane deliver\n" + "echo harmless\n" * 20000}}))')"
+OUT="$(printf '%s' "$PAYLOAD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && rr_has 'App Store Compliance Guard' && ok "hk-1 a submit followed by 20000 lines is still scanned and blocked" || bad "hk-1 a submit followed by 20000 lines is still scanned and blocked (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

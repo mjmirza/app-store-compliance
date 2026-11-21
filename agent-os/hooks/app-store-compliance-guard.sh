@@ -4,6 +4,8 @@
 # @event: PreToolUse
 # @matcher: Bash
 set -uo pipefail
+# Reads all its input. grep -q stops early, and under pipefail its producer's SIGPIPE turns a match into a miss.
+grep_q() { grep "$@" >/dev/null; }
 
 HOOK_LOG="${HOME:-}/.claude/hooks/hook-log.sh"
 # shellcheck disable=SC1090
@@ -241,7 +243,7 @@ $(find "$DIR" -maxdepth 3 -name Fastfile -not -path '*/node_modules/*' 2>/dev/nu
 FASTFILES
     return 1
   }
-  submits() { set -- "$(fl_norm "$1")"; printf '%s' "$1" | grep -qiE "$SUBMIT_RE" || printf '%s' "$1" | grep -qE 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
+  submits() { set -- "$(fl_norm "$1")"; printf '%s' "$1" | grep_q -iE "$SUBMIT_RE" || printf '%s' "$1" | grep_q -E 'gradlew?[[:space:]]+\$' || fastlane_lane_submits "$1"; }
   # What a package script or a make target runs, one level deep, so a wrapped submit is still seen.
   runner_body() {  # $1 one command segment
     local name esc sub pj seg w prev mf targets mfiles
@@ -266,7 +268,7 @@ FASTFILES
       [ -z "$sel" ] && sel="$(printf '%s' "$rseg" | sed -nE 's/.*nx[^;&|]*[[:space:]]run[[:space:]]+([A-Za-z0-9_.@\/-]+):.*/\1/p' | head -1)"
       sub="$(printf '%s' "$rseg" | sed -nE 's/.*[[:space:]](--dir|--prefix|--cwd|-C)[=[:space:]]+([^[:space:]]+).*/\2/p' | head -1)"
       case "$sub" in /*|*..*) sub="" ;; esac
-      all=0; printf '%s' "$rseg" | grep -qE '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|(^|[^A-Za-z0-9_./-])nx[[:space:]]|[[:space:]](-r|--recursive|-ws|--workspaces|foreach)([[:space:]=]|$)' && all=1
+      all=0; printf '%s' "$rseg" | grep_q -E '(^|[^A-Za-z0-9_./-])(turbo|lerna)[[:space:]]|(^|[^A-Za-z0-9_./-])nx[[:space:]]|[[:space:]](-r|--recursive|-ws|--workspaces|foreach)([[:space:]=]|$)' && all=1
       files="$(find "$DIR" -maxdepth 6 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build \) -prune \) -o \( -name package.json -o -name project.json \) -print 2>/dev/null | head -200)"
       if [ -n "$sub" ] && [ -f "$DIR/$sub/package.json" ]; then pick="$DIR/$sub/package.json"
       elif [ -n "$sel" ]; then
@@ -324,8 +326,8 @@ SELS
     done
   }
   # Cheap exit for the everyday command. Nothing below runs unless a submit tool or a wrapper is named.
-  if ! printf '%s' "$CMD_MATCH" | grep -qiE "$SUBMIT_RE" \
-    && ! printf '%s' "$CMD_MATCH" | grep -qE '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make|turbo|nx|lerna)[[:space:]]|gradlew?[[:space:]]+\$'; then
+  if ! printf '%s' "$CMD_MATCH" | grep_q -iE "$SUBMIT_RE" \
+    && ! printf '%s' "$CMD_MATCH" | grep_q -E '(^|[^A-Za-z0-9_./-])(fastlane|npm|pnpm|bun|yarn|make|turbo|nx|lerna)[[:space:]]|gradlew?[[:space:]]+\$'; then
     exit 0
   fi
   DIR="${CLAUDE_PROJECT_DIR:-}"
@@ -340,7 +342,7 @@ SELS
   # The target must resolve inside the project root, otherwise the root is scanned as before.
   FIRST="$(printf '%s' "$CMD" | head -1)"
   CD_COUNT="$(printf '%s' "$CMD" | grep -oE '(^|[;&|(][[:space:]]*)(cd|pushd|popd|source|\.)[[:space:]]' | wc -l | tr -d ' ')"
-  if [ "$CD_COUNT" -eq 1 ] && printf '%s' "$FIRST" | grep -qE '^[[:space:]]*cd[[:space:]]+[^&|;]+(&&|;)'; then
+  if [ "$CD_COUNT" -eq 1 ] && printf '%s' "$FIRST" | grep_q -E '^[[:space:]]*cd[[:space:]]+[^&|;]+(&&|;)'; then
     TARGET="$(printf '%s' "$FIRST" | sed -E 's/^[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*(&&|;).*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/')"
     TARGET="${TARGET//\$\{CLAUDE_PROJECT_DIR\}/$DIR}"; TARGET="${TARGET//\$CLAUDE_PROJECT_DIR/$DIR}"
     case "$TARGET" in /*) ;; '~'*) TARGET="${HOME:-}${TARGET#\~}" ;; *) TARGET="$DIR/$TARGET" ;; esac
@@ -368,26 +370,26 @@ if [ -n "$CMD" ]; then
   SEG_SUBMITS=0; SEG_ALL_AND=1
   # Beside an Android submit only a known harmless command keeps it Android only. Anything else may upload to Apple.
   SAFE_SEG_RE='^(cd|pushd|popd|echo|printf|export|unset|set|true|false|:|test|sleep|ls|pwd|mkdir|rm|cp|mv|cat|touch|tee|grep|head|tail|wc|date|clear)$'
-  SUBST=0; printf '%s' "$CMD" | grep -qE '\$\(|`|<\(|>\(|=\(' && SUBST=1
+  SUBST=0; printf '%s' "$CMD" | grep_q -E '\$\(|`|<\(|>\(|=\(' && SUBST=1
   while IFS= read -r SEG; do
     W1="$(printf '%s' "$SEG" | awk '{ sub(/^[ \t({!]+/, ""); while (match($0, /^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/)) $0 = substr($0, RLENGTH + 1); print $1 }')"
     [ -n "$W1" ] || continue
     if ! submits "$SEG"; then
-      { [ "$SUBST" -eq 0 ] && printf '%s' "$W1" | grep -qE "$SAFE_SEG_RE"; } || SEG_ALL_AND=0
+      { [ "$SUBST" -eq 0 ] && printf '%s' "$W1" | grep_q -E "$SAFE_SEG_RE"; } || SEG_ALL_AND=0
       continue
     fi
     SEG_SUBMITS=$((SEG_SUBMITS+1))
     SEGN="$(fl_norm "$SEG")"
-    { printf '%s' "$SEGN" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep -qiE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
+    { printf '%s' "$SEGN" | grep_q -iE "$AND_TARGET_RE" && ! printf '%s' "$SEGN" | grep_q -iE "$IOS_TARGET_RE"; } || SEG_ALL_AND=0
   done <<SEGS
 $(printf '%s\n' "$CMD_MATCH" | tr ';&|' '\n\n\n')
 SEGS
-  if printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
+  if printf '%s' "$CMD" | grep_q -iE "$IOS_TARGET_RE"; then
     :   # an Apple word anywhere in the command keeps the Apple checks, as on main
   elif [ "$SEG_SUBMITS" -gt 0 ]; then
     [ "$SEG_ALL_AND" -eq 1 ] && CMD_TARGET_ANDROID_ONLY=1
   # A wrapped submit (npm run, make) names no tool in the command itself, so the whole command decides, as before.
-  elif printf '%s' "$CMD" | grep -qiE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep -qiE "$IOS_TARGET_RE"; then
+  elif printf '%s' "$CMD" | grep_q -iE "$AND_TARGET_RE" && ! printf '%s' "$CMD" | grep_q -iE "$IOS_TARGET_RE"; then
     CMD_TARGET_ANDROID_ONLY=1
   fi
   # Each command in the line is read twice, quoted text kept and quoted text blanked, # comments dropped. A submit is found
@@ -408,14 +410,14 @@ SEGS
       [ -n "$NQW" ] || continue
       if submits "$NQK"; then
         NQ_SUB=$((NQ_SUB+1))
-        printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_AND=0
+        printf '%s' "$NQB" | grep_q -iE "$AND_TARGET_RE" || NQ_AND=0
         # the outer arguments of bash -c, sh -c or eval never reach the quoted command, so they name no target
-        printf '%s' "$NQB" | grep -qE '(^|[[:space:]/])(bash|sh|zsh|dash|ksh|fish|eval)([[:space:]]|$)' && NQ_AND=0
+        printf '%s' "$NQB" | grep_q -E '(^|[[:space:]/])(bash|sh|zsh|dash|ksh|fish|eval)([[:space:]]|$)' && NQ_AND=0
         # a submit seen only inside quotes runs in another program (python -c, ruby -e), which never passes it the outer arguments
         submits "$NQB" || NQ_AND=0
-      elif ! printf '%s' "$NQW" | grep -qE "$SAFE_SEG_RE"; then
+      elif ! printf '%s' "$NQW" | grep_q -E "$SAFE_SEG_RE"; then
         NQ_AND=0; NQ_WRAP=$((NQ_WRAP+1))
-        printf '%s' "$NQB" | grep -qiE "$AND_TARGET_RE" || NQ_WRAP_AND=0
+        printf '%s' "$NQB" | grep_q -iE "$AND_TARGET_RE" || NQ_WRAP_AND=0
       fi
     done <<NQSEGS
 $CMD_PAIRS
@@ -429,13 +431,13 @@ NQSEGS
   fi
 fi
 # Android only also needs the 1.0.0 rule, so the Apple checks are never off where 1.0.0 ran them.
-if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && ! { printf '%s' "$CMD" | grep -qiE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b' \
-  && ! printf '%s' "$CMD" | grep -qiE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; }; then
+if [ "$CMD_TARGET_ANDROID_ONLY" -eq 1 ] && ! { printf '%s' "$CMD" | grep_q -iE 'build[[:space:]]+(apk|appbundle)\b|assembleRelease|bundleRelease|run-android|run:android|--platform[[:space:]]+android\b|capacitor[[:space:]]+android\b|-buildtarget[[:space:]]+android|net[0-9.]+-android|tauri[[:space:]]+android\b' \
+  && ! printf '%s' "$CMD" | grep_q -iE '\bios\b|\bipa\b|xcodebuild|altool|notarytool'; }; then
   CMD_TARGET_ANDROID_ONLY=0
 fi
 CMD_TARGET_IOS_ONLY=0
-if [ -n "$CMD" ] && printf '%s' "$CMD" | grep -qiE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \
-  && ! printf '%s' "$CMD" | grep -qiE 'android|(-p|--platform)[[:space:]=]+all'; then
+if [ -n "$CMD" ] && printf '%s' "$CMD" | grep_q -iE '(-p|--platform)[[:space:]=]+ios([^A-Za-z]|$)' \
+  && ! printf '%s' "$CMD" | grep_q -iE 'android|(-p|--platform)[[:space:]=]+all'; then
   CMD_TARGET_IOS_ONLY=1
 fi
 
@@ -873,13 +875,13 @@ if [ "$IS_RN" -eq 1 ] && [ "$NEEDS_NATIVE" -eq 1 ]; then
       # Only the permissions array counts. blockedPermissions removes a permission, it never adds one.
       EX_PERMS="$(cat "${EXPO_CFG[@]}" 2>/dev/null | tr -d '\n\r' | grep -oE "(^|[^A-Za-z])[\"']?permissions[\"']?[[:space:]]*:[[:space:]]*\\[[^]]*\\]")"
       # A JS or TS config may quote a key either way, or not at all.
-      if printf '%s' "$EX_PERMS" | grep -q 'ACCESS_BACKGROUND_LOCATION' || ex_cfg "isAndroidBackgroundLocationEnabled[\"']?[[:space:]]*:[[:space:]]*true"; then
+      if printf '%s' "$EX_PERMS" | grep_q 'ACCESS_BACKGROUND_LOCATION' || ex_cfg "isAndroidBackgroundLocationEnabled[\"']?[[:space:]]*:[[:space:]]*true"; then
         finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location requested in the Expo app config" "Justify with a core feature and prominent disclosure, or use foreground location."
       fi
-      if printf '%s' "$EX_PERMS" | grep -qE 'READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG'; then
+      if printf '%s' "$EX_PERMS" | grep_q -E 'READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG'; then
         finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission in the Expo app config" "Use the permissions declaration for an approved core use case, or drop it."
       fi
-      if printf '%s' "$EX_PERMS" | grep -q 'MANAGE_EXTERNAL_STORAGE'; then
+      if printf '%s' "$EX_PERMS" | grep_q 'MANAGE_EXTERNAL_STORAGE'; then
         finding critical "GOOGLE-PERM-ALL-FILES" "All files access in the Expo app config" "Use scoped storage. Request all files access only for a qualifying use case."
       fi
     fi
@@ -949,7 +951,7 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   # A Podfile has no extension, so it is outside the source list. Read it directly.
   podfile_below_ios13() {
     find "$DIR" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules \) -prune \) -o -name Podfile -type f -print 2>/dev/null \
-      | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep -q hit
+      | head -5 | while IFS= read -r pf; do grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf" && echo hit; done | grep_q hit
   }
   # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
   pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
@@ -1737,7 +1739,7 @@ readiness_check() {  # $1 app root, $2 workspace root
     flush_findings; return 0
   fi
   out="$(python3 - "$f" "$req" "$from" <<'PYR'
-import datetime, json, os, re, signal, stat, sys
+import datetime, json, os, re, signal, stat, sys, threading
 
 CHECKS = [
     ("demo_account", True, "A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
@@ -1809,6 +1811,14 @@ def late(signum, frame):
     raise Late()
 
 
+def give_up():
+    # Without SIGALRM a blocked read cannot be interrupted, so report it and end the process.
+    emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json could not be read within %d seconds, so a fail inside it cannot be seen" % READ_DEADLINE, "Move it to a local disk as a regular file shaped like templates/app-review-readiness.json.")
+    sys.stdout.write("END\n")
+    sys.stdout.flush()
+    os._exit(0)
+
+
 def run():
     path, required, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
     raw = b""
@@ -1816,6 +1826,10 @@ def run():
     if hasattr(signal, "SIGALRM"):
         signal.signal(signal.SIGALRM, late)
         signal.alarm(READ_DEADLINE)
+    else:
+        watchdog = threading.Timer(READ_DEADLINE, give_up)
+        watchdog.daemon = True
+        watchdog.start()
     try:
         # Non-blocking open and fstat on the same descriptor, so a file swapped for a FIFO cannot hang the read.
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
@@ -1916,7 +1930,7 @@ finally:
 sys.stdout.write("END\n")
 PYR
 )"; rc=$?
-  if [ "$rc" -ne 0 ] || [ "$(printf '%s\n' "$out" | tail -n 1)" != "END" ] || printf '%s\n' "$out" | grep -qx 'CRASH'; then
+  if [ "$rc" -ne 0 ] || [ "$(printf '%s\n' "$out" | tail -n 1)" != "END" ] || printf '%s\n' "$out" | grep_q -x 'CRASH'; then
     finding critical "MANUAL-READINESS-UNREADABLE" ".app-review-readiness.json for $label could not be read" "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done."
     flush_findings; return 0
   fi
@@ -1980,7 +1994,7 @@ EOF3
   while IFS= read -r ROOT; do
     [ -n "$ROOT" ] || continue
     INHERIT_FW=""
-    if [ -n "$POOL_FW" ] && { [ "${ROOT%/}" = "$PROJECT_ROOT" ] || printf '%s' "$SPLIT_NATIVE" | grep -qxF "${ROOT%/}"; }; then
+    if [ -n "$POOL_FW" ] && { [ "${ROOT%/}" = "$PROJECT_ROOT" ] || printf '%s' "$SPLIT_NATIVE" | grep_q -xF "${ROOT%/}"; }; then
       INHERIT_FW="$POOL_FW"
     fi
     NESTED_PRUNE=()
