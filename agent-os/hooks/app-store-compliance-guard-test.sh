@@ -1583,7 +1583,7 @@ printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/ios/App/A.swift"
 printf 'X=1;\n' > "$D/examples/NativeDemo/Demo.xcodeproj/project.pbxproj"
 printf '<plist><dict></dict></plist>' > "$D/examples/NativeDemo/Demo/Info.plist"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "656-1 a nested demo Xcode project never splits a root framework app" || bad "656-1 a nested demo Xcode project never splits a root framework app (rc=$RC)"
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "656-1 a nested demo Xcode project never splits a root framework app" || { bad "656-1 a nested demo Xcode project never splits a root framework app (rc=$RC)"; echo "$OUT" | grep -E '^(Project|Apps?)\. ' | head -5 | sed 's/^/    | /'; }
 rm -rf "$D"
 
 # 657 an app directory linked into the tree from outside it is followed one level and scanned

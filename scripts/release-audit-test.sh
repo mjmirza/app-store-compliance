@@ -22,7 +22,7 @@ AFTER="$(git status --porcelain)"
 REPORT="$FX/RELEASE-READINESS-REPORT.md"
 
 if [ -f "$REPORT" ]; then ok "report is written into the audited project"; else
-  bad "report missing from the audited project (exit $RUN_RC)"; { printf '%s\n' "$OUT" | grep -E '^(FAIL|  ERROR)'; printf '%s\n' "$OUT" | tail -n 15; } | sed 's/^/    | /'; fi
+  bad "report missing from the audited project (exit $RUN_RC)"; { printf '%s\n' "$OUT" | grep -E '^(FAIL|  ERROR|    [|] )'; printf '%s\n' "$OUT" | tail -n 15; } | sed 's/^/    | /'; fi
 [ "$BEFORE" = "$AFTER" ] && ok "the playbook repository is left untouched" || bad "the audit changed files in this repository"
 
 SUMMARY="$(printf '%s\n' "$OUT" | grep -E '^Summary: ' | tail -1)"
