@@ -3357,7 +3357,7 @@ rd_case() {  # $1 label, $2 json, $3 env assignment or "", $4 expected rc, $5 gr
   if [ "$RC" -eq "$4" ] && { [ -z "$5" ] || rr_has "$5"; } && { [ -z "$6" ] || ! rr_has "$6"; }; then ok "$1"; else bad "$1 (rc=$RC)"; fi
 }
 rm -f "$D/.app-review-readiness.json"; rr_run "$D"
-rr_has 'Manual checks for this project. Not attested' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
+rr_has 'Manual checks for this project. Not attested' && rr_has 'an in-app purchase the reviewer can reach' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
 OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'MANUAL-READINESS-MISSING' && [ "$RC" -eq 2 ] && ok "rd-2 required readiness with no file blocks" || bad "rd-2 required readiness with no file blocks (rc=$RC)"
 rd_case "rd-3 a failed demo account blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
@@ -3387,6 +3387,9 @@ rd_case "rd-19 malformed notes never hide a recorded failure" "{\"checked_on\":\
 rr_has 'MANUAL-READINESS-NOTES-INVALID' && ok "rd-19b the malformed notes are named" || bad "rd-19b the malformed notes are named"
 rd_case "rd-21 bad checks with enforce only inside notes stays high" '{"checks":[],"notes":{"enforce":true}}' "" 0 'MANUAL-READINESS-UNREADABLE' ''
 rd_case "rd-22 bad checks with an escaped top-level enforce blocks" "{\"en${BS}u0066orce\":true,\"checks\":[]}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-27 a repeated key never hides a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-DUPLICATE-KEY' && ok "rd-27b the repeated key is named" || bad "rd-27b the repeated key is named"
+rd_case "rd-28 a repeated checks object keeps the first object's fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.

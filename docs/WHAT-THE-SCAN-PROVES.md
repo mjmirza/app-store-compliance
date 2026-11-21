@@ -19,7 +19,7 @@ Since version 2.5.0 the guard prints both halves on every run. With no readiness
 - Set `"enforce": true` in the file, or `APP_STORE_GUARD_REQUIRE_READINESS=1`, and any check still `todo` blocks too. So does a file the guard cannot read. Use this in CI.
 - `n/a` counts only with a reason under `notes` for that check. The privacy labels check never accepts `n/a`, because every app has one.
 - A `checked_on` date older than 30 days, missing, or in the future is flagged, because a pass on last month's build says nothing about this one.
-- In a monorepo each app is read on its own. The guard uses the nearest file above each app, up to the workspace root, and names the file it used. In a single app tree it reads only the file in the folder you scan. If another readiness file sits below that folder, the report names it as not read, so scan that app folder to use it.
+- In a monorepo each app is read on its own. The guard uses the nearest file above each app, up to the workspace root, and names the file it used. In a single app tree it reads only the file in the folder you scan. If another readiness file sits up to eight folders below it, outside node_modules, Pods, .pub-cache, and .git, the report names one as not read, so scan that app folder to use it. A repeated key in the file is reported, and a recorded fail among its values still counts.
 
 The full manual walk is [the pre-submission checklist](PRE-SUBMISSION-CHECKLIST.md). For the review notes themselves, use [the review notes template](../templates/REVIEW-NOTES-TEMPLATE.md).
 

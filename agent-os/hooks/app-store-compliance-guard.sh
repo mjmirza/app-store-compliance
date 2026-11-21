@@ -1724,7 +1724,7 @@ readiness_check() {  # $1 app root, $2 workspace root
   fi
   echo ""
   if [ -z "$f" ]; then
-    echo "Manual checks for $label. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, or privacy labels that match runtime. Copy templates/app-review-readiness.json to the app folder and record each one."
+    echo "Manual checks for $label. Not attested. The scan proves code, config and manifests only. It cannot prove a working demo account, a live backend, review notes, screenshots of this build, account deletion on a real device, privacy labels that match runtime, or an in-app purchase the reviewer can reach. Copy templates/app-review-readiness.json to the app folder and record each one."
     [ "$req" = "1" ] && finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json for $label, and readiness is required" "Copy templates/app-review-readiness.json to the app folder, test each item on the release build, and record pass, fail, or n/a with a reason."
     flush_findings; return 0
   fi
@@ -1749,6 +1749,33 @@ CHECKS = [
 ]
 
 
+class Dup(list):
+    pass
+
+
+def keep_dups(pairs):
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            prev = out[key]
+            out[key] = Dup((prev if isinstance(prev, Dup) else [prev]) + [value])
+        else:
+            out[key] = value
+    return out
+
+
+def merge_checks(value):
+    if not isinstance(value, Dup):
+        return value
+    merged = {}
+    for part in value:
+        if not isinstance(part, dict):
+            return None
+        for key, item in part.items():
+            merged[key] = Dup((merged[key] if isinstance(merged.get(key), Dup) else ([merged[key]] if key in merged else [])) + [item])
+    return {k: (v if len(v) > 1 else v[0]) for k, v in merged.items()}
+
+
 def clean(value, limit=300):
     text = str(value).encode("ascii", "replace").decode("ascii")
     return "".join(c if c.isprintable() and c not in "\t" else " " for c in text)[:limit]
@@ -1764,11 +1791,14 @@ def run():
     try:
         with open(path, "rb") as fh:
             raw = fh.read()
-        data = json.loads(raw.decode("utf-8"))
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=keep_dups)
     except (OSError, ValueError, RecursionError):
         data = None
+    dups = isinstance(data, dict) and any(isinstance(v, Dup) for v in data.values())
     if isinstance(data, dict):
-        strict = required or data.get("enforce") is True
+        if isinstance(data.get("checks"), Dup):
+            data["checks"] = merge_checks(data["checks"])
+        strict = required or (data.get("enforce") is True if not isinstance(data.get("enforce"), Dup) else any(v is True for v in data["enforce"]))
     else:
         # Only an unparsed file falls back to the raw text, to stay on the safe side.
         strict = required or (data is None and re.search(rb'"enforce"\s*:\s*true', raw) is not None)
@@ -1786,6 +1816,10 @@ def run():
     for key, na_ok, title, fix in CHECKS:
         tag = "MANUAL-" + key.upper().replace("_", "-")
         value = checks.get(key, "missing")
+        if isinstance(value, Dup):
+            dups = True
+            seen = {v.strip().lower() if isinstance(v, str) else "invalid" for v in value}
+            value = "fail" if "fail" in seen else (seen.pop() if len(seen) == 1 else "conflicting")
         value = value.strip().lower() if isinstance(value, str) else "invalid"
         reason = notes.get(key)
         has_reason = isinstance(reason, str) and reason.strip() != ""
@@ -1800,6 +1834,8 @@ def run():
         still_open.append(key)
         if strict:
             emit("critical", tag + "-UNVERIFIED", "%s, not verified (%s)" % (title, value), fix)
+    if dups:
+        emit("high", "MANUAL-READINESS-DUPLICATE-KEY", ".app-review-readiness.json repeats a key, so the guard kept every value and a recorded fail still counts", "Keep each key once, as in templates/app-review-readiness.json.")
     when = data.get("checked_on")
     try:
         age = (datetime.date.today() - datetime.date.fromisoformat(str(when))).days
