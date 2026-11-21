@@ -1063,7 +1063,7 @@ mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to 
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
   [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$d/python3"
-  printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
+  rm -f "$d/$1"; printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
   echo "$d"
 }
 P_UNI='{"tool_input":{"command":"cd apps/caf\xc3\xa9 && npx eas submit --platform ios"}}'
@@ -3411,6 +3411,13 @@ TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
 if [ -n "$TO" ]; then OUT="$("$TO" 45 bash "$GUARD" "$D" 2>&1)"; RC=$?; else rr_run "$D"; fi
 rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 45 ] && ok "rd-38 200000 repeated keys still block quickly" || bad "rd-38 200000 repeated keys still block quickly (rc=$RC, $((SECONDS - T0))s)"
 rm -f "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+PYSHIM="$(mktemp -d)"; REAL_PY="$(command -v python3)"
+printf '#!/bin/sh\nif [ "$1" = "-" ] && [ "${2:-}" = "%s" ]; then mv "$2" "$2.saved"; mkfifo "$2"; fi\nexec "%s" "$@"\n' "$D/.app-review-readiness.json" "$REAL_PY" > "$PYSHIM/python3"; chmod +x "$PYSHIM/python3"
+TO="$(command -v timeout || command -v gtimeout || true)"
+if [ -n "$TO" ]; then OUT="$(PATH="$PYSHIM:$PATH" "$TO" 30 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PATH="$PYSHIM:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs" || bad "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs (rc=$RC)"
+rm -rf "$PYSHIM" "$D/.app-review-readiness.json" "$D/.app-review-readiness.json.saved"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.

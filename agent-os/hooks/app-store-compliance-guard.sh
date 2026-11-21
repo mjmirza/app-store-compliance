@@ -1737,7 +1737,7 @@ readiness_check() {  # $1 app root, $2 workspace root
     flush_findings; return 0
   fi
   out="$(python3 - "$f" "$req" "$from" <<'PYR'
-import datetime, json, re, sys
+import datetime, json, os, re, stat, sys
 
 CHECKS = [
     ("demo_account", True, "A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
@@ -1801,8 +1801,19 @@ def run():
     path, required, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
     raw = b""
     try:
-        with open(path, "rb") as fh:
-            raw = fh.read()
+        # Non-blocking open and fstat on the same descriptor, so a file swapped for a FIFO cannot hang the read.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not a regular file, so a fail inside it cannot be seen", "Replace it with a regular file shaped like templates/app-review-readiness.json, or remove it.")
+                return
+            fh = os.fdopen(fd, "rb")
+            fd = -1
+            with fh:
+                raw = fh.read()
+        finally:
+            if fd >= 0:
+                os.close(fd)
         data = json.loads(raw, object_pairs_hook=keep_dups)
     except (OSError, ValueError, RecursionError):
         data = None
