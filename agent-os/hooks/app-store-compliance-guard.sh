@@ -619,12 +619,20 @@ find_tree() {  # find "$DIR" <expr>, the whole tree as before, minus the nested 
   if [ "${#NESTED_PRUNE[@]}" -eq 0 ]; then find "$DIR" "$@" 2>/dev/null
   else find "$DIR" \( -type d \( -name '' "${NESTED_PRUNE[@]}" \) -prune \) -o "$@" 2>/dev/null; fi
 }
+# A hook lets an unchecked submit through by default. APP_STORE_GUARD_BLOCK_UNCHECKED=1 stops it instead.
+block_unchecked() {
+  [ "${APP_STORE_GUARD_BLOCK_UNCHECKED:-0}" = "1" ] || return 0
+  if declare -F emit_report >/dev/null; then
+    echo "BLOCKED. Nothing was checked, and APP_STORE_GUARD_BLOCK_UNCHECKED=1 is set."; emit_report 2
+  else cursor_reply 2; fi
+  echo "$1 Blocked because APP_STORE_GUARD_BLOCK_UNCHECKED=1." >&2; exit 2
+}
 FILELIST="$(mktemp 2>/dev/null)" || FILELIST=""
 { [ -n "$FILELIST" ] && : > "$FILELIST" 2>/dev/null; } || FILELIST="/tmp/ascg.$$"
 # No scan buffer means no scan. Say so rather than end CLEAR on an empty file list.
 if [ -z "$FILELIST" ] || ! : > "$FILELIST" 2>/dev/null; then
   NOTE="NOT CHECKED. The guard could not create its scan buffer in ${TMPDIR:-/tmp}, so nothing was scanned. Point TMPDIR at a writable folder and run it again."
-  if [ -n "$STDIN_JSON" ]; then echo "app-store-compliance-guard. $NOTE" >&2; cursor_reply 0; exit 0; fi
+  if [ -n "$STDIN_JSON" ]; then block_unchecked "$NOTE"; echo "app-store-compliance-guard. $NOTE" >&2; cursor_reply 0; exit 0; fi
   echo "$NOTE"; exit 1
 fi
 SCAN_ERROR=""
@@ -746,11 +754,35 @@ fi
 PERM_REQ_RE='requestWhenInUseAuthorization|requestAlwaysAuthorization|requestTrackingAuthorization|requestAuthorization[(:]|requestAuthorizationWithOptions|requestAccess[(:]|requestAccessForMediaType|requestRecordPermission|request[(][[:space:]]*PERMISSIONS[.]IOS|requestMultiple[(][[:space:]]*[[]?[[:space:]]*PERMISSIONS[.]IOS|request[A-Za-z]*PermissionsAsync|Permission[.][A-Za-z]+[.]request[(]'
 ALLOW_BTN_RE='(Button[(][[:space:]]*(LocalizedStringKey[(]|String[(]localized:[[:space:]]*|NSLocalizedString[(])?|setTitle[(]|setTitle:@|<Button[^>]*title=[{]?)["'"'"'`]Allow([[:space:]][A-Za-z ]{0,30})?["'"'"'`]'
 ANDROID_SRC_RE='(^|/)android/|[.]android[.][A-Za-z]+$|[.](kt|kts|java)$'
+strip_comments() {  # $1 file. Blanks // and /* */ comments outside strings, keeping line numbers
+  awk 'BEGIN { inb = 0 }
+  { o = ""; q = ""; n = length($0); i = 1
+    while (i <= n) {
+      c = substr($0, i, 1); t = substr($0, i, 2)
+      if (inb) { if (t == "*/") { inb = 0; i += 2 } else i++; continue }
+      if (q != "") { o = o c; if (c == "\\") { o = o substr($0, i + 1, 1); i += 2; continue }; if (c == q) q = ""; i++; continue }
+      if (t == "/*") { inb = 1; i += 2; continue }
+      if (t == "//") break
+      if (c == "\"" || c == "`" || c == "'"'"'") q = c
+      o = o c; i++
+    }
+    print o }' "$1" 2>/dev/null
+}
+pre_prompt_hit() {  # prints path:line of an Allow button in an Apple source file that also requests a permission
+  local f src hit
+  while IFS= read -r f <&4; do
+    src="$(strip_comments "$f")"
+    printf '%s\n' "$src" | grep -Eq -e "$PERM_REQ_RE" || continue
+    hit="$(printf '%s\n' "$src" | grep -En -e "$ALLOW_BTN_RE" | head -1 | cut -d: -f1)"
+    [ -z "$hit" ] && hit="$(printf '%s\n' "$src" | awk '/Toggle/ { b = 0 } /Button[[:space:]]*([(][[:space:]]*action:|[{])/ { b = NR } b && NR - b <= 4 && /Text[(][[:space:]]*"Allow[ A-Za-z]*"/ { print NR; exit }')"
+    if [ -n "$hit" ]; then printf '%s:%s\n' "$f" "$hit"; return 0; fi
+  done 4< <(grep -E "$SRC_EXT_RE" "$FILELIST" | grep -Ev "$ANDROID_SRC_RE" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -l -e 'Allow' 2>/dev/null)
+  return 1
+}
 if [ "$IOS_TARGET_ACTIVE" -eq 1 ] && [ -s "$FILELIST" ]; then
-  PRE_PROMPT_HIT="$(grep -E "$SRC_EXT_RE" "$FILELIST" | grep -Ev "$ANDROID_SRC_RE" | tr '\n' '\0' | xargs -0 grep -El -e "$PERM_REQ_RE" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EnH -e "$ALLOW_BTN_RE" 2>/dev/null | grep -Ev '^[^:]*:[0-9]+:[[:space:]]*(//|/[*]|[*]|#)' | head -1)"
+  PRE_PROMPT_HIT="$(pre_prompt_hit)"
   if [ -n "$PRE_PROMPT_HIT" ]; then
     PRE_PROMPT_AT="${PRE_PROMPT_HIT#"${DIR%/}"/}"
-    PRE_PROMPT_AT="$(printf '%s' "$PRE_PROMPT_AT" | cut -d: -f1-2)"
     finding medium "APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON" "Possible pre-permission screen with a button titled Allow, at $PRE_PROMPT_AT" "If this screen comes before a system permission alert, title its one button Continue or Next and let the alert ask. Add another action only to collect legally required consent (Apple HIG Privacy, Guideline 5.1.1(iv)). A Settings toggle or a plain label is fine."
   fi
 fi
@@ -1624,7 +1656,7 @@ fi
 # A stale checklist gives false confidence. Every report names its rule pack version and the newest
 # verified_on date, and warns when that is older than APP_STORE_GUARD_STALE_DAYS (default 60).
 rule_pack_line() {
-  local hd root="" c ver="unknown" newest="" age="" then_s now_s stale="${APP_STORE_GUARD_STALE_DAYS:-60}"
+  local hd root="" c ver="unknown" dates="" newest="" oldest="" total=0 old=0 cutoff age="" then_s now_s stale="${APP_STORE_GUARD_STALE_DAYS:-60}"
   case "$stale" in ''|*[!0-9]*) stale=60 ;; esac
   hd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   for c in "$hd/../.." "$hd/../skills/app-store-compliance" "${HOME:-}/.agents/skills/app-store-compliance"; do
@@ -1635,13 +1667,24 @@ rule_pack_line() {
     return 0
   fi
   [ -f "$root/VERSION" ] && ver="$(tr -d '[:space:]' < "$root/VERSION")"
-  newest="$(grep -oE '"verified_on":[[:space:]]*"[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$root/data/regulatory-deadlines.json" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort | tail -1)"
-  if [ -n "$newest" ]; then
+  dates="$(grep -oE '"verified_on":[[:space:]]*"[0-9]{4}-[0-9]{2}-[0-9]{2}"' "$root/data/regulatory-deadlines.json" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sort)"
+  if [ -n "$dates" ]; then
+    newest="$(printf '%s\n' "$dates" | tail -1)"; oldest="$(printf '%s\n' "$dates" | head -1)"
+    total="$(printf '%s\n' "$dates" | wc -l | tr -d ' ')"
     now_s="$(date +%s 2>/dev/null)"
     then_s="$(date -j -f %Y-%m-%d "$newest" +%s 2>/dev/null || date -d "$newest" +%s 2>/dev/null)"
     case "$now_s$then_s" in ''|*[!0-9]*) ;; *) [ -n "$then_s" ] && age=$(( (now_s - then_s) / 86400 )) ;; esac
+    cutoff="$(date -v-"${stale}"d +%Y-%m-%d 2>/dev/null || date -d "-$stale days" +%Y-%m-%d 2>/dev/null)"
+    [ -n "$cutoff" ] && old="$(printf '%s\n' "$dates" | awk -v c="$cutoff" '$0 < c' | wc -l | tr -d ' ')"
   fi
-  echo "Rule pack. v$ver, sources last verified ${newest:-unknown}${age:+ ($age days ago)}. The checks run against this dated snapshot, not the live guideline pages."
+  if [ -n "$newest" ]; then
+    echo "Rule pack. v$ver. Its $total dated sources were verified between $oldest and $newest${age:+ (newest $age days ago)}. The checks run against this dated snapshot, not the live guideline pages."
+  else
+    echo "Rule pack. v$ver, sources last verified unknown. The checks run against this dated snapshot, not the live guideline pages."
+  fi
+  if [ -n "$age" ] && [ "$age" -le "$stale" ] && [ "${old:-0}" -gt 0 ]; then
+    echo "Rule pack. $old of $total dated sources were last verified more than $stale days ago, so their rules may have changed since. Each one carries its date as verified_on in data/regulatory-deadlines.json."
+  fi
   if [ -z "$age" ]; then
     echo "Rule pack freshness not checked. The verified date could not be read or compared, so treat these rules as possibly stale."
   elif [ "$age" -gt "$stale" ]; then
@@ -1671,21 +1714,22 @@ readiness_check() {  # $1 app root, $2 workspace root
     [ "$req" = "1" ] && finding critical "MANUAL-READINESS-MISSING" "No .app-review-readiness.json for $label, and readiness is required" "Copy templates/app-review-readiness.json to the app folder, test each item on the release build, and record pass, fail, or n/a with a reason."
     flush_findings; return 0
   fi
+  # Only for the no-python and crash paths, where the file cannot be decoded. Python decides from the real field.
   { [ "$req" = "1" ] || grep -Eqs '"enforce"[[:space:]]*:[[:space:]]*true' "$f"; } && strict=1
   if ! tool_ok python3 -c pass; then
     if [ "$strict" -eq 1 ]; then finding critical "MANUAL-READINESS-UNREAD" "Readiness is required for $label, but python3 is not available to read it" "Install python3, then run the guard again."
     else echo "Manual checks for $label. .app-review-readiness.json found, not read. python3 not found."; fi
     flush_findings; return 0
   fi
-  out="$(python3 - "$f" "$strict" "$from" <<'PYR'
-import datetime, json, sys
+  out="$(python3 - "$f" "$req" "$from" <<'PYR'
+import datetime, json, re, sys
 
 CHECKS = [
     ("demo_account", True, "A reviewer can sign in with the demo account in the review notes", "Create a demo account that works against production, put it in App Review Information, and sign in with it on the release build (Apple 2.1, Google Play app access)."),
     ("live_backend", True, "The backend the reviewer reaches is live and holds test data", "Point the release build at production, load the data a reviewer needs, and keep it up for the whole review (Apple 2.1)."),
     ("review_notes", True, "Review notes say where every feature is and how to reach it", "Write the tap path to each feature, the IAP, and anything behind login or region in App Review Information (Apple 2.1, 2.3.1)."),
-    ("screenshots_match_build", True, "Screenshots show this build, in use, on every device size you support", "Capture screenshots from the release build, show the app in use, and cover the iPad and iPhone Duo sizes you support (Apple 2.3.3, 2.3.14)."),
-    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device, then try to sign back in with it. The sign-in must fail (Apple 5.1.1(v), Google Play account deletion)."),
+    ("screenshots_match_build", True, "Screenshots show this build, in use, for each device family you support", "Capture screenshots from the release build with the app in use, and upload the required sizes for each device family you support, iPad included if the app runs there. App Store Connect scales the smaller sizes, so check those layouts on a device (Apple 2.3.3, 2.3.14)."),
+    ("account_deletion_device_test", True, "Account deletion works end to end on a real device", "Delete an account on a real device. After the completion time you tell users, check that the account, its sessions, and its data are gone, and that signing in again does not bring the old account back (Apple 5.1.1(v), Google Play account deletion)."),
     ("privacy_labels_match_runtime", False, "Privacy labels and Data Safety match what the build and its SDKs collect", "Compare App Privacy answers and the Data Safety form with traffic from the release build, SDKs included (Apple 5.1.2, Google Play User Data). Every app has this check, so n/a is not accepted."),
     ("iap_reachable_by_reviewer", True, "A reviewer can find and complete every in-app purchase", "Make every product reachable in the review build, submit the IAPs with the version, and name where they are in the review notes (Apple 2.1(b), 3.1.1)."),
 ]
@@ -1701,18 +1745,27 @@ def emit(*fields):
 
 
 def run():
-    path, strict, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
-    unreadable_sev = "critical" if strict else "high"
+    path, required, src = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
+    raw = b""
     try:
         with open(path, "rb") as fh:
-            data = json.loads(fh.read().decode("utf-8"))
-        checks = data.get("checks")
-        notes = data.get("notes") or {}
-        if not isinstance(checks, dict) or not isinstance(notes, dict):
-            raise ValueError("checks and notes must be objects")
-    except (OSError, ValueError, AttributeError, RecursionError):
-        emit(unreadable_sev, "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
+            raw = fh.read()
+        data = json.loads(raw.decode("utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("checks"), dict):
+            raise ValueError("the file must be an object with a checks object")
+    except (OSError, ValueError, RecursionError):
+        # The file cannot be decoded, so a raw enforce flag is honoured to stay on the safe side.
+        strict = required or re.search(rb'"enforce"\s*:\s*true', raw) is not None
+        emit("critical" if strict else "high", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json is not valid JSON with a checks object", "Fix the file using templates/app-review-readiness.json as the shape. Until then no manual check counts as done.")
         return
+    strict = required or data.get("enforce") is True
+    checks = data["checks"]
+    notes = data.get("notes")
+    if notes is None:
+        notes = {}
+    elif not isinstance(notes, dict):
+        emit("high", "MANUAL-READINESS-NOTES-INVALID", "notes in .app-review-readiness.json is not an object, so no n/a reason counts", "Make notes an object keyed by check name, as in templates/app-review-readiness.json.")
+        notes = {}
     passed, still_open = 0, []
     for key, na_ok, title, fix in CHECKS:
         tag = "MANUAL-" + key.upper().replace("_", "-")
@@ -1742,7 +1795,7 @@ def run():
         (" Still open. " + ", ".join(still_open) + ".") if still_open else ""))
     if age is None:
         emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json has no valid checked_on date", "Re-run the manual checks on the build you are submitting and set checked_on to that day, as YYYY-MM-DD.")
-    elif age < -1:
+    elif age < 0:
         emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json has a checked_on date in the future", "Set checked_on to the day the manual checks were actually run.")
     elif age > 30:
         emit("high", "MANUAL-READINESS-STALE", ".app-review-readiness.json is older than 30 days", "Re-run the manual checks on the build you are submitting and update checked_on.")
@@ -1863,7 +1916,14 @@ EOF
 else
   scan_tree
   flush_findings
-  readiness_check "$DIR" "$DIR"
+  RD_FILES="$(find "$DIR" -mindepth 2 -maxdepth 5 \( -name node_modules -o -name Pods -o -name .git -o -name build -o -name .build -o -name DerivedData \) -prune -o -name .app-review-readiness.json -type f -print 2>/dev/null | sort | head -20)"
+  if [ -z "$RD_FILES" ]; then readiness_check "$DIR" "$DIR"
+  else
+    [ -f "$DIR/.app-review-readiness.json" ] && readiness_check "$DIR" "$DIR"
+    while IFS= read -r RD_FILE <&4; do readiness_check "$(dirname "$RD_FILE")" "$DIR"; done 4<<RD_EOF
+$RD_FILES
+RD_EOF
+  fi
 fi
 print_deadlines
 
@@ -1896,12 +1956,6 @@ if [ "$CRIT" -gt 0 ]; then
   [ "${REPORT_DEGRADED:-0}" = "1" ] && echo "BLOCKED. $CRIT critical rejection risk(s). Full report on stdout (no temp file available for buffering)." >&2
   emit_report 2; exit 2
 fi
-# A hook lets an unchecked submit through by default. APP_STORE_GUARD_BLOCK_UNCHECKED=1 stops it instead.
-block_unchecked() {
-  [ "${APP_STORE_GUARD_BLOCK_UNCHECKED:-0}" = "1" ] || return 0
-  echo "BLOCKED. Nothing was checked, and APP_STORE_GUARD_BLOCK_UNCHECKED=1 is set."
-  emit_report 2; echo "$1 Blocked because APP_STORE_GUARD_BLOCK_UNCHECKED=1." >&2; exit 2
-}
 # A scan buffer that failed mid-run leaves the result unknown, never CLEAR.
 if [ -n "$SCAN_ERROR" ]; then
   NOTE="NOT CHECKED. The scan could not run because $SCAN_ERROR."

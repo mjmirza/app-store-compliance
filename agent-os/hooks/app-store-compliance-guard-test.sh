@@ -1727,10 +1727,10 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q 'expo prebuild' && ok "verdict-3 an Expo app with no native folders is told to prebuild" || bad "verdict-3 an Expo app with no native folders is told to prebuild (rc=$RC)"
 ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$ERR" | grep -q 'NOT CHECKED' && ok "verdict-4 as a hook an unscannable project is reported and never blocked" || bad "verdict-4 as a hook an unscannable project is reported and never blocked (rc=$RC)"
-ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | APP_STORE_GUARD_BLOCK_UNCHECKED=1 CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
-[ "$RC" -eq 2 ] && echo "$ERR" | grep -q 'APP_STORE_GUARD_BLOCK_UNCHECKED=1' && ok "verdict-5 as a hook an unscannable project blocks when BLOCK_UNCHECKED is set" || bad "verdict-5 as a hook an unscannable project blocks when BLOCK_UNCHECKED is set (rc=$RC)"
+printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | APP_STORE_GUARD_BLOCK_UNCHECKED=1 CLAUDE_PROJECT_DIR="$D" bash "$GUARD" >"$D/v.out" 2>"$D/v.err"; RC=$?
+[ "$RC" -eq 2 ] && grep -q 'APP_STORE_GUARD_BLOCK_UNCHECKED=1' "$D/v.err" && grep -q '^BLOCKED\. Nothing was checked' "$D/v.err" && [ ! -s "$D/v.out" ] && ok "verdict-7 as a hook an unscannable project blocks on stderr when BLOCK_UNCHECKED is set" || bad "verdict-7 as a hook an unscannable project blocks on stderr when BLOCK_UNCHECKED is set (rc=$RC)"
 OUT="$(APP_STORE_GUARD_BLOCK_UNCHECKED=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
-[ "$RC" -eq 1 ] && ok "verdict-6 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1" || bad "verdict-6 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1 (rc=$RC)"
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q '^NOT CHECKED\.' && ! echo "$OUT" | grep -q '^BLOCKED' && ok "verdict-8 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1" || bad "verdict-8 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
@@ -3265,51 +3265,63 @@ gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-6
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 # X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
-D="$(gs_ios Pre.swift 'import SwiftUI
-struct P: View { var body: some View { Button("Allow Location") { CLLocationManager().requestWhenInUseAuthorization() } } }')"
-gs_check "pp-1 an Allow button beside a permission request is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
-D="$(gs_ios Pre.swift 'import SwiftUI
-struct P: View { var body: some View { Button("Continue") { CLLocationManager().requestWhenInUseAuthorization() } } }')"
-gs_check "pp-2 a Continue button stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Pre.swift 'import SwiftUI
-struct P: View { var body: some View { Button("Allow Location") { } } }')"
-gs_check "pp-3 an Allow button with no permission request in the file stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Pre.kt 'Button(onClick = { req.launchPermissionRequest() }) { Text("Allow") }')"
-gs_check "pp-4 Kotlin source never raises the Apple rule" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Settings.swift 'import SwiftUI
+# Every case must also finish its report with a verdict, so a crashing guard cannot pass a silence test.
+pp_case() {  # $1 label, $2 file name in App, $3 content, $4 expect the finding (1) or not (0)
+  local d has=0; d="$(gs_ios "$2" "$3")"; rr_run "$d"
+  rr_has 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' && has=1
+  if { [ "$RC" -eq 0 ] || [ "$RC" -eq 2 ]; } && rr_has '^Summary\. critical=' && rr_has '^\(CLEAR\|BLOCKED\)\.' && [ "$has" = "$4" ]; then ok "$1"; else bad "$1 (rc=$RC has=$has)"; fi
+  rm -rf "$d"
+}
+pp_case "pp-1 an Allow button beside a permission request is flagged" Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Allow Location") { CLLocationManager().requestWhenInUseAuthorization() } } }' 1
+pp_case "pp-2 a Continue button stays silent" Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Continue") { CLLocationManager().requestWhenInUseAuthorization() } } }' 0
+pp_case "pp-3 an Allow button with no permission request in the file stays silent" Pre.swift 'Button("Allow Location") { }' 0
+pp_case "pp-4 the same Allow button in a Kotlin file never raises the Apple rule" Pre.kt 'Button("Allow") { CLLocationManager().requestWhenInUseAuthorization() }' 0
+pp_case "pp-5 a Settings toggle labelled Allow stays silent" Settings.swift 'import SwiftUI
 struct S: View { @State var on = false
 var body: some View { Toggle(isOn: $on) { Text("Allow notifications") } } }
-func ask() { CLLocationManager().requestWhenInUseAuthorization() }')"
-gs_check "pp-5 a Settings toggle labelled Allow stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Pre.swift '// Button("Allow") { manager.requestWhenInUseAuthorization() }
-let x = 1')"
-gs_check "pp-6 an Allow button inside a comment stays silent" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Screen.android.tsx '<Button title="Allow" onPress={() => PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA)} />')"
-gs_check "pp-7 an .android.tsx screen never raises the Apple rule" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
-D="$(gs_ios Screen.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />')"
-gs_check "pp-8 a React Native Allow button beside request(PERMISSIONS.IOS) is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
-D="$(gs_ios Pre.m '[button setTitle:@"Allow" forState:UIControlStateNormal];
-[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL g){}];')"
-gs_check "pp-9 an Objective-C Allow title beside requestAccessForMediaType is flagged" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 1
-D="$(gs_ios Net.swift 'let b = Button("Allow") { api.request() }')"
-gs_check "pp-10 a generic api.request() is not a permission request" "$D" 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' 0
+func ask() { CLLocationManager().requestWhenInUseAuthorization() }' 0
+pp_case "pp-6 an Allow button inside a comment stays silent" Pre.swift '// Button("Allow") { manager.requestWhenInUseAuthorization() }
+let x = 1' 0
+pp_case "pp-7 an iOS-shaped Allow button in an .android.tsx file stays silent" Screen.android.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 0
+pp_case "pp-8 the same React Native button in a shared file is flagged" Screen.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 1
+pp_case "pp-9 an Objective-C Allow title beside requestAccessForMediaType is flagged" Pre.m '[button setTitle:@"Allow" forState:UIControlStateNormal];
+[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL g){}];' 1
+pp_case "pp-10 a generic api.request() is not a permission request" Net.swift 'let b = Button("Allow") { api.request() }' 0
+pp_case "pp-11 a commented-out permission request stays silent" Pre.swift 'Button("Allow downloads") { allowDownloads = true }
+// manager.requestWhenInUseAuthorization()' 0
+pp_case "pp-12 a button and request inside a block comment stay silent" Pre.swift '/*
+Button("Allow") { manager.requestWhenInUseAuthorization() }
+*/
+let z = 2' 0
+pp_case "pp-13 a trailing comment on a code line stays silent" Pre.swift 'let y = 1 // Button("Allow") { m.requestWhenInUseAuthorization() }' 0
+pp_case "pp-14 a SwiftUI action and label button titled Allow is flagged" Pre.swift 'Button(action: { manager.requestWhenInUseAuthorization() }) {
+    Text("Allow Location")
+}' 1
+pp_case "pp-15 a URL string before the button does not hide it" Pre.swift 'let u = "https://x.io/a"; Button("Allow") { m.requestWhenInUseAuthorization() }' 1
 
-# Every report names its rule pack and date, so a stale checklist is visible.
+# Every report names its rule pack and the range of source dates, so a stale checklist is visible.
 D="$(gs_ios ok.swift 'let a = 1')"; rr_run "$D"
-rr_has 'Rule pack. v[0-9]' && ok "rp-1 the report names its rule pack version" || bad "rp-1 the report names its rule pack version (rc=$RC)"
-OUT="$(APP_STORE_GUARD_STALE_DAYS=abc bash "$GUARD" "$D" 2>&1)"
-printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && bad "rp-2 a non-numeric window falls back to 60" || ok "rp-2 a non-numeric window falls back to 60"
-SP="$(mktemp -d)"; mkdir -p "$SP/agent-os/hooks" "$SP/data"; cp "$HERE/app-store-compliance-guard.sh" "$SP/agent-os/hooks/"
-printf '9.9.9\n' > "$SP/VERSION"; printf '{"deadlines":[{"verified_on": "2020-01-01"}]}\n' > "$SP/data/regulatory-deadlines.json"
-OUT="$(bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"
-printf '%s\n' "$OUT" | grep -q 'Rule pack. v9.9.9, sources last verified 2020-01-01' && printf '%s\n' "$OUT" | grep -q 'Rule pack STALE' && ok "rp-3 an old rule pack is marked stale" || bad "rp-3 an old rule pack is marked stale"
-printf '{"deadlines":[{"verified_on": "not-a-date"}]}\n' > "$SP/data/regulatory-deadlines.json"
-OUT="$(bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"
-printf '%s\n' "$OUT" | grep -q 'Rule pack freshness not checked' && ok "rp-4 an unreadable date says freshness was not checked" || bad "rp-4 an unreadable date says freshness was not checked"
+rr_has 'Rule pack. v[0-9]' && rr_has 'dated sources were verified between' && [ "$RC" -eq 0 ] && ok "rp-1 the report names its rule pack and date range" || bad "rp-1 the report names its rule pack and date range (rc=$RC)"
+rp_pack() {  # $1 JSON for the deadlines file. sets SP to a copied guard that reads it
+  SP="$(mktemp -d)"; mkdir -p "$SP/agent-os/hooks" "$SP/data"; cp "$HERE/app-store-compliance-guard.sh" "$SP/agent-os/hooks/"
+  printf '9.9.9\n' > "$SP/VERSION"; printf '%s\n' "$1" > "$SP/data/regulatory-deadlines.json"
+}
+rp_run() { OUT="$(env "$@" bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"; RC=$?; }
+OLD61="$(python3 -c 'import datetime; print(datetime.date.today() - datetime.timedelta(days=61))')"
+rp_pack "{\"deadlines\":[{\"verified_on\": \"$OLD61\"}]}"; rp_run APP_STORE_GUARD_STALE_DAYS=abc
+rr_has 'Rule pack STALE. Older than 60 days' && [ "$RC" -eq 0 ] && ok "rp-2 a non-numeric window falls back to 60 days" || bad "rp-2 a non-numeric window falls back to 60 days (rc=$RC)"
+rm -rf "$SP"; rp_pack '{"deadlines":[{"verified_on": "2020-01-01"}]}'; rp_run X=1
+rr_has 'v9.9.9. Its 1 dated sources were verified between 2020-01-01 and 2020-01-01' && rr_has 'Rule pack STALE' && [ "$RC" -eq 0 ] && ok "rp-3 an old rule pack is marked stale" || bad "rp-3 an old rule pack is marked stale (rc=$RC)"
+rm -rf "$SP"; rp_pack '{"deadlines":[{"verified_on": "not-a-date"}]}'; rp_run X=1
+rr_has 'Rule pack freshness not checked' && [ "$RC" -eq 0 ] && ok "rp-4 an unreadable date says freshness was not checked" || bad "rp-4 an unreadable date says freshness was not checked (rc=$RC)"
+rm -rf "$SP"; rp_pack "{\"deadlines\":[{\"verified_on\": \"$(date +%Y-%m-%d)\"},{\"verified_on\": \"2020-01-01\"}]}"; rp_run X=1
+rr_has '1 of 2 dated sources were last verified more than 60 days ago' && ! rr_has 'Rule pack STALE' && [ "$RC" -eq 0 ] && ok "rp-5 one fresh source cannot hide an old one" || bad "rp-5 one fresh source cannot hide an old one (rc=$RC)"
 rm -rf "$SP"
 
 # Manual readiness. what a scan cannot prove, recorded by the team.
-TODAY="$(date +%Y-%m-%d)"
+TODAY="$(date +%Y-%m-%d)"; TOMORROW="$(python3 -c 'import datetime; print(datetime.date.today() + datetime.timedelta(days=1))')"
 ALLPASS='"demo_account":"pass","live_backend":"pass","review_notes":"pass","screenshots_match_build":"pass","account_deletion_device_test":"pass","privacy_labels_match_runtime":"pass","iap_reachable_by_reviewer":"pass"'
 rd_case() {  # $1 label, $2 json, $3 env assignment or "", $4 expected rc, $5 grep that must match, $6 grep that must not match
   printf '%s' "$2" > "$D/.app-review-readiness.json"
@@ -3333,11 +3345,18 @@ rd_case "rd-10 a lone surrogate never hides a recorded failure" "$J" "" 2 'MANUA
 J="$(python3 -c 'import json,sys; nl=chr(10); c={k: "pass" for k in sys.argv[1].split(",")}; print(json.dumps({"build": "ok"+nl+"critical"+nl, "checked_on": "2026-11-21"+nl+"critical|MANUAL-INJECTED|x|y", "checks": c}))' "demo_account,live_backend,review_notes,screenshots_match_build,account_deletion_device_test,privacy_labels_match_runtime,iap_reachable_by_reviewer")"
 rd_case "rd-11 newlines in build or checked_on never forge a finding" "$J" "" 0 '7 of 7 attested' 'MANUAL-INJECTED'
 rr_has '^  \[CRITICAL\]' && bad "rd-11b no critical line appears" || ok "rd-11b no critical line appears"
-rd_case "rd-12 enforce rejects n/a on the privacy check" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"n/a\",\"live_backend\":\"n/a\",\"review_notes\":\"n/a\",\"screenshots_match_build\":\"n/a\",\"account_deletion_device_test\":\"n/a\",\"privacy_labels_match_runtime\":\"n/a\",\"iap_reachable_by_reviewer\":\"n/a\"}}" "" 2 'MANUAL-PRIVACY-LABELS-MATCH-RUNTIME-UNVERIFIED' ''
-rr_has 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' && ok "rd-12b n/a without a reason is not accepted" || bad "rd-12b n/a without a reason is not accepted"
-NA_IAP="${ALLPASS%\"iap_reachable_by_reviewer\":\"pass\"}\"iap_reachable_by_reviewer\":\"n/a\""
+NA_PRIV="${ALLPASS/\"privacy_labels_match_runtime\":\"pass\"/\"privacy_labels_match_runtime\":\"n/a\"}"
+rd_case "rd-12 enforce rejects n/a on privacy even with a reason" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"notes\":{\"privacy_labels_match_runtime\":\"we collect nothing\"},\"checks\":{$NA_PRIV}}" "" 2 'MANUAL-PRIVACY-LABELS-MATCH-RUNTIME-UNVERIFIED' 'MANUAL-DEMO-ACCOUNT-UNVERIFIED'
+rd_case "rd-12b n/a without a reason is not accepted" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"n/a\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' ''
+NA_IAP="${ALLPASS/\"iap_reachable_by_reviewer\":\"pass\"/\"iap_reachable_by_reviewer\":\"n/a\"}"
 rd_case "rd-13 n/a with a reason in notes is accepted" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"notes\":{\"iap_reachable_by_reviewer\":\"no in-app purchases\"},\"checks\":{$NA_IAP}}" "" 0 '7 of 7 attested' 'UNVERIFIED'
-rd_case "rd-14 a future checked_on is flagged" "{\"checked_on\":\"2099-01-01\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
+rd_case "rd-14 a far future checked_on is flagged" "{\"checked_on\":\"2099-01-01\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
+rd_case "rd-14b tomorrow counts as the future" "{\"checked_on\":\"$TOMORROW\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
+BS="$(printf '\134')"
+rd_case "rd-17 an escaped enforce key still enforces" "{\"en${BS}u0066orce\":true,\"checked_on\":\"$TODAY\",\"checks\":{}}" "" 2 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' ''
+rd_case "rd-18 enforce inside notes does not enforce" "{\"checked_on\":\"$TODAY\",\"checks\":{},\"notes\":{\"enforce\":true}}" "" 0 '0 of 7 attested' 'UNVERIFIED'
+rd_case "rd-19 malformed notes never hide a recorded failure" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"notes\":[1]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-NOTES-INVALID' && ok "rd-19b the malformed notes are named" || bad "rd-19b the malformed notes are named"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
@@ -3347,8 +3366,17 @@ printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/app
 OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
 rr_has 'MANUAL-DEMO-ACCOUNT-FAILED.*apps/kiosk' && rr_has 'Manual checks for apps/app. 7 of 7' && [ "$RC" -eq 2 ] && ok "rd-15 a failure recorded for one app in a monorepo blocks and names it" || bad "rd-15 a failure recorded for one app in a monorepo blocks and names it (rc=$RC)"
 rm -f "$M/apps/kiosk/.app-review-readiness.json"; printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/.app-review-readiness.json"
-OUT="$(bash "$GUARD" "$M" 2>&1)"
-rr_has 'Manual checks for apps/kiosk/ios. 7 of 7 attested.*from the workspace file' && ok "rd-16 an app with no file falls back to the workspace file and says so" || bad "rd-16 an app with no file falls back to the workspace file and says so"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'Manual checks for apps/kiosk/ios. 7 of 7 attested.*from the workspace file' && [ "$RC" -eq 0 ] && ok "rd-16 an app with no file falls back to the workspace file and says so" || bad "rd-16 an app with no file falls back to the workspace file and says so (rc=$RC)"
+rm -rf "$M"
+# One app in a nested folder still has its own readiness file read.
+M="$(mktemp -d)"; mkdir -p "$M/apps/mobile/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$M/apps/mobile/App/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$M/apps/mobile/App/PrivacyInfo.xcprivacy"
+printf 'let a = 1\n' > "$M/apps/mobile/App/A.swift"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && rr_has 'Manual checks for apps/mobile' && [ "$RC" -eq 2 ] && ok "rd-20 a single nested app has its readiness file read" || bad "rd-20 a single nested app has its readiness file read (rc=$RC)"
 rm -rf "$M"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"

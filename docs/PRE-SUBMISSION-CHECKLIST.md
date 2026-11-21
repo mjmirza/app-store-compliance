@@ -34,8 +34,9 @@ Then work down the page. Do Shared first, then the store you ship to. Skip any s
 - [ ] Every data collection has user consent before it happens.
 - [ ] Every permission has a specific reason string that names the real feature using it.
 - [ ] Account creating apps offer in app account deletion.
-- [ ] Account deletion tested on a real device. delete the account, then try to sign in with it again. The sign-in must fail.
-- [ ] A custom screen before a permission alert has one button titled Continue or Next, never Allow, and no Close or Cancel (Apple HIG Privacy, 5.1.1(iv)).
+- [ ] Account deletion tested on a real device. Delete the account, wait for the completion time you tell users, then check that the account, its sessions, and its data are gone and that signing in again does not bring the old account back.
+- [ ] Apple. A custom screen before a permission alert has one button titled Continue or Next, never Allow, and no Close or Cancel, unless the screen also collects legally required consent (Apple HIG Privacy, 5.1.1(iv)).
+- [ ] Google Play. A screen that explains a permission before the request lets the user decline, and the app keeps working without it (Android permission guidance).
 - [ ] Users can withdraw consent and the app still works for non core features.
 - [ ] Every third party SDK and its data behavior is known and declared.
 

@@ -10,8 +10,8 @@ A clean scan and a ready submission are different things. The guard reads your p
 
 | Half | What it covers | How you prove it |
 |---|---|---|
-| Proven by the scan | Source code, Info.plist and purpose strings, the privacy manifest, AndroidManifest permissions, Gradle and Xcode build settings, SDK names in your dependencies, placeholder text, payment code paths | `bash agent-os/hooks/app-store-compliance-guard.sh "/path/to/app"` |
-| Only a person can prove | A demo account that signs in, a backend that is live and holds test data, review notes that say where each feature is, screenshots of this build on every device you support, account deletion working on a real device, privacy labels that match real traffic, an in-app purchase the reviewer can reach | `.app-review-readiness.json`, read by the same guard |
+| Checked by the scan | Selected patterns in source code, missing purpose-string keys in Info.plist, the privacy manifest, AndroidManifest permissions, Gradle and Xcode build settings, SDK names in your dependencies, placeholder text, signs of non-store payment code. Whether a purpose string fits its feature is a manual check | `bash agent-os/hooks/app-store-compliance-guard.sh "/path/to/app"` |
+| Only a person can prove | A demo account that signs in, a backend that is live and holds test data, review notes that say where each feature is, screenshots of this build for each device family you support, account deletion working on a real device, privacy labels that match real traffic, an in-app purchase the reviewer can reach | `.app-review-readiness.json`, read by the same guard |
 
 Since version 2.5.0 the guard prints both halves on every run. With no readiness file it says plainly which checks it could not see. Copy [the template](../templates/app-review-readiness.json) into your app folder, test each item on the release build, write `pass`, `fail`, `n/a`, or `todo`, and set `checked_on` to that day.
 
@@ -28,11 +28,12 @@ The full manual walk is [the pre-submission checklist](PRE-SUBMISSION-CHECKLIST.
 A stale checklist gives false confidence, and several people said that is worse than none. So every report now opens with a line like this.
 
 ```
-Rule pack. v2.5.0, sources last verified 2026-11-21 (0 days ago). The checks run against this dated snapshot, not the live guideline pages.
+Rule pack. v2.5.0. Its 109 dated sources were verified between 2026-07-13 and 2026-11-21 (newest 0 days ago). The checks run against this dated snapshot, not the live guideline pages.
+Rule pack. 2 of 109 dated sources were last verified more than 60 days ago, so their rules may have changed since. Each one carries its date as verified_on in data/regulatory-deadlines.json.
 ```
 
 - The checks are a snapshot, not a live read of Apple's or Google's pages. Each deadline in [data/regulatory-deadlines.json](../data/regulatory-deadlines.json) carries the `source_url` it was read from and the `verified_on` day.
-- Past 60 days the guard prints `Rule pack STALE` and the command to update. Change the window with `APP_STORE_GUARD_STALE_DAYS`. If the date cannot be read or compared, it says freshness was not checked rather than staying quiet.
+- The line shows the oldest and newest source date, and counts the sources older than the window, so one fresh record cannot hide old ones. When even the newest source is past 60 days, the guard prints `Rule pack STALE` and the command to update. Change the window with `APP_STORE_GUARD_STALE_DAYS`. If the date cannot be read or compared, it says freshness was not checked rather than staying quiet.
 - Sweeps run about every two months and are written up as gap analyses, the latest [November 2026](GAP-ANALYSIS-2026-11.md). Between sweeps the monitors in `scripts/monitor*.py` watch Apple's news feed and the Play policy pages.
 
 ## 3. Both stores, at similar depth
@@ -41,7 +42,7 @@ The playbook covers the Apple App Store and Google Play. People asked whether Pl
 
 | | Apple | Google Play | Both |
 |---|---|---|---|
-| Rejection patterns in `data/rejection-patterns.json` | 61 | 43 | 13 |
+| Rejection patterns in `data/rejection-patterns.json` | 62 | 43 | 13 |
 | Distinct code checks in the guard | 34 | 38 (20 Play policy, 18 Android build) | 5 |
 | Rule map | [APPLE.md](APPLE.md) | [GOOGLE-PLAY.md](GOOGLE-PLAY.md) | [MISTAKE-PATTERNS.md](MISTAKE-PATTERNS.md) |
 
@@ -69,7 +70,7 @@ Taken from rejection reasons developers described in public replies in November 
 
 | Reported reason | Caught by | Strength |
 |---|---|---|
-| Missing privacy manifest, purpose strings that did not match | Guard. APPLE-PRIVACY-MANIFEST-MISSING and APPLE-5.1.1-MISSING-USAGE-DESCRIPTION, plus `scripts/validate-privacy-manifest.py` | Scan, critical |
+| Missing privacy manifest, purpose strings that did not match | Guard. APPLE-PRIVACY-MANIFEST-MISSING and APPLE-5.1.1-MISSING-USAGE-DESCRIPTION for a missing key, plus `scripts/validate-privacy-manifest.py`. Whether the wording fits the feature is not checked | Scan for missing keys, a person for the wording |
 | Onboarding button said "Allow permissions" before the location prompt, Apple wanted "Continue" | Guard. APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON, new in 2.5.0, when the button and the permission request sit in the same file | Scan, medium, reported as possible |
 | Reviewer could not log in | Guard. APPLE-2.1-STAGING-BACKEND for a staging or localhost backend, plus `demo_account` in the readiness file | Scan flags part, a person proves the rest |
 | Reviewer could not find the in-app purchase | `iap_reachable_by_reviewer` and `review_notes` in the readiness file | Person |
@@ -93,13 +94,15 @@ On queue time, Apple's App Review page says at least 50 percent of submissions a
 
 ## 7. When the guard runs, and what its exit code means
 
-Run by hand, the last line and the exit code always agree.
+Run by hand, the report ends with a verdict, and the exit code matches it. A `Next.` line with the step to take can follow it.
 
 | Exit | Last line | Meaning |
 |---|---|---|
 | 0 | `CLEAR.` | No critical risk in what the scan can see. Not an approval |
 | 2 | `BLOCKED.` | A critical risk in the code, or a manual check recorded as failed |
 | 1 | `NOT CHECKED.` | No iOS or Android project was found, so nothing was proven. Treat it as a failure in CI, never as a pass |
+
+`APP_STORE_GUARD_OK=1` turns a block into exit 0 with the line `APP_STORE_GUARD_OK set.`, and the run is logged. Use it only for a finding you have checked by hand.
 
 As a hook inside an AI coding tool, the guard runs only when that tool is about to run a submit command (fastlane, eas submit, xcrun altool, a Gradle release bundle, and the others in the README). Two things follow.
 
