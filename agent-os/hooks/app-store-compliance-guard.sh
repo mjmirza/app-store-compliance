@@ -1819,10 +1819,12 @@ def give_up():
     # Without SIGALRM a blocked read cannot be interrupted. Whichever side takes FINISH first owns END.
     if not FINISH.acquire(False):
         return
-    emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json could not be read within %d seconds, so a fail inside it cannot be seen" % READ_DEADLINE, "Move it to a local disk as a regular file shaped like templates/app-review-readiness.json.")
-    sys.stdout.write("END\n")
-    sys.stdout.flush()
-    os._exit(0)
+    try:
+        emit("critical", "MANUAL-READINESS-UNREADABLE", ".app-review-readiness.json could not be read within %d seconds, so a fail inside it cannot be seen" % READ_DEADLINE, "Move it to a local disk as a regular file shaped like templates/app-review-readiness.json.")
+        sys.stdout.write("END\n")
+        sys.stdout.flush()
+    finally:
+        os._exit(0)
 
 
 def run():
@@ -1937,7 +1939,8 @@ finally:
     for watchdog in WATCHDOGS:
         watchdog.cancel()
     if not FINISH.acquire(False):
-        threading.Event().wait()
+        threading.Event().wait(5)
+        os._exit(0)
 sys.stdout.write("END\n")
 PYR
 )"; rc=$?

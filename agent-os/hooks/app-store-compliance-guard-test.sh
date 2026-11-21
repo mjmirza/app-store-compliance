@@ -3441,6 +3441,24 @@ printf 'import atexit, signal, time\ndel signal.SIGALRM\natexit.register(time.sl
 OUT="$(PYTHONPATH="$SLOWEXIT" bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has '7 of 7 attested' && ! rr_has 'within 10 seconds' && [ "$RC" -eq 0 ] && ok "rd-43 a slow exit after a clean read never reports a false timeout" || bad "rd-43 a slow exit after a clean read never reports a false timeout (rc=$RC)"
 rm -rf "$SLOWEXIT" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+WD="$(mktemp -d)"
+printf 'import os, signal, time\ndel signal.SIGALRM\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(12)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$WD/sitecustomize.py"
+python3 -c 'import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+start = src.index("<<'"'"'PYR'"'"'\n") + len("<<'"'"'PYR'"'"'\n")
+open(sys.argv[2], "w", encoding="utf-8").write(src[start:src.index("\nPYR\n", start)])' "$GUARD" "$WD/reader.py"
+python3 -c 'import os, subprocess, sys, time
+env = dict(os.environ, PYTHONPATH=sys.argv[2])
+child = subprocess.Popen([sys.executable, sys.argv[1], sys.argv[3], "0", ""], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
+child.stdout.close()
+try:
+    child.wait(timeout=25)
+except subprocess.TimeoutExpired:
+    child.kill()
+    sys.exit(1)' "$WD/reader.py" "$WD" "$D/.app-review-readiness.json"
+[ $? -eq 0 ] && ok "rd-44 a watchdog whose output pipe is closed still ends the reader" || bad "rd-44 a watchdog whose output pipe is closed still ends the reader"
+rm -rf "$WD" "$D/.app-review-readiness.json"
 rm -rf "$D"
 
 # Readiness is read per app in a monorepo, with the workspace file as the fallback.
