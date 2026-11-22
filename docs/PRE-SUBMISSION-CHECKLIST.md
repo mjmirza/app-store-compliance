@@ -133,6 +133,7 @@ The full hard rules and sources are in the [global regulatory guide](GLOBAL-REGU
 - [ ] Australia under-16 age assurance for an age-restricted social media platform.
 - [ ] South Korea Korea-only binary with an approved payment provider if alternative billing is used.
 - [ ] China MIIT app filing with a local entity, plus PIPL and a Banhao license for a game.
+- [ ] China mainland App Store. On App Compliance, an Account Holder or Admin answers AI-Generated or Synthetic Content and Security Assessment for every app on that storefront, including No when the feature is absent, disabled, or geoblocked. A Yes answer includes the approved filing number and registered filing name, an authorization or usage agreement when someone else's technology powers the AI feature, and, for a Security Assessment, a National Internet Security Management Service Platform screenshot showing pass plus the report with the company seal. Existing apps must be completed and verified by 31 January 2027 to remain available. The app can release in other regions while China mainland stays unavailable until verification succeeds ([Apple](https://developer.apple.com/help/app-store-connect/manage-compliance-information/view-china-mainland-compliance-information/)).
 
 ## Platform mechanics gate (both stores, if the item applies)
 
