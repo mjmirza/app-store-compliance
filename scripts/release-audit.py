@@ -184,11 +184,11 @@ def child_env():
     shim_dir = tempfile.mkdtemp(prefix="asc-python3-")
     atexit.register(shutil.rmtree, shim_dir, True)
     shim = os.path.join(shim_dir, "python3")
-    with open(shim, "w", newline="\n") as f:
-        exe = shlex.quote(sys.executable.replace(chr(92), "/"))
-        f.write('#!/bin/sh\nexec %s "$@"\n' % exe)
+    exe = sys.executable.replace(chr(92), "/") if os.name == "nt" else sys.executable
+    with open(shim, "w", encoding="utf-8", newline="\n") as f:
+        f.write('#!/bin/sh\nexec %s "$@"\n' % shlex.quote(exe))
     os.chmod(shim, 0o755)
-    env["PATH"] = shim_dir + os.pathsep + env.get("PATH", "")
+    env["PATH"] = shim_dir + os.pathsep + env.get("PATH", os.defpath)
     return env
 
 
@@ -197,9 +197,9 @@ CHILD_ENV = None
 
 def run_command(args, cwd=ROOT):
     global CHILD_ENV
-    if CHILD_ENV is None:
-        CHILD_ENV = child_env()
     try:
+        if CHILD_ENV is None:
+            CHILD_ENV = child_env()
         res = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=CHILD_ENV)
         return res.returncode, res.stdout, res.stderr
     except Exception as e:

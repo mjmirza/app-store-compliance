@@ -119,18 +119,22 @@ sys.exit(0 if calls and calls[0][:2] == [sys.executable, "scripts/validate.py"] 
 PYT
 
 # Where python3 is missing, the children find a shim that runs this interpreter.
-python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
+NOPY="$(mktemp -d)"; ln -s "$(command -v bash)" "$NOPY/bash"
+NOPY_DIR="$NOPY" python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
 import importlib.util, os, subprocess, sys
 spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
 ra = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ra)
-ra.shutil.which = lambda name: None
+nopy = os.environ["NOPY_DIR"]
+os.environ["PATH"] = nopy
 env = ra.child_env()
 shim_dir = env["PATH"].split(os.pathsep)[0]
-out = subprocess.run([os.path.join(shim_dir, "python3"), "-c", "import sys; print(sys.executable)"],
+fresh = os.path.basename(shim_dir).startswith("asc-python3-") and env["PATH"].endswith(os.pathsep + nopy)
+out = subprocess.run([os.path.join(nopy, "bash"), "-c", "python3 -c 'import sys; print(sys.executable)'"],
                      capture_output=True, text=True, env=env).stdout.strip()
-sys.exit(0 if os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
+sys.exit(0 if fresh and os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
 PYT
+rm -rf "$NOPY"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
 [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "Overall Status: INCOMPLETE" && echo "$OUT" | grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
