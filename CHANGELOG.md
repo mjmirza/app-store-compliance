@@ -2,6 +2,22 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Added
+
+- `GOOGLE-PLAY-TRADER-STATUS-2027`. Every active Google Play developer account must declare trader or non-trader status. Existing accounts must do so by 1 February 2027. A missing declaration may block updates and remove the app globally. Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 announcement (answer 18100766) says the declaration starts in November 2026 and does not state this date. This is separate from `EU-DSA-TRADER-STATUS` (Apple, enforced 17 February 2025) and from `GOOGLE-TECH-QUALITY-FEB-2027`.
+- `GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027`. From 1 March 2027 Play uses an online marketplace model in the EEA and the UK. Where the account declared as a trader, users everywhere see contact details, the D-U-N-S number, and a terms link if one was provided. EEA and UK users also see the trader name in place of Google in Offered by. Same Play Console page.
+
+### Changed
+
+- `docs/EU-REGULATORY-2026.md` section 3 no longer says Google Play's trader deadline is unverified. The Play Console dates replace that sentence. The older claim that Google enforced only with reduced discoverability was not on the page and is dropped.
+
+### Fixed
+
+- `scripts/verify-citations.py` ignores a long numeric cache-buster on an asset URL when it compares a page with the soft-404 control. Apple's news index rotates that query string between fetches, which made the same index look like two pages and let a fabricated news id pass.
+- `EU-AI-ACT-MARKING-RETROFIT-2026` and `EU-AI-ACT-ART-4` now follow the consolidated AI Act, CELEX 02024R1689-20260727, read on 19 November 2026. The 2 December 2026 date is unchanged. Article 111(4) still requires Article 50(2) marking on generative systems placed on the market before 2 August 2026. Article 5(1a) prohibits placing on the market or putting into service only where non-consensual intimate material or child sexual abuse material is the intended purpose, or a reasonably foreseeable and reproducible outcome and the system lacks reasonable and adequate safeguards and a process to correct observed or reported misuse. Use is prohibited only where the deployer uses the system for that purpose. Article 4 requires measures to support the development of AI literacy and does not require guaranteeing a specific level. The previous entries told operators to stop any system whose output was reasonably foreseeable, and to ensure a sufficient level of literacy. `docs/EU-REGULATORY-2026.md` sections 1.1 and 1.3, the AI app-type guideline, and the generated timeline carry the same wording.
+
 ## 2.5.0 (2026-11-22)
 
 This release answers the most repeated requests from about 300 replies on X after the playbook spread in November 2026, and folds in Apple's 16 and 17 November developer posts. The new check is medium. A project without a readiness file and without the opt-in sees no new kind of block, though some existing checks now fire reliably where timing used to hide them (see Fixed). Once a team adds a readiness file, it blocks on a check recorded as failed, on a file the guard cannot read, and, when the team opts in, on an open check. Fourteen Codex review rounds attacked the changes before release, until a round found nothing. Every reproduced problem became a test. It is a minor version.

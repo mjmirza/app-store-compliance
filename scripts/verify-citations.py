@@ -92,7 +92,10 @@ def trust_of(host):
 
 
 def fingerprint(body):
-    return hashlib.sha256(body[:200000]).hexdigest()[:16]
+    # A soft-404 index can rotate a numeric cache-buster on an asset URL (Apple news
+    # stamps sf-symbol.js?###########), so strip it to keep two fetches equal.
+    sample = re.sub(br"\?\d{8,}", b"", body[:200000])
+    return hashlib.sha256(sample).hexdigest()[:16]
 
 
 def fetch(url):
