@@ -2,6 +2,12 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Fixed
+
+- `scripts/metadata-audit.py` no longer reports a rule word hidden inside a longer word. Freeform, Freelance, and Freedom Journal were HIGH price claims, Todoist and the Spanish "Todos" were placeholder text, and "desktop app" was the ranking claim "top app". Short everyday terms now need a word break, where a space, punctuation, a digit, a non-ASCII letter, or a case change counts, so FreeToUse, VPNfree, TODO123, and Android版 still fire. Brand names, long terms, and terms with digits or punctuation keep matching anywhere, so Androidille, Geminin, and #1notepad still fire. `freeware` and `freemium` are listed as price claims. Reported and fixed by @dajiaohuang (#2371). Eight adversarial review rounds checked that real rejection text caught before is still caught, across 35,840 comparisons.
+
 ## 2.5.1 (2026-11-22)
 
 A patch release. It adds Apple's China mainland compliance declarations and Google Play's trader status dates, corrects the EU AI Act entries against the consolidated text, fixes two Windows failures reported by a contributor, and answers every tool question from the X replies in the docs and the Q&A discussions. Nothing that passed 2.5.0 starts to block. An independent Codex security review read every added line of the merged pull requests before release.

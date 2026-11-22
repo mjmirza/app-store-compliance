@@ -80,7 +80,7 @@ GOOGLE_ALIASES = dict(ALIASES, short_description="short_description")
 OTHER_PLATFORMS = [
     "android",
     "google play",
-    "play store",
+    "play store", "playstore",
     "windows phone",
     "blackberry",
 ]
@@ -103,7 +103,7 @@ PLACEHOLDER = [
     "example.com",
 ]
 CHINA_AI = ["chatgpt", "openai", "gemini", "claude", "anthropic", "copilot"]
-RANKING = ["#1", "number one", "best app", "top app", "free", "no.1", "no. 1"]
+RANKING = ["#1", "number one", "best app", "top app", "free", "no.1", "no. 1", "freeware", "freemium"]
 # small safe profanity sample; teams extend in their own config
 CURSE = ["fuck", "shit", "asshole", "bitch", "bastard"]
 
@@ -160,16 +160,27 @@ def lc(s):
     return (s or "").lower()
 
 
-def mentions(text, term):
-    """True when term appears as a whole word or phrase, never inside a longer word.
+def _word_break(raw, i, j, side):
+    """A non-letter, a non-ASCII letter or a case change is a word break: FreeToUse fires, Freeform does not."""
+    def glue(c):
+        return c.isascii() and c.isalpha()
+    if side == "right":
+        nxt = raw[j:j + 1]
+        return not glue(nxt) or nxt.isupper() or (raw[i:j].isupper() and j - i > 1)
+    prv = raw[i - 1:i] if i else ""
+    return not glue(prv) or prv.islower() != raw[i:i + 1].islower()
 
-    A plain substring test read "free" out of Freeform and Freelance, "todo" out of
-    Todoist, and "top app" out of "desktop app". The bound is a lookaround rather than
-    \\b so a term that opens with punctuation, such as #1, still matches after a word.
-    """
-    left = r"(?<![0-9a-z])" if term[:1].isalnum() else ""
-    right = r"(?![0-9a-z])" if term[-1:].isalnum() else ""
-    return re.search(left + re.escape(term) + right, lc(text)) is not None
+
+def mentions(text, term, brand=False):
+    """Short everyday words (free, todo, top app) must stand alone; brand names, long terms and
+    terms with digits or punctuation match anywhere, as before (Androidille, #1notepad)."""
+    raw = text or ""
+    if brand or len(term) >= 8 or not term.replace(" ", "").isalpha():
+        return term in raw.lower()
+    for m in re.finditer(re.escape(term), raw, re.IGNORECASE):
+        if _word_break(raw, m.start(), m.end(), "left") and (" " in term or _word_break(raw, m.start(), m.end(), "right")):
+            return True
+    return False
 
 
 def audit_fields(fields, check_urls=False, platform="apple"):
@@ -228,7 +239,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # other platform mentions (Apple side only, an Android listing may say Android)
     for f, v in fields.items() if apple else ():
         for term in OTHER_PLATFORMS:
-            if mentions(v, term):
+            if mentions(v, term, brand=True):
                 add(
                     findings,
                     "high",
@@ -395,7 +406,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     for f in ("name", "subtitle", "keywords", "description") if apple else ():
         v = fields.get(f, "")
         for term in CHINA_AI:
-            if mentions(v, term):
+            if mentions(v, term, brand=True):
                 add(
                     findings,
                     "medium",
