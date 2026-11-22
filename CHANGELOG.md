@@ -2,7 +2,9 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
-## Unreleased
+## 2.5.1 (2026-11-22)
+
+A patch release. It adds Apple's China mainland compliance declarations and Google Play's trader status dates, corrects the EU AI Act entries against the consolidated text, fixes two Windows failures reported by a contributor, and answers every tool question from the X replies in the docs and the Q&A discussions. Nothing that passed 2.5.0 starts to block. An independent Codex security review read every added line of the merged pull requests before release.
 
 ### Added
 
@@ -10,14 +12,23 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 - `GOOGLE-PLAY-TRADER-STATUS-2027`. Every active Google Play developer account must declare trader or non-trader status. Existing accounts must do so by 1 February 2027. A missing declaration may block updates and remove the app globally. Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 announcement (answer 18100766) says the declaration starts in November 2026 and does not state this date. This is separate from `EU-DSA-TRADER-STATUS` (Apple, enforced 17 February 2025) and from `GOOGLE-TECH-QUALITY-FEB-2027`.
 - `GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027`. From 1 March 2027 Play uses an online marketplace model in the EEA and the UK. Where the account declared as a trader, users everywhere see contact details, the D-U-N-S number, and a terms link if one was provided. EEA and UK users also see the trader name in place of Google in Offered by. Same Play Console page.
 
+- `docs/FAQ.md`. Every question about the tool itself from the X replies, answered in full: Google Play coverage, the Mac App Store, install safety, guideline numbers on findings, privacy and account data, what a static scan cannot see, SDK permissions, the hook and fastlane, the Chinese stores, update speed, review times and notes, intro offers, device frames, and the licence. Each answer is also an accepted answer in a Q&A discussion, linked from the page.
+
 ### Changed
 
 - `docs/EU-REGULATORY-2026.md` section 3 no longer says Google Play's trader deadline is unverified. The Play Console dates replace that sentence. The older claim that Google enforced only with reduced discoverability was not on the page and is dropped.
 
 ### Fixed
 
+- On Windows the deadline report crashed on a law name with a non-ASCII character, because the data files were read and the report written in the locale encoding. The data files are now read as UTF-8 and the checker writes UTF-8 while keeping each stream's error policy, so a missing database still fails open. Reported and fixed by @JoAdo07 (#2330, #2331).
+- On Windows `scripts/check-docs.py` handed bash an absolute path it could not open, and `scripts/release-audit.py` started its test suites through a `python3` that is not on PATH there. install.sh is now passed to bash on stdin with only CRLF folded, and the audit puts a small shim first on PATH that runs the current interpreter when `python3` is missing. Reported and fixed by @JoAdo07 (#2332, #2333, #2334). Security review hardened the shim: it is written as UTF-8, quotes the interpreter path, changes backslashes only on Windows, and keeps the default PATH when none is set.
 - `scripts/verify-citations.py` ignores a long numeric cache-buster on an asset URL when it compares a page with the soft-404 control. Apple's news index rotates that query string between fetches, which made the same index look like two pages and let a fabricated news id pass.
 - `EU-AI-ACT-MARKING-RETROFIT-2026` and `EU-AI-ACT-ART-4` now follow the consolidated AI Act, CELEX 02024R1689-20260727, read on 19 November 2026. The 2 December 2026 date is unchanged. Article 111(4) still requires Article 50(2) marking on generative systems placed on the market before 2 August 2026. Article 5(1a) prohibits placing on the market or putting into service only where non-consensual intimate material or child sexual abuse material is the intended purpose, or a reasonably foreseeable and reproducible outcome and the system lacks reasonable and adequate safeguards and a process to correct observed or reported misuse. Use is prohibited only where the deployer uses the system for that purpose. Article 4 requires measures to support the development of AI literacy and does not require guaranteeing a specific level. The previous entries told operators to stop any system whose output was reasonably foreseeable, and to ensure a sufficient level of literacy. `docs/EU-REGULATORY-2026.md` sections 1.1 and 1.3, the AI app-type guideline, and the generated timeline carry the same wording.
+
+### Thanks
+
+- @JoAdo07 for finding the Windows encoding and path failures, writing the fixes, and taking the review changes on board (#2331, #2334).
+- Everyone who replied on X with a question. Each one now has a written answer.
 
 ## 2.5.0 (2026-11-22)
 

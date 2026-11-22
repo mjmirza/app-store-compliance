@@ -385,6 +385,7 @@ python3 scripts/deadline-checker.py
 | Path | What it holds |
 |---|---|
 | `docs/WHAT-THE-SCAN-PROVES.md` | What the scan can prove and what only a person can, the readiness file, how current the rules are, Apple and Play coverage side by side, an honest take on 4.3 spam, reported rejections mapped to checks, and what the scripts do on your machine |
+| `docs/FAQ.md` | Every question about the tool from the X replies, answered in full. Google Play and Mac coverage, install safety, guideline numbers on findings, the hook and fastlane, update speed, review times, and the licence |
 | `docs/APPLE.md` | Apple rejection map, sections 1 to 5, every guideline with the trigger and the fix, plus the 2026 age rating and AI disclosure changes |
 | `docs/GOOGLE-PLAY.md` | Google Play rejection map across every policy, plus the four level enforcement ladder from rejection to account termination |
 | `docs/ADVANCED-2026.md` | The modern upload time layer (privacy manifests, export compliance), payments and DMA depth, the full legal layer (GDPR, EU AI Act, DSA, COPPA), gambling depth, AI content policy, and Android specifics |
