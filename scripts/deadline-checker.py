@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # locale encoding, so the report would stop at the first such name.
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
-        _stream.reconfigure(encoding="utf-8")
+        _stream.reconfigure(encoding="utf-8", errors=_stream.errors)
 
 DEADLINES_FILE = os.environ.get(
     "DEADLINES_FILE", os.path.join(ROOT, "data", "regulatory-deadlines.json")

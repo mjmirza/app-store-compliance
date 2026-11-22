@@ -245,6 +245,16 @@ class TestDataFilesReadAsUtf8(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertNotIn("EncodingWarning", out)
 
+    def test_non_ascii_id_is_read_exactly(self):
+        # A wrong decoding still validates, so check the id the validator echoes back.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "deadlines.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"deadlines": [entry(id="ACTE-\u00e9-1", verified_on="2026-13-40")]}, f, ensure_ascii=False)
+            rc, out = run_with(path, PYTHONIOENCODING="utf-8")
+        self.assertNotEqual(rc, 0, out)
+        self.assertIn("deadline 'ACTE-\u00e9-1' has invalid verified_on", out)
+
 
 if __name__ == "__main__":
     unittest.main()

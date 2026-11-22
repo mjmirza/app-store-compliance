@@ -247,6 +247,16 @@ class TestDatabaseReadAsUtf8(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertIn("Error loading deadlines", err)
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX paths carry undecodable bytes")
+    def test_missing_database_with_undecodable_path_fails_open(self):
+        # Reconfiguring stdout must keep its error policy, or this message crashes.
+        path = os.fsdecode(b"/nonexistent/act-\xff.json")
+        env = dict(os.environ, DEADLINES_FILE=path)
+        result = subprocess.run([sys.executable, self.SCRIPT], capture_output=True, env=env)
+        err = result.stderr.decode("utf-8", "replace")
+        self.assertEqual(result.returncode, 0, err)
+        self.assertIn("Deadlines database not found at", err)
+
 
 if __name__ == "__main__":
     unittest.main()
