@@ -202,7 +202,7 @@ Change the thing the rejection names, and nothing else at the same time.
 
 - Read the guideline number in the rejection. 2.3 is the listing (screenshots, description, metadata), 5.1 is privacy and data, 3.1 is payments, 4.x is the app itself. That tells you where to look.
 - Never resubmit unchanged. Fix it, or reply in Resolution Center if you think the reviewer misread the app, with steps and a screen recording.
-- On Google Play, most reversals come from correcting the Data safety form or removing the SDK or permission that caused it.
+- On Google Play, when the rejection cites a Data safety mismatch or an SDK or permission, correct the form or remove the offending SDK or permission before you resubmit, rather than arguing.
 - Do not resubmit in parallel, and do not create a new account to get around a rejection. An account-level action can only be appealed, never worked around.
 
 The appeal playbook in `docs/MISTAKE-PATTERNS.md` has the steps for both stores.
