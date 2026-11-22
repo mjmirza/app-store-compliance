@@ -234,5 +234,43 @@ printf 'Journal' > "$GN/en-US/name.txt"; printf 'https://j.test/privacy' > "$GN/
 OUT="$($AUDIT "$GN" 2>&1)"
 echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "the global review notes are audited over a locale's notes" || bad "the global review notes are audited over a locale's notes"
 rm -rf "$GN"
+# A rule term matches as a whole word, so Freeform, Todoist and "desktop app" are clean.
+WB="$(mktemp -d)"; mkdir -p "$WB/en-US"
+printf 'https://j.test/privacy' > "$WB/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$WB/en-US/support_url.txt"
+for word in Freeform Freelance "Freedom Journal" Todoist; do
+  printf '%s' "$word" > "$WB/en-US/name.txt"
+  OUT="$($AUDIT "$WB" 2>&1)"
+  echo "$OUT" | grep -qE '\[(HIGH|MEDIUM)\]' && bad "a name that only contains a listed word is not a claim. $word" || ok "a name that only contains a listed word is not a claim. $word"
+done
+printf 'Journal' > "$WB/en-US/name.txt"; printf 'Now on the desktop app too' > "$WB/en-US/subtitle.txt"
+printf 'Syncs every note' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && bad "'top app' inside 'desktop app' is not a ranking claim" || ok "'top app' inside 'desktop app' is not a ranking claim"
+printf 'Todos los usuarios pueden crear notas' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && bad "'Todos' is not the placeholder TODO" || ok "'Todos' is not the placeholder TODO"
+# The words themselves still fire, so the boundary is not a blanket off switch.
+printf 'Journal Free' > "$WB/en-US/name.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && ok "a name that says free is still a price claim" || bad "a name that says free is still a price claim"
+printf '#1 Notes' > "$WB/en-US/name.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && ok "a name that says #1 is still a ranking claim" || bad "a name that says #1 is still a ranking claim"
+printf 'TODO add the screenshots' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "a TODO in the description is still a placeholder" || bad "a TODO in the description is still a placeholder"
+printf 'Shipped from Scunthorpe' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'CURSE-WORD' && bad "a place name is not profanity" || ok "a place name is not profanity"
+# Inflections and attached versions of a real claim still fire.
+for pair in "subtitle|One of the best apps|BOTH-METADATA-DECORATION" "description|Download via Google PlayStore.|APPLE-2.3-CROSS-PLATFORM-REFERENCE" "description|TODO123: replace before submission|BOTH-PLACEHOLDER" "description|Multiplayer will arrive in future releases.|APPLE-2.3-FUTURE-FUNCTIONALITY" "description|Powered by ChatGPT4|CHINA-AI-REFERENCES" "description|Replace placeholders before publishing.|BOTH-PLACEHOLDER" "description|Offline mode coming sooner than expected.|APPLE-2.3-FUTURE-FUNCTIONALITY" "description|Get our AndroidTV app.|APPLE-2.3-CROSS-PLATFORM-REFERENCE" "subtitle|Journal - FreeToUse|BOTH-METADATA-DECORATION" "description|TODOreplace before submission|BOTH-PLACEHOLDER" "description|Offline mode upcoming soon.|APPLE-2.3-FUTURE-FUNCTIONALITY" "description|Powered by ChatGPTPlus.|CHINA-AI-REFERENCES" "description|Android版も公開中です。|APPLE-2.3-CROSS-PLATFORM-REFERENCE" "description|İstanbul guide. TODO: replace this.|BOTH-PLACEHOLDER" "subtitle|İstanbul Free Guide|BOTH-METADATA-DECORATION" "description|Auch für Androidgeräte verfügbar.|APPLE-2.3-CROSS-PLATFORM-REFERENCE" "description|Saatavilla myös Androidille.|APPLE-2.3-CROSS-PLATFORM-REFERENCE" "subtitle|Memo Freeware|BOTH-METADATA-DECORATION" "description|Kirjoita nopeammin Geminin avulla.|CHINA-AI-REFERENCES" "name|Notes: #1notepad|BOTH-METADATA-DECORATION" "description|Placeholdertext|BOTH-PLACEHOLDER" "name|AIChatGPT - Writing Assistant|CHINA-AI-REFERENCES" "name|VPNfree - Secure VPN|BOTH-METADATA-DECORATION" "name|PDFfree Scanner|BOTH-METADATA-DECORATION"; do
+  IFS='|' read -r fld txt id <<< "$pair"
+  printf 'Journal' > "$WB/en-US/name.txt"; rm -f "$WB/en-US/subtitle.txt" "$WB/en-US/description.txt"
+  printf '%s' "$txt" > "$WB/en-US/$fld.txt"
+  OUT="$($AUDIT "$WB" 2>&1)"
+  echo "$OUT" | grep -q "$id" && ok "still fires. $txt" || bad "still fires. $txt"
+done
+rm -rf "$WB"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
