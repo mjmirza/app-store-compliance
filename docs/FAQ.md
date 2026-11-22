@@ -23,11 +23,11 @@ Discussion. [#2344](https://github.com/mjmirza/app-store-compliance/discussions/
 Both stores. Of the 124 rejection patterns, 62 are Apple, 43 are Google Play, 13 apply to both, and 6 are web.
 
 On an Android project the guard checks, among others.
-- Sensitive permissions. background location, all files access, SMS and call log, accessibility service, photo and video access, each without its declaration.
+- Sensitive permissions. background location, all files access, SMS and call log, accessibility service, and photo and video access, each flagged so you can justify it. The guard cannot see your Play Console declarations.
 - Play Billing for digital goods, Billing Library below version 8, and donation links.
 - Target API level below the current floor, and 64-bit ABIs missing next to 32-bit ones.
 - Analytics or ad SDKs that mean your Data safety form needs a second look.
-- A debuggable release build, and a foreground service type that is not declared.
+- A debuggable release build, and a `specialUse` foreground service missing its subtype property.
 
 What no scan can check. whether your Play screenshots match the build, and the 12 testers for 14 days rule for new personal accounts. Both are in `docs/GOOGLE-PLAY.md` and the pre-submission checklist.
 
@@ -62,7 +62,7 @@ Discussion. [#2347](https://github.com/mjmirza/app-store-compliance/discussions/
 It covers the parts that leave a trace in the project, and asks you to confirm the rest.
 
 What the guard checks.
-- A privacy policy link present in the app, for Apple and Google Play.
+- A privacy policy reference in the scanned source, for Apple and Google Play. Whether the link in the app opens and works is a manual check.
 - Account deletion inside the app when the app creates accounts, and a weak version of it (only a mailto link or a deactivate button).
 - A privacy manifest when required reason APIs are used, and its contents, with `scripts/validate-privacy-manifest.py`.
 - Tracking SDKs without App Tracking Transparency, and SDKs that mean your Apple privacy labels or Play Data safety form need review.
@@ -75,7 +75,7 @@ Discussion. [#2348](https://github.com/mjmirza/app-store-compliance/discussions/
 
 Mostly the second kind, and here is the honest line.
 
-- Design checks it does run. Sign in with Apple layout and relay email handling, thin web wrappers (4.2), social login without a privacy-friendly option (4.8), Live Activity spam, and a set of accessibility checks.
+- Design checks it does run. Sign in with Apple offered next to other social logins, relay email handling, thin web wrappers (4.2), social login without a privacy-friendly option (4.8), Live Activity spam, and a set of accessibility checks.
 - Several checks catch things the guidelines do not spell out, for example a button titled Allow before the permission prompt, health data reaching iCloud, or an iOS deployment target below 13.
 - What it cannot judge. layout, visual polish, whether screens look consistent, and iPad layout. Those need a person on a device.
 
@@ -87,12 +87,12 @@ Discussion. [#2349](https://github.com/mjmirza/app-store-compliance/discussions/
 
 That is exactly right, and the tool is built around saying so.
 
-- 113 of the 124 patterns have a detection recipe in `data/detection-recipes.json`. The others, such as device frames in a preview video or the Play 12-tester rule, cannot be seen in code at all.
+- 113 of the 124 patterns have a detection recipe in `data/detection-recipes.json`. Some of the rest, such as device frames in a preview video or the Play 12-tester rule, cannot be seen in code at all. A few are checked by the guard directly, without a recipe.
 - Having a recipe does not mean the guard runs it. Some recipes are guidance for a person.
 - For what a scan cannot prove, 2.5.0 added `.app-review-readiness.json`. You record seven checks (demo account, live backend, review notes, screenshots of this build, deletion on a real device, privacy labels against runtime, a reachable purchase). A fail blocks, and with no file the report lists what it could not see.
-- A result that could not check something says NOT CHECKED instead of passing. Set `APP_STORE_GUARD_BLOCK_UNCHECKED=1` to make that block too.
+- A scan that could not run says NOT CHECKED instead of passing. Set `APP_STORE_GUARD_BLOCK_UNCHECKED=1` to make that block too, and `APP_STORE_GUARD_REQUIRE_READINESS=1` (or `"enforce": true` in the readiness file) to make an open readiness check block. Some unavailable checks, such as a missing manifest validator, stay warnings.
 
-The honesty you mention is the point. The tool never turns cannot verify into green.
+The honesty you mention is the point. The tool reports what it could not verify instead of hiding it.
 
 Discussion. [#2350](https://github.com/mjmirza/app-store-compliance/discussions/2350)
 
@@ -103,7 +103,7 @@ There is no app type setting. Checks fire on what is in your code, so a game, a 
 - Examples. loot boxes and gambling for games, HealthKit with iCloud for health apps, betting code, and organization registration for VPN, health and finance apps on Google Play.
 - `docs/BY-APP-TYPE.md` lists what reviewers expect for ten types. every app, subscriptions and in-app purchase, social and user content, kids, health, games, macOS, AI, crypto and finance, and VPN. Each has a longer guide in `references/guidelines/by-app-type/`.
 
-How it runs. the guard reads your project, detects the platform and framework (native, Flutter, React Native, Expo, Ionic, Unity), runs the matching checks, and prints critical findings first. As a hook it runs automatically before a submit command.
+How it runs. the guard reads your project, detects the platform and framework (native, Flutter, React Native, Expo, Ionic, Unity), runs the matching checks, and sorts the code findings by severity. As a hook it runs automatically before a submit command.
 
 Discussion. [#2351](https://github.com/mjmirza/app-store-compliance/discussions/2351)
 
@@ -111,7 +111,8 @@ Discussion. [#2351](https://github.com/mjmirza/app-store-compliance/discussions/
 
 Partly.
 
-- The guard finds SDKs by name in your project files (package.json, Podfile, Gradle, imports) and flags the ones with known consequences, such as tracking SDKs that need App Tracking Transparency or SDKs that change your Data safety answers.
+- The guard finds known SDKs by name in scanned files (package.json, Gradle files, source imports) and flags the ones with known consequences, such as tracking SDKs that need App Tracking Transparency or SDKs that change your Data safety answers.
+- An SDK declared only in a Podfile is not detected.
 - It does not read inside `Pods`, `node_modules`, or vendored folders, and it does not validate an SDK's own privacy manifest. That is the vendor's job, but you are the one rejected if it is wrong.
 - To see which dependency added an Android permission, check the merged manifest. See the Q&A on which dependency added a sensitive permission to the merged manifest.
 
@@ -135,7 +136,7 @@ Discussion. [#2353](https://github.com/mjmirza/app-store-compliance/discussions/
 
 As documentation, not as automated checks.
 
-- `docs/OTHER-STORES.md` covers Huawei AppGallery and the Chinese Android stores, including the MIIT app filing, the ICP filing, and the review time.
+- `docs/OTHER-STORES.md` covers Huawei AppGallery and the Chinese Android stores, including the MIIT app filing, the ICP filing, and how long ICP filing takes.
 - `docs/GLOBAL-REGULATORY-2026.md` tracks China deadlines, including Apple's new China mainland App Compliance declarations due by 31 January 2027 for existing apps.
 - The guard has no checks specific to the Chinese stores. You apply those gates by hand.
 
@@ -148,7 +149,7 @@ Discussion. [#2354](https://github.com/mjmirza/app-store-compliance/discussions/
 It checks a dated snapshot, and tells you how old it is.
 
 - Every report opens with a `Rule pack.` line, the version and the oldest and newest date its sources were verified. Past 60 days it prints `Rule pack STALE`.
-- Every deadline in `data/regulatory-deadlines.json` names its primary source and the day it was read. `scripts/verify-citations.py` confirms every cited page still exists, and a new rule is read on its primary source before it lands.
+- Every deadline in `data/regulatory-deadlines.json` records its source URL and the day it was verified, and its `source_note` says plainly when the source is secondary or the primary text was not read. `scripts/verify-citations.py` checks that cited pages respond and are not soft 404s, and reports blocked or failing pages for follow-up.
 - New rules have shipped within days. 2.5.0 added Apple's November developer emails, and 2.5.1 adds Apple's China mainland compliance declarations.
 - To update, run `git pull` in the repo, then the same install command again.
 
@@ -160,10 +161,10 @@ Discussion. [#2355](https://github.com/mjmirza/app-store-compliance/discussions/
 
 Honest answer. it is tested heavily as software, and the real-world evidence so far is reports, not a published study.
 
-- Every guard check has regression tests built from real failure shapes, and CI runs the full suite before every release.
+- The guard has regression tests covering many of its checks and the failure shapes people reported, and CI runs the suite on every pull request and every push to main.
 - `evals/gold-cases.json` scores the Fleet Sweep, Waiver Ledger and Ruling Register against fixed expected verdicts. Those are synthetic cases, not real apps.
 - People have reported first-try approvals after running it, and others reported rejections it would not have caught. Those reports shaped 2.5.0.
-- A clear result is not an approval. It means nothing it can see is wrong.
+- A clear result is not an approval. It means no critical risk was found. High and medium findings can still be listed.
 
 If you run it before a submission, please post the outcome either way. A published record of real results is the next thing worth building.
 
@@ -213,7 +214,7 @@ Discussion. [#2359](https://github.com/mjmirza/app-store-compliance/discussions/
 Check eligibility before the paywall renders, and only then say free trial.
 
 - StoreKit 2. `Product.SubscriptionInfo.isEligibleForIntroOffer`, or `isEligibleForIntroOffer(for:)` on the subscription group.
-- RevenueCat. `checkTrialOrIntroDiscountEligibility`, or the eligibility on the offering's package.
+- RevenueCat on iOS. `checkTrialOrIntroDiscountEligibility(product: package.storeProduct)`, and show trial wording only for `.eligible`.
 - An ineligible user sees the full price. Telling them free trial when they would be charged is a misleading pricing rejection under 3.1.2.
 - The billed amount must also be at least as prominent as any per-month breakdown.
 
@@ -250,7 +251,7 @@ Discussion. [#2362](https://github.com/mjmirza/app-store-compliance/discussions/
 From the rejections people described in the replies, the most common were.
 
 - Permission wording. an onboarding button saying Allow before the system prompt. Caught by `APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON` since 2.5.0.
-- Missing privacy details or vague purpose strings. Caught where they leave a trace in the project.
+- Missing permission purpose strings. Caught for the APIs the guard knows. Whether a purpose string is specific enough is a manual check.
 - A demo account that did not work, or a backend that was down during review. Not visible in code, so it goes in `.app-review-readiness.json`.
 - 4.3 spam or duplicate app. No scan can decide it. See [#2340](https://github.com/mjmirza/app-store-compliance/discussions/2340).
 - Device frames in a preview video, and screenshots from an older build. Manual items on the checklist.
@@ -261,7 +262,7 @@ Discussion. [#2363](https://github.com/mjmirza/app-store-compliance/discussions/
 
 ## Which checks run first, and is there a rule that screenshots match the app one to one?
 
-There is no single first rule. The guard runs every check and prints critical findings first, then high, then medium.
+There is no single first rule. The guard runs every check and sorts the code findings by severity, critical first. Readiness findings follow in their own block.
 
 The order it scans in. it lists the project files, detects the platforms and framework, then runs the iOS, Android and web checks that apply.
 
