@@ -179,7 +179,10 @@ def child_env():
     """The test suites call python3 by name. Where it is missing (Windows), a shim
     first on PATH runs this interpreter instead (#2333)."""
     env = dict(os.environ)
-    if shutil.which("python3"):
+    # An empty entry or "." searches the current folder, and Windows os.defpath starts with ".".
+    raw = env.get("PATH") or os.defpath
+    env["PATH"] = os.pathsep.join(p for p in raw.split(os.pathsep) if p and p != ".")
+    if shutil.which("python3", path=env["PATH"]):
         return env
     shim_dir = tempfile.mkdtemp(prefix="asc-python3-")
     atexit.register(shutil.rmtree, shim_dir, True)
@@ -188,7 +191,7 @@ def child_env():
     with open(shim, "w", encoding="utf-8", newline="\n") as f:
         f.write('#!/bin/sh\nexec %s "$@"\n' % shlex.quote(exe))
     os.chmod(shim, 0o755)
-    env["PATH"] = shim_dir + os.pathsep + env.get("PATH", os.defpath)
+    env["PATH"] = shim_dir + (os.pathsep + env["PATH"] if env["PATH"] else "")
     return env
 
 

@@ -119,8 +119,8 @@ sys.exit(0 if calls and calls[0][:2] == [sys.executable, "scripts/validate.py"] 
 PYT
 
 # Where python3 is missing, the children find a shim that runs this interpreter.
-NOPY="$(mktemp -d)"; ln -s "$(command -v bash)" "$NOPY/bash"
-NOPY_DIR="$NOPY" python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
+NOPY="$(mktemp -d)"
+NOPY_DIR="$NOPY" BASH_EXE="$(command -v bash)" python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
 import importlib.util, os, subprocess, sys
 spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
 ra = importlib.util.module_from_spec(spec)
@@ -130,9 +130,24 @@ os.environ["PATH"] = nopy
 env = ra.child_env()
 shim_dir = env["PATH"].split(os.pathsep)[0]
 fresh = os.path.basename(shim_dir).startswith("asc-python3-") and env["PATH"].endswith(os.pathsep + nopy)
-out = subprocess.run([os.path.join(nopy, "bash"), "-c", "python3 -c 'import sys; print(sys.executable)'"],
+out = subprocess.run([os.environ["BASH_EXE"], "-c", "python3 -c 'import sys; print(sys.executable)'"],
                      capture_output=True, text=True, env=env).stdout.strip()
 sys.exit(0 if fresh and os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
+PYT
+
+# An unset PATH falls back to os.defpath, which starts with "." on Windows. Neither branch may search the current folder.
+NOPY_DIR="$NOPY" PYDIR="$(dirname "$(command -v python3)")" python3 - <<'PYT' && ok "an unset PATH never adds the current folder" || bad "an unset PATH never adds the current folder"
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+os.environ.pop("PATH", None)
+ok = True
+for found in (os.environ["PYDIR"], os.environ["NOPY_DIR"]):
+    os.defpath = os.pathsep.join([".", "", found])
+    parts = ra.child_env()["PATH"].split(os.pathsep)
+    ok = ok and "." not in parts and "" not in parts and found in parts
+sys.exit(0 if ok else 1)
 PYT
 rm -rf "$NOPY"
 
