@@ -9,6 +9,13 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# A deadline can name a law outside ASCII. On Windows a piped stdout is the
+# locale encoding, so the report would stop at the first such name.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors=_stream.errors)
+
 DEADLINES_FILE = os.environ.get(
     "DEADLINES_FILE", os.path.join(ROOT, "data", "regulatory-deadlines.json")
 )
@@ -21,7 +28,7 @@ def load_deadlines():
         )
         return []
     try:
-        with open(DEADLINES_FILE, "r") as f:
+        with open(DEADLINES_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             return data.get("deadlines", [])
     except Exception as e:
