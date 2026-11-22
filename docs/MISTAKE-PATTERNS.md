@@ -87,7 +87,7 @@ A rejection is recoverable. A bad appeal turns one rejection into a strike.
 
 1. The enforcement email names the policy and includes appeal instructions. Use that link.
 2. State precisely what the app does, why it complies, and what you changed if anything.
-3. Fix the declaration mismatch first. Most Google reversals come from correcting the Data Safety form or removing the offending SDK or permission, not from arguing.
+3. Fix the declaration mismatch first. When the rejection cites a Data Safety mismatch or an SDK or permission, correct the form or remove the offending SDK or permission rather than arguing.
 4. Do not resubmit the same rejected build in parallel. That compounds strikes.
 5. For an account level action, the appeal is the only channel. Be complete and honest, because a second wrong move can be terminal.
 
