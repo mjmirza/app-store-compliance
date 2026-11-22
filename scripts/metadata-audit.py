@@ -160,6 +160,18 @@ def lc(s):
     return (s or "").lower()
 
 
+def mentions(text, term):
+    """True when term appears as a whole word or phrase, never inside a longer word.
+
+    A plain substring test read "free" out of Freeform and Freelance, "todo" out of
+    Todoist, and "top app" out of "desktop app". The bound is a lookaround rather than
+    \\b so a term that opens with punctuation, such as #1, still matches after a word.
+    """
+    left = r"(?<![0-9a-z])" if term[:1].isalnum() else ""
+    right = r"(?![0-9a-z])" if term[-1:].isalnum() else ""
+    return re.search(left + re.escape(term) + right, lc(text)) is not None
+
+
 def audit_fields(fields, check_urls=False, platform="apple"):
     findings = []
     apple = platform == "apple"
@@ -193,7 +205,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
                 f"Remove emoji from {f}",
             )
         for r in RANKING:
-            if r in lc(v):
+            if mentions(v, r):
                 add(
                     findings,
                     "high",
@@ -216,7 +228,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # other platform mentions (Apple side only, an Android listing may say Android)
     for f, v in fields.items() if apple else ():
         for term in OTHER_PLATFORMS:
-            if term in lc(v):
+            if mentions(v, term):
                 add(
                     findings,
                     "high",
@@ -229,7 +241,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # future functionality
     for f, v in fields.items() if apple else ():
         for term in FUTURE:
-            if term in lc(v):
+            if mentions(v, term):
                 add(
                     findings,
                     "medium",
@@ -242,7 +254,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # negative apple sentiment
     for f, v in fields.items() if apple else ():
         for term in NEGATIVE_APPLE:
-            if term in lc(v):
+            if mentions(v, term):
                 add(
                     findings,
                     "medium",
@@ -255,7 +267,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # placeholder / test
     for f, v in fields.items():
         for term in PLACEHOLDER:
-            if term in lc(v):
+            if mentions(v, term):
                 add(
                     findings,
                     "high",
@@ -268,7 +280,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
     # curse words
     for f, v in fields.items():
         for term in CURSE:
-            if re.search(r"\b" + re.escape(term) + r"\b", lc(v)):
+            if mentions(v, term):
                 add(
                     findings,
                     "high",
@@ -381,9 +393,9 @@ def audit_fields(fields, check_urls=False, platform="apple"):
 
     # china AI references (advisory, storefront dependent, Apple only)
     for f in ("name", "subtitle", "keywords", "description") if apple else ():
-        v = lc(fields.get(f, ""))
+        v = fields.get(f, "")
         for term in CHINA_AI:
-            if term in v:
+            if mentions(v, term):
                 add(
                     findings,
                     "medium",

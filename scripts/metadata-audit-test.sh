@@ -234,5 +234,37 @@ printf 'Journal' > "$GN/en-US/name.txt"; printf 'https://j.test/privacy' > "$GN/
 OUT="$($AUDIT "$GN" 2>&1)"
 echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "the global review notes are audited over a locale's notes" || bad "the global review notes are audited over a locale's notes"
 rm -rf "$GN"
+# A term in a rule list is a whole word or phrase, never a fragment of a longer one. Before this,
+# "free" inside Freeform, Freelance, and Freedom was read as a price claim, "todo" inside Todoist
+# and "Todos" as placeholder text, and "top app" inside "desktop app" as a ranking claim.
+WB="$(mktemp -d)"; mkdir -p "$WB/en-US"
+printf 'https://j.test/privacy' > "$WB/en-US/privacy_url.txt"; printf 'https://j.test/help' > "$WB/en-US/support_url.txt"
+for word in Freeform Freelance "Freedom Journal" Todoist; do
+  printf '%s' "$word" > "$WB/en-US/name.txt"
+  OUT="$($AUDIT "$WB" 2>&1)"
+  echo "$OUT" | grep -qE '\[(HIGH|MEDIUM)\]' && bad "a name that only contains a listed word is not a claim. $word" || ok "a name that only contains a listed word is not a claim. $word"
+done
+printf 'Journal' > "$WB/en-US/name.txt"; printf 'Now on the desktop app too' > "$WB/en-US/subtitle.txt"
+printf 'Syncs every note' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && bad "'top app' inside 'desktop app' is not a ranking claim" || ok "'top app' inside 'desktop app' is not a ranking claim"
+printf 'Todos los usuarios pueden crear notas' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && bad "'Todos' is not the placeholder TODO" || ok "'Todos' is not the placeholder TODO"
+# The words themselves still fire, so the boundary is not a blanket off switch.
+printf 'Journal Free' > "$WB/en-US/name.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && ok "a name that says free is still a price claim" || bad "a name that says free is still a price claim"
+printf '#1 Notes' > "$WB/en-US/name.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-METADATA-DECORATION' && ok "a name that says #1 is still a ranking claim" || bad "a name that says #1 is still a ranking claim"
+printf 'TODO add the screenshots' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-PLACEHOLDER' && ok "a TODO in the description is still a placeholder" || bad "a TODO in the description is still a placeholder"
+printf 'Shipped from Scunthorpe' > "$WB/en-US/description.txt"
+OUT="$($AUDIT "$WB" 2>&1)"
+echo "$OUT" | grep -q 'CURSE-WORD' && bad "a place name is not profanity" || ok "a place name is not profanity"
+rm -rf "$WB"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
