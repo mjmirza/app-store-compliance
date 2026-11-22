@@ -182,7 +182,8 @@ def child_env():
     # An empty entry or "." searches the current folder, and Windows os.defpath starts with ".".
     raw = env.get("PATH") or os.defpath
     env["PATH"] = os.pathsep.join(p for p in raw.split(os.pathsep) if p and p != ".")
-    if shutil.which("python3", path=env["PATH"]):
+    # Windows which() also searches the current folder, so a stray python3.exe there must not skip the shim.
+    if os.name != "nt" and shutil.which("python3", path=env["PATH"]):
         return env
     shim_dir = tempfile.mkdtemp(prefix="asc-python3-")
     atexit.register(shutil.rmtree, shim_dir, True)

@@ -151,6 +151,23 @@ sys.exit(0 if ok else 1)
 PYT
 rm -rf "$NOPY"
 
+# On Windows the shim is always made, so a python3 found on PATH or in the current folder cannot replace it.
+DECOY="$(mktemp -d)"; printf '#!/bin/sh\necho decoy\n' > "$DECOY/python3"; chmod +x "$DECOY/python3"
+DECOY_DIR="$DECOY" BASH_EXE="$(command -v bash)" python3 - <<'PYT' && ok "on Windows the shim wins over another python3" || bad "on Windows the shim wins over another python3"
+import importlib.util, os, subprocess, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+os.environ["PATH"] = os.environ["DECOY_DIR"]
+os.name = "nt"
+env = ra.child_env()
+os.name = "posix"
+out = subprocess.run([os.environ["BASH_EXE"], "-c", "python3 -c 'import sys; print(sys.executable)'"],
+                     capture_output=True, text=True, env=env).stdout.strip()
+sys.exit(0 if os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
+PYT
+rm -rf "$DECOY"
+
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
 [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "Overall Status: INCOMPLETE" && echo "$OUT" | grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
 
