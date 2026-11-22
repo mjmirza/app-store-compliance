@@ -8,10 +8,10 @@ Questions about one person's own rejection were left to that person. The pattern
 
 Fair question, and stars prove nothing. Check it yourself in a few minutes.
 
-- The guard is one Bash file. It reads your project, writes only its own temp files and removes them, makes no network call, and never changes your app.
+- The guard is one Bash file. It reads your project, uses temporary scan buffers that it removes, makes no network call, and never changes your app. If `~/.claude/hooks/hook-log.sh` exists, it loads that helper to log errors and overrides.
 - `scripts/install.sh` writes into `~/.claude` (or `$CLAUDE_CONFIG_DIR`). the hook, the skill folder, one command file, and a hook entry in `settings.json`. It backs up `settings.json` first as `settings.json.bak-<timestamp>`.
 - `bash scripts/install.sh install --dry-run` prints every change and writes nothing. `doctor` checks the install, `uninstall` removes it.
-- Neither the installer nor the guard calls curl or wget. The monitor scripts fetch public pages only when you run them with `--live`.
+- Neither the installer nor the guard calls curl or wget. `scripts/monitor.py` fetches Apple's public developer feed by default; pass `--mock`, `--simulate` or `--news-file` to stay offline. The Android, AI policy and privacy monitors fetch only with `--live`.
 - Want more isolation? Run it in a container or a VM.
 
 Section 8 of `docs/WHAT-THE-SCAN-PROVES.md` lists what each script touches.
@@ -67,7 +67,7 @@ What the guard checks.
 - A privacy manifest when required reason APIs are used, and its contents, with `scripts/validate-privacy-manifest.py`.
 - Tracking SDKs without App Tracking Transparency, and SDKs that mean your Apple privacy labels or Play Data safety form need review.
 
-What only you can confirm. that the policy text is accurate, that the privacy labels match what the app really sends, and that deletion works on a real device. Since 2.5.0 you record those in `.app-review-readiness.json`, and a check marked fail blocks the submit.
+What only you can confirm. that the policy text is accurate, that the privacy labels match what the app really sends, and that deletion works on a real device. Check the policy text with the pre-submission checklist. Since 2.5.0 the readiness file `.app-review-readiness.json` records the privacy labels against runtime and account deletion on a real device, and a check marked fail blocks the submit.
 
 Discussion. [#2348](https://github.com/mjmirza/app-store-compliance/discussions/2348)
 
@@ -75,8 +75,8 @@ Discussion. [#2348](https://github.com/mjmirza/app-store-compliance/discussions/
 
 Mostly the second kind, and here is the honest line.
 
-- Design checks it does run. Sign in with Apple offered next to other social logins, relay email handling, thin web wrappers (4.2), social login without a privacy-friendly option (4.8), Live Activity spam, and a set of accessibility checks.
-- Several checks catch things the guidelines do not spell out, for example a button titled Allow before the permission prompt, health data reaching iCloud, or an iOS deployment target below 13.
+- Design checks it does run. Sign in with Apple offered next to other social logins, relay email handling, thin web wrappers (4.2), social login without a privacy-friendly option (4.8), and a set of accessibility checks. Live Activity spam is documented with a manual detection recipe, and the guard does not check it.
+- Some heuristics flag risks that are easy to miss, for example a button titled Allow before the permission prompt, HealthKit used in an app that also uses iCloud storage, or an iOS deployment target below 13. The HealthKit finding asks you to confirm by hand that no health data reaches iCloud (5.1.3(ii)).
 - What it cannot judge. layout, visual polish, whether screens look consistent, and iPad layout. Those need a person on a device.
 
 `docs/WHAT-THE-SCAN-PROVES.md` section 5 lists reported rejections and marks each as caught, partial, or not covered.
@@ -113,7 +113,7 @@ Partly.
 
 - The guard finds known SDKs by name in scanned files (package.json, Gradle files, source imports) and flags the ones with known consequences, such as tracking SDKs that need App Tracking Transparency or SDKs that change your Data safety answers.
 - An SDK declared only in a Podfile is not detected.
-- It does not read inside `Pods`, `node_modules`, or vendored folders, and it does not validate an SDK's own privacy manifest. That is the vendor's job, but you are the one rejected if it is wrong.
+- The main source scan skips `Pods`, `node_modules` and vendored folders, and the guard does not fully audit transitive SDK permissions or each SDK's own privacy manifest. That is the vendor's job, but you are the one rejected if it is wrong.
 - To see which dependency added an Android permission, check the merged manifest. See the Q&A on which dependency added a sensitive permission to the merged manifest.
 
 Section 5 of `docs/WHAT-THE-SCAN-PROVES.md` rates SDK permissions as partial for this reason.
@@ -161,7 +161,7 @@ Discussion. [#2355](https://github.com/mjmirza/app-store-compliance/discussions/
 
 Honest answer. it is tested heavily as software, and the real-world evidence so far is reports, not a published study.
 
-- The guard has regression tests covering many of its checks and the failure shapes people reported, and CI runs the suite on every pull request and every push to main.
+- The guard has regression tests covering many of its checks and the failure shapes people reported, and CI runs the suite on every pull request to main and every push to main.
 - `evals/gold-cases.json` scores the Fleet Sweep, Waiver Ledger and Ruling Register against fixed expected verdicts. Those are synthetic cases, not real apps.
 - People have reported first-try approvals after running it, and others reported rejections it would not have caught. Those reports shaped 2.5.0.
 - A clear result is not an approval. It means no critical risk was found. High and medium findings can still be listed.
