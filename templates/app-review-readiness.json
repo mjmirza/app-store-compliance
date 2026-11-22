@@ -1,0 +1,17 @@
+{
+  "build": "1.0.0 (1)",
+  "checked_on": "YYYY-MM-DD",
+  "enforce": false,
+  "checks": {
+    "demo_account": "todo",
+    "live_backend": "todo",
+    "review_notes": "todo",
+    "screenshots_match_build": "todo",
+    "account_deletion_device_test": "todo",
+    "privacy_labels_match_runtime": "todo",
+    "iap_reachable_by_reviewer": "todo"
+  },
+  "notes": {
+    "iap_reachable_by_reviewer": "Replace with a reason, or delete this line. n/a needs a reason here, and privacy_labels_match_runtime never accepts n/a."
+  }
+}

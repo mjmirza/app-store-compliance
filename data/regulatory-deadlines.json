@@ -1,6 +1,6 @@
 {
-  "version": "2.4.0",
-  "updated": "2026-11-15",
+  "version": "2.5.0",
+  "updated": "2026-11-21",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -1589,6 +1589,34 @@
       "absorbed_into": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
       "source_url": "https://developer.apple.com/news/upcoming-requirements/",
       "verified_on": "2026-11-15"
+    },
+    {
+      "id": "APPLE-CALIFORNIA-SALES-TAX-DIGITAL-2027",
+      "jurisdiction": "Apple App Store (United States, California)",
+      "law": "Apple tax and price update, 17 November 2026 (Apple Developer news 4o5ie73a)",
+      "requirement": "From 1 January 2027 apps in the SaaS, App Store Software, Software Training Material, Dating, and Boosting tax categories are subject to California sales and use tax. US storefront prices show exclusive of tax and proceeds do not change, but the total a customer pays may rise. A new Software as a Service (SaaS) attribute is available for the App Store Software, Software Training Material, Dating, and Boosting tax categories. Review each app and In-App Purchase tax category and the SaaS attribute in Pricing and Availability before 1 January 2027, and check that in-app price copy does not promise a tax-inclusive total for US buyers.",
+      "effective_date": "2026-11-17",
+      "grace_period": "none",
+      "mandatory_date": "2027-01-01",
+      "enforcement_date": "2027-01-01",
+      "affected_repository_sections": "docs/APPLE.md 2026 changes you must act on",
+      "priority": "medium",
+      "source_url": "https://developer.apple.com/news/?id=4o5ie73a",
+      "verified_on": "2026-11-21"
+    },
+    {
+      "id": "APPLE-PRICE-EQUALIZATION-2026-12-03",
+      "jurisdiction": "Apple App Store (Botswana, Colombia, Egypt, Rwanda, Türkiye)",
+      "law": "Apple tax and price update, 17 November 2026 (Apple Developer news 4o5ie73a)",
+      "requirement": "On 3 December 2026 Apple updates app and In-App Purchase prices in Botswana, Colombia, Egypt, Rwanda, and Türkiye, after introducing 14 percent VAT in Botswana and 18 percent VAT in Rwanda (Exhibit B of the Paid Applications Agreement now lists Apple as collecting tax there). If one of these five is your base storefront, its price stays as you set it, and Apple adjusts your prices on the other automatically equalized storefronts to keep them in line with that base price. Auto-renewable subscriptions and storefronts where you manage prices manually do not change. Check any price hard-coded in screenshots, promotional text, or in-app copy for affected storefronts.",
+      "effective_date": "2026-11-17",
+      "grace_period": "none",
+      "mandatory_date": "2026-12-03",
+      "enforcement_date": "2026-12-03",
+      "affected_repository_sections": "docs/APPLE.md 2026 changes you must act on",
+      "priority": "low",
+      "source_url": "https://developer.apple.com/news/?id=4o5ie73a",
+      "verified_on": "2026-11-21"
     }
   ]
 }

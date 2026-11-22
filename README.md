@@ -4,7 +4,7 @@
 
 # App Store Compliance Playbook
 
-Stop getting your iOS and Android apps rejected. The enterprise reference and automated guard that turns App Store and Google Play rejection into a designed out failure mode.
+Catch App Store and Google Play rejection causes before the reviewer does. A reference and a pre-submission guard for iOS and Android apps that is plain about what a scan can prove and what still needs a person. It does not guarantee approval.
 
 Read it as a website at [mjmirza.github.io/app-store-compliance](https://mjmirza.github.io/app-store-compliance/).
 
@@ -45,10 +45,11 @@ bash ~/repositories/app-store-compliance/agent-os/hooks/app-store-compliance-gua
 
 Replace only `/path/to/your/app`, with the folder that holds your Xcode project or your Android app. Keep the quotes, they keep a folder name with a space in it whole. To get the path without typing it, drag the folder from Finder or your file manager into the terminal window. A small project scans in about a second, a large one can take up to a minute, and the guard prints the time it took. Findings print first, critical ones on top, each with the file and line that triggered it when there is one. The last lines tell you where you stand.
 
-| Last line starts with | It means | Do next |
+| Verdict line starts with | It means | Do next |
 |---|---|---|
 | `BLOCKED.` | A critical rejection risk was found | Fix each `[CRITICAL]` line using the `fix.` line under it, then run the same command again |
-| `CLEAR.` | No critical risk in your code | Do the account and listing checks in [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md) |
+| `CLEAR.` | No critical risk in your code. Not an approval, the reviewer still checks what a scan cannot see | Do the account and listing checks in [the checklist](docs/PRE-SUBMISSION-CHECKLIST.md), then record them in `.app-review-readiness.json` ([why](docs/WHAT-THE-SCAN-PROVES.md)) |
+| `Rule pack STALE.` (near the top) | The rules this scan used are more than 60 days old | Update the playbook with `git pull`, then run the scan again |
 | `NOT CHECKED.` | No iOS or Android project was found in that folder, or the guard could not write its scan files. Run by hand this exits 1. As a hook it lets the command through | Point it at the right folder, and check the temp folder is writable. A managed Expo app with no native folders still gets its `app.json` or `app.config` read for purpose strings, the privacy manifest and Android permissions. Run `npx expo prebuild` to cover the native code too |
 
 ## What you get
@@ -383,6 +384,7 @@ python3 scripts/deadline-checker.py
 
 | Path | What it holds |
 |---|---|
+| `docs/WHAT-THE-SCAN-PROVES.md` | What the scan can prove and what only a person can, the readiness file, how current the rules are, Apple and Play coverage side by side, an honest take on 4.3 spam, reported rejections mapped to checks, and what the scripts do on your machine |
 | `docs/APPLE.md` | Apple rejection map, sections 1 to 5, every guideline with the trigger and the fix, plus the 2026 age rating and AI disclosure changes |
 | `docs/GOOGLE-PLAY.md` | Google Play rejection map across every policy, plus the four level enforcement ladder from rejection to account termination |
 | `docs/ADVANCED-2026.md` | The modern upload time layer (privacy manifests, export compliance), payments and DMA depth, the full legal layer (GDPR, EU AI Act, DSA, COPPA), gambling depth, AI content policy, and Android specifics |

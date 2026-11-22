@@ -1063,7 +1063,7 @@ mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to 
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
   [ "$3" = jq ] && ln -s "$(command -v jq)" "$d/jq"; [ "$3" = python3 ] && ln -s "$(pyenv which python3 2>/dev/null || command -v python3)" "$d/python3"
-  printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
+  rm -f "$d/$1"; printf '%s\n' "$2" > "$d/$1"; chmod +x "$d/$1"
   echo "$d"
 }
 P_UNI='{"tool_input":{"command":"cd apps/caf\xc3\xa9 && npx eas submit --platform ios"}}'
@@ -1583,7 +1583,7 @@ printf 'import CoreLocation\nlet m=CLLocationManager()\n' > "$D/ios/App/A.swift"
 printf 'X=1;\n' > "$D/examples/NativeDemo/Demo.xcodeproj/project.pbxproj"
 printf '<plist><dict></dict></plist>' > "$D/examples/NativeDemo/Demo/Info.plist"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "656-1 a nested demo Xcode project never splits a root framework app" || bad "656-1 a nested demo Xcode project never splits a root framework app (rc=$RC)"
+echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "656-1 a nested demo Xcode project never splits a root framework app" || { bad "656-1 a nested demo Xcode project never splits a root framework app (rc=$RC)"; echo "$OUT" | grep -E '^(Project|Apps?)\. ' | head -5 | sed 's/^/    | /'; }
 rm -rf "$D"
 
 # 657 an app directory linked into the tree from outside it is followed one level and scanned
@@ -1727,6 +1727,10 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 1 ] && echo "$OUT" | grep -q 'expo prebuild' && ok "verdict-3 an Expo app with no native folders is told to prebuild" || bad "verdict-3 an Expo app with no native folders is told to prebuild (rc=$RC)"
 ERR="$(printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$ERR" | grep -q 'NOT CHECKED' && ok "verdict-4 as a hook an unscannable project is reported and never blocked" || bad "verdict-4 as a hook an unscannable project is reported and never blocked (rc=$RC)"
+printf '{"tool_name":"Bash","tool_input":{"command":"eas submit -p ios"}}' | APP_STORE_GUARD_BLOCK_UNCHECKED=1 CLAUDE_PROJECT_DIR="$D" bash "$GUARD" >"$D/v.out" 2>"$D/v.err"; RC=$?
+[ "$RC" -eq 2 ] && grep -q 'APP_STORE_GUARD_BLOCK_UNCHECKED=1' "$D/v.err" && grep -q '^BLOCKED\. Nothing was checked' "$D/v.err" && [ ! -s "$D/v.out" ] && ok "verdict-7 as a hook an unscannable project blocks on stderr when BLOCK_UNCHECKED is set" || bad "verdict-7 as a hook an unscannable project blocks on stderr when BLOCK_UNCHECKED is set (rc=$RC)"
+OUT="$(APP_STORE_GUARD_BLOCK_UNCHECKED=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q '^NOT CHECKED\.' && ! echo "$OUT" | grep -q '^BLOCKED' && ok "verdict-8 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1" || bad "verdict-8 run by hand BLOCK_UNCHECKED keeps the NOT CHECKED exit 1 (rc=$RC)"
 rm -rf "$D"
 D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
@@ -3260,6 +3264,259 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { n
 gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
+# Clean fixtures, so a pass means exit 0, CLEAR, and the finding at MEDIUM or absent.
+PP_KEYS='<key>NSLocationWhenInUseUsageDescription</key><string>Shows the nearest mosque on the map.</string><key>NSCameraUsageDescription</key><string>Scans a QR code to join a group.</string>'
+pp_case() {  # $1 label, $2 file name in App, $3 content, $4 expect the finding (1) or not (0)
+  local d has=0 sev=1; d="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; printf '%s\n' "$3" > "$d/App/$2"; rr_run "$d"
+  rr_has 'APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' && has=1
+  [ "$has" = "1" ] && ! rr_has '\[MEDIUM\][[:space:]]*APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON' && sev=0
+  if [ "$RC" -eq 0 ] && rr_has '^CLEAR\.' && [ "$has" = "$4" ] && [ "$sev" = "1" ]; then ok "$1"; else bad "$1 (rc=$RC has=$has)"; fi
+  rm -rf "$d"
+}
+pp_case "pp-1 an Allow button beside a permission request is flagged" Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Allow Location") { CLLocationManager().requestWhenInUseAuthorization() } } }' 1
+pp_case "pp-2 a Continue button stays silent" Pre.swift 'import SwiftUI
+struct P: View { var body: some View { Button("Continue") { CLLocationManager().requestWhenInUseAuthorization() } } }' 0
+pp_case "pp-3 an Allow button with no permission request in the file stays silent" Pre.swift 'Button("Allow Location") { }' 0
+pp_case "pp-4 the same Allow button in a Kotlin file never raises the Apple rule" Pre.kt 'Button("Allow") { CLLocationManager().requestWhenInUseAuthorization() }' 0
+pp_case "pp-5 a Settings toggle labelled Allow stays silent" Settings.swift 'import SwiftUI
+struct S: View { @State var on = false
+var body: some View { Toggle(isOn: $on) { Text("Allow notifications") } } }
+func ask() { CLLocationManager().requestWhenInUseAuthorization() }' 0
+pp_case "pp-6 an Allow button inside a comment stays silent" Pre.swift '// Button("Allow") { manager.requestWhenInUseAuthorization() }
+let x = 1' 0
+pp_case "pp-7 an iOS-shaped Allow button in an .android.tsx file stays silent" Screen.android.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 0
+pp_case "pp-8 the same React Native button in a shared file is flagged" Screen.tsx '<Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 1
+pp_case "pp-9 an Objective-C Allow title beside requestAccessForMediaType is flagged" Pre.m '[button setTitle:@"Allow" forState:UIControlStateNormal];
+[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL g){}];' 1
+pp_case "pp-10 a generic api.request() is not a permission request" Net.swift 'let b = Button("Allow") { api.request() }' 0
+pp_case "pp-11 a commented-out permission request stays silent" Pre.swift 'Button("Allow downloads") { allowDownloads = true }
+// manager.requestWhenInUseAuthorization()' 0
+pp_case "pp-12 a button and request inside a block comment stay silent" Pre.swift '/*
+Button("Allow") { manager.requestWhenInUseAuthorization() }
+*/
+let z = 2' 0
+pp_case "pp-13 a trailing comment on a code line stays silent" Pre.swift 'let y = 1 // Button("Allow") { m.requestWhenInUseAuthorization() }' 0
+pp_case "pp-15 a URL string before the button does not hide it" Pre.swift 'let u = "https://x.io/a"; Button("Allow") { m.requestWhenInUseAuthorization() }' 1
+
+pp_case "pp-16 a button inside a nested Swift comment stays silent" Pre.swift '/* outer
+   /* nested */
+   Button("Allow") { m.requestWhenInUseAuthorization() }
+*/
+let k = 1' 0
+pp_case "pp-17 a comment marker inside a multiline string does not hide the button" Pre.swift 'let explanation = """
+Show /* to describe a wildcard.
+"""
+Button("Allow") { m.requestWhenInUseAuthorization() }' 1
+pp_case "pp-18 an Allow text outside the button closure stays silent" Pre.swift 'Button(action: { m.requestWhenInUseAuthorization() }) {
+    Text("Continue")
+}
+Text("Allow Location")' 0
+pp_case "pp-20 an Objective-C title with a space after the colon is flagged" Pre.m '[button setTitle: @"Allow" forState:UIControlStateNormal];
+[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                       completionHandler:^(BOOL g){}];' 1
+pp_case "pp-22 a Swift raw string with a quote and comment marker does not hide the button" Pre.swift 'let e = #"a quote " and /* literal text"#
+Button("Allow") { manager.requestWhenInUseAuthorization() }' 1
+pp_case "pp-23 a JS template literal spanning lines does not hide the button" Screen.tsx 'const t = `line one
+line two /* not a comment`;
+export const S = () => <Button title="Allow" onPress={() => request(PERMISSIONS.IOS.CAMERA)} />' 1
+BIG="$(printf 'Button("Allow") { m.requestWhenInUseAuthorization() }\n'; seq 1 100000 | sed 's/^/let v/;s/$/ = 1/')"
+pp_case "pp-21 a match early in a very large file is not lost" Big.swift "$BIG" 1
+
+# Every report names its rule pack and the range of source dates, so a stale checklist is visible.
+D="$(gs_ios ok.swift 'let a = 1')"; rr_run "$D"
+rr_has 'Rule pack. v[0-9]' && rr_has 'dated sources were verified between' && [ "$RC" -eq 0 ] && ok "rp-1 the report names its rule pack and date range" || bad "rp-1 the report names its rule pack and date range (rc=$RC)"
+rp_pack() {  # $1 JSON for the deadlines file. sets SP to a copied guard that reads it
+  SP="$(mktemp -d)"; mkdir -p "$SP/agent-os/hooks" "$SP/data"; cp "$HERE/app-store-compliance-guard.sh" "$SP/agent-os/hooks/"
+  printf '9.9.9\n' > "$SP/VERSION"; printf '%s\n' "$1" > "$SP/data/regulatory-deadlines.json"
+}
+rp_run() { OUT="$(env "$@" bash "$SP/agent-os/hooks/app-store-compliance-guard.sh" "$D" 2>&1)"; RC=$?; }
+OLD61="$(python3 -c 'import datetime; print(datetime.date.today() - datetime.timedelta(days=61))')"
+rp_pack "{\"deadlines\":[{\"verified_on\": \"$OLD61\"}]}"; rp_run APP_STORE_GUARD_STALE_DAYS=abc
+rr_has 'Rule pack STALE. Older than 60 days' && [ "$RC" -eq 0 ] && ok "rp-2 a non-numeric window falls back to 60 days" || bad "rp-2 a non-numeric window falls back to 60 days (rc=$RC)"
+rm -rf "$SP"; rp_pack '{"deadlines":[{"verified_on": "2020-01-01"}]}'; rp_run X=1
+rr_has 'v9.9.9. Its 1 dated sources were verified between 2020-01-01 and 2020-01-01' && rr_has 'Rule pack STALE' && [ "$RC" -eq 0 ] && ok "rp-3 an old rule pack is marked stale" || bad "rp-3 an old rule pack is marked stale (rc=$RC)"
+rm -rf "$SP"; rp_pack '{"deadlines":[{"verified_on": "not-a-date"}]}'; rp_run X=1
+rr_has 'Rule pack freshness not checked' && [ "$RC" -eq 0 ] && ok "rp-4 an unreadable date says freshness was not checked" || bad "rp-4 an unreadable date says freshness was not checked (rc=$RC)"
+rm -rf "$SP"; rp_pack "{\"deadlines\":[{\"verified_on\": \"$(date +%Y-%m-%d)\"},{\"verified_on\": \"2020-01-01\"}]}"; rp_run X=1
+rr_has '1 of 2 dated sources were last verified more than 60 days ago' && ! rr_has 'Rule pack STALE' && [ "$RC" -eq 0 ] && ok "rp-5 one fresh source cannot hide an old one" || bad "rp-5 one fresh source cannot hide an old one (rc=$RC)"
+rm -rf "$SP"
+
+SHIM="$(mktemp -d)"; printf '#!/bin/sh\ncase "$1" in -v*|-d) exit 1 ;; esac\nexec /bin/date "$@"\n' > "$SHIM/date"; chmod +x "$SHIM/date"
+OUT="$(PATH="$SHIM:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'Rule pack freshness not checked' && ! rr_has 'days ago' && [ "$RC" -eq 0 ] && ok "rp-6 a failing date step reads as not checked, never as a number" || bad "rp-6 a failing date step reads as not checked, never as a number (rc=$RC)"
+rm -rf "$SHIM"
+
+# Manual readiness. what a scan cannot prove, recorded by the team.
+TODAY="$(date +%Y-%m-%d)"; TOMORROW="$(python3 -c 'import datetime; print(datetime.date.today() + datetime.timedelta(days=1))')"
+ALLPASS='"demo_account":"pass","live_backend":"pass","review_notes":"pass","screenshots_match_build":"pass","account_deletion_device_test":"pass","privacy_labels_match_runtime":"pass","iap_reachable_by_reviewer":"pass"'
+rd_case() {  # $1 label, $2 json, $3 env assignment or "", $4 expected rc, $5 grep that must match, $6 grep that must not match
+  printf '%s' "$2" > "$D/.app-review-readiness.json"
+  if [ -n "$3" ]; then OUT="$(env "$3" bash "$GUARD" "$D" 2>&1)"; RC=$?; else rr_run "$D"; fi
+  if [ "$RC" -eq "$4" ] && { [ -z "$5" ] || rr_has "$5"; } && { [ -z "$6" ] || ! rr_has "$6"; }; then ok "$1"; else bad "$1 (rc=$RC)"; fi
+}
+rm -f "$D/.app-review-readiness.json"; rr_run "$D"
+rr_has 'Manual checks for this project. Not attested' && rr_has 'an in-app purchase the reviewer can reach' && [ "$RC" -eq 0 ] && ok "rd-1 no readiness file is named but does not block" || bad "rd-1 no readiness file is named but does not block (rc=$RC)"
+OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'MANUAL-READINESS-MISSING' && [ "$RC" -eq 2 ] && ok "rd-2 required readiness with no file blocks" || bad "rd-2 required readiness with no file blocks (rc=$RC)"
+rd_case "rd-3 a failed demo account blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-4 open items without enforce only inform" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 0 'Still open' 'UNVERIFIED'
+rd_case "rd-5 enforce turns an open item into a block" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-LIVE-BACKEND-UNVERIFIED' ''
+rd_case "rd-6 a readiness file that cannot be read blocks, since a fail inside it cannot be seen" '{"checks": [1,2' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-7 an old attestation is flagged stale" "{\"checked_on\":\"2020-01-01\",\"checks\":{$ALLPASS}}" "" 0 '7 of 7 attested' ''
+rr_has 'MANUAL-READINESS-STALE' && ok "rd-7b the stale attestation names itself" || bad "rd-7b the stale attestation names itself"
+rd_case "rd-8 required readiness with an empty checks list blocks" '{"checks":[]}' "APP_STORE_GUARD_REQUIRE_READINESS=1" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-9 enforce in a broken file still blocks" '{"enforce":true,"checks":[]}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+J="$(python3 -c 'import json,sys; print(json.dumps({"enforce": True, "checked_on": sys.argv[1], "checks": {"demo_account": chr(0xd800), "live_backend": "fail"}}))' "$TODAY")"
+rd_case "rd-10 a lone surrogate never hides a recorded failure" "$J" "" 2 'MANUAL-LIVE-BACKEND-FAILED' ''
+J="$(python3 -c 'import json,sys; nl=chr(10); c={k: "pass" for k in sys.argv[1].split(",")}; print(json.dumps({"build": "ok"+nl+"critical"+nl, "checked_on": "2026-11-21"+nl+"critical|MANUAL-INJECTED|x|y", "checks": c}))' "demo_account,live_backend,review_notes,screenshots_match_build,account_deletion_device_test,privacy_labels_match_runtime,iap_reachable_by_reviewer")"
+rd_case "rd-11 newlines in build or checked_on never forge a finding" "$J" "" 0 '7 of 7 attested' 'MANUAL-INJECTED'
+rr_has '^  \[CRITICAL\]' && bad "rd-11b no critical line appears" || ok "rd-11b no critical line appears"
+NA_PRIV="${ALLPASS/\"privacy_labels_match_runtime\":\"pass\"/\"privacy_labels_match_runtime\":\"n/a\"}"
+rd_case "rd-12 enforce rejects n/a on privacy even with a reason" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"notes\":{\"privacy_labels_match_runtime\":\"we collect nothing\"},\"checks\":{$NA_PRIV}}" "" 2 'MANUAL-PRIVACY-LABELS-MATCH-RUNTIME-UNVERIFIED' 'MANUAL-DEMO-ACCOUNT-UNVERIFIED'
+rd_case "rd-12b n/a without a reason is not accepted" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"n/a\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' ''
+NA_IAP="${ALLPASS/\"iap_reachable_by_reviewer\":\"pass\"/\"iap_reachable_by_reviewer\":\"n/a\"}"
+rd_case "rd-13 n/a with a reason in notes is accepted" "{\"enforce\":true,\"checked_on\":\"$TODAY\",\"notes\":{\"iap_reachable_by_reviewer\":\"no in-app purchases\"},\"checks\":{$NA_IAP}}" "" 0 '7 of 7 attested' 'UNVERIFIED'
+rd_case "rd-14 a far future checked_on is flagged" "{\"checked_on\":\"2099-01-01\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
+rd_case "rd-14b tomorrow counts as the future" "{\"checked_on\":\"$TOMORROW\",\"checks\":{$ALLPASS}}" "" 0 'date in the future' ''
+BS="$(printf '\134')"
+rd_case "rd-17 an escaped enforce key still enforces" "{\"en${BS}u0066orce\":true,\"checked_on\":\"$TODAY\",\"checks\":{}}" "" 2 'MANUAL-DEMO-ACCOUNT-UNVERIFIED' ''
+rd_case "rd-18 enforce inside notes does not enforce" "{\"checked_on\":\"$TODAY\",\"checks\":{},\"notes\":{\"enforce\":true}}" "" 0 '0 of 7 attested' 'UNVERIFIED'
+rd_case "rd-19 malformed notes never hide a recorded failure" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"notes\":[1]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-NOTES-INVALID' && ok "rd-19b the malformed notes are named" || bad "rd-19b the malformed notes are named"
+rd_case "rd-21 a checks list instead of an object blocks" '{"checks":[],"notes":{"enforce":true}}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-22 bad checks with an escaped top-level enforce blocks" "{\"en${BS}u0066orce\":true,\"checks\":[]}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-27 a repeated key never hides a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-DUPLICATE-KEY' && ok "rd-27b the repeated key is named" || bad "rd-27b the repeated key is named"
+rd_case "rd-28 a repeated checks object keeps the first object's fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-29 repeats at both levels keep a recorded fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\",\"demo_account\":\"pass\"},\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rd_case "rd-30 a malformed repeated checks entry keeps the valid fail" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":\"fail\"},\"checks\":[]}" "" 2 'MANUAL-DEMO-ACCOUNT-FAILED' ''
+rr_has 'MANUAL-READINESS-UNREADABLE' && ok "rd-30b the malformed entry is named" || bad "rd-30b the malformed entry is named"
+rd_case "rd-31 a trailing comma never hides a recorded fail" '{"checks":{"demo_account":"fail"},}' "" 2 'MANUAL-READINESS-UNREADABLE' ''
+rd_case "rd-32 a fail wrapped in a list blocks" "{\"checked_on\":\"$TODAY\",\"checks\":{\"demo_account\":[\"fail\"],\"demo_account\":\"pass\"}}" "" 2 'MANUAL-DEMO-ACCOUNT-INVALID' ''
+rd_case "rd-33 a checks list repeated with an object blocks" "{\"checked_on\":\"$TODAY\",\"checks\":[{\"demo_account\":\"fail\"}],\"checks\":{\"demo_account\":\"pass\"}}" "" 2 'MANUAL-READINESS-UNREADABLE' ''
+python3 -c 'import sys; open(sys.argv[1], "wb").write(("{\"checked_on\":\"%s\",\"checks\":{\"demo_account\":\"fail\"}}" % sys.argv[2]).encode("utf-16"))' "$D/.app-review-readiness.json" "$TODAY"
+rr_run "$D"
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && ok "rd-34 a UTF-16 file is read and its fail blocks" || bad "rd-34 a UTF-16 file is read and its fail blocks (rc=$RC)"
+python3 -c 'import sys; n = 600; open(sys.argv[1], "w").write("{\"checks\":{\"demo_account\":\"fail\"},\"build\":" + "{\"x\":" * n + "0" + ",\"x\":0}" * n + "}")' "$D/.app-review-readiness.json"
+rr_run "$D"
+[ "$RC" -eq 2 ] && rr_has '\[CRITICAL\][[:space:]]*MANUAL-' && ok "rd-35 a deeply nested build value never hides a recorded fail" || bad "rd-35 a deeply nested build value never hides a recorded fail (rc=$RC)"
+rm -f "$D/.app-review-readiness.json"; mkdir "$D/.app-review-readiness.json"; rr_run "$D"; rmdir "$D/.app-review-readiness.json"
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-36 a folder named like the readiness file blocks, never reads as absent" || bad "rd-36 a folder named like the readiness file blocks, never reads as absent (rc=$RC)"
+ln -s missing-target.json "$D/.app-review-readiness.json"; rr_run "$D"; rm -f "$D/.app-review-readiness.json"
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-37 a broken symlink named like the readiness file blocks" || bad "rd-37 a broken symlink named like the readiness file blocks (rc=$RC)"
+python3 -c 'import sys; open(sys.argv[1], "wb").write(b"{\"checks\":{\"demo_account\":\"fail\"}," + b"\"x\":0," * 200000 + b"\"x\":0}")' "$D/.app-review-readiness.json"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$("$TO" 45 bash "$GUARD" "$D" 2>&1)"; RC=$?; else rr_run "$D"; fi
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 45 ] && ok "rd-38 200000 repeated keys still block quickly" || bad "rd-38 200000 repeated keys still block quickly (rc=$RC, $((SECONDS - T0))s)"
+rm -f "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+PYSHIM="$(mktemp -d)"; REAL_PY="$(command -v python3)"
+printf '#!/bin/sh\nif [ "$1" = "-" ] && [ "${2:-}" = "%s" ]; then mv "$2" "$2.saved"; mkfifo "$2"; fi\nexec "%s" "$@"\n' "$D/.app-review-readiness.json" "$REAL_PY" > "$PYSHIM/python3"; chmod +x "$PYSHIM/python3"
+TO="$(command -v timeout || command -v gtimeout || true)"
+if [ -n "$TO" ]; then OUT="$(PATH="$PYSHIM:$PATH" "$TO" 30 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PATH="$PYSHIM:$PATH" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'MANUAL-READINESS-UNREADABLE' && [ "$RC" -eq 2 ] && ok "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs" || bad "rd-39 a readiness file swapped for a FIFO before the read blocks, never hangs (rc=$RC)"
+rm -rf "$PYSHIM" "$D/.app-review-readiness.json" "$D/.app-review-readiness.json.saved"
+python3 -c 'import sys; open(sys.argv[1], "wb").write(b"{\"checks\":{\"demo_account\":\"fail\"},\"pad\":\"" + b"x" * (9 * 1024 * 1024) + b"\"}")' "$D/.app-review-readiness.json"
+rr_run "$D"
+rr_has 'larger than 8 MiB' && [ "$RC" -eq 2 ] && ok "rd-40 a readiness file over 8 MiB blocks without being parsed" || bad "rd-40 a readiness file over 8 MiB blocks without being parsed (rc=$RC)"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+STALL="$(mktemp -d)"
+printf 'import os, time\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(60)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$STALL/sitecustomize.py"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-41 a stalled read ends in a block within its deadline" || bad "rd-41 a stalled read ends in a block within its deadline (rc=$RC, $((SECONDS - T0))s)"
+rm -rf "$STALL" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+STALL="$(mktemp -d)"
+printf 'import os, signal, time\ndel signal.SIGALRM\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(60)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$STALL/sitecustomize.py"
+TO="$(command -v timeout || command -v gtimeout || true)"; T0=$SECONDS
+if [ -n "$TO" ]; then OUT="$(PYTHONPATH="$STALL" "$TO" 40 bash "$GUARD" "$D" 2>&1)"; RC=$?; else OUT="$(PYTHONPATH="$STALL" bash "$GUARD" "$D" 2>&1)"; RC=$?; fi
+rr_has 'could not be read within 10 seconds' && [ "$RC" -eq 2 ] && [ $((SECONDS - T0)) -lt 40 ] && ok "rd-42 without SIGALRM a stalled read still blocks within its deadline" || bad "rd-42 without SIGALRM a stalled read still blocks within its deadline (rc=$RC, $((SECONDS - T0))s)"
+rm -rf "$STALL" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$D/.app-review-readiness.json"
+SLOWEXIT="$(mktemp -d)"
+printf 'import atexit, signal, time\ndel signal.SIGALRM\natexit.register(time.sleep, 12)\n' > "$SLOWEXIT/sitecustomize.py"
+OUT="$(PYTHONPATH="$SLOWEXIT" bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has '7 of 7 attested' && ! rr_has 'within 10 seconds' && [ "$RC" -eq 0 ] && ok "rd-43 a slow exit after a clean read never reports a false timeout" || bad "rd-43 a slow exit after a clean read never reports a false timeout (rc=$RC)"
+rm -rf "$SLOWEXIT" "$D/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$D/.app-review-readiness.json"
+WD="$(mktemp -d)"
+printf 'import os, signal, time\ndel signal.SIGALRM\n_o = os.open\ndef _slow(p, *a, **k):\n    if str(p).endswith(".app-review-readiness.json"):\n        time.sleep(12)\n    return _o(p, *a, **k)\nos.open = _slow\n' > "$WD/sitecustomize.py"
+python3 -c 'import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+start = src.index("<<'"'"'PYR'"'"'\n") + len("<<'"'"'PYR'"'"'\n")
+open(sys.argv[2], "w", encoding="utf-8").write(src[start:src.index("\nPYR\n", start)])' "$GUARD" "$WD/reader.py"
+python3 -c 'import os, subprocess, sys, time
+env = dict(os.environ, PYTHONPATH=sys.argv[2])
+child = subprocess.Popen([sys.executable, sys.argv[1], sys.argv[3], "0", ""], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
+child.stdout.close()
+try:
+    child.wait(timeout=25)
+except subprocess.TimeoutExpired:
+    child.kill()
+    sys.exit(1)' "$WD/reader.py" "$WD" "$D/.app-review-readiness.json"
+[ $? -eq 0 ] && ok "rd-44 a watchdog whose output pipe is closed still ends the reader" || bad "rd-44 a watchdog whose output pipe is closed still ends the reader"
+rm -rf "$WD" "$D/.app-review-readiness.json"
+rm -rf "$D"
+
+# Readiness is read per app in a monorepo, with the workspace file as the fallback.
+M="$(mk_expo_mono)"; rm -f "$M/apps/app/ios/App/A.swift"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/apps/app/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/kiosk/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'MANUAL-DEMO-ACCOUNT-FAILED.*apps/kiosk' && rr_has 'Manual checks for apps/app. 7 of 7' && [ "$RC" -eq 2 ] && ok "rd-15 a failure recorded for one app in a monorepo blocks and names it" || bad "rd-15 a failure recorded for one app in a monorepo blocks and names it (rc=$RC)"
+rm -f "$M/apps/kiosk/.app-review-readiness.json"; printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'Manual checks for apps/kiosk/ios. 7 of 7 attested.*from the workspace file' && [ "$RC" -eq 0 ] && ok "rd-16 an app with no file falls back to the workspace file and says so" || bad "rd-16 an app with no file falls back to the workspace file and says so (rc=$RC)"
+rm -rf "$M"
+# Only the scanned folder's file is read. Any other one is named, so it is never silently used.
+M="$(mktemp -d)"; mkdir -p "$M/apps/mobile/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$M/apps/mobile/App/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$M/apps/mobile/App/PrivacyInfo.xcprivacy"
+printf 'let a = 1\n' > "$M/apps/mobile/App/A.swift"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'not read, for example apps/mobile/.app-review-readiness.json' && ! rr_has 'MANUAL-DEMO' && [ "$RC" -eq 0 ] && ok "rd-20 a readiness file in a nested folder is named as not read, never silently used" || bad "rd-20 a readiness file in a nested folder is named as not read, never silently used (rc=$RC)"
+rm -rf "$M"
+# A readiness file in a dependency or the docs never counts.
+M="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; mkdir -p "$M/node_modules/pkg"
+printf '{"checks":{"demo_account":"fail"}}' > "$M/node_modules/pkg/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && rr_has '^CLEAR\.' && ! rr_has 'MANUAL-DEMO' && ok "rd-23 a readiness file inside node_modules is never read" || bad "rd-23 a readiness file inside node_modules is never read (rc=$RC)"
+rm -rf "$M/node_modules"; mkdir -p "$M/docs"; printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/docs/.app-review-readiness.json"
+OUT="$(APP_STORE_GUARD_REQUIRE_READINESS=1 bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && rr_has 'MANUAL-READINESS-MISSING' && ok "rd-24 a passing file in docs never stands in for the app" || bad "rd-24 a passing file in docs never stands in for the app (rc=$RC)"
+rm -rf "$M"
+M="$(mktemp -d)"; R="$M/apps/team/products/mobile/release"; mkdir -p "$R/App"
+printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$R/App/Info.plist"
+printf '%s' "$PLIST_EMPTY" > "$R/App/PrivacyInfo.xcprivacy"; printf 'let a = 1\n' > "$R/App/A.swift"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$R/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && rr_has 'not read, for example apps/team/products/mobile/release' && ok "rd-25 a readiness file six folders deep is named as not read" || bad "rd-25 a readiness file six folders deep is named as not read (rc=$RC)"
+rm -rf "$M"
+M="$(mk_rr_ios "$PP_KEYS" 'let ready = true')"; mkdir -p "$M/apps/mobile/App"; cp "$M/App/Info.plist" "$M/apps/mobile/App/"
+printf '{"checked_on":"%s","checks":{%s}}' "$TODAY" "$ALLPASS" > "$M/.app-review-readiness.json"
+printf '{"checked_on":"%s","checks":{"demo_account":"fail"}}' "$TODAY" > "$M/apps/mobile/.app-review-readiness.json"
+OUT="$(bash "$GUARD" "$M" 2>&1)"; RC=$?
+rr_has 'Manual checks for this project. 7 of 7' && rr_has 'not read, for example apps/mobile/.app-review-readiness.json' && ok "rd-26 the scanned folder's file is used and a nested one is named" || bad "rd-26 the scanned folder's file is used and a nested one is named (rc=$RC)"
+rm -rf "$M"
+
+# A long multi-line hook command cannot hide its submit from the detector.
+D="$(mk_ios_bad)"
+PAYLOAD="$(python3 -c 'import json; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "fastlane deliver\n" + "echo harmless\n" * 20000}}))')"
+OUT="$(printf '%s' "$PAYLOAD" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; RC=$?
+[ "$RC" -eq 2 ] && rr_has 'App Store Compliance Guard' && ok "hk-1 a submit followed by 20000 lines is still scanned and blocked" || bad "hk-1 a submit followed by 20000 lines is still scanned and blocked (rc=$RC bytes=${#OUT})"
+rm -rf "$D"
+
+# A Podfile below iOS 13 is found even when other Podfiles in the tree are fine.
+D="$(mk_ios_clean)"; mkdir -p "$D/a" "$D/b" "$D/c" "$D/d"
+printf "platform :ios, '11.0'\n" > "$D/a/Podfile"
+for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

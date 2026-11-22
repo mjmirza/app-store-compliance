@@ -1,6 +1,6 @@
 {
-  "version": "2.4.0",
-  "updated": "2026-11-15",
+  "version": "2.5.0",
+  "updated": "2026-11-21",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -2022,6 +2022,15 @@
       ],
       "fix": "Add arm64-v8a, and x86_64 when x86 ships, to abiFilters.",
       "added": "2026-11-15"
+    },
+    {
+      "id": "APPLE-5.1.1-PRE-PROMPT-ALLOW-BUTTON",
+      "platform": "apple",
+      "guideline": "5.1.1(iv)",
+      "title": "Possible pre-permission screen with a button titled Allow",
+      "severity": "medium",
+      "detection": "Automated. The guard flags a button titled Allow or Allow plus a noun (SwiftUI Button with a string title, UIKit or Objective-C setTitle, or a React Native Button title) in an Apple source file that also requests a permission. It ignores comments in the common forms and Android-only files. A comment marker inside a Swift multiline raw string or a JavaScript regex literal can hide a button, and a comment inside a template literal interpolation can still be read. A button and a request in one file is evidence, not proof, so the finding is reported as possible. A permission requested from another file, and a SwiftUI button whose label is a separate Text view, are not seen. Manual. A Close or Cancel action on the pre-alert screen, an incentive, or an image of the system alert. Apple's Human Interface Guidelines say a custom screen that takes advantage of quick taps to influence the choice leads to rejection.",
+      "fix": "Give the pre-alert screen one button titled Continue or Next that opens the system alert, with no incentive and no image of the alert. Do not offer Close or Cancel there, unless the screen also collects legally required consent, which Apple allows. Where possible, offer a way to use the app without the permission (5.1.1(iv)). A Settings toggle or a plain label that says Allow is fine. Sources. https://developer.apple.com/design/human-interface-guidelines/privacy, https://developer.apple.com/app-store/review/guidelines/#5.1.1"
     }
   ]
 }

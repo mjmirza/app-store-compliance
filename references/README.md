@@ -5,7 +5,7 @@ A structured, AI loadable reference tree. Load the rule category and the app typ
 ## Rules by category
 
 - [rules/metadata.md](rules/metadata.md). Metadata and store listing. 11 rules
-- [rules/privacy.md](rules/privacy.md). Privacy and data. 18 rules
+- [rules/privacy.md](rules/privacy.md). Privacy and data. 19 rules
 - [rules/payments.md](rules/payments.md). Payments, in app purchase, subscriptions. 11 rules
 - [rules/design.md](rules/design.md). Design and login. 6 rules
 - [rules/performance.md](rules/performance.md). Performance and completeness. 34 rules
