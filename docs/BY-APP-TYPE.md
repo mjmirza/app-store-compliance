@@ -31,6 +31,7 @@ A games app and a finance app fail review for very different reasons. This doc r
 - The developer acts on an objectionable content report within 24 hours by removing the content and ejecting the user. Apple 1.2.
 - Published contact information.
 - For AI generated output, the same moderation applies. The model is a content source. Apple 1.2 and Google AI Generated Content.
+- China mainland App Store. An app that enables end-to-end encrypted instant messaging there answers the Security Assessment declaration on App Compliance, including No when that feature is absent, disabled, or geoblocked. The evidence, the failure mode, and the 31 January 2027 date for existing apps are in the AI and generative apps section and in docs/GLOBAL-REGULATORY-2026.md section 3.9.
 
 ## Kids category and families
 
@@ -76,6 +77,7 @@ A games app and a finance app fail review for very different reasons. This doc r
 - Self harm and crisis safeguards for a companion or character AI.
 - Not a thin wrapper over a third party model with no added value. Apple 4.2 and 4.3.
 - In a China storefront, references to external AI services such as ChatGPT or Gemini can trigger a regional rejection.
+- China mainland App Store. Every app on that storefront answers both App Compliance declarations, including an app that selects No because the feature is absent, disabled, or geoblocked there. The role is Account Holder or Admin, under General. AI-Generated or Synthetic Content covers services such as AI chatbots, image or video generation, and voice and face alteration. A Yes answer needs the approved filing number and registered filing name. If someone else's technology powers the feature, the authorization or usage agreement names the registered foundation model or algorithm and its filing number, names you or your organization as the authorized party, and names an authorizing entity that matches the Cyberspace Administration of China approval registry. Security Assessment covers features such as distributing that content or end-to-end encrypted instant messaging. A Yes answer needs a National Internet Security Management Service Platform screenshot showing the app name, the provider name, and pass or passed review, plus the report with the app name, the provider name, and the company seal or chop. Statuses are Missing Info, Pending Verification, Verification Failed, and Active. If verification fails, the app ships in other selected regions and stays off the China mainland store until a corrected declaration is reviewed with the next version and accepted. Existing apps must be completed and verified by 31 January 2027 to stay available. Source. [Apple, China mainland compliance](https://developer.apple.com/help/app-store-connect/manage-compliance-information/view-china-mainland-compliance-information/).
 - A reviewer demo account needs a high or unlimited quota so the feature can be exercised.
 
 ## Crypto, finance, and trading

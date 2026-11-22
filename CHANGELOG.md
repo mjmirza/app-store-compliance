@@ -6,6 +6,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Added
 
+- `APPLE-CN-APP-COMPLIANCE-2027`. Every app available on the App Store in China mainland must complete the App Compliance declarations for AI-Generated or Synthetic Content and for Security Assessment, including an app that answers No. Existing apps must be completed and verified by 31 January 2027 to remain available. A failed verification releases the app elsewhere and leaves it unavailable in China mainland. Read on App Store Connect Help on 22 November 2026. TechNode, citing IT Home, reported the page on 17 November 2026.
 - `GOOGLE-PLAY-TRADER-STATUS-2027`. Every active Google Play developer account must declare trader or non-trader status. Existing accounts must do so by 1 February 2027. A missing declaration may block updates and remove the app globally. Read on Play Console Help answer 17594752 on 19 November 2026. The 29 October 2026 announcement (answer 18100766) says the declaration starts in November 2026 and does not state this date. This is separate from `EU-DSA-TRADER-STATUS` (Apple, enforced 17 February 2025) and from `GOOGLE-TECH-QUALITY-FEB-2027`.
 - `GOOGLE-PLAY-MARKETPLACE-DISPLAY-2027`. From 1 March 2027 Play uses an online marketplace model in the EEA and the UK. Where the account declared as a trader, users everywhere see contact details, the D-U-N-S number, and a terms link if one was provided. EEA and UK users also see the trader name in place of Google in Offered by. Same Play Console page.
 
