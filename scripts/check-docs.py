@@ -134,13 +134,12 @@ def main():
     files = markdown_files()
     for path in files:
         problems.extend(check_file(path))
-    # A Windows checkout is CRLF, and an absolute Windows path is not a path bash can
-    # open, so parse the source from stdin with LF endings instead of naming a file.
-    # The bytes go in as bytes: text mode would rewrite every LF back to CRLF on Windows.
+    # Bash cannot open an absolute Windows path, so feed it the bytes on stdin. Only CRLF
+    # is folded, so a bare CR or a non-UTF-8 byte reaches bash exactly as it is on disk.
     install_sh = os.path.join(ROOT, "scripts", "install.sh")
     if os.path.exists(install_sh):
-        with open(install_sh, encoding="utf-8") as f:
-            source = f.read().replace("\r\n", "\n").encode("utf-8")
+        with open(install_sh, "rb") as f:
+            source = f.read().replace(b"\r\n", b"\n")
         syntax = subprocess.run(["bash", "-n"], input=source, capture_output=True)
         if syntax.returncode != 0:
             problems.append("scripts/install.sh does not parse")

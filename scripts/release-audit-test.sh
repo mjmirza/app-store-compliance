@@ -106,13 +106,30 @@ OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" 
 [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "a clean pulled listing passed with --metadata reaches CLEAR" || bad "a clean pulled listing passed with --metadata reaches CLEAR (rc=$RC)"
 
 # The audit starts its Python children on the interpreter running it, never on the name python3.
-python3 - <<'PYT' && ok "the audit starts its children on sys.executable" || bad "the audit starts its children on sys.executable"
-import importlib.util, os, sys
+APP_STORE_GUARD_PATH="$STUB_PASS" python3 - "$NOMETA" <<'PYT' && ok "the audit starts validate.py on sys.executable" || bad "the audit starts validate.py on sys.executable"
+import importlib.util, sys
 spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
 ra = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ra)
-cmd = ra.python_cmd("scripts/validate.py")
-sys.exit(0 if cmd == [sys.executable, "scripts/validate.py"] and os.path.isabs(cmd[0]) else 1)
+calls = []
+ra.run_command = lambda args, cwd=None: (calls.append(list(args)), (1, "", "stub"))[1]
+sys.argv = ["release-audit.py", sys.argv[1]]
+ra.main()
+sys.exit(0 if calls and calls[0][:2] == [sys.executable, "scripts/validate.py"] else 1)
+PYT
+
+# Where python3 is missing, the children find a shim that runs this interpreter.
+python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
+import importlib.util, os, subprocess, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+ra.shutil.which = lambda name: None
+env = ra.child_env()
+shim_dir = env["PATH"].split(os.pathsep)[0]
+out = subprocess.run([os.path.join(shim_dir, "python3"), "-c", "import sys; print(sys.executable)"],
+                     capture_output=True, text=True, env=env).stdout.strip()
+sys.exit(0 if os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
 PYT
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
