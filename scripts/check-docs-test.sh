@@ -23,6 +23,26 @@ printf '# T\n\n[guide](docs/GUIDE.md#first-step) and `docs/GUIDE.md`.\n\n<img sr
 OUT="$(run)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "0 problem" && ok "a clean tree passes" || bad "a clean tree passes (rc=$RC)"
 
+# A Windows working tree is CRLF. The parse step must not depend on the checkout's endings.
+printf '#!/usr/bin/env bash\r\ncase "${1:-x}" in\r\n  x) echo ok ;;\r\nesac\r\n' > "$T/scripts/install.sh"
+OUT="$(run)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "0 problem" && ok "a CRLF install.sh with a case statement parses" || bad "a CRLF install.sh with a case statement parses (rc=$RC)"
+
+printf '#!/usr/bin/env bash\nif true; then\necho ok\n' > "$T/scripts/install.sh"
+OUT="$(run)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "install.sh does not parse" && ok "an install.sh that does not parse is still reported" || bad "an install.sh that does not parse is still reported (rc=$RC)"
+
+# A bare CR is invalid to bash, so it must still be reported. Only CRLF is folded.
+printf 'case x in\nx) true ;;\nesac\r' > "$T/scripts/install.sh"
+OUT="$(run)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "install.sh does not parse" && ok "a bare CR in install.sh is still reported" || bad "a bare CR in install.sh is still reported (rc=$RC)"
+
+# A non-UTF-8 byte in a comment is valid bash, and bash must receive it as bytes.
+printf '#!/usr/bin/env bash\n# caf\351\necho ok\n' > "$T/scripts/install.sh"
+OUT="$(run)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "0 problem" && ok "a non-UTF-8 comment byte in install.sh parses" || bad "a non-UTF-8 comment byte in install.sh parses (rc=$RC)"
+printf '#!/usr/bin/env bash\necho ok\n' > "$T/scripts/install.sh"
+
 expect_fail "a link to a missing file fails" '[x](docs/NOPE.md)' "docs/NOPE.md"
 expect_fail "a link to a missing heading fails" '[x](docs/GUIDE.md#no-such-part)' "no-such-part"
 expect_fail "a missing image fails" '<img src="assets/gone.png" alt="x" />' "assets/gone.png"

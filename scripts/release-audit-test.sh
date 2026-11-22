@@ -106,6 +106,69 @@ printf '{"privacy_policy_url":"https://lumina.app/privacy","support_url":"https:
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" --metadata "$MD" 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "a clean pulled listing passed with --metadata reaches CLEAR" || bad "a clean pulled listing passed with --metadata reaches CLEAR (rc=$RC)"
 
+# The audit starts its Python children on the interpreter running it, never on the name python3.
+APP_STORE_GUARD_PATH="$STUB_PASS" python3 - "$NOMETA" <<'PYT' && ok "the audit starts validate.py on sys.executable" || bad "the audit starts validate.py on sys.executable"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+calls = []
+ra.run_command = lambda args, cwd=None: (calls.append(list(args)), (1, "", "stub"))[1]
+sys.argv = ["release-audit.py", sys.argv[1]]
+ra.main()
+sys.exit(0 if calls and calls[0][:2] == [sys.executable, "scripts/validate.py"] else 1)
+PYT
+
+# Where python3 is missing, the children find a shim that runs this interpreter.
+NOPY="$(mktemp -d)"
+NOPY_DIR="$NOPY" BASH_EXE="$(command -v bash)" python3 - <<'PYT' && ok "a missing python3 gets a shim that runs this interpreter" || bad "a missing python3 gets a shim that runs this interpreter"
+import importlib.util, os, subprocess, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+nopy = os.environ["NOPY_DIR"]
+os.environ["PATH"] = nopy
+env = ra.child_env()
+shim_dir = env["PATH"].split(os.pathsep)[0]
+fresh = os.path.basename(shim_dir).startswith("asc-python3-") and env["PATH"].endswith(os.pathsep + nopy)
+out = subprocess.run([os.environ["BASH_EXE"], "-c", "python3 -c 'import sys; print(sys.executable)'"],
+                     capture_output=True, text=True, env=env).stdout.strip()
+sys.exit(0 if fresh and os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
+PYT
+
+# An unset PATH falls back to os.defpath, which starts with "." on Windows. Neither branch may search the current folder.
+NOPY_DIR="$NOPY" PYDIR="$(dirname "$(command -v python3)")" python3 - <<'PYT' && ok "an unset PATH never adds the current folder" || bad "an unset PATH never adds the current folder"
+import importlib.util, os, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+os.environ.pop("PATH", None)
+ok = True
+for found in (os.environ["PYDIR"], os.environ["NOPY_DIR"]):
+    os.defpath = os.pathsep.join([".", "", found])
+    parts = ra.child_env()["PATH"].split(os.pathsep)
+    ok = ok and "." not in parts and "" not in parts and found in parts
+sys.exit(0 if ok else 1)
+PYT
+rm -rf "$NOPY"
+
+# On Windows the shim is always made, so a python3 found on PATH or in the current folder cannot replace it.
+DECOY="$(mktemp -d)"; printf '#!/bin/sh\necho decoy\n' > "$DECOY/python3"; chmod +x "$DECOY/python3"
+DECOY_DIR="$DECOY" BASH_EXE="$(command -v bash)" python3 - <<'PYT' && ok "on Windows the shim wins over another python3" || bad "on Windows the shim wins over another python3"
+import importlib.util, os, subprocess, sys
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+ra = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ra)
+os.environ["PATH"] = os.environ["DECOY_DIR"]
+os.name = "nt"
+env = ra.child_env()
+os.name = "posix"
+out = subprocess.run([os.environ["BASH_EXE"], "-c", "python3 -c 'import sys; print(sys.executable)'"],
+                     capture_output=True, text=True, env=env).stdout.strip()
+sys.exit(0 if os.path.realpath(out) == os.path.realpath(sys.executable) else 1)
+PYT
+rm -rf "$DECOY"
+
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
 [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "Overall Status: INCOMPLETE" && echo "$OUT" | grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
 

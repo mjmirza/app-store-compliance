@@ -2,11 +2,15 @@
 """Release readiness audit. Usage. release-audit.py <app-dir> [--metadata <pulled-listing-dir>]
 Exit 0 clear, 2 blocked on a critical or high finding, 3 incomplete scan, 1 bad input."""
 
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 import subprocess
 import json
 import re
+import shlex
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUARD_NAME = "app-store-compliance-guard.sh"
@@ -166,9 +170,41 @@ def decide_status(findings, problems):
     return "PASSED", 0
 
 
+def python_cmd(script, *args):
+    """The interpreter running this audit, never a guessed name like python3 (#2333)."""
+    return [sys.executable, script, *args]
+
+
+def child_env():
+    """The test suites call python3 by name. Where it is missing (Windows), a shim
+    first on PATH runs this interpreter instead (#2333)."""
+    env = dict(os.environ)
+    # An empty entry or "." searches the current folder, and Windows os.defpath starts with ".".
+    raw = env.get("PATH") or os.defpath
+    env["PATH"] = os.pathsep.join(p for p in raw.split(os.pathsep) if p and p != ".")
+    # Windows which() also searches the current folder, so a stray python3.exe there must not skip the shim.
+    if os.name != "nt" and shutil.which("python3", path=env["PATH"]):
+        return env
+    shim_dir = tempfile.mkdtemp(prefix="asc-python3-")
+    atexit.register(shutil.rmtree, shim_dir, True)
+    shim = os.path.join(shim_dir, "python3")
+    exe = sys.executable.replace(chr(92), "/") if os.name == "nt" else sys.executable
+    with open(shim, "w", encoding="utf-8", newline="\n") as f:
+        f.write('#!/bin/sh\nexec %s "$@"\n' % shlex.quote(exe))
+    os.chmod(shim, 0o755)
+    env["PATH"] = shim_dir + (os.pathsep + env["PATH"] if env["PATH"] else "")
+    return env
+
+
+CHILD_ENV = None
+
+
 def run_command(args, cwd=ROOT):
+    global CHILD_ENV
     try:
-        res = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+        if CHILD_ENV is None:
+            CHILD_ENV = child_env()
+        res = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=CHILD_ENV)
         return res.returncode, res.stdout, res.stderr
     except Exception as e:
         return -1, "", str(e)
@@ -394,7 +430,7 @@ def main():
     # --- Step 1. Run Internal Validation and Test Engines ---
     print("Step 1 of 2. Checking the playbook itself first. This takes about two minutes.", flush=True)
 
-    val_code, val_out, val_err = run_command(["python3", "scripts/validate.py"])
+    val_code, val_out, val_err = run_command(python_cmd("scripts/validate.py"))
     if val_code != 0:
         print("  ERROR: validate.py failed")
         print(val_out)
@@ -433,7 +469,7 @@ def main():
     # Run metadata-audit.py
     # The pulled listing from --metadata when given, otherwise the app folder itself
     meta_code, meta_out, meta_err = run_command(
-        ["python3", "scripts/metadata-audit.py", meta_dir or target_dir]
+        python_cmd("scripts/metadata-audit.py", meta_dir or target_dir)
     )
 
     patterns_dict = load_patterns()
