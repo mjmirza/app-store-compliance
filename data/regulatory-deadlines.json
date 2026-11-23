@@ -1664,6 +1664,21 @@
       "source_url": "https://developer.apple.com/help/app-store-connect/manage-compliance-information/view-china-mainland-compliance-information/",
       "verified_on": "2026-11-22",
       "source_note": "Read on Apple App Store Connect Help, View China mainland compliance information, on 22 November 2026. That page states the 31 January 2027 date for existing apps, the Yes and No answers (including disabled or geoblocked), the evidence for each declaration, the four statuses, and that the app is released in other selected countries and regions but stays unavailable in China mainland until verification succeeds. A failed verification is corrected on the App Compliance page and reviewed with the next submitted version. The page does not state the day the declarations appeared, and it does not say that a new app must supply them at submission. TechNode on 17 November 2026 reports the page and, citing IT Home the same day, says a new app must provide the information at submission while existing apps have until 31 January 2027. IT Home says developers reported the new fields the day before. effective_date is the TechNode report date, not a date printed on Apple's page. https://technode.com/2026/11/17/apple-adds-generative-ai-compliance-filings-to-app-store-connect-in-china/ https://www.ithome.com/1/028/158.htm"
+    },
+    {
+      "id": "KR-PIPA-SELF-TRANSMISSION-2027",
+      "jurisdiction": "South Korea",
+      "law": "Personal Information Protection Act Article 35-2(1), Enforcement Decree Article 42-2(1)(1) as amended by Presidential Decree No. 36121 (19 February 2026)",
+      "requirement": "From 20 February 2027 a private personal information handler whose average revenue under the Framework Act on Small and Medium Enterprises Enforcement Decree exceeds KRW 180 billion, and which processes the personal information of 1 million or more data subjects or the sensitive or unique identifying information of 50,000 or more (daily average over the last three months of the previous year), must transmit a data subject's personal information to that data subject on request. Schools and medical institutions are excluded. The handler transmits without delay, encrypted with a secure algorithm, keeps the data accurate, complete and current, accepts an agent's automated tool on a method agreed in advance, and publishes on its website how to make the request and check its status and history (Decree Article 42-6). A large app operator serving Korean users plans the request flow, the export format and the agent interface before that date.",
+      "effective_date": "2027-02-20",
+      "grace_period": "none",
+      "mandatory_date": "2027-02-20",
+      "enforcement_date": "2027-02-20",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
+      "priority": "medium",
+      "source_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283503",
+      "verified_on": "2026-11-23",
+      "source_note": "law.go.kr loads the decree body by script. The text of Decree No. 36121 was read from its body endpoint for the same lsiSeq. Its Supplementary Provisions put the decree in force six months after promulgation (20 August 2026) and Article 42-2(1)(1) one year after promulgation, and law.go.kr annotates that item [시행일: 2027. 2. 20.]."
     }
   ]
 }

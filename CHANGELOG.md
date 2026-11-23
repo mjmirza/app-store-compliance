@@ -4,6 +4,10 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Added
+
+- `KR-PIPA-SELF-TRANSMISSION-2027`. From 20 February 2027 a private handler in Korea with average revenue over KRW 180 billion that processes the personal information of 1 million or more data subjects, or the sensitive or unique identifying information of 50,000 or more, must transmit a data subject's personal information to that data subject on request, encrypted and without delay, and publish how to ask. Read on law.go.kr in Enforcement Decree No. 36121 (19 February 2026), whose Supplementary Provisions start Article 42-2(1)(1) one year after promulgation. The earlier MyData stages (13 March 2025, 1 June 2026, 20 August 2026) have passed and are described in `docs/GLOBAL-REGULATORY-2026.md` section 3.5. This closes the Korea item left open in #659.
+
 ### Fixed
 
 - `scripts/metadata-audit.py` no longer reports a rule word hidden inside a longer word. Freeform, Freelance, and Freedom Journal were HIGH price claims, Todoist and the Spanish "Todos" were placeholder text, and "desktop app" was the ranking claim "top app". Short everyday terms now need a word break, where a space, punctuation, a digit, a non-ASCII letter, or a case change counts, so FreeToUse, VPNfree, TODO123, and Android版 still fire. Brand names, long terms, and terms with digits or punctuation keep matching anywhere, so Androidille, Geminin, and #1notepad still fire. `freeware` and `freemium` are listed as price claims. Reported and fixed by @dajiaohuang (#2371). Eight adversarial review rounds checked that real rejection text caught before is still caught, across 35,840 comparisons.
