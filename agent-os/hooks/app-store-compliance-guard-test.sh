@@ -3517,6 +3517,28 @@ for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
 rm -rf "$D"
+
+# Sign in with Apple in React Native and Expo apps. The JS libraries never name SignInWithApple or
+# ASAuthorizationAppleIDProvider in app code, so the 4.8 check must also know their packages and calls.
+mk_rn_social() {  # $1 = package.json dependencies, $2 = sign-in code
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '<plist/>' > "$d/ios/App/Info.plist"
+  printf '{"name":"t","dependencies":{"react-native":"0.80.0"%s}}\n' "$1" > "$d/package.json"
+  printf 'import { GoogleSignIn } from "./google"\n%s\n' "$2" > "$d/src/signIn.ts"
+  echo "$d"
+}
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'const r = await appleAuth.performRequest({ requestedOperation: appleAuth.Operation.LOGIN })')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-1 React Native Sign in with Apple (react-native-apple-authentication) counts" || bad "siwa-1 React Native Sign in with Apple (react-native-apple-authentication) counts"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'const c = await AppleAuthentication.signInAsync({ requestedScopes: [] })')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-2 Expo Sign in with Apple (expo-apple-authentication) counts" || bad "siwa-2 Expo Sign in with Apple (expo-apple-authentication) counts"
+rm -rf "$D"
+D="$(mk_rn_social '' 'export const signIn = () => GoogleSignIn.signIn()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-3 social login with no Sign in with Apple at all is still flagged" || bad "siwa-3 social login with no Sign in with Apple at all is still flagged"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

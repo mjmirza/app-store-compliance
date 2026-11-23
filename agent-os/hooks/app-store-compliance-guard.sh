@@ -930,7 +930,9 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    # React Native and Expo apps sign in with Apple through a JS library that never names the native
+    # classes in app code, so its package and its sign-in call count as Sign in with Apple too.
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider|react-native-apple-authentication|expo-apple-authentication|appleAuth\.performRequest|AppleAuthentication\.signInAsync' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then
