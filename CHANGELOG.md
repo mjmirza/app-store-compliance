@@ -4,6 +4,10 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Added
+
+- `APPLE-MIN-DEPLOYMENT-TARGET-IOS15`. Starting April 2027, iOS and iPadOS apps uploaded to App Store Connect must be built with the iOS & iPadOS 27 SDK or later and must target iOS 15 or later. Apple named the month only, so the deadline is 1 April 2027. The Upcoming Requirements page still lists only the iOS 13 floor, in force since 9 September 2026, and the 9 September 2026 submissions news post states the SDK floors without a deployment target. The guard warns, and does not block, when the app target is iOS 13 or 14. Read on Apple's Submitting page on 23 November 2026.
+
 ### Fixed
 
 - `scripts/metadata-audit.py` no longer reports a rule word hidden inside a longer word. Freeform, Freelance, and Freedom Journal were HIGH price claims, Todoist and the Spanish "Todos" were placeholder text, and "desktop app" was the ranking claim "top app". Short everyday terms now need a word break, where a space, punctuation, a digit, a non-ASCII letter, or a case change counts, so FreeToUse, VPNfree, TODO123, and Android版 still fire. Brand names, long terms, and terms with digits or punctuation keep matching anywhere, so Androidille, Geminin, and #1notepad still fire. `freeware` and `freemium` are listed as price claims. Reported and fixed by @dajiaohuang (#2371). Eight adversarial review rounds checked that real rejection text caught before is still caught, across 35,840 comparisons.

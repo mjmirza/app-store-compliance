@@ -1,6 +1,6 @@
 {
   "version": "2.5.1",
-  "updated": "2026-11-22",
+  "updated": "2026-11-23",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -483,7 +483,7 @@
       "id": "APPLE-SDK-27-REQ",
       "jurisdiction": "Apple App Store (Global)",
       "law": "Apple App Store Submission Requirements",
-      "requirement": "Starting April 2027 apps and games uploaded to App Store Connect must be built with the iOS 27 and iPadOS 27 SDK or later, and the matching tvOS 27, visionOS 27, and watchOS 27 SDKs. Apple has published the month only, no exact day, so this entry is tracked as 1 April 2027 and must be re-checked when Apple names the date. macOS is not in Apple's list. Announced 9 September 2026 with the Xcode 27 Release Candidate. Source https://developer.apple.com/news/?id=k1mtkt1k",
+      "requirement": "Starting April 2027 apps and games uploaded to App Store Connect must be built with the iOS 27 and iPadOS 27 SDK or later, and the matching tvOS 27, visionOS 27, and watchOS 27 SDKs. Apple has published the month only, no exact day, so this entry is tracked as 1 April 2027 and must be re-checked when Apple names the date. macOS is not in Apple's list. Announced 9 September 2026 with the Xcode 27 Release Candidate. The Submitting page states the same April 2027 minimum requirements and adds that iOS and iPadOS apps must target iOS 15 or later, tracked as APPLE-MIN-DEPLOYMENT-TARGET-IOS15. Source https://developer.apple.com/news/?id=k1mtkt1k",
       "effective_date": "2026-09-09",
       "grace_period": "about 7 months",
       "mandatory_date": "2027-04-01",
@@ -491,7 +491,8 @@
       "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 1.6, docs/APPLE.md 2026 changes, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific",
       "priority": "critical",
       "source_url": "https://developer.apple.com/news/?id=k1mtkt1k",
-      "verified_on": "2026-11-14"
+      "verified_on": "2026-11-23",
+      "source_note": "Re-read on 23 November 2026. This post states the April 2027 SDK floors and does not state a deployment target. The iOS 15 target is on https://developer.apple.com/app-store/submitting/, tracked as APPLE-MIN-DEPLOYMENT-TARGET-IOS15."
     },
     {
       "id": "APPLE-IPHONE-DUO-SCREENSHOTS-REQ",
@@ -1590,7 +1591,23 @@
       "priority": "critical",
       "absorbed_into": "APPLE-MIN-DEPLOYMENT-TARGET-IOS13",
       "source_url": "https://developer.apple.com/news/upcoming-requirements/",
-      "verified_on": "2026-11-15"
+      "verified_on": "2026-11-23",
+      "source_note": "Re-read on 23 November 2026. The page still says iOS and iPadOS apps uploaded to App Store Connect must target iOS 13 or later, since 9 September 2026. It does not list the April 2027 iOS 15 target, which is on the Submitting page and tracked as APPLE-MIN-DEPLOYMENT-TARGET-IOS15."
+    },
+    {
+      "id": "APPLE-MIN-DEPLOYMENT-TARGET-IOS15",
+      "jurisdiction": "Apple App Store (Global)",
+      "law": "Apple App Store Submission Requirements",
+      "requirement": "Starting April 2027, apps and games uploaded to App Store Connect must meet Apple's minimum requirements. iOS and iPadOS apps must be built with the iOS & iPadOS 27 SDK or later, and target iOS 15 or later. Apple has published the month only, no exact day, so this entry is tracked as 1 April 2027 and must be re-checked when Apple names the date. Until then the in-force floor remains iOS 13 (APPLE-MIN-DEPLOYMENT-TARGET-IOS13). The pre-submission guard warns, and does not block, when the app target is iOS 13 or 14. Source https://developer.apple.com/app-store/submitting/",
+      "effective_date": "2027-04-01",
+      "grace_period": "none",
+      "mandatory_date": "2027-04-01",
+      "enforcement_date": "2027-04-01",
+      "affected_repository_sections": "docs/APPLE.md 2026 changes, docs/PLATFORM-MECHANICS-2026.md section 1.6, docs/PRE-SUBMISSION-CHECKLIST.md Apple specific, data/rejection-patterns.json APPLE-MIN-DEPLOYMENT-TARGET-IOS15",
+      "priority": "critical",
+      "source_url": "https://developer.apple.com/app-store/submitting/",
+      "verified_on": "2026-11-23",
+      "source_note": "Read on the Submitting page on 23 November 2026. Apple names April 2027 and no day. The same day's Upcoming Requirements page still lists only the iOS 13 floor, since 9 September 2026. The 9 September 2026 news post https://developer.apple.com/news/?id=k1mtkt1k states the April 2027 SDK floors and does not state a deployment target."
     },
     {
       "id": "GOOGLE-PLAY-TRADER-STATUS-2027",

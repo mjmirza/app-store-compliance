@@ -90,6 +90,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 - [ ] iPhone Duo layout. Layout comes from size classes and scene bounds, never `userInterfaceIdiom`, `UIInterfaceOrientation`, or fixed screen sizes. Custom views stay clear of reserved regions (cameras and the fold).
 - [ ] iPhone Duo bars. Navigation bars, toolbars, and tab bars come from the system navigation containers, and every toolbar item has both an icon and a title so it can present vertically.
 - [ ] The build meets the SDK floor. the 26 SDKs today, the 27 SDKs from April 2027.
+- [ ] From April 2027 the iOS and iPadOS deployment target is iOS 15 or later (APPLE-MIN-DEPLOYMENT-TARGET-IOS15). iOS 13 remains the upload floor until then.
 
 ## Google Play specific
 

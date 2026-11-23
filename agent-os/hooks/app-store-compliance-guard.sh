@@ -949,12 +949,16 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
   # A Podfile has no extension, so it is outside the source list. Read it directly.
-  podfile_below_ios13() {
+  # $1 is a major-version alternation, for example 8|9|10|11|12.
+  podfile_ios_major() {
     find "$DIR" -maxdepth 4 \( -type d \( -name Pods -o -name node_modules \) -prune \) -o -name Podfile -type f -print 2>/dev/null \
-      | awk 'NR <= 5' | while IFS= read -r pf; do if grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)([.][0-9]+)*." "$pf"; then echo hit; fi; done | grep_q hit
+      | awk 'NR <= 5' | while IFS= read -r pf; do if grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.($1)([.][0-9]+)*." "$pf"; then echo hit; fi; done | grep_q hit
   }
-  # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
-  pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
+  podfile_below_ios13() { podfile_ios_major '8|9|10|11|12'; }
+  podfile_below_ios15() { podfile_ios_major '13|14'; }
+  # The app target's build settings decide, never a framework's or a test bundle's.
+  # Prints below13 when that target is under iOS 13, or below15 when it is iOS 13 or 14.
+  pbx_ios_floor() {
     [ -s "$FILELIST" ] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
     local pf
@@ -980,10 +984,11 @@ DEPENDENCY_MARKERS = (
 )
 
 
-def below(settings):
-    return [int(v) < 13 for v in DT_RE.findall(settings)]
+def majors(settings):
+    return [int(v) for v in DT_RE.findall(settings)]
 
 
+worst = 0
 for path in sys.argv[1:]:
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
@@ -992,17 +997,27 @@ for path in sys.argv[1:]:
         continue
     app, project = [], []
     for settings in BLOCK_RE.findall(text):
-        flags = below(settings)
-        if not flags:
+        vals = majors(settings)
+        if not vals:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
             if not any(marker in settings for marker in DEPENDENCY_MARKERS):
-                app.extend(flags)
+                app.extend(vals)
         else:
-            project.extend(flags)
+            project.extend(vals)
     # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
-    if (app and any(app)) or (not app and any(project)):
-        sys.exit(0)
+    chosen = app if app else project
+    if any(v < 13 for v in chosen):
+        worst = 13
+        break
+    if any(v < 15 for v in chosen):
+        worst = 15
+if worst == 13:
+    print("below13")
+    sys.exit(0)
+if worst == 15:
+    print("below15")
+    sys.exit(0)
 sys.exit(1)
 PBXPY
 )" 2>/dev/null
@@ -1011,8 +1026,18 @@ PBXPY
     [ -s "$FILELIST" ] || return 1
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
-  if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
+  xcconfig_below_ios15() {
+    [ -s "$FILELIST" ] || return 1
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
+  }
+  # Below iOS 13 is refused today (Upcoming Requirements). iOS 13 and 14 stay legal until April 2027,
+  # when the Submitting page requires iOS 15, so they warn and do not block. A below-13 target keeps
+  # only the existing finding.
+  pbx_floor="$(pbx_ios_floor || true)"
+  if podfile_below_ios13 || xcconfig_below_ios13 || printf '%s\n' "$pbx_floor" | grep_q -x below13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
+  elif podfile_below_ios15 || xcconfig_below_ios15 || printf '%s\n' "$pbx_floor" | grep_q -x below15; then
+    finding medium "APPLE-MIN-DEPLOYMENT-TARGET-IOS15" "iOS deployment target below the April 2027 iOS 15 floor" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 15.0 or later before April 2027. Apple has named the month only. Source. https://developer.apple.com/app-store/submitting/. A target below iOS 13 is already refused at upload." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
   # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.

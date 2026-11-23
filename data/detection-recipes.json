@@ -109,6 +109,7 @@
     "GOOGLE-PHOTO-VIDEO-PERMISSIONS-DECLARATION": "grep -rnE 'android\\.permission\\.READ_MEDIA_(IMAGES|VIDEO)' --include='AndroidManifest.xml' . && ! grep -rnE 'PickVisualMedia|ACTION_PICK_IMAGES|PhotoPicker|photo_picker' .",
     "BOTH-US-ASAA-AGE-SIGNALS-MISSING": "grep -rnE 'ageCategory|minorUser|parentalConsent|DeclaredAgeRange|age-signals' . && ! grep -rqE 'verifyParentalConsent|handleAgeCategorySignal|rescindConsent|deleteAgeVerificationData' .",
     "APPLE-MIN-DEPLOYMENT-TARGET-IOS13": "grep -rnE 'IPHONEOS_DEPLOYMENT_TARGET *= *\"?(8|9|10|11|12)[.;]|platform :ios, .(8|9|10|11|12)[.\\x27]' --include='*.pbxproj' --include='*.xcconfig' --include='Podfile' .",
+    "APPLE-MIN-DEPLOYMENT-TARGET-IOS15": "grep -rnE 'IPHONEOS_DEPLOYMENT_TARGET *= *\"?(13|14)[.;]|platform :ios, .(13|14)[.\\x27]' --include='*.pbxproj' --include='*.xcconfig' --include='Podfile' .",
     "APPLE-2.5.5-IPV4-ONLY-NETWORKING": "grep -rnE '(inet_addr|inet_aton|gethostbyname)[[:space:]]*\\(' --include='*.swift' --include='*.m' --include='*.mm' --include='*.c' --include='*.h' .",
     "APPLE-5.1.3-HEALTH-DATA-ICLOUD": "grep -rqE 'HKHealthStore' --include='*.swift' --include='*.m' . && grep -rnE 'CKContainer|CKDatabase|NSUbiquitousKeyValueStore|NSPersistentCloudKitContainer' --include='*.swift' --include='*.m' .",
     "ANDROID-DEBUGGABLE-RELEASE": "grep -rnE \"android:debuggable *= *[\\\"']true\" --include='AndroidManifest.xml' . | grep -vE '/src/(debug|test|androidTest)'",

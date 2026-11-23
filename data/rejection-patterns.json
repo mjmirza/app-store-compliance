@@ -1,6 +1,6 @@
 {
   "version": "2.5.1",
-  "updated": "2026-11-21",
+  "updated": "2026-11-23",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -1938,6 +1938,26 @@
       ],
       "fix": "Raise the deployment target to iOS 13.0 or later in the project, the app target and the Podfile.",
       "added": "2026-11-15"
+    },
+    {
+      "id": "APPLE-MIN-DEPLOYMENT-TARGET-IOS15",
+      "platform": "apple",
+      "guideline": "App Store Connect upload requirement (Submitting, April 2027)",
+      "title": "iOS deployment target below the April 2027 iOS 15 floor",
+      "severity": "medium",
+      "detection": "Apple's Submitting page states that starting April 2027, iOS and iPadOS apps uploaded to App Store Connect must be built with the iOS & iPadOS 27 SDK or later, and target iOS 15 or later. Apple names the month only. The Upcoming Requirements page still requires iOS 13 or later, which is the floor in force now, so an IPHONEOS_DEPLOYMENT_TARGET or Podfile platform of 13 or 14 is an advisory warning and does not block. A dependency or test target below 15 does not decide the upload on its own. A target below 13 stays on the iOS 13 finding.",
+      "signals": [
+        "IPHONEOS_DEPLOYMENT_TARGET = 13",
+        "IPHONEOS_DEPLOYMENT_TARGET = 14",
+        "platform :ios, '13",
+        "platform :ios, '14"
+      ],
+      "counterSignals": [
+        "IPHONEOS_DEPLOYMENT_TARGET = 15",
+        "IPHONEOS_DEPLOYMENT_TARGET = 1[6-9]"
+      ],
+      "fix": "Raise the app target and the Podfile platform to iOS 15.0 or later before April 2027. Source. https://developer.apple.com/app-store/submitting/",
+      "added": "2026-11-23"
     },
     {
       "id": "APPLE-2.5.5-IPV4-ONLY-NETWORKING",

@@ -3168,9 +3168,39 @@ gs_check "ios13-1 a 12.0 deployment target is flagged" "$D" 'APPLE-MIN-DEPLOYMEN
 D="$(gs_ios ok.swift 'let a = 1')"; printf "platform :ios, '11.0'\n" > "$D/Podfile"
 gs_check "ios13-2 a Podfile platform 11.0 is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 13.0;'
-gs_check "ios13-3 a 13.0 target stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+gs_check "ios13-3 a 13.0 target does not raise the iOS 13 finding" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 17.0;'
 gs_check "ios13-4 a 17.0 target stays silent (no 1x prefix match)" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+# April 2027 iOS 15 floor (Submitting page). 13 and 14 warn. Below 13 keeps the existing finding.
+ios15_case() {  # $1 label, $2 pbx setting or -, $3 Podfile line or -, $4 block, warn, or clean
+  local d has13=0 has15=0 med15=0 good=0
+  d="$(gs_ios ok.swift 'let a = 1')"
+  [ "$2" != "-" ] && mkdir_proj "$d" "$2"
+  [ "$3" != "-" ] && printf '%s\n' "$3" > "$d/Podfile"
+  rr_run "$d"
+  rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && has13=1
+  rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && has15=1
+  rr_has '\[MEDIUM\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && med15=1
+  case "$4" in
+    block) [ "$has13" = 1 ] && [ "$has15" = 0 ] && good=1 ;;
+    warn) [ "$has13" = 0 ] && [ "$med15" = 1 ] && [ "$RC" -eq 0 ] && rr_has 'April 2027' && rr_has 'developer.apple.com/app-store/submitting' && ! rr_has '\[HIGH\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && ! rr_has '\[CRITICAL\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && good=1 ;;
+    clean) [ "$has13" = 0 ] && [ "$has15" = 0 ] && good=1 ;;
+  esac
+  [ "$good" = 1 ] && ok "ios15 $1" || bad "ios15 $1 (rc=$RC has13=$has13 has15=$has15 med=$med15)"
+  rm -rf "$d"
+}
+ios15_case "a 12.0 target keeps the iOS 13 finding" 'IPHONEOS_DEPLOYMENT_TARGET = 12.0;' - block
+ios15_case "a 14.0 target is an advisory warning" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' - warn
+ios15_case "a 15.0 target stays clean" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
+ios15_case "a 13.0 target is an advisory warning" 'IPHONEOS_DEPLOYMENT_TARGET = 13.0;' - warn
+ios15_case "a Podfile platform 14.0 is an advisory warning" - "platform :ios, '14.0'" warn
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Base.xcconfig"
+rr_run "$D"
+rr_has '\[MEDIUM\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && [ "$RC" -eq 0 ] && ok "ios15 an xcconfig 14.0 target is an advisory warning" || bad "ios15 an xcconfig 14.0 target is an advisory warning (rc=$RC)"
+rm -rf "$D"
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 14.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios15 a framework target of 14 beside an iOS 15 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 
 D="$(gs_ios Net.m 'in_addr_t a = inet_addr("10.0.0.1");')"
 gs_check "ipv6-1 inet_addr is flagged" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1

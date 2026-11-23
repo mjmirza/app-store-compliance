@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-34 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+35 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -507,6 +507,23 @@ How to detect.
 
 ```bash
 python3 scripts/accessibility-audit.py . --rule APPLE-ACCESSIBILITY-VOICEOVER
+```
+
+## APPLE-MIN-DEPLOYMENT-TARGET-IOS15
+
+- Title. iOS deployment target below the April 2027 iOS 15 floor
+- Platform. apple
+- Guideline or policy. App Store Connect upload requirement (Submitting, April 2027)
+- Severity. medium
+- What triggers it. Apple's Submitting page states that starting April 2027, iOS and iPadOS apps uploaded to App Store Connect must be built with the iOS & iPadOS 27 SDK or later, and target iOS 15 or later. Apple names the month only. The Upcoming Requirements page still requires iOS 13 or later, which is the floor in force now, so an IPHONEOS_DEPLOYMENT_TARGET or Podfile platform of 13 or 14 is an advisory warning and does not block. A dependency or test target below 15 does not decide the upload on its own. A target below 13 stays on the iOS 13 finding.
+- How to fix it. Raise the app target and the Podfile platform to iOS 15.0 or later before April 2027. Source. https://developer.apple.com/app-store/submitting/
+- Detection signals. IPHONEOS_DEPLOYMENT_TARGET = 13, IPHONEOS_DEPLOYMENT_TARGET = 14, platform :ios, '13, platform :ios, '14
+- Present means handled. IPHONEOS_DEPLOYMENT_TARGET = 15, IPHONEOS_DEPLOYMENT_TARGET = 1[6-9]
+
+How to detect.
+
+```bash
+grep -rnE 'IPHONEOS_DEPLOYMENT_TARGET *= *"?(13|14)[.;]|platform :ios, .(13|14)[.\x27]' --include='*.pbxproj' --include='*.xcconfig' --include='Podfile' .
 ```
 
 ## APPLE-2.5.5-IPV4-ONLY-NETWORKING
