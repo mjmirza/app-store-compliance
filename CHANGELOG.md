@@ -6,6 +6,7 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ### Fixed
 
+- `agent-os/hooks/app-store-compliance-guard.sh` no longer scans JavaScript and TypeScript test files. On React Native projects a `localhost` or `example.com` in a Jest or Vitest file such as `integration/api.test.ts` raised a false APPLE-2.1-STAGING-BACKEND critical and a BOTH-PLACEHOLDER high, because these files sit next to the code they test instead of in a test folder. Files named `*.test.js`, `*.test.ts`, `*.spec.jsx`, `*.spec.tsx` and the other JS and TS combinations are now left out of the source list. The same strings in a file that ships are still flagged.
 - `scripts/metadata-audit.py` no longer reports a rule word hidden inside a longer word. Freeform, Freelance, and Freedom Journal were HIGH price claims, Todoist and the Spanish "Todos" were placeholder text, and "desktop app" was the ranking claim "top app". Short everyday terms now need a word break, where a space, punctuation, a digit, a non-ASCII letter, or a case change counts, so FreeToUse, VPNfree, TODO123, and Android版 still fire. Brand names, long terms, and terms with digits or punctuation keep matching anywhere, so Androidille, Geminin, and #1notepad still fire. `freeware` and `freemium` are listed as price claims. Reported and fixed by @dajiaohuang (#2371). Eight adversarial review rounds checked that real rejection text caught before is still caught, across 35,840 comparisons.
 
 ## 2.5.1 (2026-11-22)

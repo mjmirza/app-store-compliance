@@ -3517,6 +3517,24 @@ for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
 rm -rf "$D"
+# JS and TS test files (Jest, Vitest, Detox) sit next to the code they test, as *.test.ts or
+# *.spec.tsx, and never ship. A localhost or example.com inside one is not a release-build string.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/src" "$D/integration"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'export const api = "https://api.app.com"\n' > "$D/src/api.ts"
+printf 'const base = "http://localhost:3000"\nconst email = "user@example.com"\n' > "$D/integration/api.test.ts"
+printf 'it("logs in", () => fetch("http://localhost:8081/login"))\n' > "$D/src/login.spec.tsx"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! rr_has 'APPLE-2.1-STAGING-BACKEND' && ! rr_has 'BOTH-PLACEHOLDER' && ok "js-test-1 localhost and example.com in *.test.ts and *.spec.tsx files are not release-build strings" || bad "js-test-1 localhost and example.com in *.test.ts and *.spec.tsx files are not release-build strings"
+rm -rf "$D"
+
+# The exclusion goes by test-file name only: the same localhost in a file that ships is still flagged.
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/src"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'export const api = "http://localhost:3000"\n' > "$D/src/config.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-test-2 localhost in a shipping .ts file is still flagged" || bad "js-test-2 localhost in a shipping .ts file is still flagged"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
