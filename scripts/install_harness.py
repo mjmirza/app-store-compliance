@@ -489,7 +489,7 @@ def kimi_block(cmd):
 def kimi_bounds(text):
     """Offsets for a single complete managed block, or None when no markers exist."""
     begin, end = map(re.escape, (KIMI_BEGIN, KIMI_END))
-    markers = list(re.finditer(r"^[ \t]*(" + begin + "|" + end + r")[ \t]*(?:\r?\n|$)", text, re.M))
+    markers = list(re.finditer(r"^[ \t]*(" + begin + "|" + end + r")[^\r\n]*(?:\r?\n|$)", text, re.M))
     if not markers:
         return None
     if [m.group(1) for m in markers] != [KIMI_BEGIN, KIMI_END]:

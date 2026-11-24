@@ -309,6 +309,15 @@ OUT="$(run --tool kimi)"; RC=$?
 run --tool kimi uninstall >/dev/null; RC=$?
 [ "$RC" -eq 0 ] && ! grep -q 'app-store-compliance' "$(cfg kimi)" && ok "kimi uninstall removes a block with indented markers" || bad "kimi uninstall removes a block with indented markers (rc=$RC)"
 
+# A note after the closing marker is still valid TOML, so doctor and uninstall still find the block.
+fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "fixture"\n' > "$(cfg kimi)"
+run --tool kimi >/dev/null
+sed -i.tmp 's/^# <<< app-store-compliance guard <<</& # keep this block/' "$(cfg kimi)" && rm -f "$(cfg kimi).tmp"
+OUT="$(run --tool kimi)"; RC=$?
+[ "$RC" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'ambiguous' && ok "kimi reinstall accepts a note after the closing marker" || bad "kimi reinstall accepts a note after the closing marker (rc=$RC)"
+run --tool kimi uninstall >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ! grep -q 'app-store-compliance-guard' "$(cfg kimi)" && ok "kimi uninstall removes a block with a note after its marker" || bad "kimi uninstall removes a block with a note after its marker (rc=$RC)"
+
 # 2d9 a Windows path in the Gemini audit command still gives valid TOML
 python3 -c '
 import sys, tomllib
