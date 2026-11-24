@@ -26,9 +26,9 @@ case "$target" in
     fi
     : "${APP_ID:?set APP_ID to your App Store Connect app id}"
     : "${VERSION:?set VERSION to the app version, e.g. 1.2.0}"
-    mkdir -p "$DIR"
+    mkdir -p "$DIR" || exit 1
     echo "Pulling Apple metadata for app $APP_ID version $VERSION into $DIR"
-    asc metadata pull --app "$APP_ID" --version "$VERSION" --dir "$DIR"
+    asc metadata pull --app "$APP_ID" --version "$VERSION" --dir "$DIR" || exit $?
     echo "Done. Now run: python3 scripts/metadata-audit.py $DIR"
     ;;
 
@@ -48,14 +48,18 @@ case "$target" in
       exit 1
     fi
     BASE="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
-    mkdir -p "$DIR"
+    mkdir -p "$DIR" || exit 1
     echo "Creating a Play edit for $PACKAGE_NAME"
     EDIT="$(curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Length: 0" "$BASE/edits" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("id",""))')"
     if [ -z "$EDIT" ]; then echo "Failed to create edit. Check token and package access."; exit 1; fi
+    delete_edit() {
+      curl -fsS -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/edits/$EDIT" >/dev/null || true
+    }
+    trap delete_edit EXIT
     echo "Edit $EDIT. Fetching listings."
-    LISTINGS="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/edits/$EDIT/listings")"
+    LISTINGS="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/edits/$EDIT/listings")" || exit $?
     # the heredoc is python's stdin, so the listings travel in the environment, not on a pipe
-    LISTINGS="$LISTINGS" python3 - "$DIR" <<'PYIN'
+    LISTINGS="$LISTINGS" python3 - "$DIR" <<'PYIN' || exit $?
 import json, os, sys
 dir = sys.argv[1]
 data = json.loads(os.environ["LISTINGS"])
@@ -68,7 +72,8 @@ for l in data.get("listings", []):
     print("wrote", lang)
 PYIN
     echo "Deleting the edit (read only pull, nothing committed)."
-    curl -fsS -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/edits/$EDIT" >/dev/null || true
+    delete_edit
+    trap - EXIT
     echo "Note. The Play privacy policy URL and Data Safety form are not in the listings API. Add the privacy policy URL to $DIR/meta.json as {\"privacy_policy_url\":\"...\"} and verify Data Safety in the Play Console."
     echo "Done. Now run: python3 scripts/metadata-audit.py $DIR"
     ;;

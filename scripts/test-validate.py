@@ -184,6 +184,17 @@ class TestSourceProvenance(unittest.TestCase):
         self.assertEqual(rc, 1, out)
         self.assertIn("not a web address", out)
 
+    def test_source_url_requires_an_http_host(self):
+        for source in ("", "  ", "https://", "https:///act", "http://bad host/act"):
+            with self.subTest(source=source):
+                rc, out = run(entry(source_url=source))
+                self.assertEqual(rc, 1, out)
+                self.assertIn("source_url", out)
+
+    def test_complete_web_source_is_accepted(self):
+        rc, out = run(entry(source_url="https://example.org/act?article=1#date"))
+        self.assertEqual(rc, 0, out)
+
     def test_bad_verified_on_format_fails(self):
         rc, out = run(entry(verified_on="14 Nov 2026"))
         self.assertEqual(rc, 1, out)

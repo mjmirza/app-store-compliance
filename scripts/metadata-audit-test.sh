@@ -272,5 +272,36 @@ for pair in "subtitle|One of the best apps|BOTH-METADATA-DECORATION" "descriptio
 done
 rm -rf "$WB"
 
+# Cross-field combinations are bounded, but every individual conflicting value must be audited.
+MC="$(mktemp -d)"
+python3 - "$MC" <<'PYTHON'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+(root / "listing.json").write_text(json.dumps({
+    "name": "Personal Journal",
+    "privacy_url": "https://journal.test/privacy",
+    "support_url": "https://journal.test/help",
+    "release_notes": "A long release note describing changes",
+    "review_notes": "A long note describing manual review",
+    "subtitle": "A pocket notebook for everyone",
+}))
+(root / "title.txt").write_text("Android Diary")
+for n in range(15):
+    (root / f"alternate-{n}.json").write_text(json.dumps({
+        "release_notes": f"Updates {n}", "review_notes": f"Review {n}", "subtitle": f"Notebook {n}"
+    }))
+PYTHON
+OUT="$($AUDIT "$MC" 2>&1)"
+if echo "$OUT" | grep -q 'APPLE-2.3-CROSS-PLATFORM-REFERENCE.*(name,' \
+    && echo "$OUT" | grep -q 'each value and the first 4096 of 8192 combinations'; then
+  ok "the combination limit never hides an individual conflicting value"
+else
+  bad "the combination limit never hides an individual conflicting value"
+fi
+rm -rf "$MC"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
