@@ -994,6 +994,7 @@ import sys
 BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
+VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])*\"?\s*=\s*\"?\$")
 DT_RE = re.compile(
     r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
@@ -1014,7 +1015,11 @@ def majors(settings):
     # Drop /* */ and // comments, but never inside a quoted value such as "$(SRCROOT)/**".
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
     # A simulator-only value never reaches an App Store upload, so it is left out.
-    return [int(value) for cond, value in DT_RE.findall(settings) if "iphonesimulator" not in cond]
+    vals = [int(value) for cond, value in DT_RE.findall(settings) if "iphonesimulator" not in cond]
+    # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
+    if VAR_RE.search(settings):
+        vals.append(99)
+    return vals
 
 
 worst = 0
