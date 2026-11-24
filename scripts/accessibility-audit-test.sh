@@ -1052,6 +1052,8 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
     <View android:layout_width="match_parent" android:layout_height="1dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
     <Button android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" />
+    <CheckedTextView android:layout_width="match_parent" android:layout_height="15dp" android:checked="true" />
+    <CheckBox style="@style/RowCheck" android:layout_width="14dp" android:layout_height="14dp" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
     <Button android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
@@ -1071,6 +1073,8 @@ if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 10 ] \
     && ! echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="16dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="15dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="14dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="18dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_height="17dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="20dp"' \

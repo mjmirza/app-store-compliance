@@ -476,7 +476,7 @@ def find_icon_only_buttons(code):
             continue
         yield m.start(), i
 ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar|Slider"
-                               r"|Spinner|EditText|AutoCompleteTextView|RatingBar|CheckedTextView|NumberPicker|Picker)$")
+                               r"|Spinner|EditText|AutoCompleteTextView|RatingBar|NumberPicker|Picker)$")
 
 
 def run_rule_scan(rule_id, ios_files, android_files):
@@ -826,7 +826,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     style = re.search(r"(?<![\w:])style\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)
                     indicator = vals.get("isIndicator", "false").lower() != "false" or bool(
                         style and re.search(r"ratingBarStyle(Small|Indicator)|RatingBar\.(Small|Indicator)", style.group(1) or style.group(2) or ""))
-                    widget = ("clickable" not in vals or vals["clickable"].lower() == "true") and not indicator and ANDROID_TOUCH_TAG.search(tag)
+                    # A style can switch clickability off, so a styled widget does not count by its type alone.
+                    widget = ("clickable" not in vals or vals["clickable"].lower() == "true") and not indicator and not style and ANDROID_TOUCH_TAG.search(tag)
                     if not (true_attr or handler or widget):
                         continue
                     for axis in ("layout_width", "layout_height"):
