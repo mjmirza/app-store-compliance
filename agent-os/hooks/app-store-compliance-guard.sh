@@ -583,45 +583,94 @@ import os
 import re
 import sys
 
-TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
 WANT = re.compile(os.environ["ASCG_STRING_RE"])
-QUOTES = chr(34) + chr(39) + chr(96)
-OPEN, CLOSE = chr(123), chr(125)
-EXPR = chr(36) + OPEN
+SQ, DQ, BT, DOL = chr(39), chr(34), chr(96), chr(36)
+LB, RB, BS, NL, SL, ST = chr(123), chr(125), chr(92), chr(10), chr(47), chr(42)
 
 
-def expr_comments_out(text):
-    # Inside each template expression drop comments, step over strings, keep the rest.
-    out, i, depth, n = [], 0, 0, len(text)
-    while i < n:
-        c = text[i]
-        if depth == 0:
-            if text.startswith(EXPR, i):
-                depth, i = 1, i + 2
-                out.append(EXPR)
-            else:
+def read_quoted(code, i, q):
+    # End index of a quoted string, or None when it never closes on its line.
+    j, n = i + 1, len(code)
+    while j < n:
+        c = code[j]
+        if c == BS:
+            j += 2
+        elif c == q:
+            return j + 1
+        elif c == NL:
+            return None
+        else:
+            j += 1
+    return None
+
+
+def skip_comment(code, j):
+    # End index of a comment that starts at j, or None when none starts there.
+    if code.startswith(SL + ST, j):
+        k = code.find(ST + SL, j + 2)
+        return len(code) if k < 0 else k + 2
+    if code.startswith(SL + SL, j):
+        k = code.find(NL, j)
+        return len(code) if k < 0 else k
+    return None
+
+
+def read_template(code, i):
+    # A template literal with comments dropped from its expressions. Nested templates are followed.
+    out, j, n = [BT], i + 1, len(code)
+    while j < n:
+        c = code[j]
+        if c == BS:
+            out.append(code[j:j + 2])
+            j += 2
+            continue
+        if c == BT:
+            out.append(BT)
+            return j + 1, "".join(out)
+        if c == DOL and code.startswith(LB, j + 1):
+            out.append(DOL + LB)
+            j, depth = j + 2, 1
+            while j < n and depth:
+                c = code[j]
+                e = skip_comment(code, j)
+                if e is not None:
+                    j = e
+                    continue
+                if c in (SQ, DQ):
+                    e = read_quoted(code, j, c)
+                    if e is not None:
+                        out.append(code[j:e])
+                        j = e
+                        continue
+                if c == BT:
+                    j, t = read_template(code, j)
+                    out.append(t)
+                    continue
+                depth += (c == LB) - (c == RB)
                 out.append(c)
-                i += 1
+                j += 1
             continue
-        if c in QUOTES:
-            j = i + 1
-            while j < n and text[j] != c:
-                j += 2 if text[j] == chr(92) else 1
-            out.append(text[i:j + 1])
-            i = j + 1
-            continue
-        if text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            i = n if j < 0 else j + 2
-            continue
-        if text.startswith("//", i):
-            j = text.find(chr(10), i)
-            i = n if j < 0 else j
-            continue
-        depth += 1 if c == OPEN else -1 if c == CLOSE else 0
         out.append(c)
-        i += 1
-    return "".join(out)
+        j += 1
+    return n, "".join(out)
+
+
+def literals(code):
+    i, n = 0, len(code)
+    while i < n:
+        c = code[i]
+        e = skip_comment(code, i)
+        if e is not None:
+            i = e
+        elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
+            e = read_quoted(code, i, c)
+            yield code[i:e]
+            i = e
+        elif c == BT:
+            i, t = read_template(code, i)
+            yield t
+        else:
+            i += 1
 
 
 for path in sys.argv[1:]:
@@ -630,11 +679,8 @@ for path in sys.argv[1:]:
             code = fh.read()
     except OSError:
         continue
-    for tok in TOKEN.finditer(code):
-        text = tok.group(0)
-        if text[0] == "\x60":
-            text = expr_comments_out(text)
-        if text[0] in "'\x60" and WANT.search(text):
+    for text in literals(code):
+        if text[0] in (SQ, BT) and WANT.search(text):
             print(path)
             sys.exit(0)
 JSSTRPY
