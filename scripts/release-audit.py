@@ -545,6 +545,14 @@ def parse_findings(all_scanner_stdout):
     return findings
 
 
+def area_status(findings, problems):
+    if any(f["severity"] in BLOCKING for f in findings):
+        return "BLOCKED"
+    if findings:
+        return "ADVISORY"
+    return "NOT_CHECKED" if problems else "NO_FINDINGS"
+
+
 def compile_report(target_dir, findings, problems, patterns_dict, affected_files_map):
     # --- Step 3. Compile Report and Map to 13 Areas ---
     area_findings = {area: [] for area in REQUIRED_AREAS}
@@ -597,17 +605,12 @@ def compile_report(target_dir, findings, problems, patterns_dict, affected_files
     report_lines.append("| --- | --- | --- | --- |")
 
     for area in REQUIRED_AREAS:
-        area_status = "PASSED"
         area_f = area_findings[area]
-        if area_f:
-            if any(af["severity"] in BLOCKING for af in area_f):
-                area_status = "BLOCKED"
-            else:
-                area_status = "ADVISORY"
+        status = area_status(area_f, problems)
 
         num_risks = len(area_f)
         reviewers = RECOMMENDED_REVIEWERS.get(area, "Lead Developer")
-        report_lines.append(f"| {area} | {area_status} | {num_risks} | {reviewers} |")
+        report_lines.append(f"| {area} | {status} | {num_risks} | {reviewers} |")
     report_lines.append("")
 
     report_lines.append("## Detailed Compliance Analysis")
@@ -615,22 +618,20 @@ def compile_report(target_dir, findings, problems, patterns_dict, affected_files
 
     for idx, area in enumerate(REQUIRED_AREAS, 1):
         area_f = area_findings[area]
-        area_status = "PASSED"
-        if area_f:
-            if any(af["severity"] in BLOCKING for af in area_f):
-                area_status = "BLOCKED"
-            else:
-                area_status = "ADVISORY"
+        status = area_status(area_f, problems)
 
         report_lines.append(f"### {idx}. {area}")
-        report_lines.append(f"- Status: {area_status}")
+        report_lines.append(f"- Status: {status}")
         report_lines.append(
             f"- Recommended Reviewers: {RECOMMENDED_REVIEWERS.get(area, 'Lead Developer')}"
         )
         report_lines.append("")
 
         if not area_f:
-            report_lines.append("No outstanding risks found for this area.")
+            report_lines.append(
+                "Scan coverage is incomplete. No verdict is available for this area."
+                if problems else "No automatic finding for this area. Check any manual requirements separately."
+            )
             report_lines.append("")
             continue
 
