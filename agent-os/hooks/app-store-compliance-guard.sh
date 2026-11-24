@@ -1004,12 +1004,16 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     app, project = [], []
+    has_app = False
     for settings in BLOCK_RE.findall(text):
+        is_app = ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and not any(
+            marker in settings for marker in DEPENDENCY_MARKERS)
+        has_app = has_app or is_app
         vals = majors(settings)
         if not vals:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
-            if not any(marker in settings for marker in DEPENDENCY_MARKERS):
+            if is_app:
                 app.extend(vals)
         else:
             project.extend(vals)
@@ -1019,6 +1023,9 @@ for path in sys.argv[1:]:
         worst = 13
         break
     # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
+    # A project with no app target, such as a local framework or library, never decides the iOS 15 status.
+    if not has_app:
+        continue
     if chosen and max(chosen) < 15:
         worst = 15
         # A project-level value is inherited, so a target xcconfig can still override it.
