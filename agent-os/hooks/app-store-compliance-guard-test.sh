@@ -3539,6 +3539,18 @@ D="$(mk_rn_social '' 'export const signIn = () => GoogleSignIn.signIn()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-3 social login with no Sign in with Apple at all is still flagged" || bad "siwa-3 social login with no Sign in with Apple at all is still flagged"
 rm -rf "$D"
+# The package alone is not a login. Installed but unused, or used only in an Android file, is still flagged.
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const signIn = () => GoogleSignIn.signIn()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-4 the Apple package with no sign-in call is still flagged" || bad "siwa-4 the Apple package with no sign-in call is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const signIn = () => GoogleSignIn.signIn()')"
+printf 'import { appleAuthAndroid } from "@invertase/react-native-apple-authentication"
+export const a = () => appleAuthAndroid.signIn()
+' > "$D/src/signIn.android.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-5 Apple sign-in used only on Android is still flagged" || bad "siwa-5 Apple sign-in used only on Android is still flagged"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

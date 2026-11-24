@@ -537,10 +537,10 @@
       "counterSignals": [
         "SignInWithApple",
         "ASAuthorizationAppleIDProvider",
-        "react-native-apple-authentication",
-        "expo-apple-authentication",
         "appleAuth.performRequest",
-        "AppleAuthentication.signInAsync"
+        "AppleAuthentication.signInAsync",
+        "AppleAuthentication.AppleAuthenticationButton",
+        "<AppleButton"
       ],
       "fix": "Add Sign in with Apple or an equal login that limits data to name and email and allows a private email."
     },
