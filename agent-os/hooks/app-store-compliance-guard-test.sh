@@ -3950,6 +3950,17 @@ rm -rf "$D"
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
 fi
+
+# Xcode writes SDK-conditional build setting keys in quotes.
+D="$(gs_ios ok.swift 'let a = 1')"
+mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 12.0;'
+gs_check "ios13-quoted-1 a quoted device override below the floor is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"
+mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 15.0;'
+gs_check "ios13-quoted-2 a quoted device override above the floor stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
