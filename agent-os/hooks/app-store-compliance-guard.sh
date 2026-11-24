@@ -678,9 +678,7 @@ scan_tree() {
 # match also hit the folders ABOVE the root, so a project sitting under a folder named build was
 # scanned as empty, and it still walked every excluded tree. Test code, Python virtualenvs, and
 # bundled web output (dist) never ship in the binary, and a virtualenv's vendored JSON otherwise
-# reads as app source. JS and TS test files (*.test.ts, *.spec.tsx) sit next to the code they test
-# instead of in a test folder, so they are excluded by name. .xcprivacy is scanned because
-# NSPrivacyCollectedDataTypes lives there.
+# reads as app source. .xcprivacy is scanned because NSPrivacyCollectedDataTypes lives there.
 find "$DIR" -mindepth 1 \
   \( -type d \( -name node_modules -o -name Pods -o -name .git -o -name build -o \( -name dist -not -path '*/src/dist' \) \
     -o -name DerivedData -o -name vendor -o -name .dart_tool -o -name Carthage \
@@ -694,9 +692,18 @@ find "$DIR" -mindepth 1 \
   -o -name '*.dart' -o -name '*.xcconfig' -o -name '*.yaml' -o -name '*.yml' \
   -o -name '*.pbxproj' -o -name '*.entitlements' -o -name '*.html' -o -name '*.xcprivacy' \
   -o -name '*.cs' -o -name '*.rs' -o -name '*.csproj' -o -name '*.xaml' -o -name '*.toml' \
-  \) ! \( -name '*.test.[jt]s' -o -name '*.test.[jt]sx' -o -name '*.spec.[jt]s' -o -name '*.spec.[jt]sx' \) \
-  -print 2>/dev/null \
+  \) -print 2>/dev/null \
   > "$FILELIST" || : 2>/dev/null >> "$FILELIST" || SCAN_ERROR="the file list could not be written to $FILELIST"
+# JS and TS test files (*.test.ts, *.spec.tsx) sit next to the code they test and never ship, unless
+# app code imports one. Then the bundler ships it, so every test file stays in the scan.
+JS_TEST_RE='[.](test|spec)[.][jt]sx?$'
+TEST_IMPORTERS="$(grep -E '[.][jt]sx?$' "$FILELIST" 2>/dev/null | grep -vE "$JS_TEST_RE" | tr '\n' '\0' \
+  | xargs -0 grep -EIl "(from|require[(]|import[(])[[:space:]]*['\"][^'\"]*[.](test|spec)(['\"]|[.][jt]sx?['\"])" 2>/dev/null || true)"
+if [ -z "$TEST_IMPORTERS" ] && grep -vE "$JS_TEST_RE" "$FILELIST" > "$FILELIST.kept" 2>/dev/null; then
+  mv "$FILELIST.kept" "$FILELIST"
+else
+  rm -f "$FILELIST.kept"
+fi
 build_blob
 CODE_STATE=""
 
