@@ -724,7 +724,10 @@ grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -
 # Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
 # CI config, end-to-end flows and npm scripts never ship either, imported or not (issue #2397).
 # Matched below the project root, so a project that itself sits in a folder named e2e is still read.
-NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e|detox)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$|(^|/)package[.]json$'
+NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e|detox)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
+# package.json ships only when code imports it, for example to read a config block or the version.
+grep -E '[.][cm]?[jt]sx?$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -IlE "package[.]json['\"]" 2>/dev/null | grep . >/dev/null \
+  || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
 SHIP_TEST_RE='^$'
 [ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
 SHIPLIST="$FILELIST"
