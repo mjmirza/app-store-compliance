@@ -3251,6 +3251,11 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'APP_MIN_IOS = 15.0; IPHONEO
 gs_check "ios15 a project deployment target set from a variable stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" '/* IPHONEOS_DEPLOYMENT_TARGET = 15.0; */ IPHONEOS_DEPLOYMENT_TARGET = 14.0;'
 gs_check "ios15 a commented-out 15.0 does not hide an active 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = "$(inherited)";\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13 an app target of inherited still reports a project 12.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0; "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = "$(SIM_MIN)";'
+gs_check "ios15 a simulator-only variable does not hide a device 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean

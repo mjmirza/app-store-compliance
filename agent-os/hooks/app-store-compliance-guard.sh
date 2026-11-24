@@ -994,7 +994,7 @@ import sys
 BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
-VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])*\"?\s*=\s*\"?\$")
+VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?(\$[^;\"\n]*)")
 DT_RE = re.compile(
     r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
@@ -1016,10 +1016,13 @@ def majors(settings):
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
     # A simulator-only value never reaches an App Store upload, so it is left out.
     vals = [int(value) for cond, value in DT_RE.findall(settings) if "iphonesimulator" not in cond]
-    # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
-    if VAR_RE.search(settings):
-        vals.append(99)
     return vals
+
+
+def unresolved(settings):
+    # A device value built from a variable, other than inherited, cannot be read here.
+    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
+    return any("iphonesimulator" not in cond and "inherited" not in value for cond, value in VAR_RE.findall(settings))
 
 
 worst = 0
@@ -1033,10 +1036,12 @@ for path in sys.argv[1:]:
         continue
     app, project = [], []
     has_app = False
+    app_var = False
     for settings in BLOCK_RE.findall(text):
         is_app = ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and not any(
             marker in settings for marker in DEPENDENCY_MARKERS)
         has_app = has_app or is_app
+        app_var = app_var or (is_app and unresolved(settings))
         vals = majors(settings)
         if not vals:
             continue
@@ -1053,6 +1058,10 @@ for path in sys.argv[1:]:
     # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
     # A project with no app target, such as a local framework or library, never decides the iOS 15 status.
     if not has_app:
+        continue
+    # An app value set from a variable cannot be checked, and this warning is advisory, so stay quiet.
+    if app_var:
+        ok15 = True
         continue
     if chosen and max(chosen) < 15:
         worst = 15
