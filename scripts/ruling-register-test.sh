@@ -169,5 +169,7 @@ fleet '{"regions":["US"],"features":["gaming"]}'
 fleet '{"regions":["US"],"features":["social"]}'
 [ "$(sweep)" = 0 ] && ok || bad "an app outside every applicable rule stays READY"
 
+python3 "$HERE/test-ruling-register-scope.py" && ok || bad "ruling register rejects invalid scope"
+
 echo "ruling-register-test. $pass passed, $fail failed"
 exit "$fail"

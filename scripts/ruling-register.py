@@ -113,6 +113,9 @@ def validate(doc, pattern_ids):
         for key in ("title", "jurisdiction", "instrument", "authority", "check"):
             if not text(r.get(key)):
                 errors.append(f"{where}. {key} is missing")
+        jurisdiction = r.get("jurisdiction")
+        if text(jurisdiction) and jurisdiction != "GLOBAL" and not COUNTRY.fullmatch(jurisdiction):
+            errors.append(f"{where}. jurisdiction must be GLOBAL, EU or a two-letter country code")
         if r.get("standing") not in STANDINGS:
             errors.append(f"{where}. standing must be one of {', '.join(STANDINGS)}")
         eff = r.get("takes_effect")
@@ -312,6 +315,15 @@ def main():
 
     today = dt.date.today()
     if args.cmd == "due":
+        regions = {r.upper() for r in csv_set(args.regions)}
+        if not regions or any(not COUNTRY.fullmatch(region) for region in regions):
+            print("ruling-register. --regions needs two-letter country codes such as DE or AU", file=sys.stderr)
+            return 1
+        stores = csv_set(args.stores)
+        bad = stores - set(STORES)
+        if bad:
+            print(f"ruling-register. unknown stores {', '.join(sorted(bad))}", file=sys.stderr)
+            return 1
         features = csv_set(args.features)
         bad = features - set(FEATURES)
         if bad:
@@ -322,8 +334,8 @@ def main():
             return 1
         rows = due(
             doc,
-            {r.upper() for r in csv_set(args.regions)},
-            csv_set(args.stores),
+            regions,
+            stores,
             features,
             today,
         )
