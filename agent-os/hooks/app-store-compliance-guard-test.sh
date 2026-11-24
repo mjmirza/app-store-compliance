@@ -3815,6 +3815,16 @@ rm -rf "$D"
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
 fi
+# A comment inside a template expression is code, not a URL the app ships.
+D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/src"; printf '<plist/>' > "$D/ios/App/Info.plist"
+printf 'export const api = \x60https://${config.apiHost /* localhost is dev only */}/v1\x60;\n' > "$D/src/api.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-quote a comment inside a template expression is not a host" || bad "js-quote a comment inside a template expression is not a host"
+printf 'export const api = \x60http://localhost:3000/${path}\x60;\n' > "$D/src/api.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-quote a localhost template literal with an expression is still reported" || bad "js-quote a localhost template literal with an expression is still reported"
+rm -rf "$D"
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

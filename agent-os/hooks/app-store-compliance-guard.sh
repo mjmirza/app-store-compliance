@@ -592,7 +592,11 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     for tok in TOKEN.finditer(code):
-        if tok.group(0)[0] in "'\x60" and WANT.search(tok.group(0)):
+        text = tok.group(0)
+        # Code inside a template expression is not string text, so drop it before searching.
+        if text[0] == "\x60":
+            text = re.sub(r"\$\{[^{}]*\}", "", text)
+        if text[0] in "'\x60" and WANT.search(text):
             print(path)
             sys.exit(0)
 JSSTRPY
