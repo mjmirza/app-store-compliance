@@ -1077,11 +1077,7 @@ PBXPY
     # and the file reports its highest value. A Podfile-style platform line counts as 14.
     [ -s "$FILELIST" ] || return 0
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
-      awk '{ l = ""; s = $0
-          while (s != "") { if (inc) { i = index(s, "*/"); if (!i) break; s = substr(s, i + 2); inc = 0; continue }
-            i = index(s, "/*"); j = index(s, "//"); if (j && (!i || j < i)) { l = l substr(s, 1, j - 1); break }
-            if (!i) { l = l s; break }; l = l substr(s, 1, i - 1); s = substr(s, i + 2); inc = 1 }
-          $0 = l }
+      awk '{ sub(/\/\/.*/, "") }
         /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { cond = ""; if (match($0, /\[[^]]*\]/)) cond = substr($0, RSTART, RLENGTH)
           if (cond ~ /iphonesimulator/) next
           v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last[cond] = p[1] + 0 }
