@@ -20,6 +20,10 @@ UNVERIFIED = []
 KIMI_BEGIN = "# >>> app-store-compliance guard >>>"
 KIMI_END = "# <<< app-store-compliance guard <<<"
 KIMI_SEP_FILE = ".app-store-compliance-kimi-sep"
+OPENCODE_HEADER = (
+    "// App Store Compliance Playbook guard for OpenCode. Runs the guard before every shell command\n"
+    "// and stops the command when the guard exits 2. Installed by scripts/install_harness.py.\n"
+)
 
 # How each tool runs a hook before a shell command, from each vendor's hook reference.
 # style nested. groups of {matcher, hooks:[...]} under the event. flat. a list of entries under the event.
@@ -433,9 +437,8 @@ def container(lay, data):
 
 def plugin_source(guard):
     return (
-        "// App Store Compliance Playbook guard for OpenCode. Runs the guard before every shell command\n"
-        "// and stops the command when the guard exits 2. Installed by scripts/install_harness.py.\n"
-        'import { spawnSync } from "node:child_process";\n\n'
+        OPENCODE_HEADER
+        + 'import { spawnSync } from "node:child_process";\n\n'
         "export const AppStoreCompliance = async ({ directory }) => ({\n"
         '  "tool.execute.before": async (input, output) => {\n'
         '    if (input.tool !== "bash") return;\n'
@@ -467,6 +470,16 @@ def legacy_plugin(lay):
         "plugin",
         os.path.basename(lay["config"]),
     )
+
+
+def owned_plugin(path):
+    if os.path.islink(path) or not os.path.isfile(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read(len(OPENCODE_HEADER)) == OPENCODE_HEADER
+    except (OSError, UnicodeError):
+        return False
 
 
 def kimi_block(cmd):
@@ -747,7 +760,7 @@ def unregister(tool, lay, guard):
     style = SPECS[tool]["style"]
     if style == "plugin":
         for path in (lay["config"], legacy_plugin(lay)):
-            if os.path.exists(path):
+            if owned_plugin(path):
                 os.remove(path)
         return True
     if not os.path.exists(lay["config"]):
@@ -1072,6 +1085,9 @@ def check_plugin(lay, app):
         if not os.path.isfile(path):
             fail("plugin missing at " + shown(path))
             return
+        if not owned_plugin(path):
+            fail("plugin at " + shown(path) + " was not created by this installer")
+            return
     rc = run_plugin(lay["config"], SUBMIT, app)
     if rc is None:
         note(
@@ -1295,6 +1311,11 @@ def main(argv):
         return verify(tool, lay, guard, repo_dir)
     if mode == "uninstall":
         return uninstall(tool, lay, guard, dry)
+    if tool == "opencode":
+        for path in (lay["config"], legacy_plugin(lay)):
+            if os.path.lexists(path) and not owned_plugin(path):
+                fail("plugin at " + shown(path) + " was not created by this installer. Move it before installing.")
+                return 1
     if dry:
         print("Dry run. Nothing is written.")
         print("  would copy the guard to " + shown(guard))

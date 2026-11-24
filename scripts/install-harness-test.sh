@@ -444,6 +444,22 @@ await a["tool.execute.before"]({ tool: "bash" }, out); await b["tool.execute.bef
 ' "$(cfg opencode)" "$H/.config/opencode/plugin/app-store-compliance.js" "$H" 2>/dev/null
   [ "$(wc -l < "$H/count" | tr -d ' ')" = "1" ] && ok "opencode checks a call once with both plugin folders loaded" || bad "opencode checks a call once with both plugin folders loaded ($(wc -l < "$H/count" 2>/dev/null))"
 else ok "opencode double-load check skipped, node not installed"; fi
+# A same-named local OpenCode plug-in belongs to the user, including in the legacy folder.
+for plugdir in plugin plugins; do
+  fresh
+  foreign="$H/.config/opencode/$plugdir/app-store-compliance.js"
+  mkdir -p "$(dirname "$foreign")"
+  printf 'export const LocalPlugin = () => ({});\n' > "$foreign"
+  cp "$foreign" "$WORK/local-plugin.js"
+  OUT="$(run --tool opencode)"; RC=$?
+  [ "$RC" -eq 1 ] && cmp -s "$foreign" "$WORK/local-plugin.js" && [ ! -e "$(gdir opencode)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'not created by this installer' \
+    && ok "opencode install leaves a local $plugdir file and payload alone" || bad "opencode install leaves a local $plugdir file and payload alone (rc=$RC)"
+  cp "$WORK/local-plugin.js" "$foreign"
+  run --tool opencode uninstall >/dev/null; RC=$?
+  [ "$RC" -eq 0 ] && cmp -s "$foreign" "$WORK/local-plugin.js" \
+    && ok "opencode uninstall preserves a local $plugdir file" || bad "opencode uninstall preserves a local $plugdir file (rc=$RC)"
+done
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
