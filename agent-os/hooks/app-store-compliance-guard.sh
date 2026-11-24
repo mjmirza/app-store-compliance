@@ -619,8 +619,15 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
+def url_shaped(text, m):
+    # A scheme before the host, or a port or path right after it. Prose such as JSX text has neither.
+    return text[max(0, m.start() - 3):m.start()] == chr(58) + SL + SL or text[m.end():m.end() + 1] in (chr(58), SL)
+
+
 def skip_regex(code, i):
     # End index of a regex literal starting at i, or None when a slash there is division.
+    if code[i - 1:i] == chr(60) or code[i + 1:i + 2] == chr(62):
+        return None
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9)):
         k -= 1
@@ -717,7 +724,7 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     for text in literals(code):
-        if text[0] in (SQ, BT) and WANT.search(text):
+        if text[0] in (SQ, BT) and any(url_shaped(text, m) for m in WANT.finditer(text)):
             print(path)
             sys.exit(0)
 JSSTRPY
@@ -728,14 +735,7 @@ JSSTRPY
 # The React Native GoogleSignin export counts only where it can reach the iOS build.
 ios_google_signin() {
   [ -s "$FILELIST" ] || return 1
-  # A file with a .ios sibling, such as login.ts beside login.ios.ts, is replaced on iOS, so it is left out too.
-  local f stem
-  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
-    | while IFS= read -r f; do
-        case "$f" in *.ios.*) echo "$f"; continue ;; esac
-        stem="${f%.*}"
-        ls "$stem".ios.* >/dev/null 2>&1 || echo "$f"
-      done | grep . >/dev/null
+  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null | grep . >/dev/null
 }
 
 # Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
