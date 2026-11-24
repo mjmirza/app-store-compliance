@@ -725,8 +725,12 @@ grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -
 # CI config, end-to-end flows and npm scripts never ship either, imported or not (issue #2397).
 # Matched below the project root, so a project that itself sits in a folder named e2e is still read.
 NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e|detox)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
-# package.json ships only when code imports it, for example to read a config block or the version.
-grep -E '[.][cm]?[jt]sx?$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -IlE "package[.]json['\"]" 2>/dev/null | grep . >/dev/null \
+# package.json ships only when code imports or requires it by a relative or alias path, with or without
+# the extension. Vue, Svelte, Astro and .mjs files are not in the source list, so they are found here too.
+{ grep -v '/package[.]json$' "$FILELIST" 2>/dev/null
+  find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \) -prune \) \
+    -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
+  | tr '\n' '\0' | xargs -0 grep -IlE "(from|require|import)[[:space:]]*[(]?[[:space:]]*['\"]([.]{1,2}/|~/|@/|/)([^'\"]*/)?package([.]json)?['\"]" 2>/dev/null | grep . >/dev/null \
   || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
 SHIP_TEST_RE='^$'
 [ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
