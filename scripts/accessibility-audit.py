@@ -471,6 +471,9 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
+ANDROID_TOUCH_TAGS = {"CheckBox", "RadioButton", "Switch", "SwitchCompat", "SwitchMaterial", "ToggleButton", "Chip", "SeekBar", "Spinner", "EditText", "TextInputEditText", "RatingBar"}
+
+
 def run_rule_scan(rule_id, ios_files, android_files):
     findings = []
 
@@ -786,17 +789,34 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
                 # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
-                for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
-                    start_idx = match.start()
-                    line_no = content.count("\n", 0, start_idx) + 1
-                    findings.append({
-                        "file": f,
-                        "line": line_no,
-                        "rule_id": rule_id,
-                        "match": match.group(0),
-                        "message": f"Component dimension ({match.group(0)}) is below the recommended 48dp touch target threshold.",
-                        "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
-                    })
+                # Judge each element on its own. Only interactive controls are touch targets, and
+                # minWidth or minHeight is a lower bound, so the real size is the larger of the two.
+                for el in re.finditer(r"<([A-Za-z_][\w.]*)\b([^<>]*)>", content):
+                    tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
+                    vals = dict(re.findall(r"android:(\w+)\s*=\s*\"([^\"]*)\"", attrs))
+                    clickable = vals.get("clickable", "").lower()
+                    interactive = ("onClick" in vals or clickable == "true" or vals.get("focusable", "").lower() == "true"
+                                   or (clickable != "false" and (tag.endswith("Button") or tag in ANDROID_TOUCH_TAGS)))
+                    if not interactive:
+                        continue
+                    for axis, low in (("layout_width", "minWidth"), ("layout_height", "minHeight")):
+                        size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
+                        if not size:
+                            continue
+                        floor_dp = re.fullmatch(r"([0-9]+)dp", vals.get(low, ""))
+                        if max(int(size.group(1)), int(floor_dp.group(1)) if floor_dp else 0) >= 48 or int(size.group(1)) == 0:
+                            continue
+                        attr = re.search(r"android:" + axis + r"\s*=\s*\"[^\"]*\"", attrs)
+                        start_idx = el.start(2) + attr.start()
+                        line_no = content.count("\n", 0, start_idx) + 1
+                        findings.append({
+                            "file": f,
+                            "line": line_no,
+                            "rule_id": rule_id,
+                            "match": attr.group(0),
+                            "message": f"Component dimension ({attr.group(0)}) is below the recommended 48dp touch target threshold.",
+                            "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
+                        })
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()

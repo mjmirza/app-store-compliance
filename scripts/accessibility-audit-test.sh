@@ -1027,24 +1027,30 @@ if echo "$OUT" | grep -q 'Image("hero")'; then ok "a raw-string interpolated Ima
 rm -rf "$R24_DIR" 2>/dev/null || true
 # A wrapped axis has no explicit size, but must not hide any explicit dimension.
 WRAP_DIR="$(mktemp -d)"
-cat <<'EOF' > "$WRAP_DIR/mixed_targets.xml"
+cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
     <Button android:layout_width="36dp" android:layout_height="wrap_content" />
+    <ImageView android:layout_width="24dp" android:layout_height="24dp" android:clickable="true" />
     <Button android:layout_width="match_parent" android:layout_height="56dp"
         android:minWidth="40dp" />
+    <Button android:layout_width="96dp" android:layout_height="56dp" android:minWidth="40dp" />
+    <Button android:layout_width="40dp" android:layout_height="48dp" android:minWidth="48dp" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
     <Button android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
-EOF
+EOF2
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 2 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 3 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
-    && echo "$OUT" | grep -q 'context: android:minWidth="40dp"'; then
-  ok "wrap_content does not hide explicit undersized dimensions"
+    && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_height="24dp"'; then
+  ok "wrap_content does not hide an undersized control, and dividers or minWidth-raised controls stay silent"
 else
-  bad "wrap_content does not hide explicit undersized dimensions"
+  bad "wrap_content does not hide an undersized control, and dividers or minWidth-raised controls stay silent"
   echo "$OUT"
 fi
 rm -rf "$WRAP_DIR"
