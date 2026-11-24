@@ -593,9 +593,9 @@ for path in sys.argv[1:]:
         continue
     for tok in TOKEN.finditer(code):
         text = tok.group(0)
-        # Code inside a template expression is not string text, so drop it before searching.
+        # A comment inside a template expression is not string text, so drop comments only.
         if text[0] == "\x60":
-            text = re.sub(r"\$\{[^{}]*\}", "", text)
+            text = re.sub(r"/[*].*?[*]/", "", text, flags=re.S)
         if text[0] in "'\x60" and WANT.search(text):
             print(path)
             sys.exit(0)

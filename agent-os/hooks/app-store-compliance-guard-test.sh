@@ -3823,6 +3823,12 @@ rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok 
 printf 'export const api = \x60http://localhost:3000/${path}\x60;\n' > "$D/src/api.ts"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-quote a localhost template literal with an expression is still reported" || bad "js-quote a localhost template literal with an expression is still reported"
+printf 'export const api = \x60https://${getHost({region: "eu"}) /* localhost is dev only */}/v1\x60;\n' > "$D/src/api.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-quote a comment beside nested braces is not a host" || bad "js-quote a comment beside nested braces is not a host"
+printf 'export const api = \x60${config.apiUrl || '"'"'http://localhost:3000'"'"'}/v1\x60;\n' > "$D/src/api.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-quote a localhost fallback inside a template expression is still reported" || bad "js-quote a localhost fallback inside a template expression is still reported"
 rm -rf "$D"
 
 echo ""
