@@ -955,8 +955,31 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if code_has 'CNContactStore'; then
     config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
+js_apple_login_started() {  # 0 if JS or TS code calls signInAsync( or performRequest({... Operation.LOGIN ...})
+    [ -s "$FILELIST" ] || return 1
+    grep -E '[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'SIWAPY'
+import re
+import sys
+
+TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
+EXPO = re.compile(r"AppleAuthentication\s*[.]\s*signInAsync\s*[(]")
+INVERTASE = re.compile(r"[.]performRequest\s*[(]\s*[{][^{}]*?requestedOperation\s*:\s*appleAuth\s*[.]\s*Operation\s*[.]\s*LOGIN\b", re.S)
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            code = TOKEN.sub(" ", fh.read())
+    except OSError:
+        continue
+    if EXPO.search(code) or INVERTASE.search(code):
+        sys.exit(0)
+sys.exit(1)
+SIWAPY
+  )" 2>/dev/null
+  }
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
+    # with comments and strings removed. Buttons, enums, options objects and logout do not.
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then
