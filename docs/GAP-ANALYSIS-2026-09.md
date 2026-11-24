@@ -71,6 +71,8 @@ Stale entries corrected. `docs/PLATFORM-MECHANICS-2026.md` cited the wrong annou
 | Target API 36 with 1 November 2026 extension, Billing v8 ladder to 2028 | [Target SDK](https://developer.android.com/google/play/requirements/target-sdk) | Deadline text updated, GOOGLE-TARGET-API updated |
 | US alternative billing reporting from 1 October 2026, Play Catalog Access default from 22 July 2026 | [16497028](https://support.google.com/googleplay/android-developer/answer/16497028), [17117200](https://support.google.com/googleplay/android-developer/answer/17117200) | Deadlines, GOOGLE-PLAY.md section |
 
+Correction, 23 November 2026. The READ_CALL_LOG row above recorded 26 August 2026 from the 15 July 2026 announcement (Play Console Help answer 17134731). That announcement named the change and did not state a day. Answer 10208820, read on 23 November 2026, says account verification via phone call stops being a permitted use case for READ_CALL_LOG on 27 January 2027, and the exceptions table on that page still lists the use case until then. The 29 October 2026 announcement (answer 18100766) states the same date and adds the SMS User Consent API. The replacements are the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, and the SMS User Consent API. The September row is left as it was written.
+
 ## 6. Regulation, verified deltas
 
 Thirty-eight deadlines were added and eight corrected. The full dated list is in `data/regulatory-deadlines.json` and the compiled view in `docs/REGULATORY-TIMELINE.md`.
