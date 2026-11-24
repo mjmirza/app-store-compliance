@@ -539,8 +539,7 @@
         "ASAuthorizationAppleIDProvider",
         "appleAuth.performRequest",
         "AppleAuthentication.signInAsync",
-        "AppleAuthentication.AppleAuthenticationButton",
-        "<AppleButton"
+        "AppleAuthentication.AppleAuthenticationButton"
       ],
       "fix": "Add Sign in with Apple or an equal login that limits data to name and email and allows a private email."
     },

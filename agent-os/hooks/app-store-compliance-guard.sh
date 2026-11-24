@@ -931,8 +931,8 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
     # React Native and Expo apps sign in with Apple through a JS library. Its sign-in call or button
-    # counts, never the package name alone, since an installed but unused dependency offers no login.
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider|appleAuth\.performRequest|AppleAuthentication\.signInAsync|AppleAuthentication\.AppleAuthenticationButton|<AppleButton' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    # counts, never the package name or the cross-platform AppleButton alone, since neither proves an iOS login.
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider|appleAuth\.performRequest|AppleAuthentication\.signInAsync|AppleAuthentication\.AppleAuthenticationButton' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then

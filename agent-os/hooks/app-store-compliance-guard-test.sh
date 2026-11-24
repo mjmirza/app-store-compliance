@@ -3551,6 +3551,11 @@ export const a = () => appleAuthAndroid.signIn()
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-5 Apple sign-in used only on Android is still flagged" || bad "siwa-5 Apple sign-in used only on Android is still flagged"
 rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const signIn = () => GoogleSignIn.signIn()')"
+printf 'import { AppleButton, appleAuthAndroid } from "@invertase/react-native-apple-authentication"\nexport const B = () => <AppleButton onPress={() => appleAuthAndroid.signIn()} />\n' > "$D/src/Login.android.tsx"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-6 an Android-only AppleButton is still flagged" || bad "siwa-6 an Android-only AppleButton is still flagged"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
