@@ -473,7 +473,8 @@ def legacy_plugin(lay):
 
 
 def owned_plugin(path):
-    if os.path.islink(path) or not os.path.isfile(path):
+    # A symlink counts when the file it points to is the installer's plugin.
+    if not os.path.isfile(path):
         return False
     try:
         with open(path, encoding="utf-8") as f:

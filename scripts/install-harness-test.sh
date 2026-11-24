@@ -467,6 +467,13 @@ mv "$plug" "$moved" && ln -s "$moved" "$plug"
 run --tool opencode uninstall >/dev/null; RC=$?
 [ "$RC" -eq 0 ] && [ ! -e "$plug" ] && [ ! -L "$plug" ] && [ -f "$moved" ] && ok "opencode uninstall unlinks a symlinked plugin and keeps its target" || bad "opencode uninstall unlinks a symlinked plugin and keeps its target (rc=$RC)"
 
+# A dotfile-managed symlink to the installer's own plugin still reinstalls and passes doctor.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"; kept="$WORK/dotfiles-plugin.js"
+cp "$plug" "$kept" && rm -f "$plug" && ln -s "$kept" "$plug"
+OUT="$(run --tool opencode)"; RC1=$?; run --tool opencode doctor >/dev/null; RC2=$?
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode accepts a symlink to its own plugin" || bad "opencode accepts a symlink to its own plugin (rc=$RC1/$RC2)"
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
