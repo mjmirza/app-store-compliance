@@ -3256,6 +3256,85 @@ gs_check "ipv6-2 getaddrinfo stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKIN
 D="$(gs_ios Net.swift 'let my_inet_addr_label = "x"')"
 gs_check "ipv6-3 a word containing inet_addr without a call stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
 
+# Sign in with Apple in React Native and Expo apps. The JS libraries never name SignInWithApple or
+# ASAuthorizationAppleIDProvider in app code, so the 4.8 check must also know their packages and calls.
+mk_rn_social() {  # $1 = package.json dependencies, $2 = sign-in code
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '<plist/>' > "$d/ios/App/Info.plist"
+  printf '{"name":"t","dependencies":{"react-native":"0.80.0"%s}}\n' "$1" > "$d/package.json"
+  printf 'import { GoogleSignIn } from "./google"\n%s\n' "$2" > "$d/src/signIn.ts"
+  echo "$d"
+}
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'const r = await appleAuth.performRequest({ requestedOperation: appleAuth.Operation.LOGIN })')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-1 React Native Sign in with Apple (react-native-apple-authentication) counts" || bad "siwa-1 React Native Sign in with Apple (react-native-apple-authentication) counts"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'const c = await AppleAuthentication.signInAsync({ requestedScopes: [] })')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-2 Expo Sign in with Apple (expo-apple-authentication) counts" || bad "siwa-2 Expo Sign in with Apple (expo-apple-authentication) counts"
+rm -rf "$D"
+D="$(mk_rn_social '' 'export const signIn = () => GoogleSignIn.signIn()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-3 social login with no Sign in with Apple at all is still flagged" || bad "siwa-3 social login with no Sign in with Apple at all is still flagged"
+rm -rf "$D"
+# The package alone is not a login. Installed but unused, or used only in an Android file, is still flagged.
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const signIn = () => GoogleSignIn.signIn()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-4 the Apple package with no sign-in call is still flagged" || bad "siwa-4 the Apple package with no sign-in call is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const signIn = () => GoogleSignIn.signIn()')"
+printf 'import { appleAuthAndroid } from "@invertase/react-native-apple-authentication"
+export const a = () => appleAuthAndroid.signIn()
+' > "$D/src/signIn.android.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-5 Apple sign-in used only on Android is still flagged" || bad "siwa-5 Apple sign-in used only on Android is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const signIn = () => GoogleSignIn.signIn()')"
+printf 'import { AppleButton, appleAuthAndroid } from "@invertase/react-native-apple-authentication"\nexport const B = () => <AppleButton onPress={() => appleAuthAndroid.signIn()} />\n' > "$D/src/Login.android.tsx"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-6 an Android-only AppleButton is still flagged" || bad "siwa-6 an Android-only AppleButton is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const t = AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-7 the Expo button type enum alone is still flagged" || bad "siwa-7 the Expo button type enum alone is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const out = () => appleAuth.performRequest({ requestedOperation: appleAuth.Operation.LOGOUT })')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-8 an Apple logout request is still flagged" || bad "siwa-8 an Apple logout request is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' '// TODO implement AppleAuthentication.signInAsync()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-9 a sign-in call inside a comment is still flagged" || bad "siwa-9 a sign-in call inside a comment is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const B = () => <AppleAuthentication.AppleAuthenticationButton onPress={() => {}} />')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-10 a rendered Expo Apple button with no sign-in call is still flagged" || bad "siwa-10 a rendered Expo Apple button with no sign-in call is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const o = { requestedOperation: appleAuth.Operation.LOGIN }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-11 a LOGIN options object with no performRequest call is still flagged" || bad "siwa-11 a LOGIN options object with no performRequest call is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' '/* Legacy flow
+AppleAuthentication.signInAsync()
+*/')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-12 a sign-in call inside a block comment is still flagged" || bad "siwa-12 a sign-in call inside a block comment is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'const unused = { requestedOperation: appleAuth.Operation.LOGIN };
+export const logout = () => appleAuth.performRequest({
+  requestedOperation: appleAuth.Operation.LOGOUT
+})')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-13 a LOGIN options object beside a LOGOUT request is still flagged" || bad "siwa-13 a LOGIN options object beside a LOGOUT request is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const login = () => appleAuth.performRequest({
+  requestedOperation: appleAuth.Operation.LOGIN,
+  requestedScopes: [appleAuth.Scope.EMAIL],
+})')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-14 a multiline Invertase LOGIN request counts" || bad "siwa-14 a multiline Invertase LOGIN request counts"
+rm -rf "$D"
+
 D="$(gs_ios H.swift 'let s = HKHealthStore()
 let c = CKContainer.default()')"
 gs_check "health-1 HealthKit plus CloudKit is flagged" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 1
@@ -3594,6 +3673,10 @@ for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
 rm -rf "$D"
+# macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
+if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
+  /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
+fi
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -536,7 +536,9 @@
       ],
       "counterSignals": [
         "SignInWithApple",
-        "ASAuthorizationAppleIDProvider"
+        "ASAuthorizationAppleIDProvider",
+        "AppleAuthentication.signInAsync(",
+        "appleAuth.performRequest( with appleAuth.Operation.LOGIN"
       ],
       "fix": "Add Sign in with Apple or an equal login that limits data to name and email and allows a private email."
     },
