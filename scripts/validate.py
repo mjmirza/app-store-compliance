@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import datetime
+from urllib.parse import urlsplit
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = os.path.join(ROOT, "data", "rejection-patterns.json")
@@ -81,7 +82,16 @@ def validate_section_paths(d, did):
 def validate_provenance(d, did, today):
     """Every deadline names its source and the day it was last read (#661)."""
     url = str(d.get("source_url") or "").strip()
-    if url and not url.startswith(("https://", "http://")):
+    try:
+        parts = urlsplit(url)
+        web_address = (
+            parts.scheme in {"http", "https"}
+            and bool(parts.hostname)
+            and not any(char.isspace() for char in url)
+        )
+    except ValueError:
+        web_address = False
+    if d.get("source_url") is not None and not web_address:
         errors.append(f"deadline '{did}' has source_url '{url}', which is not a web address")
     note = d.get("source_note")
     if note is not None and not str(note).strip():
