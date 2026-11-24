@@ -1086,12 +1086,18 @@ cat <<'EOF4' > "$RES_DIR/res/layout/x.xml"
     android:layout_width="match_parent" android:layout_height="wrap_content">
     <Button android:layout_width="32dp" android:layout_height="48dp" android:clickable="@bool/tap" />
     <TextView android:layout_width="match_parent" android:layout_height="24dp" android:autoLink="web" android:linksClickable="@bool/links" />
+    <TextView android:layout_width="wrap_content" android:layout_height="23dp" android:autoLink="web" android:linksClickable="@bool/alias" />
+    <RatingBar android:layout_width="wrap_content" android:layout_height="22dp" android:isIndicator="@bool/read_only" />
+    <RatingBar style="?android:attr/ratingBarStyleSmall" android:layout_width="wrap_content" android:layout_height="21dp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="20dp" android:focusable="true" />
+    <ImageView android:layout_width="19dp" android:layout_height="48dp" android:clickable="@bool/inert" />
 </LinearLayout>
 EOF4
-printf '<resources><bool name="tap">true</bool><bool name="links">false</bool></resources>\n' > "$RES_DIR/res/values/b.xml"
-printf '<resources><bool name="tap">false</bool></resources>\n' > "$RES_DIR/res/values-sw600dp/b.xml"
+printf '<resources><bool name="tap">true</bool><bool name="links">false</bool><bool name="alias">@bool/on</bool><bool name="on">true</bool><bool name="read_only">false</bool><!-- <bool name="inert">true</bool> --><bool name="inert">false</bool></resources>\n' > "$RES_DIR/res/values/b.xml"
+printf '<resources><bool name="tap">false</bool><bool name="read_only">true</bool></resources>\n' > "$RES_DIR/res/values-sw600dp/b.xml"
 OUT=$($AUDIT "$RES_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_width="32dp"'; then
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 3 ] && echo "$OUT" | grep -q 'context: android:layout_width="32dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_height="23dp"' && echo "$OUT" | grep -q 'context: android:layout_height="22dp"'; then
   ok "a bool resource true in any variant counts, a link resource set to false stays silent"
 else
   bad "a bool resource true in any variant counts, a link resource set to false stays silent"

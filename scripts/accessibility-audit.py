@@ -785,25 +785,39 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
-        # Boolean resources, so android:clickable="@bool/name" resolves to the value the project defines.
+        # Boolean resources, so android:clickable="@bool/name" resolves to the values the project defines.
+        # Every variant (phone, tablet, night) is kept, and an alias to another bool is followed.
         bool_res = {}
         for rf in android_files:
             if rf.endswith(".xml"):
                 try:
                     with open(rf, encoding="utf-8", errors="ignore") as fh:
-                        for name, value in re.findall(r"<bool\s+name=\"([\w.]+)\"\s*>\s*(true|false)\s*</bool>", fh.read()):
-                            bool_res.setdefault(name, set()).add(value)
+                        text = re.sub(r"<!--.*?-->", "", fh.read(), flags=re.S)
                 except OSError:
                     continue
+                for name, value in re.findall(r"<bool\s+name=\"([\w.]+)\"\s*>\s*([^<]*?)\s*</bool>", text):
+                    bool_res.setdefault(name, set()).add(value)
 
-        def resolve(value):
-            # An unresolved resource reads as unknown, never as true. A value that is true in any
-            # resource variant (phone, tablet, night) counts as true, since one device sees it.
-            ref = re.fullmatch(r"@bool/([\w.]+)", value.strip())
+        def values(value, depth=0):
+            # The set of booleans a value can take on some device. Empty means unknown.
+            value = value.strip()
+            ref = re.fullmatch(r"@bool/([\w.]+)", value)
             if not ref:
-                return value.lower()
-            seen = bool_res.get(ref.group(1), set())
-            return "true" if "true" in seen else ("false" if seen else "")
+                return {value.lower()} if value.lower() in ("true", "false") else set()
+            if depth > 8:
+                return set()
+            out = set()
+            for v in bool_res.get(ref.group(1), set()):
+                out |= values(v, depth + 1)
+            return out
+
+        def maybe_true(value):
+            # An attribute that turns touch on counts when any variant sets it true.
+            return "true" in values(value)
+
+        def surely_true(value):
+            # An attribute that turns touch off counts only when every variant sets it true.
+            return values(value) == {"true"}
 
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
         for f in android_files:
@@ -837,14 +851,18 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*/?>", live):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
-                    true_attr = any(resolve(vals.get(k, "")) == "true" for k in ("clickable", "longClickable", "focusable", "textIsSelectable"))
+                    # Focusable alone is keyboard focus, not touch, so it is left out as Google's own check does.
+                    true_attr = any(maybe_true(vals.get(k, "")) for k in ("clickable", "longClickable", "textIsSelectable"))
                     # linksClickable defaults to true. An unresolved resource reads as unknown, so no finding.
                     lc = vals.get("linksClickable", "true")
-                    links = vals.get("autoLink", "none").lower() != "none" and resolve(lc) == "true"
+                    links = vals.get("autoLink", "none").lower() != "none" and maybe_true(lc)
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
-                    # A RatingBar with isIndicator only displays a value, it takes no touch.
-                    widget = (resolve(vals.get("clickable", "")) != "false" and resolve(vals.get("isIndicator", "")) != "true"
-                              and ANDROID_TOUCH_TAG.search(tag))
+                    # A RatingBar with isIndicator, or an indicator or small style, only displays a value.
+                    style = re.search(r"(?<![\w:])style\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)
+                    indicator = surely_true(vals.get("isIndicator", "")) or bool(
+                        style and re.search(r"ratingBarStyle(Small|Indicator)|RatingBar\.(Small|Indicator)", style.group(1) or style.group(2) or ""))
+                    off = values(vals.get("clickable", "")) == {"false"}
+                    widget = not off and not indicator and ANDROID_TOUCH_TAG.search(tag)
                     if not (true_attr or links or handler or widget):
                         continue
                     for axis in ("layout_width", "layout_height"):
