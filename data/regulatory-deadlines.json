@@ -1697,6 +1697,21 @@
       "verified_on": "2026-11-23",
       "source_note": "Read on Play Console Help answer 10208820 on 23 November 2026. The page says the SMS and Call Log permissions policy will no longer permit account verification via phone call as a use case for READ_CALL_LOG, effective 27 January 2027, and names the Digital Credentials API (directly or through a verification provider built upon it) and the SMS Retriever API. The exceptions table on the same page still lists account verification via phone call. The 29 October 2026 policy announcement (answer 18100766, https://support.google.com/googleplay/android-developer/answer/18100766?hl=en-GB) repeats the 27 January 2027 date and adds the SMS User Consent API as a privacy-preserving alternative for account verification. The 15 July 2026 announcement (answer 17134731, https://support.google.com/googleplay/android-developer/answer/17134731) named the change and did not state 27 January 2027.",
       "history": "2026-11-23. Added. docs/GOOGLE-PLAY.md and GOOGLE-PERM-SMS-CALLLOG previously said 26 August 2026, taken from the 15 July 2026 announcement, which named the change and did not state a day. Answers 10208820 and 18100766 state 27 January 2027. The September gap-analysis row is left as written, with a correction note."
+    },
+    {
+      "id": "KR-PIPA-SELF-TRANSMISSION-2027",
+      "jurisdiction": "South Korea",
+      "law": "Personal Information Protection Act Article 35-2(1), Enforcement Decree Article 42-2(1)(1) as amended by Presidential Decree No. 36121 (19 February 2026)",
+      "requirement": "From 20 February 2027 a private personal information handler whose average revenue under the Framework Act on Small and Medium Enterprises Enforcement Decree exceeds KRW 180 billion, and which processes the personal information of 1 million or more data subjects or the sensitive or unique identifying information of 50,000 or more (daily average over the last three months of the previous year), must transmit a data subject's personal information to that data subject on request. Schools and medical institutions are excluded. The handler transmits without delay, encrypted with a secure algorithm, keeps the data accurate, complete and current, accepts an agent's automated tool on a method agreed in advance, and publishes on its website how to make the request and check its status and history (Decree Article 42-6). A large app operator serving Korean users plans the request flow, the export format and the agent interface before that date.",
+      "effective_date": "2027-02-20",
+      "grace_period": "none",
+      "mandatory_date": "2027-02-20",
+      "enforcement_date": "2027-02-20",
+      "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 3.5, references/rules/privacy.md",
+      "priority": "medium",
+      "source_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283503",
+      "verified_on": "2026-11-23",
+      "source_note": "law.go.kr loads the decree body by script. The text of Decree No. 36121 was read from its body endpoint for the same lsiSeq. Its Supplementary Provisions put the decree in force six months after promulgation (20 August 2026) and Article 42-2(1)(1) one year after promulgation, and law.go.kr annotates that item [시행일: 2027. 2. 20.]."
     }
   ]
 }

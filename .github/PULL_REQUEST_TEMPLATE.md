@@ -26,6 +26,14 @@ python3 scripts/validate.py
 python3 scripts/verify-citations.py --files docs/ data/
 ```
 
+## What still fires
+
+<!--
+For a change to the guard or a script: the test that failed before your change, and the control
+that shows the real case is still caught. If your change makes a check flag less, list what it
+could now miss and why that is acceptable. Docs or data only? Write "no check changed".
+-->
+
 ## Declarations
 
 - [ ] Every guideline number, date, and statistic here traces to a source above. Nothing is from memory
