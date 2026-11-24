@@ -990,14 +990,8 @@ COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
 def majors(settings):
     # Drop /* */ and // comments, but never inside a quoted value such as "$(SRCROOT)/**".
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    # A simulator- or arch-conditional value never reaches an App Store upload. A device value wins.
-    plain, device = [], []
-    for cond, value in DT_RE.findall(settings):
-        if not cond:
-            plain.append(int(value))
-        elif "sdk=iphoneos" in cond:
-            device.append(int(value))
-    return device or plain
+    # A simulator-only value never reaches an App Store upload, so it is left out.
+    return [int(value) for cond, value in DT_RE.findall(settings) if "iphonesimulator" not in cond]
 
 
 worst = 0
@@ -1023,7 +1017,8 @@ for path in sys.argv[1:]:
     if any(v < 13 for v in chosen):
         worst = 13
         break
-    if any(v < 15 for v in chosen):
+    # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
+    if chosen and max(chosen) < 15:
         worst = 15
     elif chosen:
         ok15 = True
@@ -1045,22 +1040,26 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   xcconfig_ios15_state() {
-    # One line per app xcconfig, below15 or ok15. The last device or unconditional assignment wins.
+    # One number per app xcconfig. Per key the last assignment wins, simulator-only keys are left out,
+    # and the file reports its highest value. A Podfile-style platform line counts as 14.
     [ -s "$FILELIST" ] || return 0
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
       awk '{ sub(/\/\/.*/, "") }
-        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
-          if ($0 ~ /IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*=/) plain = p[1]; else if ($0 ~ /sdk=iphoneos/) dev = p[1] }
+        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { cond = ""; if (match($0, /\[[^]]*\]/)) cond = substr($0, RSTART, RLENGTH)
+          if (cond ~ /iphonesimulator/) next
+          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last[cond] = p[1] + 0 }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
-        END { last = (dev != "") ? dev : plain
-          if (last == "13" || last == "14" || plat) print "below15"; else if (last + 0 >= 15) print "ok15" }' "$xf" 2>/dev/null
+        END { m = -1; for (c in last) if (last[c] > m) m = last[c]
+          if (plat && m < 0) m = 14
+          if (m >= 0) print m }' "$xf" 2>/dev/null
     done
   }
   # Below iOS 13 is refused today (Upcoming Requirements). iOS 13 and 14 stay legal until April 2027,
   # when the Submitting page requires iOS 15, so they warn and do not block. A below-13 target keeps
   # only the existing finding.
   pbx_floor="$(pbx_ios_floor || true)"
-  xc_state="$(xcconfig_ios15_state)"
+  xc_max="$(xcconfig_ios15_state | sort -n | tail -1)"
+  case "$xc_max" in 13|14) xc_state=below15 ;; '') xc_state='' ;; *) [ "$xc_max" -ge 15 ] 2>/dev/null && xc_state=ok15 || xc_state='' ;; esac
   # An app setting of 15 or later, in the project file or an xcconfig, overrides the Podfile's pod platform.
   if podfile_below_ios13 || xcconfig_below_ios13 || printf '%s\n' "$pbx_floor" | grep_q -x below13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'

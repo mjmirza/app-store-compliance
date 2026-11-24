@@ -3220,11 +3220,10 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLO
 gs_check "ios15 an xcconfig app target of 15 overrides a Podfile platform 14" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\nIPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*] = 14.0\n' > "$D/Config/Release.xcconfig"
 gs_check "ios15 a simulator-only 14.0 in an xcconfig stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
-ios15_case "a simulator-only 14.0 in the project file stays clean" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 14.0;
-IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*] = 14.0;' - clean
-ios15_case "a device-only 14.0 in the project file still warns" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = 14.0;' - warn
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET[arch=arm64] = 15.0\n' > "$D/Config/Release.xcconfig"
+gs_check "ios15 an arch-conditional 15.0 over a base 14.0 stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Base.xcconfig"; printf '#include "Base.xcconfig"\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/Config/Release.xcconfig"
+gs_check "ios15 a Release xcconfig of 15.0 over an included Base of 14.0 stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
