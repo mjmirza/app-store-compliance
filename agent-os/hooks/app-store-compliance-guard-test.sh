@@ -3596,6 +3596,10 @@ for x in b c d; do printf "platform :ios, '15.0'\n" > "$D/$x/Podfile"; done
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' && ok "pf-1 one old Podfile among newer ones is still reported" || bad "pf-1 one old Podfile among newer ones is still reported (rc=$RC)"
 rm -rf "$D"
+# macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
+if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
+  /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
+fi
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

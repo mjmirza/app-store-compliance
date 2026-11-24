@@ -935,7 +935,7 @@ js_apple_login_started() {  # 0 if JS or TS code calls signInAsync( or performRe
 import re
 import sys
 
-TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"`(?:\\.|[^`\\])*`|/[*].*?[*]/|//[^\n]*", re.S)
+TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
 EXPO = re.compile(r"AppleAuthentication\s*[.]\s*signInAsync\s*[(]")
 INVERTASE = re.compile(r"[.]performRequest\s*[(]\s*[{][^{}]*?requestedOperation\s*:\s*appleAuth\s*[.]\s*Operation\s*[.]\s*LOGIN\b", re.S)
 for path in sys.argv[1:]:
