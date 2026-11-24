@@ -992,7 +992,7 @@ import re
 import sys
 
 BLOCK_RE = re.compile(
-    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
+    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
 )
 VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?(\$[^;\"\n]*)")
 DT_RE = re.compile(
@@ -1038,7 +1038,11 @@ for path in sys.argv[1:]:
     has_app = False
     app_var = False
     project_var = False
-    for settings in BLOCK_RE.findall(text):
+    # An App Store archive builds Release, so when Release configurations exist only they decide.
+    blocks = BLOCK_RE.findall(text)
+    if any(name == "Release" for _, name in blocks):
+        blocks = [b for b in blocks if b[1] == "Release"]
+    for settings, _ in blocks:
         is_app = ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and not any(
             marker in settings for marker in DEPENDENCY_MARKERS)
         has_app = has_app or is_app
@@ -1093,7 +1097,8 @@ PBXPY
     # One number per app xcconfig. Per key the last assignment wins, simulator-only keys are left out,
     # and the file reports its highest value. A Podfile-style platform line counts as 14.
     [ -s "$FILELIST" ] || return 0
-    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
+    # The name filter reads the path below the project, so a parent folder such as contest-app is never matched.
+    grep '[.]xcconfig$' "$FILELIST" | awk -v root="${DIR%/}/" '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } tolower(p) !~ /(test|framework|pods)/' | while IFS= read -r xf; do
       awk '{ sub(/\/\/.*/, "") }
         /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
           if (cond ~ /iphonesimulator/) next
