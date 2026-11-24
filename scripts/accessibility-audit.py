@@ -475,7 +475,7 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
-ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar|Slider"
+ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar"
                                r"|Spinner|EditText|AutoCompleteTextView|RatingBar|NumberPicker|Picker)$")
 
 
@@ -814,12 +814,21 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 attr_re = r"\s+[\w:.-]+\s*=\s*(?:\"[^\"]*\"|'[^']*')"
                 # A commented-out element is not a control. Blank comments but keep their line breaks.
                 live = re.sub(r"<!--.*?-->", lambda m: re.sub(r"[^\n]", " ", m.group(0)), content, flags=re.S)
-                for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*/?>", live):
-                    tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
+                # Walk the tree, so a view inside a hidden parent is hidden too.
+                hidden_stack = []
+                for el in re.finditer(r"<(/?)([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*(/?)>", live):
+                    if el.group(1):
+                        if hidden_stack:
+                            hidden_stack.pop()
+                        continue
+                    tag, attrs = el.group(2).rsplit(".", 1)[-1], el.group(3)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
-                    # Only certain interactivity counts. A resource value, autoLink (it depends on the text) and a
-                    # hidden view are unknown here, so they stay silent, the same as before this check existed.
-                    if vals.get("visibility", "visible").lower() != "visible":
+                    hidden = any(hidden_stack) or vals.get("visibility", "visible").lower() != "visible"
+                    if not el.group(4):
+                        hidden_stack.append(hidden)
+                    # Only certain interactivity counts. A resource value, autoLink (it depends on the text), a
+                    # hidden view and a weighted size are unknown here, so they stay silent, as before this check.
+                    if hidden or vals.get("layout_weight", "0").strip() not in ("0", "0.0", ""):
                         continue
                     true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "textIsSelectable"))
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
@@ -835,7 +844,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         if not size or not 0 < int(size.group(1)) < 48:
                             continue
                         attr = re.search(r"android:" + axis + r"\s*=\s*(?:\"[^\"]*\"|'[^']*')", attrs)
-                        add_finding(attr.group(0), el.start(2) + attr.start())
+                        add_finding(attr.group(0), el.start(3) + attr.start())
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()

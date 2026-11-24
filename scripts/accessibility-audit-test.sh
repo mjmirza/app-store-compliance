@@ -1109,6 +1109,27 @@ else
   echo "$OUT"
 fi
 rm -rf "$RES_DIR"
+# A hidden parent, a weighted size and a Material Slider are unknown or enforced, so they stay silent.
+TREE_DIR="$(mktemp -d)"
+cat <<'EOF5' > "$TREE_DIR/tree.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="horizontal"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone">
+        <Button android:layout_width="13dp" android:layout_height="13dp" />
+    </LinearLayout>
+    <Button android:layout_width="12dp" android:layout_height="48dp" android:layout_weight="1" />
+    <com.google.android.material.slider.Slider android:layout_width="match_parent" android:layout_height="11dp" />
+    <Button android:layout_width="33dp" android:layout_height="48dp" />
+</LinearLayout>
+EOF5
+OUT=$($AUDIT "$TREE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_width="33dp"'; then
+  ok "a hidden parent, a weighted size and a Material Slider stay silent, a sibling is still reported"
+else
+  bad "a hidden parent, a weighted size and a Material Slider stay silent, a sibling is still reported"
+  echo "$OUT"
+fi
+rm -rf "$TREE_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
