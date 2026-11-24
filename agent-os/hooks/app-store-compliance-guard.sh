@@ -984,8 +984,12 @@ DEPENDENCY_MARKERS = (
 )
 
 
+COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
+
+
 def majors(settings):
-    settings = re.sub(r"/[*].*?[*]/", "", settings, flags=re.S)
+    # Drop /* */ and // comments, but never inside a quoted value such as "$(SRCROOT)/**".
+    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
     return [int(v) for v in DT_RE.findall(settings)]
 
 
@@ -1014,7 +1018,7 @@ for path in sys.argv[1:]:
         break
     if any(v < 15 for v in chosen):
         worst = 15
-    elif app:
+    elif chosen:
         ok15 = True
 if worst == 13:
     print("below13")

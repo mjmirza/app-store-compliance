@@ -3184,7 +3184,7 @@ ios15_case() {  # $1 label, $2 pbx setting or -, $3 Podfile line or -, $4 block,
   case "$4" in
     block) [ "$has13" = 1 ] && [ "$has15" = 0 ] && good=1 ;;
     warn) [ "$has13" = 0 ] && [ "$med15" = 1 ] && [ "$RC" -eq 0 ] && rr_has 'April 2027' && rr_has 'developer.apple.com/app-store/submitting' && ! rr_has '\[HIGH\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && ! rr_has '\[CRITICAL\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && good=1 ;;
-    clean) [ "$has13" = 0 ] && [ "$has15" = 0 ] && good=1 ;;
+    clean) [ "$has13" = 0 ] && [ "$has15" = 0 ] && rr_has 'Coverage. complete ios=1' && good=1 ;;
   esac
   [ "$good" = 1 ] && ok "ios15 $1" || bad "ios15 $1 (rc=$RC has13=$has13 has15=$has15 med=$med15)"
   rm -rf "$d"
@@ -3211,6 +3211,16 @@ ios15_case "an app target of 14 still warns beside a Podfile platform 15" 'IPHON
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '  IPHONEOS_DEPLOYMENT_TARGET = 14.0 // set for the old devices\n' > "$D/Config/Base.xcconfig"
 gs_check "ios15 an indented xcconfig 14.0 with a trailing comment still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
+ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
+ios15_case "a /** inside a quoted path does not hide a 12.0 target" 'HEADER_SEARCH_PATHS = "$(SRCROOT)/Headers/**";
+IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+EXCLUDED_SOURCE_FILE_NAMES = "*/Legacy.swift";' - block
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"; printf "platform :ios, '14.0'\n" > "$D/Podfile"
+printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+rr_run "$D"
+! rr_has 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && rr_has 'Coverage. complete ios=1' && ok "ios15 an app inheriting a project-level 15.0 overrides a Podfile 14" || bad "ios15 an app inheriting a project-level 15.0 overrides a Podfile 14"
+rm -rf "$D"
 
 D="$(gs_ios Net.m 'in_addr_t a = inet_addr("10.0.0.1");')"
 gs_check "ipv6-1 inet_addr is flagged" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1
