@@ -3201,6 +3201,15 @@ rm -rf "$D"
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 14.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a framework target of 14 beside an iOS 15 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+# A commented-out 14 is not a target, and an app target of 15 overrides a base xcconfig or the Podfile.
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '// IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/Config/Release.xcconfig"
+gs_check "ios15 a commented-out 14.0 in an xcconfig stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Base.xcconfig"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;'
+gs_check "ios15 an app target of 15 overrides a base xcconfig of 14" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+ios15_case "an app target of 15 overrides a Podfile platform 14" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;' "platform :ios, '14.0'" clean
+ios15_case "an app target of 14 still warns beside a Podfile platform 15" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' "platform :ios, '15.0'" warn
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '  IPHONEOS_DEPLOYMENT_TARGET = 14.0 // set for the old devices\n' > "$D/Config/Base.xcconfig"
+gs_check "ios15 an indented xcconfig 14.0 with a trailing comment still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 
 D="$(gs_ios Net.m 'in_addr_t a = inet_addr("10.0.0.1");')"
 gs_check "ipv6-1 inet_addr is flagged" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1
