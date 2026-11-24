@@ -399,9 +399,13 @@ def _label_closure_after(code, k, pairs):
     return None if end == -1 else (start, end)
 
 
-def _line_end(text, start, end):
-    nl = text.find("\n", start, end)
-    return end if nl == -1 else nl
+def _button_context(text, start, end):
+    """Keep context on one line and bound output for nested, single-line controls."""
+    stop = min(end, start + 160)
+    newline = text.find("\n", start, stop)
+    if newline != -1:
+        return text[start:newline].strip()
+    return text[start:stop].strip() + ("..." if stop < end else "")
 
 
 def find_icon_only_buttons(code):
@@ -523,7 +527,7 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         "file": f,
                         "line": bisect.bisect_right(newlines, offset) + 1,
                         "rule_id": rule_id,
-                        "match": content[offset : _line_end(content, offset, end)].strip(),
+                        "match": _button_context(content, offset, end),
                         "message": "Possible icon-only Button. Its label shows an Image(systemName:) with no Text, Label or accessibilityLabel, so VoiceOver may read the symbol name.",
                         "fix": 'Add .accessibilityLabel("...") to the Button, or use Label("Title", systemImage: ...) / Button("Title", systemImage: ...).',
                     }

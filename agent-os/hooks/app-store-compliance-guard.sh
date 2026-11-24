@@ -15,7 +15,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -542,6 +542,13 @@ own_privacy_manifest() {
 # build compiles is not flagged. The string-literal requirement (the match must sit inside "...")
 # skips comments and identifiers. This is what makes the backend check precise instead of matching
 # a localhost mentioned in a comment or guarded behind DEBUG. Without it the check cries wolf.
+ship_has() {  # grep_has over the files that ship. Test files are left out when nothing imports them
+  [ "${SHIPLIST:-$FILELIST}" = "$FILELIST" ] && { grep_has "$1"; return; }
+  [ -s "$SHIPLIST" ] || return 1
+  # Test the output, not the exit code. xargs splits a long list into batches, and one batch
+  # with no match would otherwise make the whole pipeline fail under pipefail.
+  [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
+}
 release_string_has() {
   [ -s "$FILELIST" ] || return 1
   local f
@@ -557,7 +564,7 @@ release_string_has() {
         ' "$f" 2>/dev/null ;;
       *) cat "$f" 2>/dev/null ;;
     esac
-  done < "$FILELIST" \
+  done < "${SHIPLIST:-$FILELIST}" \
     | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1
   # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
   # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
@@ -694,6 +701,25 @@ find "$DIR" -mindepth 1 \
   -o -name '*.cs' -o -name '*.rs' -o -name '*.csproj' -o -name '*.xaml' -o -name '*.toml' \
   \) -print 2>/dev/null \
   > "$FILELIST" || : 2>/dev/null >> "$FILELIST" || SCAN_ERROR="the file list could not be written to $FILELIST"
+# JS and TS test files (*.test.ts, *.spec.tsx) sit next to the code they test and never ship, unless
+# app code or a web page names one (an import, a require, a <script src>). Then every test file stays.
+JS_TEST_RE='[.](test|spec)[.][jt]sx?$'
+# Vue, Svelte, Astro, .mjs and .cjs files are not in the source list, so they are found here, outside test folders.
+# A glob or context import (import.meta.glob, require.context) can bundle a test file unnamed, so it keeps them too.
+TEST_IMPORTERS="$({ grep -E '[.]([cm]?[jt]sx?|html?|vue|svelte|astro)$' "$FILELIST" 2>/dev/null | grep -vE "$JS_TEST_RE"
+  find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \
+    -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests -o -name integration_test -o -name e2e \) -prune \) \
+    -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.html' -o -name '*.htm' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
+  | tr '\n' '\0' | xargs -0 grep -EIl -e "['\"\`][^'\"\`]*[.](test|spec)([.][cm]?[jt]sx?)?([?#][^'\"\`]*)?['\"\`]" -e "=[[:space:]]*[^[:space:]>='\"\`]*[.](test|spec)[.][cm]?[jt]sx?([?#][^[:space:]>]*)?([[:space:]>]|$)" -e 'import[.]meta[.]glob|require[.]context' 2>/dev/null || true)"
+# Expo Router bundles every file under app/ as a route, test files included, so those stay.
+ROUTE_KEEP='^$'
+grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -Il '"expo-router"' 2>/dev/null | grep . >/dev/null && ROUTE_KEEP='/app/'
+# Test files stay in the source list, so they still count as evidence the way they always did.
+# Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
+SHIPLIST="$FILELIST"
+if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.ship" 2>/dev/null; then
+  SHIPLIST="$FILELIST.ship"
+fi
 build_blob
 CODE_STATE=""
 
@@ -800,7 +826,7 @@ fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
-if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
+if ship_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
   finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." src 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
@@ -929,8 +955,31 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if code_has 'CNContactStore'; then
     config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
+js_apple_login_started() {  # 0 if JS or TS code calls signInAsync( or performRequest({... Operation.LOGIN ...})
+    [ -s "$FILELIST" ] || return 1
+    grep -E '[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'SIWAPY'
+import re
+import sys
+
+TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
+EXPO = re.compile(r"AppleAuthentication\s*[.]\s*signInAsync\s*[(]")
+INVERTASE = re.compile(r"[.]performRequest\s*[(]\s*[{][^{}]*?requestedOperation\s*:\s*appleAuth\s*[.]\s*Operation\s*[.]\s*LOGIN\b", re.S)
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            code = TOKEN.sub(" ", fh.read())
+    except OSError:
+        continue
+    if EXPO.search(code) or INVERTASE.search(code):
+        sys.exit(0)
+sys.exit(1)
+SIWAPY
+  )" 2>/dev/null
+  }
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
+    # with comments and strings removed. Buttons, enums, options objects and logout do not.
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then

@@ -229,14 +229,21 @@ def attestation_problem(a, row, app_regions, today):
             return f"is missing {key}"
     if a["outcome"] != "compliant":
         return f"records the outcome {a['outcome']}, only compliant clears a rule"
-    if a.get("revision") != row["revision"]:
+    revision = a.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        return "revision must be a whole number"
+    if revision != row["revision"]:
         return f"was made for revision {a.get('revision')}, the rule is now at revision {row['revision']}"
     covers = a.get("covers")
-    missing_items = sorted(set(row["proof_items"]) - set(covers if isinstance(covers, list) else []))
+    if not isinstance(covers, list) or not all(is_text(item) for item in covers):
+        return "covers must be a list of proof item ids"
+    missing_items = sorted(set(row["proof_items"]) - set(covers))
     if missing_items:
         return f"does not cover proof items {', '.join(missing_items)}"
     regions = a.get("regions")
-    missing_regions = sorted(in_scope_regions(row["jurisdiction"], app_regions) - set(regions if isinstance(regions, list) else []))
+    if not isinstance(regions, list) or not all(is_text(region) for region in regions):
+        return "regions must be a list of country codes"
+    missing_regions = sorted(in_scope_regions(row["jurisdiction"], app_regions) - set(regions))
     if missing_regions:
         return f"does not cover {', '.join(missing_regions)}"
     try:

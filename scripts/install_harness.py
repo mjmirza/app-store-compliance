@@ -778,11 +778,17 @@ def unregister(tool, lay, guard):
         return False
     box = data.get("hooks") if lay["wrap"] else data
     if not isinstance(box, dict):
-        return True
+        return lay["wrap"] and "hooks" not in data
     changed = False
     for ev, st in events(tool):
-        groups = box.get(ev)
-        if not isinstance(groups, list) or not ours_in(st, groups, cmd, guard):
+        if ev not in box:
+            continue
+        groups = box[ev]
+        if not isinstance(groups, list) or not all(isinstance(g, dict) for g in groups):
+            return False
+        if st == "nested" and any(not isinstance(g.get("hooks", []), list) for g in groups):
+            return False
+        if not ours_in(st, groups, cmd, guard):
             continue
         kept = without_ours(st, groups, cmd, guard)
         if kept:
@@ -1220,7 +1226,13 @@ def uninstall(tool, lay, guard, dry):
             + "."
         )
         return 0
-    done = unregister(tool, lay, guard)
+    if not unregister(tool, lay, guard):
+        print(
+            "Could not edit "
+            + shown(lay["config"])
+            + ". Installed files were kept so any existing hook can still run."
+        )
+        return 1
     for p in (guard, lay["command"]):
         if p and os.path.exists(p):
             os.remove(p)
@@ -1247,15 +1259,6 @@ def uninstall(tool, lay, guard, dry):
                 + SPECS[tool]["name"]
                 + " guard, hook and the shared skill."
             )
-    if not done:
-        print(
-            "Could not edit "
-            + shown(lay["config"])
-            + ". Remove the "
-            + GUARD_NAME
-            + " entry by hand."
-        )
-        return 1
     return 0
 
 
@@ -1302,8 +1305,7 @@ def main(argv):
             print("  would copy the skill to " + shown(skill_dir()))
         if lay["command"]:
             print("  would write the audit command to " + shown(lay["command"]))
-        register(tool, lay, guard, True)
-        return 0
+        return 0 if register(tool, lay, guard, True) else 1
     print("Installing the App Store Compliance Playbook for " + SPECS[tool]["name"])
     copy_payload(tool, lay, guard)
     if not register(tool, lay, guard, False):

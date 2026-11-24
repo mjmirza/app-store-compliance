@@ -53,7 +53,7 @@ The regional pass for Asia-Pacific, Canada, Australia, and Brazil was still runn
 - Ofcom's amended Illegal Content Codes of Practice (issued 12 October 2026, in force 2 November 2026) and its categorised-services risk assessment dates. ofcom.org.uk answers scripted reads with a browser challenge, so the wording was seen only through a search index.
 - The UK under-16 social media regulations, reported to be laid in December 2026 for spring 2027. Secondary only.
 - The Alabama App Store Accountability Act challenge (CCIA, reported 28 October 2026). No docket found.
-- Korea MyData expansion dates and the Australia App Distribution Services Code on the live eSafety register, carried over from [#659](https://github.com/mjmirza/app-store-compliance/issues/659).
+- The Australia App Distribution Services Code on the live eSafety register, carried over from [#659](https://github.com/mjmirza/app-store-compliance/issues/659). The Korea MyData dates from the same issue were read on 23 November 2026 and are encoded as `KR-PIPA-SELF-TRANSMISSION-2027`.
 
 ## 7. Follow-up, 15 November 2026
 

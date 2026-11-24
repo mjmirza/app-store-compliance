@@ -177,5 +177,7 @@ OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" 
 
 rm -rf "$W"
 
+python3 scripts/test-release-audit-area.py && ok "area status reflects coverage" || bad "area status reflects coverage"
+
 echo "release-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -1090,6 +1090,30 @@ else
   echo "$OUT"
 fi
 rm -rf "$PLAIN_DIR"
+# Long one-line expressions must not inflate output or hide any controls.
+CONTEXT_DIR="$(mktemp -d)"
+python3 - "$CONTEXT_DIR/Controls.swift" <<'PYTHON'
+import sys
+from pathlib import Path
+
+context = "work()" + ' + "long" ' * 500
+Path(sys.argv[1]).write_text(
+    'Button(action: { ' + context + ' }) { Image(systemName: "trash") }\n'
+    'Button(action: {}) { Image(systemName: "gear") }\n'
+    'Button(action: {}) { Image(systemName: "star") }.accessibilityLabel("Star")\n'
+)
+PYTHON
+OUT=$($AUDIT "$CONTEXT_DIR" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
+CONTEXT_COUNT=$(echo "$OUT" | grep -c 'APPLE-ACCESSIBILITY-VOICEOVER  (')
+if [ "$CONTEXT_COUNT" -eq 2 ] \
+    && ! echo "$OUT" | grep '^      context:' | awk 'length($0) > 180 { found = 1 } END { exit !found }' \
+    && echo "$OUT" | grep -q 'context: Button(action: {.*\.\.\.$' \
+    && echo "$OUT" | grep -Fq 'context: Button(action: {}) { Image(systemName: "gear") }'; then
+  ok "reports every icon-only Button with bounded context and keeps short snippets"
+else
+  bad "reports every icon-only Button with bounded context and keeps short snippets"
+fi
+rm -rf "$CONTEXT_DIR"
 
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
