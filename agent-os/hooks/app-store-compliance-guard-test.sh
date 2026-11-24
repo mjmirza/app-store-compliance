@@ -3652,6 +3652,13 @@ printf 'import { deleteAccount } from "./account";\ntest("deleteAccount", () => 
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-5.1.1-NO-ACCOUNT-DELETION' && ok "js-test-17 a test file still counts as deletion evidence" || bad "js-test-17 a test file still counts as deletion evidence"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/src/gen"
+printf '<plist/>' > "$D/App/Info.plist"
+i=1; while [ $i -le 5200 ]; do echo "export const v$i = $i" > "$D/src/gen/f$i.ts"; i=$((i+1)); done
+echo 'const s = "lorem ipsum dolor"' > "$D/src/aaa.ts"; echo 'const x = 1' > "$D/src/z.test.ts"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'BOTH-PLACEHOLDER' && ok "js-test-18 a placeholder is still found when more than 5000 files are scanned" || bad "js-test-18 a placeholder is still found when more than 5000 files are scanned"
+rm -rf "$D"
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -545,7 +545,9 @@ own_privacy_manifest() {
 ship_has() {  # grep_has over the files that ship. Test files are left out when nothing imports them
   [ "${SHIPLIST:-$FILELIST}" = "$FILELIST" ] && { grep_has "$1"; return; }
   [ -s "$SHIPLIST" ] || return 1
-  tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | grep . >/dev/null
+  # Test the output, not the exit code. xargs splits a long list into batches, and one batch
+  # with no match would otherwise make the whole pipeline fail under pipefail.
+  [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
 release_string_has() {
   [ -s "$FILELIST" ] || return 1
