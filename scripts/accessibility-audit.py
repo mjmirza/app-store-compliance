@@ -471,7 +471,7 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
-ANDROID_TOUCH_TAGS = {"CheckBox", "RadioButton", "Switch", "SwitchCompat", "SwitchMaterial", "ToggleButton", "Chip", "SeekBar", "Spinner", "EditText", "TextInputEditText", "RatingBar"}
+ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar|Slider|Spinner|EditText|AutoCompleteTextView|RatingBar|CheckedTextView)$")
 
 
 def run_rule_scan(rule_id, ios_files, android_files):
@@ -789,22 +789,21 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
                 # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
-                # Judge each element on its own. Only interactive controls are touch targets, and
-                # minWidth or minHeight is a lower bound, so the real size is the larger of the two.
-                for el in re.finditer(r"<([A-Za-z_][\w.]*)\b([^<>]*)>", content):
+                # Judge each element on its own. Only interactive controls are touch targets, and an
+                # explicit size wins over minWidth or minHeight, as Android measures it.
+                for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:\s+[\w:.-]+\s*=\s*\"[^\"]*\")*)\s*/?>", content):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = dict(re.findall(r"android:(\w+)\s*=\s*\"([^\"]*)\"", attrs))
                     clickable = vals.get("clickable", "").lower()
-                    interactive = ("onClick" in vals or clickable == "true" or vals.get("focusable", "").lower() == "true"
-                                   or (clickable != "false" and (tag.endswith("Button") or tag in ANDROID_TOUCH_TAGS)))
+                    flagged = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "focusable"))
+                    interactive = "onClick" in vals or flagged or (clickable != "false" and ANDROID_TOUCH_TAG.search(tag))
                     if not interactive:
                         continue
-                    for axis, low in (("layout_width", "minWidth"), ("layout_height", "minHeight")):
+                    for axis in ("layout_width", "layout_height"):
                         size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
                         if not size:
                             continue
-                        floor_dp = re.fullmatch(r"([0-9]+)dp", vals.get(low, ""))
-                        if max(int(size.group(1)), int(floor_dp.group(1)) if floor_dp else 0) >= 48 or int(size.group(1)) == 0:
+                        if not 0 < int(size.group(1)) < 48:
                             continue
                         attr = re.search(r"android:" + axis + r"\s*=\s*\"[^\"]*\"", attrs)
                         start_idx = el.start(2) + attr.start()

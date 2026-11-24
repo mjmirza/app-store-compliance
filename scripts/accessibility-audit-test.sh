@@ -1037,6 +1037,9 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
         android:minWidth="40dp" />
     <Button android:layout_width="96dp" android:layout_height="56dp" android:minWidth="40dp" />
     <Button android:layout_width="40dp" android:layout_height="48dp" android:minWidth="48dp" />
+    <androidx.appcompat.widget.AppCompatCheckBox android:layout_width="24dp" android:layout_height="48dp" />
+    <Button android:onClick="@{() -> viewModel.save()}" android:layout_width="32dp" android:layout_height="48dp" />
+    <TextView android:layout_width="30dp" android:layout_height="48dp" android:longClickable="true" />
     <View android:layout_width="match_parent" android:layout_height="1dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
@@ -1044,13 +1047,16 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
 </LinearLayout>
 EOF2
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 3 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 7 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_height="24dp"'; then
-  ok "wrap_content does not hide an undersized control, and dividers or minWidth-raised controls stay silent"
+    && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="40dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="32dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="30dp"'; then
+  ok "wrap_content does not hide an undersized control, and dividers stay silent"
 else
-  bad "wrap_content does not hide an undersized control, and dividers or minWidth-raised controls stay silent"
+  bad "wrap_content does not hide an undersized control, and dividers stay silent"
   echo "$OUT"
 fi
 rm -rf "$WRAP_DIR"
