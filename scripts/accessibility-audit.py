@@ -814,21 +814,27 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 attr_re = r"\s+[\w:.-]+\s*=\s*(?:\"[^\"]*\"|'[^']*')"
                 # A commented-out element is not a control. Blank comments but keep their line breaks.
                 live = re.sub(r"<!--.*?-->", lambda m: re.sub(r"[^\n]", " ", m.group(0)), content, flags=re.S)
-                # Walk the tree, so a view inside a hidden parent is hidden too.
-                hidden_stack = []
+                # Walk the tree. A view inside a hidden parent is hidden too, and the parent decides the final size.
+                # Only a LinearLayout or FrameLayout keeps an explicit dp as the final size, so only their children,
+                # and the root, are judged. Any other parent can stretch or constrain the child, so it stays silent.
+                stack = []
                 for el in re.finditer(r"<(/?)([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*(/?)>", live):
                     if el.group(1):
-                        if hidden_stack:
-                            hidden_stack.pop()
+                        if stack:
+                            stack.pop()
                         continue
                     tag, attrs = el.group(2).rsplit(".", 1)[-1], el.group(3)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
-                    hidden = any(hidden_stack) or vals.get("visibility", "visible").lower() != "visible"
+                    parent = stack[-1] if stack else None
+                    hidden = bool(parent and parent[0]) or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
-                        hidden_stack.append(hidden)
-                    # Only certain interactivity counts. A resource value, autoLink (it depends on the text), a
-                    # hidden view and a weighted size are unknown here, so they stay silent, as before this check.
-                    if hidden or vals.get("layout_weight", "0").strip() not in ("0", "0.0", ""):
+                        stack.append((hidden, tag, vals.get("orientation", "horizontal").lower()))
+                    if hidden or (parent and parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout")):
+                        continue
+                    # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
+                    # false) may switch the listener off, so a handler alone does not count then.
+                    clickable = vals.get("clickable")
+                    if clickable is not None and clickable.strip().lower() != "true":
                         continue
                     true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "textIsSelectable"))
                     # A handler set to @null installs no listener.
@@ -837,10 +843,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     indicator = vals.get("isIndicator", "false").lower() != "false" or bool(
                         style and re.search(r"ratingBarStyle(Small|Indicator)|RatingBar\.(Small|Indicator)", style.group(1) or style.group(2) or ""))
                     # A style can switch clickability off, so a styled widget does not count by its type alone.
-                    widget = ("clickable" not in vals or vals["clickable"].lower() == "true") and not indicator and not style and ANDROID_TOUCH_TAG.search(tag)
+                    widget = not indicator and not style and ANDROID_TOUCH_TAG.search(tag)
                     if not (true_attr or handler or widget):
                         continue
+                    # A weight in a LinearLayout sizes the child along the layout orientation, so that axis is unknown.
+                    weighted = parent and parent[1] != "FrameLayout" and vals.get("layout_weight", "0").strip() not in ("0", "0.0", "")
+                    skip_axis = ("layout_width" if parent[2] != "vertical" else "layout_height") if weighted else None
                     for axis in ("layout_width", "layout_height"):
+                        if axis == skip_axis:
+                            continue
                         size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
                         if not size or not 0 < int(size.group(1)) < 48:
                             continue

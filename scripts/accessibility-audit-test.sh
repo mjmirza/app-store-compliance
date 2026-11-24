@@ -1131,6 +1131,28 @@ else
   echo "$OUT"
 fi
 rm -rf "$TREE_DIR"
+# Only a LinearLayout or FrameLayout keeps an explicit size final. A weight hides only its own axis.
+PARENT_DIR="$(mktemp -d)"
+cat <<'EOF6' > "$PARENT_DIR/parents.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:layout_width="0dp" android:layout_height="31dp" android:layout_weight="1" />
+    </LinearLayout>
+    <com.google.android.flexbox.FlexboxLayout android:layout_width="320dp" android:layout_height="wrap_content">
+        <Button android:layout_width="12dp" android:layout_height="48dp" app:layout_flexGrow="1" />
+    </com.google.android.flexbox.FlexboxLayout>
+    <TextView android:layout_width="11dp" android:layout_height="48dp" android:clickable="@{false}" android:onClick="@{() -> vm.save()}" />
+</LinearLayout>
+EOF6
+OUT=$($AUDIT "$PARENT_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="31dp"'; then
+  ok "a weight hides only its axis, a Flexbox child and a binding that disables clicks stay silent"
+else
+  bad "a weight hides only its axis, a Flexbox child and a binding that disables clicks stay silent"
+  echo "$OUT"
+fi
+rm -rf "$PARENT_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
