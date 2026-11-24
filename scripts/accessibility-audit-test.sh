@@ -1119,7 +1119,7 @@ cat <<'EOF5' > "$TREE_DIR/tree.xml"
     </LinearLayout>
     <Button android:layout_width="12dp" android:layout_height="48dp" android:layout_weight="1" />
     <com.google.android.material.slider.Slider android:layout_width="match_parent" android:layout_height="11dp" />
-    <TextView android:layout_width="10dp" android:layout_height="48dp" android:clickable="false" android:onClick="@null" />
+    <TextView android:layout_width="10dp" android:layout_height="48dp" android:onClick="@null" />
     <Button android:layout_width="33dp" android:layout_height="48dp" />
 </LinearLayout>
 EOF5
@@ -1157,6 +1157,26 @@ else
   echo "$OUT"
 fi
 rm -rf "$PARENT_DIR"
+# A styled section is unknown, the root may be resized by an include, and a plain MaterialTextView is still judged.
+MORE_DIR="$(mktemp -d)"
+cat <<'EOF7' > "$MORE_DIR/more.xml"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout style="@style/HiddenSection" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:layout_width="27dp" android:layout_height="27dp" />
+    </LinearLayout>
+    <com.google.android.material.textview.MaterialTextView android:layout_width="48dp" android:layout_height="26dp" android:clickable="true" />
+</FrameLayout>
+EOF7
+printf '<Button xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="25dp" android:layout_height="wrap_content" />\n' > "$MORE_DIR/root_button.xml"
+OUT=$($AUDIT "$MORE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="26dp"'; then
+  ok "a styled section and a root view stay silent, a clickable MaterialTextView is still reported"
+else
+  bad "a styled section and a root view stay silent, a clickable MaterialTextView is still reported"
+  echo "$OUT"
+fi
+rm -rf "$MORE_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"

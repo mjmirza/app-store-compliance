@@ -826,15 +826,18 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     tag, attrs = el.group(2).rsplit(".", 1)[-1], el.group(3)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
                     parent = stack[-1] if stack else None
-                    hidden = bool(parent and parent[0]) or vals.get("visibility", "visible").lower() != "visible"
+                    # A style can set visibility, so a styled view, and everything inside it, is unknown.
+                    styled = re.search(r"(?<![\w:])style\s*=", attrs)
+                    hidden = bool(parent and parent[0]) or bool(styled) or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
-                        styled = re.search(r"(?<![\w:])style\s*=", attrs)
                         stack.append((hidden, tag, None if styled else vals.get("orientation", "horizontal").lower()))
-                    if hidden or (parent and parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout")):
+                    # The root is skipped too, since an include can override its size.
+                    if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
                         continue
-                    # Material components add their own padding up to a 48dp touch target, so they are not judged here.
-                    if el.group(2).startswith("com.google.android.material."):
+                    # These Material components pad themselves up to a 48dp touch target.
+                    ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)
+                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip"):
                         continue
                     # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
                     # false) may switch the listener off, so a handler alone does not count then.
