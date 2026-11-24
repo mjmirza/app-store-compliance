@@ -538,6 +538,13 @@ OUT="$(run --tool opencode 2>&1)"; RC1=$?; run --tool opencode doctor >/dev/null
 run --tool opencode uninstall >/dev/null 2>&1; RC3=$?
 [ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$RC3" -eq 0 ] && [ ! -e "$plug" ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode treats its own plugin saved with a byte order mark as its own" || bad "opencode treats its own plugin saved with a byte order mark as its own (rc=$RC1/$RC2/$RC3)"
 
+# A directive the person added above the header, such as @ts-check, still leaves the plugin the installer's own.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"
+python3 -I -c 'import sys; p=sys.argv[1]; d=open(p).read(); open(p,"w").write("// @ts-check" + chr(10) + d)' "$plug"
+run --tool opencode uninstall >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$plug" ] && ok "opencode uninstall removes its own plugin after a directive was added above the header" || bad "opencode uninstall removes its own plugin after a directive was added above the header (rc=$RC)"
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"

@@ -477,9 +477,10 @@ def owned_plugin(path):
     if not os.path.isfile(path):
         return False
     try:
-        # utf-8-sig drops a byte order mark an editor may add when the file is saved.
+        # utf-8-sig drops a byte order mark an editor may add. The header may sit below a line the
+        # person added, such as a @ts-check directive, so it is looked for near the top, not at byte 0.
         with open(path, encoding="utf-8-sig") as f:
-            return f.read(len(OPENCODE_HEADER)) == OPENCODE_HEADER
+            return OPENCODE_HEADER in f.read(65536).replace("\r\n", "\n")
     except (OSError, UnicodeError):
         return False
 
