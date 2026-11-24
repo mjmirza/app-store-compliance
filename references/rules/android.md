@@ -122,8 +122,8 @@ grep -rn 'ACCESS_BACKGROUND_LOCATION' --include='AndroidManifest.xml' .
 - Platform. google
 - Guideline or policy. Permissions and APIs
 - Severity. critical
-- What triggers it. READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, or WRITE_CALL_LOG declared without an approved use case. From 26 August 2026 account verification via phone call is no longer a permitted use case for READ_CALL_LOG. Use the Digital Credentials API or the SMS Retriever API instead.
-- How to fix it. Use the permissions declaration form for an approved core use case, or drop the permission.
+- What triggers it. READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, or WRITE_CALL_LOG declared without an approved use case. From 27 January 2027 account verification via phone call is no longer a permitted use case for READ_CALL_LOG (Play Console Help answers 10208820 and 18100766). Until that date the exceptions table still lists it. Use the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, or the SMS User Consent API.
+- How to fix it. Use the permissions declaration form for an approved core use case, or drop the permission. From 27 January 2027, phone-call account verification is not a permitted use case for READ_CALL_LOG (Play Console Help answers 10208820 and 18100766). Use the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, or the SMS User Consent API.
 - Detection signals. READ_SMS, SEND_SMS, RECEIVE_SMS, READ_CALL_LOG, WRITE_CALL_LOG
 
 How to detect.
