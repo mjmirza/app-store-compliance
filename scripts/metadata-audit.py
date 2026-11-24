@@ -691,7 +691,6 @@ def main():
         )
         unit = audit_fields(fields, check_urls=check_urls, platform=plat)
         seen = {(f["severity"], f["rule"], f["field"], f["message"]) for f in unit}
-        # Every combination of the conflicting values is audited, so no pairing across fields hides a rejection risk.
         options = {}
         for canon, a, b, alt in clash:
             options.setdefault(canon, [fields.get(canon)])
@@ -701,12 +700,22 @@ def main():
         total = 1
         for n in names:
             total *= len(options[n])
-        for combo in itertools.islice(itertools.product(*(options[n] for n in names)), 1, 4096):
-            for f in audit_fields({**fields, **dict(zip(names, combo))}, check_urls=check_urls, platform=plat):
+
+        def audit_variant(values):
+            for f in audit_fields({**fields, **values}, check_urls=check_urls, platform=plat):
                 key = (f["severity"], f["rule"], f["field"], f["message"])
                 if key not in seen:
                     seen.add(key)
                     unit.append(f)
+
+        # A capped Cartesian prefix can omit every alternate of an earlier field.
+        # Ensure each value gets a pass, then retain the bounded cross-field audit.
+        if total > 4096:
+            for name in names:
+                for alternate in options[name][1:]:
+                    audit_variant({name: alternate})
+        for combo in itertools.islice(itertools.product(*(options[n] for n in names)), 1, 4096):
+            audit_variant(dict(zip(names, combo)))
         for canon, a, b, alt in clash:
             add(
                 unit,
@@ -714,7 +723,7 @@ def main():
                 "BOTH-METADATA-DECORATION",
                 canon,
                 f"{canon} has conflicting values in {a} and {b}, both were audited"
-                + ("" if total <= 4096 else f" (the first 4096 of {total} value combinations)"),
+                + ("" if total <= 4096 else f" (each value and the first 4096 of {total} combinations)"),
                 f"Keep one file for {canon} so the store gets the value you audited",
             )
         for f in unit:
