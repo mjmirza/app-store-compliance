@@ -704,7 +704,10 @@ TEST_IMPORTERS="$({ grep -E '[.]([cm]?[jt]sx?|html?|vue|svelte|astro)$' "$FILELI
     -o -name '*Tests' -o -name androidTest -o -name __tests__ -o -name test -o -name tests -o -name integration_test -o -name e2e \) -prune \) \
     -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.html' -o -name '*.htm' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
   | tr '\n' '\0' | xargs -0 grep -EIl -e "['\"\`][^'\"\`]*[.](test|spec)([.][cm]?[jt]sx?)?([?#][^'\"\`]*)?['\"\`]" -e "=[[:space:]]*[^[:space:]>='\"\`]*[.](test|spec)[.][cm]?[jt]sx?([?#][^[:space:]>]*)?([[:space:]>]|$)" -e 'import[.]meta[.]glob|require[.]context' 2>/dev/null || true)"
-if [ -z "$TEST_IMPORTERS" ] && grep -vE "$JS_TEST_RE" "$FILELIST" > "$FILELIST.kept" 2>/dev/null; then
+# Expo Router bundles every file under app/ as a route, test files included, so those stay.
+ROUTE_KEEP='^$'
+grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -Il '"expo-router"' 2>/dev/null | grep . >/dev/null && ROUTE_KEEP='/app/'
+if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.kept" 2>/dev/null; then
   mv "$FILELIST.kept" "$FILELIST"
 else
   rm -f "$FILELIST.kept"
