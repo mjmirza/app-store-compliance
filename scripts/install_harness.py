@@ -486,19 +486,30 @@ def kimi_block(cmd):
     )
 
 
-def kimi_entry(text):
-    """The [[hooks]] table inside our marked block, {} when it does not parse, None when absent."""
-    m = re.search(re.escape(KIMI_BEGIN) + r"\r?\n(.*?)" + re.escape(KIMI_END), text, re.S)
-    if not m:
+def kimi_bounds(text):
+    """Offsets for a single complete managed block, or None when no markers exist."""
+    begin, end = map(re.escape, (KIMI_BEGIN, KIMI_END))
+    markers = list(re.finditer(r"^[ \t]*(" + begin + "|" + end + r")[^\r\n]*(?:\r?\n|$)", text, re.M))
+    if not markers:
         return None
+    if [m.group(1) for m in markers] != [KIMI_BEGIN, KIMI_END]:
+        raise ValueError("incomplete or ambiguous managed hook markers")
+    first, last = markers
+    return first.start(), first.end(), last.start(), last.end()
+
+
+def kimi_entry(text, bounds):
+    """The [[hooks]] table inside our marked block, or {} when it does not parse."""
+    _, start, end, _ = bounds
+    content = text[start:end]
     try:
         import tomllib
 
-        hooks = tomllib.loads(m.group(1)).get("hooks")
+        hooks = tomllib.loads(content).get("hooks")
         return hooks[0] if isinstance(hooks, list) and hooks and isinstance(hooks[0], dict) else {}
     except ImportError:
         out = {}
-        for line in m.group(1).splitlines():
+        for line in content.splitlines():
             k, eq, v = line.partition("=")
             if eq:
                 try:
@@ -697,17 +708,22 @@ def register_kimi(lay, cmd, dry):
         with open(path, encoding="utf-8", newline="") as f:
             text = f.read()
     nl = "\r\n" if "\r\n" in text else "\n"
-    if KIMI_BEGIN in text:
-        h = kimi_entry(text)
+    try:
+        bounds = kimi_bounds(text)
+    except ValueError:
+        fail(shown(path) + " has incomplete or ambiguous managed hook markers. It was not changed.")
+        return False
+    if bounds is not None:
+        h = kimi_entry(text, bounds)
         if kimi_live(h) and h.get("command") == cmd:
             ok("hook already registered in " + shown(path))
             return True
         if dry:
             print("  would rewrite the guard block in " + shown(path) + ", with a backup")
             return True
-        pattern = re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?"
-        repaired = re.sub(pattern, lambda _m: kimi_block(cmd).replace("\n", nl), text, count=1, flags=re.S)
-        if kimi_hooks_taken(re.sub(pattern, "", text, count=1, flags=re.S)) or not toml_still_valid(text, repaired):
+        start, _, _, end = bounds
+        repaired = text[:start] + kimi_block(cmd).replace("\n", nl) + text[end:]
+        if kimi_hooks_taken(text[:start] + text[end:]) or not toml_still_valid(text, repaired):
             fail(shown(path) + " defines hooks another way, so the guard block cannot be repaired. It was not changed.")
             print(manual_block("kimi", lay, cmd))
             return False
@@ -755,10 +771,15 @@ def unregister(tool, lay, guard):
     if style == "toml":
         with open(lay["config"], encoding="utf-8", newline="") as f:
             text = f.read()
-        if KIMI_BEGIN not in text:
+        try:
+            bounds = kimi_bounds(text)
+        except ValueError:
+            fail(shown(lay["config"]) + " has incomplete or ambiguous managed hook markers. Installed files were kept.")
+            raise SystemExit(1)
+        if bounds is None:
             return True
-        m = re.search(re.escape(KIMI_BEGIN) + r".*?" + re.escape(KIMI_END) + r"(\r?\n)?", text, flags=re.S)
-        before, after = text[: m.start()], text[m.end() :]
+        start, _, _, end = bounds
+        before, after = text[:start], text[end:]
         sep_file = os.path.join(lay["hooks"], KIMI_SEP_FILE)
         try:
             with open(sep_file, encoding="utf-8") as f:
@@ -1101,7 +1122,12 @@ def check_kimi(lay, guard, app):
             text = f.read()
     except OSError:
         text = ""
-    if KIMI_BEGIN not in text:
+    try:
+        bounds = kimi_bounds(text)
+    except ValueError:
+        fail(shown(lay["config"]) + " has incomplete or ambiguous managed hook markers")
+        return
+    if bounds is None:
         fail("no hook block for the guard in " + shown(lay["config"]))
         return
     try:
@@ -1118,7 +1144,7 @@ def check_kimi(lay, guard, app):
     except Exception:
         fail(shown(lay["config"]) + " no longer parses as TOML")
         return
-    h = kimi_entry(text)
+    h = kimi_entry(text, bounds)
     if not kimi_live(h):
         fail(
             "the guard block in "

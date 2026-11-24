@@ -114,7 +114,9 @@ fleet() { python3 -c "import json,sys;print(json.dumps({'apps':[dict({'name':'ap
 sweep() { python3 "$HERE/fleet-sweep.py" "$T/fleet.json" "$@" > "$T/out.txt" 2>&1; echo $?; }
 has() { grep -q -- "$1" "$T/out.txt"; }
 att() {  # rule-id, then python dict overrides
-  python3 - "$1" "${2:-{\}}" <<'EOF2'
+  # macOS bash 3.2 ends a default value at its first closing brace, so keep the braces in a variable.
+  local extra='{}'
+  python3 - "$1" "${2:-$extra}" <<'EOF2'
 import json, sys
 a = {"attested_by": "Mirza", "attested_on": "2026-10-01", "evidence": "see docs/review.md", "outcome": "compliant",
      "revision": 1, "covers": ["owner-1"], "regions": ["US"]}
@@ -145,7 +147,9 @@ fleet "{$VN,\"attestations\":$(att RR-VN-SOCIAL-AUTH '{"regions":["VN"]}')}"
 fleet "{$VN,\"attestations\":$(att RR-VN-SOCIAL-AUTH '{"regions":["VN"],"covers":["auto-1","owner-2"]}')}"
 [ "$(sweep)" = 0 ] && ok || bad "covering every proof item clears a mixed rule"
 CR='"platforms":["android"],"regions":["DE","FR"],"features":["crypto"]'
-fleet "{$CR,\"attestations\":$(att RR-PLAY-CRYPTO-EU '{"regions":["DE"]}' | python3 -c "import json,sys;a=json.load(sys.stdin);a.update(json.loads('$(att RR-EU-CRA-REPORTING '{"regions":["DE","FR"]}')'));print(json.dumps(a))")}"
+A1="$(att RR-PLAY-CRYPTO-EU '{"regions":["DE"]}')"; A2="$(att RR-EU-CRA-REPORTING '{"regions":["DE","FR"]}')"
+BOTH="$(python3 -c 'import json,sys; a=json.loads(sys.argv[1]); a.update(json.loads(sys.argv[2])); print(json.dumps(a))' "$A1" "$A2")"
+fleet "{$CR,\"attestations\":$BOTH}"
 [ "$(sweep)" = 2 ] && has "does not cover FR" && ok || bad "an attestation must cover every country the rule reaches"
 fleet '{"regions":["AU"],"features":["social"]}'
 [ "$(sweep)" = 3 ] && has "RR-AU-SOCIAL-MIN-AGE applies but its source is unconfirmed" && ok || bad "a rule with an unverified date is flagged, not blocking"
