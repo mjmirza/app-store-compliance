@@ -282,6 +282,42 @@ cp "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml"
 run --tool kimi >/dev/null; RC=$?
 [ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-rep.toml" && ok "kimi refuses a block repair that would break the file" || bad "kimi refuses a block repair that would break the file (rc=$RC)"
 
+# Partial or duplicate managed markers cannot identify a block to edit.
+for markers in partial duplicate; do
+  for mode in install doctor uninstall; do
+    fresh; mkdir -p "$H/.kimi-code"
+    printf 'default_model = "fixture"\n# >>> app-store-compliance guard >>>\n' > "$(cfg kimi)"
+    if [ "$markers" = duplicate ]; then
+      printf '# <<< app-store-compliance guard <<<\n# >>> app-store-compliance guard >>>\n# <<< app-store-compliance guard <<<\n' >> "$(cfg kimi)"
+    fi
+    cp "$(cfg kimi)" "$WORK/kimi-markers.toml"
+    mkdir -p "$(gdir kimi)"
+    touch "$(gdir kimi)/app-store-compliance-guard.sh"
+    OUT="$(run --tool kimi "$mode")"; RC=$?
+    [ "$RC" -eq 1 ] && cmp -s "$(cfg kimi)" "$WORK/kimi-markers.toml" && [ -f "$(gdir kimi)/app-store-compliance-guard.sh" ] && ! ls "$(cfg kimi)".bak-* >/dev/null 2>&1 && ! printf '%s\n' "$OUT" | grep -q 'Traceback' && printf '%s\n' "$OUT" | grep -q 'ambiguous managed hook markers' \
+      && ok "kimi $mode preserves config with $markers markers without a traceback" || bad "kimi $mode preserves config with $markers markers (rc=$RC)"
+  done
+done
+
+# Indented marker comments are still valid TOML, so the block is still ours.
+fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "fixture"\n' > "$(cfg kimi)"
+run --tool kimi >/dev/null
+sed -i.tmp 's/^# \([<>]\{3\} app-store-compliance guard\)/  # \1/' "$(cfg kimi)" && rm -f "$(cfg kimi).tmp"
+grep -q '^  # >>> app-store-compliance guard' "$(cfg kimi)" || bad "kimi indented-marker fixture was not built"
+OUT="$(run --tool kimi)"; RC=$?
+[ "$RC" -eq 0 ] && [ "$(grep -c 'app-store-compliance-guard' "$(cfg kimi)")" -eq 1 ] && ok "kimi reinstall over indented markers keeps one hook" || bad "kimi reinstall over indented markers keeps one hook (rc=$RC)"
+run --tool kimi uninstall >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ! grep -q 'app-store-compliance' "$(cfg kimi)" && ok "kimi uninstall removes a block with indented markers" || bad "kimi uninstall removes a block with indented markers (rc=$RC)"
+
+# A note after the closing marker is still valid TOML, so doctor and uninstall still find the block.
+fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "fixture"\n' > "$(cfg kimi)"
+run --tool kimi >/dev/null
+sed -i.tmp 's/^# <<< app-store-compliance guard <<</& # keep this block/' "$(cfg kimi)" && rm -f "$(cfg kimi).tmp"
+OUT="$(run --tool kimi)"; RC=$?
+[ "$RC" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'ambiguous' && ok "kimi reinstall accepts a note after the closing marker" || bad "kimi reinstall accepts a note after the closing marker (rc=$RC)"
+run --tool kimi uninstall >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ! grep -q 'app-store-compliance-guard' "$(cfg kimi)" && ok "kimi uninstall removes a block with a note after its marker" || bad "kimi uninstall removes a block with a note after its marker (rc=$RC)"
+
 # 2d9 a Windows path in the Gemini audit command still gives valid TOML
 python3 -c '
 import sys, tomllib
