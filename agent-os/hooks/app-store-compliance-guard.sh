@@ -585,6 +585,45 @@ import sys
 
 TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
 WANT = re.compile(os.environ["ASCG_STRING_RE"])
+QUOTES = chr(34) + chr(39) + chr(96)
+OPEN, CLOSE = chr(123), chr(125)
+EXPR = chr(36) + OPEN
+
+
+def expr_comments_out(text):
+    # Inside each template expression drop comments, step over strings, keep the rest.
+    out, i, depth, n = [], 0, 0, len(text)
+    while i < n:
+        c = text[i]
+        if depth == 0:
+            if text.startswith(EXPR, i):
+                depth, i = 1, i + 2
+                out.append(EXPR)
+            else:
+                out.append(c)
+                i += 1
+            continue
+        if c in QUOTES:
+            j = i + 1
+            while j < n and text[j] != c:
+                j += 2 if text[j] == chr(92) else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if text.startswith("//", i):
+            j = text.find(chr(10), i)
+            i = n if j < 0 else j
+            continue
+        depth += 1 if c == OPEN else -1 if c == CLOSE else 0
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
 for path in sys.argv[1:]:
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
@@ -593,15 +632,20 @@ for path in sys.argv[1:]:
         continue
     for tok in TOKEN.finditer(code):
         text = tok.group(0)
-        # A comment inside a template expression is not string text, so drop comments only.
         if text[0] == "\x60":
-            text = re.sub(r"/[*].*?[*]/", "", text, flags=re.S)
+            text = expr_comments_out(text)
         if text[0] in "'\x60" and WANT.search(text):
             print(path)
             sys.exit(0)
 JSSTRPY
   )" 2>/dev/null)"
   [ -n "$hit" ]
+}
+
+# The React Native GoogleSignin export counts only where it can reach the iOS build.
+ios_google_signin() {
+  [ -s "$FILELIST" ] || return 1
+  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null | grep . >/dev/null
 }
 
 # Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
@@ -1007,7 +1051,7 @@ sys.exit(1)
 SIWAPY
   )" 2>/dev/null
   }
-  if grep_has 'FacebookLogin|GoogleSign[Ii]n|GIDSignIn|LoginWithFacebook'; then
+  if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook' || ios_google_signin; then
     # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
     # with comments and strings removed. Buttons, enums, options objects and logout do not.
     grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSign[Ii]n|GIDSignIn|LoginWithFacebook'
