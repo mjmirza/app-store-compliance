@@ -828,15 +828,15 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     parent = stack[-1] if stack else None
                     # A style can set visibility, so a styled view, and everything inside it, is unknown.
                     styled = re.search(r"(?<![\w:])style\s*=", attrs)
-                    hidden = bool(parent and parent[0]) or bool(styled) or vals.get("visibility", "visible").lower() != "visible"
+                    # A scale on a view or any parent changes the hit area, so it makes the subtree unknown too.
+                    scaled = any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY"))
+                    hidden = bool(parent and parent[0]) or bool(styled) or scaled or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
-                        stack.append((hidden, tag, None if styled else vals.get("orientation", "horizontal").lower()))
+                        orient = vals.get("orientation", "horizontal").strip().lower()
+                        stack.append((hidden, tag, None if styled or orient not in ("horizontal", "vertical") else orient))
                     # The root is skipped too, since an include can override its size.
                     if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
-                        continue
-                    # A scale changes the hit area, so a scaled view is unknown.
-                    if any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY")):
                         continue
                     # These Material components pad themselves up to a 48dp touch target.
                     ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)

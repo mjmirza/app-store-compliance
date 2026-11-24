@@ -1147,6 +1147,12 @@ cat <<'EOF6' > "$PARENT_DIR/parents.xml"
         <Button android:layout_width="100dp" android:layout_height="29dp" android:layout_weight="1" />
     </LinearLayout>
     <com.google.android.material.floatingactionbutton.FloatingActionButton android:layout_width="28dp" android:layout_height="28dp" app:fabSize="mini" />
+    <LinearLayout android:orientation="@integer/stack_orientation" android:layout_width="match_parent" android:layout_height="160dp">
+        <Button android:layout_width="wrap_content" android:layout_height="9dp" android:layout_weight="1" />
+    </LinearLayout>
+    <FrameLayout android:scaleX="2" android:scaleY="2" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <ImageButton android:layout_width="8dp" android:layout_height="8dp" />
+    </FrameLayout>
 </LinearLayout>
 EOF6
 OUT=$($AUDIT "$PARENT_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
