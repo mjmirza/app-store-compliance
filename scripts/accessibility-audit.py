@@ -471,8 +471,8 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
-ANDROID_DECORATIVE_TAG = re.compile(r"^(?:Material|AppCompat|Shapeable)?(?:View|Space|ImageView|TextView|ProgressBar|Guideline|Barrier|Divider|Toolbar"
-                                   r"|Include|Merge|Fragment|ViewStub|SurfaceView|TextureView|WebView|VideoView)$|Layout$|ScrollView$|RecyclerView$|ViewPager2?$|CardView$")
+ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar|Slider"
+                               r"|Spinner|EditText|AutoCompleteTextView|RatingBar|CheckedTextView|NumberPicker|Picker)$")
 
 
 def run_rule_scan(rule_id, ios_files, android_files):
@@ -790,35 +790,39 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
                 # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
-                # Judge each element on its own. Decorative views are not touch targets unless made
-                # clickable, and an explicit size wins over minWidth or minHeight, as Android measures it.
+                def add_finding(text, start_idx):
+                    findings.append({
+                        "file": f,
+                        "line": content.count("\n", 0, start_idx) + 1,
+                        "rule_id": rule_id,
+                        "match": text,
+                        "message": f"Component dimension ({text}) is below the recommended 48dp touch target threshold.",
+                        "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
+                    })
+
+                if "layout_width=\"wrap_content\"" not in content and "layout_height=\"wrap_content\"" not in content:
+                    # No wrapped axis in the file. Unchanged, every small explicit dimension is reported.
+                    for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
+                        add_finding(match.group(0), match.start())
+                    continue
+                # A wrapped axis used to hide the whole file. Now report controls that are clearly
+                # interactive, judged per element, where an explicit size wins over minWidth.
                 attr_re = r"\s+[\w:.-]+\s*=\s*(?:\"[^\"]*\"|'[^']*')"
                 for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*/?>", content):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
+                    true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "focusable", "textIsSelectable"))
+                    links = vals.get("autoLink", "none").lower() != "none" and vals.get("linksClickable", "").lower() != "false"
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
-                    links = vals.get("autoLink", "none").lower() != "none" or vals.get("linksClickable", "").lower() == "true"
-                    flagged = any(k in vals and vals[k].lower() != "false" for k in ("clickable", "longClickable")) or vals.get("focusable", "").lower() == "true"
-                    decorative = vals.get("clickable", "").lower() == "false" or ANDROID_DECORATIVE_TAG.search(tag)
-                    if decorative and not (handler or flagged or links):
+                    widget = vals.get("clickable", "").lower() != "false" and ANDROID_TOUCH_TAG.search(tag)
+                    if not (true_attr or links or handler or widget):
                         continue
                     for axis in ("layout_width", "layout_height"):
                         size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
-                        if not size:
-                            continue
-                        if not 0 < int(size.group(1)) < 48:
+                        if not size or not 0 < int(size.group(1)) < 48:
                             continue
                         attr = re.search(r"android:" + axis + r"\s*=\s*(?:\"[^\"]*\"|'[^']*')", attrs)
-                        start_idx = el.start(2) + attr.start()
-                        line_no = content.count("\n", 0, start_idx) + 1
-                        findings.append({
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": attr.group(0),
-                            "message": f"Component dimension ({attr.group(0)}) is below the recommended 48dp touch target threshold.",
-                            "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
-                        })
+                        add_finding(attr.group(0), el.start(2) + attr.start())
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()

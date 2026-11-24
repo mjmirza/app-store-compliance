@@ -1054,7 +1054,7 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
 </LinearLayout>
 EOF2
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 12 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 11 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
@@ -1065,7 +1065,7 @@ if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 12 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="26dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="22dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="20dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_height="19dp"'; then
   ok "wrap_content does not hide an undersized control, and dividers stay silent"
@@ -1074,6 +1074,22 @@ else
   echo "$OUT"
 fi
 rm -rf "$WRAP_DIR"
+# A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
+PLAIN_DIR="$(mktemp -d)"
+cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:layout_width="32dp" android:layout_height="32dp" />
+</LinearLayout>
+EOF3
+OUT=$($AUDIT "$PLAIN_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 2 ]; then
+  ok "a layout with no wrap_content still reports every small dimension"
+else
+  bad "a layout with no wrap_content still reports every small dimension"
+  echo "$OUT"
+fi
+rm -rf "$PLAIN_DIR"
 
 echo ""
 echo "Accessibility Compliance test suite complete: $PASS passed, $FAIL failed"
