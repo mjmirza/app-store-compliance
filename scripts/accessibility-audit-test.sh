@@ -1143,13 +1143,17 @@ cat <<'EOF6' > "$PARENT_DIR/parents.xml"
         <Button android:layout_width="12dp" android:layout_height="48dp" app:layout_flexGrow="1" />
     </com.google.android.flexbox.FlexboxLayout>
     <TextView android:layout_width="11dp" android:layout_height="48dp" android:clickable="@{false}" android:onClick="@{() -> vm.save()}" />
+    <LinearLayout style="@style/Col" android:layout_width="wrap_content" android:layout_height="160dp">
+        <Button android:layout_width="100dp" android:layout_height="29dp" android:layout_weight="1" />
+    </LinearLayout>
+    <com.google.android.material.floatingactionbutton.FloatingActionButton android:layout_width="28dp" android:layout_height="28dp" app:fabSize="mini" />
 </LinearLayout>
 EOF6
 OUT=$($AUDIT "$PARENT_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
 if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="31dp"'; then
-  ok "a weight hides only its axis, a Flexbox child and a binding that disables clicks stay silent"
+  ok "a weight hides only its axis, Flexbox, a disabling binding, a styled orientation and Material stay silent"
 else
-  bad "a weight hides only its axis, a Flexbox child and a binding that disables clicks stay silent"
+  bad "a weight hides only its axis, Flexbox, a disabling binding, a styled orientation and Material stay silent"
   echo "$OUT"
 fi
 rm -rf "$PARENT_DIR"

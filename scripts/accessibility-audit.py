@@ -475,7 +475,7 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
-ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|Chip|SeekBar"
+ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|SeekBar"
                                r"|Spinner|EditText|AutoCompleteTextView|RatingBar|NumberPicker|Picker)$")
 
 
@@ -828,8 +828,13 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     parent = stack[-1] if stack else None
                     hidden = bool(parent and parent[0]) or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
-                        stack.append((hidden, tag, vals.get("orientation", "horizontal").lower()))
+                        # The orientation is known only when set on the element and no style can override it.
+                        styled = re.search(r"(?<![\w:])style\s*=", attrs)
+                        stack.append((hidden, tag, None if styled else vals.get("orientation", "horizontal").lower()))
                     if hidden or (parent and parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout")):
+                        continue
+                    # Material components add their own padding up to a 48dp touch target, so they are not judged here.
+                    if el.group(2).startswith("com.google.android.material."):
                         continue
                     # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
                     # false) may switch the listener off, so a handler alone does not count then.
@@ -848,6 +853,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         continue
                     # A weight in a LinearLayout sizes the child along the layout orientation, so that axis is unknown.
                     weighted = parent and parent[1] != "FrameLayout" and vals.get("layout_weight", "0").strip() not in ("0", "0.0", "")
+                    if weighted and parent[2] is None:
+                        continue
                     skip_axis = ("layout_width" if parent[2] != "vertical" else "layout_height") if weighted else None
                     for axis in ("layout_width", "layout_height"):
                         if axis == skip_axis:
