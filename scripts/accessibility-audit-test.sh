@@ -1051,13 +1051,14 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
     <RatingBar android:layout_width="wrap_content" android:layout_height="17dp" android:isIndicator="true" />
     <View android:layout_width="match_parent" android:layout_height="1dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
+    <Button android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
     <Button android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 EOF2
 printf '<resources><bool name="image_is_clickable">true</bool></resources>\n' > "$WRAP_DIR/bools.xml"
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 12 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 10 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
@@ -1067,8 +1068,9 @@ if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 12 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="28dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="26dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="22dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="16dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="18dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_height="17dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="20dp"' \
@@ -1079,7 +1081,7 @@ else
   echo "$OUT"
 fi
 rm -rf "$WRAP_DIR"
-# A bool resource that is true in any variant still counts, and a link resource set to false stays silent.
+# A value read from a resource, a link that depends on the text, and an indicator are unknown or inert, so they stay silent.
 RES_DIR="$(mktemp -d)"; mkdir -p "$RES_DIR/res/layout" "$RES_DIR/res/values" "$RES_DIR/res/values-sw600dp"
 cat <<'EOF4' > "$RES_DIR/res/layout/x.xml"
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1096,11 +1098,10 @@ EOF4
 printf '<resources><bool name="tap">true</bool><bool name="links">false</bool><bool name="alias">@bool/on</bool><bool name="on">true</bool><bool name="read_only">false</bool><!-- <bool name="inert">true</bool> --><bool name="inert">false</bool></resources>\n' > "$RES_DIR/res/values/b.xml"
 printf '<resources><bool name="tap">false</bool><bool name="read_only">true</bool></resources>\n' > "$RES_DIR/res/values-sw600dp/b.xml"
 OUT=$($AUDIT "$RES_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 3 ] && echo "$OUT" | grep -q 'context: android:layout_width="32dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_height="23dp"' && echo "$OUT" | grep -q 'context: android:layout_height="22dp"'; then
-  ok "a bool resource true in any variant counts, a link resource set to false stays silent"
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 0 ]; then
+  ok "resource-driven, text-dependent and indicator controls stay silent"
 else
-  bad "a bool resource true in any variant counts, a link resource set to false stays silent"
+  bad "resource-driven, text-dependent and indicator controls stay silent"
   echo "$OUT"
 fi
 rm -rf "$RES_DIR"
