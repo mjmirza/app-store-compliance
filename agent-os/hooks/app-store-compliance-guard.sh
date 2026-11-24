@@ -1034,33 +1034,33 @@ for path in sys.argv[1:]:
             text = fh.read()
     except OSError:
         continue
-    app, project = [], []
-    has_app = False
-    app_var = False
-    project_var = False
-    # An App Store archive builds Release, so when Release configurations exist only they decide.
+    def collect(blocks):
+        app, project, has_app, app_var, project_var = [], [], False, False, False
+        for settings, _ in blocks:
+            named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
+            is_app = named and not any(marker in settings for marker in DEPENDENCY_MARKERS)
+            has_app = has_app or is_app
+            app_var = app_var or (is_app and unresolved(settings))
+            project_var = project_var or (not named and unresolved(settings))
+            vals = majors(settings)
+            if vals and named:
+                if is_app:
+                    app.extend(vals)
+            elif vals:
+                project.extend(vals)
+        return app, project, has_app, app_var, project_var
+
     blocks = BLOCK_RE.findall(text)
-    if any(name == "Release" for _, name in blocks):
-        blocks = [b for b in blocks if b[1] == "Release"]
-    for settings, _ in blocks:
-        is_app = ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and not any(
-            marker in settings for marker in DEPENDENCY_MARKERS)
-        has_app = has_app or is_app
-        app_var = app_var or (is_app and unresolved(settings))
-        project_var = project_var or (not ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and unresolved(settings))
-        vals = majors(settings)
-        if not vals:
-            continue
-        if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
-            if is_app:
-                app.extend(vals)
-        else:
-            project.extend(vals)
-    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
-    chosen = app if app else project
-    if any(v < 13 for v in chosen):
+    # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
+    app, project, _, _, _ = collect(blocks)
+    if any(v < 13 for v in (app if app else project)):
         worst = 13
         break
+    # The advisory iOS 15 warning leaves Debug configurations out, since an upload never builds them.
+    shipped = [b for b in blocks if b[1].strip().lower() != "debug"] or blocks
+    app, project, has_app, app_var, project_var = collect(shipped)
+    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
+    chosen = app if app else project
     # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
     # A project with no app target, such as a local framework or library, never decides the iOS 15 status.
     if not has_app:
@@ -1100,9 +1100,9 @@ PBXPY
     # The name filter reads the path below the project, so a parent folder such as contest-app is never matched.
     grep '[.]xcconfig$' "$FILELIST" | awk -v root="${DIR%/}/" '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } tolower(p) !~ /(test|framework|pods)/' | while IFS= read -r xf; do
       awk '{ sub(/\/\/.*/, "") }
-        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
+        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*(\[[^]]*\][[:space:]]*)*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
           if (cond ~ /iphonesimulator/) next
-          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
+          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*(\[[^]]*\][[:space:]]*)*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
           # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
           last[cond] = (p[1] ~ /^[0-9]+$/) ? p[1] + 0 : 99 }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
