@@ -4,10 +4,6 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-### Added
-
-- `KR-PIPA-SELF-TRANSMISSION-2027`. From 20 February 2027 a private handler in Korea with average revenue over KRW 180 billion that processes the personal information of 1 million or more data subjects, or the sensitive or unique identifying information of 50,000 or more, must transmit a data subject's personal information to that data subject on request, encrypted and without delay, and publish how to ask. Read on law.go.kr in Enforcement Decree No. 36121 (19 February 2026), whose Supplementary Provisions start Article 42-2(1)(1) one year after promulgation. The earlier MyData stages (13 March 2025, 1 June 2026, 20 August 2026) have passed and are described in `docs/GLOBAL-REGULATORY-2026.md` section 3.5. This closes the Korea item left open in #659.
-
 ### Fixed
 
 - The READ_CALL_LOG phone-call account verification cutoff is 27 January 2027, not 26 August 2026. Play Console Help answer 10208820 and the 29 October 2026 announcement (answer 18100766) set that date. Until then the exceptions table still lists the use case. The replacements are the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, and the SMS User Consent API. Added `GOOGLE-PLAY-CALL-LOG-VERIFICATION-2027`. The 15 July 2026 announcement (answer 17134731) named the change and did not state this date. The other 26 August 2026 items are unchanged.
