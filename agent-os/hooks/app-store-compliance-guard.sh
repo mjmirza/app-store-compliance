@@ -585,6 +585,7 @@ import sys
 
 WANT = re.compile(os.environ["ASCG_STRING_RE"])
 SQ, DQ, BT, DOL = chr(39), chr(34), chr(96), chr(36)
+NL = chr(10)
 LB, RB, BS, NL, SL, ST = chr(123), chr(125), chr(92), chr(10), chr(47), chr(42)
 
 
@@ -615,6 +616,35 @@ def skip_comment(code, j):
     return None
 
 
+REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
+
+
+def skip_regex(code, i):
+    # End index of a regex literal starting at i, or None when a slash there is division.
+    k = i - 1
+    while k >= 0 and code[k] in (chr(32), chr(9)):
+        k -= 1
+    word = re.search(r"(return|typeof|case|in|of|void|yield|await)$", code[max(0, k - 8):k + 1])
+    if k >= 0 and code[k] not in REGEX_BEFORE and not word:
+        return None
+    j, n, cls = i + 1, len(code), False
+    while j < n:
+        c = code[j]
+        if c == BS:
+            j += 2
+            continue
+        if c == NL:
+            return None
+        if c == chr(91):
+            cls = True
+        elif c == chr(93):
+            cls = False
+        elif c == SL and not cls:
+            return j + 1
+        j += 1
+    return None
+
+
 def read_template(code, i):
     # A template literal with comments dropped from its expressions. Nested templates are followed.
     out, j, n = [BT], i + 1, len(code)
@@ -628,7 +658,7 @@ def read_template(code, i):
             out.append(BT)
             return j + 1, "".join(out)
         if c == DOL and code.startswith(LB, j + 1):
-            out.append(DOL + LB)
+            out.append(chr(32))
             j, depth = j + 2, 1
             while j < n and depth:
                 c = code[j]
@@ -639,16 +669,21 @@ def read_template(code, i):
                 if c in (SQ, DQ):
                     e = read_quoted(code, j, c)
                     if e is not None:
-                        out.append(code[j:e])
+                        out.append(chr(32) + code[j:e] + chr(32))
+                        j = e
+                        continue
+                if c == SL:
+                    e = skip_regex(code, j)
+                    if e is not None:
                         j = e
                         continue
                 if c == BT:
                     j, t = read_template(code, j)
-                    out.append(t)
+                    out.append(chr(32) + t + chr(32))
                     continue
                 depth += (c == LB) - (c == RB)
-                out.append(c)
                 j += 1
+            out.append(chr(32))
             continue
         out.append(c)
         j += 1
@@ -666,6 +701,8 @@ def literals(code):
             e = read_quoted(code, i, c)
             yield code[i:e]
             i = e
+        elif c == SL and skip_regex(code, i) is not None:
+            i = skip_regex(code, i)
         elif c == BT:
             i, t = read_template(code, i)
             yield t
@@ -691,7 +728,14 @@ JSSTRPY
 # The React Native GoogleSignin export counts only where it can reach the iOS build.
 ios_google_signin() {
   [ -s "$FILELIST" ] || return 1
-  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null | grep . >/dev/null
+  # A file with a .ios sibling, such as login.ts beside login.ios.ts, is replaced on iOS, so it is left out too.
+  local f stem
+  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
+    | while IFS= read -r f; do
+        case "$f" in *.ios.*) echo "$f"; continue ;; esac
+        stem="${f%.*}"
+        ls "$stem".ios.* >/dev/null 2>&1 || echo "$f"
+      done | grep . >/dev/null
 }
 
 # Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
