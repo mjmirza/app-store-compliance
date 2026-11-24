@@ -1059,8 +1059,17 @@ for path in sys.argv[1:]:
     # The advisory iOS 15 warning leaves Debug configurations out, since an upload never builds them.
     shipped = [b for b in blocks if b[1].strip().lower() != "debug"] or blocks
     app, project, has_app, app_var, project_var = collect(shipped)
+    # Each shipped configuration decides on its own. Its app value wins, otherwise the project value of the
+    # same name is inherited. Within one configuration the highest conditional value counts, and the
+    # lowest configuration decides, so a Staging at 15 never hides a Release at 14.
+    per_config = []
+    for name in sorted({b[1] for b in shipped}):
+        c_app, c_project, _, _, _ = collect([b for b in shipped if b[1] == name])
+        c_chosen = c_app if c_app else c_project
+        if c_chosen:
+            per_config.append(max(c_chosen))
     # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
-    chosen = app if app else project
+    chosen = [min(per_config)] if per_config else []
     # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
     # A project with no app target, such as a local framework or library, never decides the iOS 15 status.
     if not has_app:

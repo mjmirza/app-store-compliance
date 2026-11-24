@@ -3273,6 +3273,9 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
 printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET [sdk=iphoneos*] = 15.0\n' > "$D/Config/App.xcconfig"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X /* App.xcconfig */;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 an xcconfig key with a space before its condition is read" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Staging;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios15 a Staging of 15.0 does not hide a Release of 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
