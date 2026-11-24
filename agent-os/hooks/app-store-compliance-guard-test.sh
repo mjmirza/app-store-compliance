@@ -3237,6 +3237,26 @@ D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'exp
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-11 a LOGIN options object with no performRequest call is still flagged" || bad "siwa-11 a LOGIN options object with no performRequest call is still flagged"
 rm -rf "$D"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' '/* Legacy flow
+AppleAuthentication.signInAsync()
+*/')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-12 a sign-in call inside a block comment is still flagged" || bad "siwa-12 a sign-in call inside a block comment is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'const unused = { requestedOperation: appleAuth.Operation.LOGIN };
+export const logout = () => appleAuth.performRequest({
+  requestedOperation: appleAuth.Operation.LOGOUT
+})')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-13 a LOGIN options object beside a LOGOUT request is still flagged" || bad "siwa-13 a LOGIN options object beside a LOGOUT request is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const login = () => appleAuth.performRequest({
+  requestedOperation: appleAuth.Operation.LOGIN,
+  requestedScopes: [appleAuth.Scope.EMAIL],
+})')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-14 a multiline Invertase LOGIN request counts" || bad "siwa-14 a multiline Invertase LOGIN request counts"
+rm -rf "$D"
 
 D="$(gs_ios H.swift 'let s = HKHealthStore()
 let c = CKContainer.default()')"
