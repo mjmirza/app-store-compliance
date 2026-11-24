@@ -565,12 +565,39 @@ release_string_has() {
       *) cat "$f" 2>/dev/null ;;
     esac
   done < "${SHIPLIST:-$FILELIST}" \
-    | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1
+    | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1 && return 0
   # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
   # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
   # then reports the whole pipeline non-zero even though grep matched. That made this check
   # silently miss on the CI runner (GNU grep, timing-dependent) while passing on a fast local
   # machine. Draining all input with plain grep and returning its status is deterministic.
+  js_quoted_string_has "$1"
+}
+
+# JS and TS also quote with ' and ` (issue #2378). Read as tokens, so an apostrophe in a comment
+# never pairs with another one around a host. Prints a hit, because xargs may run several batches.
+js_quoted_string_has() {
+  local hit
+  hit="$(grep -E '[.][cm]?[jt]sx?$' "${SHIPLIST:-$FILELIST}" | tr '\n' '\0' | ASCG_STRING_RE="$1" xargs -0 python3 -c "$(cat <<'JSSTRPY'
+import os
+import re
+import sys
+
+TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])*'|" + r"\x60(?:\\.|[^\x60\\])*\x60|/[*].*?[*]/|//[^\n]*", re.S)
+WANT = re.compile(os.environ["ASCG_STRING_RE"])
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            code = fh.read()
+    except OSError:
+        continue
+    for tok in TOKEN.finditer(code):
+        if tok.group(0)[0] in "'\x60" and WANT.search(tok.group(0)):
+            print(path)
+            sys.exit(0)
+JSSTRPY
+  )" 2>/dev/null)"
+  [ -n "$hit" ]
 }
 
 # Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
@@ -976,10 +1003,10 @@ sys.exit(1)
 SIWAPY
   )" 2>/dev/null
   }
-  if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
+  if grep_has 'FacebookLogin|GoogleSign[Ii]n|GIDSignIn|LoginWithFacebook'; then
     # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
     # with comments and strings removed. Buttons, enums, options objects and logout do not.
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSign[Ii]n|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then

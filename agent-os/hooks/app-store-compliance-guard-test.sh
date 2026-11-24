@@ -3261,6 +3261,76 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-14 a multiline Invertase LOGIN request counts" || bad "siwa-14 a multiline Invertase LOGIN request counts"
 rm -rf "$D"
 
+# Issue #2378. A React Native app whose whole source file is $2, at src/$1.
+mk_rn_src() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '<plist/>' > "$d/ios/App/Info.plist"
+  printf '{"name":"t","dependencies":{"react-native":"0.80.0"}}\n' > "$d/package.json"
+  printf '%s\n' "$2" > "$d/src/$1"
+  echo "$d"
+}
+# The React Native Google library exports GoogleSignin with a lower-case i.
+D="$(mk_rn_src signIn.ts 'import { GoogleSignin } from "@react-native-google-signin/google-signin";
+export const login = () => GoogleSignin.signIn();')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && rr_has 'file. src/signIn.ts:1' && ok "gsi-1 a Google-only React Native app (GoogleSignin) is flagged" || bad "gsi-1 a Google-only React Native app (GoogleSignin) is flagged"
+rm -rf "$D"
+D="$(mk_rn_src signIn.ts 'import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import * as AppleAuthentication from "expo-apple-authentication";
+export const google = () => GoogleSignin.signIn();
+export const apple = () => AppleAuthentication.signInAsync({ requestedScopes: [] });')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "gsi-2 GoogleSignin beside an Expo Apple sign-in call stays silent" || bad "gsi-2 GoogleSignin beside an Expo Apple sign-in call stays silent"
+rm -rf "$D"
+D="$(mk_rn_src signIn.ts 'export const label = "Sign in with Google";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "gsi-3 the words sign in with Google alone stay silent" || bad "gsi-3 the words sign in with Google alone stay silent"
+rm -rf "$D"
+
+# Single quotes and template literals are the usual JS and TS string styles, so a release
+# localhost in either must fire like a double-quoted one.
+D="$(mk_rn_src api.ts "export const api = 'http://localhost:3000';")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-2.1-STAGING-BACKEND' && rr_has 'file. src/api.ts:1' && ok "sq-1 a single-quoted localhost in TS is flagged" || bad "sq-1 a single-quoted localhost in TS is flagged"
+rm -rf "$D"
+D="$(mk_rn_src api.ts 'export const api = `http://localhost:3000`;')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-2 a template-literal localhost in TS is flagged" || bad "sq-2 a template-literal localhost in TS is flagged"
+rm -rf "$D"
+D="$(mk_rn_src api.js 'const port = 3000;
+export const api = `https://staging.acme.io:${port}/v1`;')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-3 a staging host in an interpolated template literal is flagged" || bad "sq-3 a staging host in an interpolated template literal is flagged"
+rm -rf "$D"
+D="$(mk_rn_src api.ts 'export const api = "http://localhost:3000";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-4 a double-quoted localhost in TS is still flagged" || bad "sq-4 a double-quoted localhost in TS is still flagged"
+rm -rf "$D"
+# A comment is not a string. Apostrophes in a comment must not pair up around a host.
+D="$(mk_rn_src api.ts "// Don't point this at localhost, it's the dev server
+/* We'd use 'http://localhost:3000' here in development */
+export const api = 'https://api.acme.io'; // isn't localhost, it's prod")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-5 localhost between apostrophes in comments stays silent" || bad "sq-5 localhost between apostrophes in comments stays silent"
+rm -rf "$D"
+# A variable named localhost between two strings is not a string containing it.
+D="$(mk_rn_src api.ts "export const api = 'https://' + localhost + '/v1';")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-6 an identifier between two single-quoted strings stays silent" || bad "sq-6 an identifier between two single-quoted strings stays silent"
+rm -rf "$D"
+# Test files never ship (#2375), in any quote style.
+D="$(mk_rn_src api.test.ts "it('loads', () => fetch('http://localhost:3000'));
+export const base = \`http://localhost:\${3000}\`;")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-6b a single-quoted localhost in a *.test.ts file stays silent" || bad "sq-6b a single-quoted localhost in a *.test.ts file stays silent"
+rm -rf "$D"
+# Swift has no single-quoted strings. A Swift comment with apostrophes stays silent as before.
+D="$(mk_ios_clean)"
+printf "// Don't use localhost, it's for tests\nlet x = 1\n" > "$D/App/Y.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "sq-7 apostrophes around localhost in a Swift comment stay silent" || bad "sq-7 apostrophes around localhost in a Swift comment stay silent"
+rm -rf "$D"
+
 D="$(gs_ios H.swift 'let s = HKHealthStore()
 let c = CKContainer.default()')"
 gs_check "health-1 HealthKit plus CloudKit is flagged" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 1
