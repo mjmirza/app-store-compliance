@@ -785,6 +785,22 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     })
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
+        # Boolean resources, so android:clickable="@bool/name" resolves to the value the project defines.
+        bool_res = {}
+        for rf in android_files:
+            if rf.endswith(".xml"):
+                try:
+                    with open(rf, encoding="utf-8", errors="ignore") as fh:
+                        for name, value in re.findall(r"<bool\s+name=\"([\w.]+)\"\s*>\s*(true|false)\s*</bool>", fh.read()):
+                            bool_res[name] = value
+                except OSError:
+                    continue
+
+        def resolve(value):
+            # An unresolved resource reference reads as unknown, never as true.
+            ref = re.fullmatch(r"@bool/([\w.]+)", value.strip())
+            return bool_res.get(ref.group(1), "") if ref else value.lower()
+
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
         for f in android_files:
             if f.endswith(".xml"):
@@ -812,13 +828,17 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 # A wrapped axis used to hide the whole file. Now report controls that are clearly
                 # interactive, judged per element, where an explicit size wins over minWidth.
                 attr_re = r"\s+[\w:.-]+\s*=\s*(?:\"[^\"]*\"|'[^']*')"
-                for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*/?>", content):
+                # A commented-out element is not a control. Blank comments but keep their line breaks.
+                live = re.sub(r"<!--.*?-->", lambda m: re.sub(r"[^\n]", " ", m.group(0)), content, flags=re.S)
+                for el in re.finditer(r"<([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*/?>", live):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
-                    true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "focusable", "textIsSelectable"))
+                    true_attr = any(resolve(vals.get(k, "")) == "true" for k in ("clickable", "longClickable", "focusable", "textIsSelectable"))
                     links = vals.get("autoLink", "none").lower() != "none" and vals.get("linksClickable", "").lower() != "false"
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
-                    widget = vals.get("clickable", "").lower() != "false" and ANDROID_TOUCH_TAG.search(tag)
+                    # A RatingBar with isIndicator only displays a value, it takes no touch.
+                    widget = (resolve(vals.get("clickable", "")) != "false" and resolve(vals.get("isIndicator", "")) != "true"
+                              and ANDROID_TOUCH_TAG.search(tag))
                     if not (true_attr or links or handler or widget):
                         continue
                     for axis in ("layout_width", "layout_height"):

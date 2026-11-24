@@ -1047,14 +1047,17 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
     <com.google.android.material.textview.MaterialTextView android:layout_width="match_parent" android:layout_height="19dp" />
     <TextView android:layout_width="match_parent" android:layout_height="40dp" android:autoLink="web" />
     <ImageView android:layout_width="34dp" android:layout_height="48dp" android:clickable="@bool/image_is_clickable" />
+    <!-- <Button android:layout_width="18dp" android:layout_height="18dp" /> -->
+    <RatingBar android:layout_width="wrap_content" android:layout_height="17dp" android:isIndicator="true" />
     <View android:layout_width="match_parent" android:layout_height="1dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
     <Button android:layout_width="wrap_content" android:layout_height="wrap_content" />
 </LinearLayout>
 EOF2
+printf '<resources><bool name="image_is_clickable">true</bool></resources>\n' > "$WRAP_DIR/bools.xml"
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 11 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 12 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
@@ -1065,7 +1068,9 @@ if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 11 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="26dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="22dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
-    && ! echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="18dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="17dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_width="20dp"' \
     && ! echo "$OUT" | grep -q 'context: android:layout_height="19dp"'; then
   ok "wrap_content does not hide an undersized control, and dividers stay silent"
