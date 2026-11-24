@@ -39,6 +39,9 @@ jobs:
       - name: Metadata audit test suite
         run: bash scripts/metadata-audit-test.sh
 
+      - name: Store metadata pull test
+        run: bash scripts/pull-metadata-test.sh
+
       - name: Accessibility audit test suite
         run: bash scripts/accessibility-audit-test.sh
 
