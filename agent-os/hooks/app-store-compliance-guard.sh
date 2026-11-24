@@ -995,7 +995,7 @@ BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
 DT_RE = re.compile(
-    r"\"?IPHONEOS_DEPLOYMENT_TARGET(\[[^\]]*\])?\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+    r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
@@ -1078,9 +1078,9 @@ PBXPY
     [ -s "$FILELIST" ] || return 0
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
       awk '{ sub(/\/\/.*/, "") }
-        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { cond = ""; if (match($0, /\[[^]]*\]/)) cond = substr($0, RSTART, RLENGTH)
+        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
           if (cond ~ /iphonesimulator/) next
-          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last[cond] = p[1] + 0 }
+          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last[cond] = p[1] + 0 }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
         END { m = -1; for (c in last) if (last[c] > m) m = last[c]
           if (plat && m < 0) m = 14
