@@ -15,7 +15,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -542,6 +542,11 @@ own_privacy_manifest() {
 # build compiles is not flagged. The string-literal requirement (the match must sit inside "...")
 # skips comments and identifiers. This is what makes the backend check precise instead of matching
 # a localhost mentioned in a comment or guarded behind DEBUG. Without it the check cries wolf.
+ship_has() {  # grep_has over the files that ship. Test files are left out when nothing imports them
+  [ "${SHIPLIST:-$FILELIST}" = "$FILELIST" ] && { grep_has "$1"; return; }
+  [ -s "$SHIPLIST" ] || return 1
+  tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | grep . >/dev/null
+}
 release_string_has() {
   [ -s "$FILELIST" ] || return 1
   local f
@@ -557,7 +562,7 @@ release_string_has() {
         ' "$f" 2>/dev/null ;;
       *) cat "$f" 2>/dev/null ;;
     esac
-  done < "$FILELIST" \
+  done < "${SHIPLIST:-$FILELIST}" \
     | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1
   # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
   # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
@@ -707,10 +712,11 @@ TEST_IMPORTERS="$({ grep -E '[.]([cm]?[jt]sx?|html?|vue|svelte|astro)$' "$FILELI
 # Expo Router bundles every file under app/ as a route, test files included, so those stay.
 ROUTE_KEEP='^$'
 grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -Il '"expo-router"' 2>/dev/null | grep . >/dev/null && ROUTE_KEEP='/app/'
-if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.kept" 2>/dev/null; then
-  mv "$FILELIST.kept" "$FILELIST"
-else
-  rm -f "$FILELIST.kept"
+# Test files stay in the source list, so they still count as evidence the way they always did.
+# Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
+SHIPLIST="$FILELIST"
+if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.ship" 2>/dev/null; then
+  SHIPLIST="$FILELIST.ship"
 fi
 build_blob
 CODE_STATE=""
@@ -818,7 +824,7 @@ fi
 # Genuine placeholder CONTENT only. the bare word "placeholder" matches every SwiftUI
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
-if grep_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
+if ship_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
   finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." src 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
