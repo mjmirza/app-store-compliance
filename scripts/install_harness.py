@@ -760,7 +760,8 @@ def unregister(tool, lay, guard):
     style = SPECS[tool]["style"]
     if style == "plugin":
         for path in (lay["config"], legacy_plugin(lay)):
-            if owned_plugin(path):
+            # A symlink is removed as before. Removing a link never deletes the file it points to.
+            if owned_plugin(path) or os.path.islink(path):
                 os.remove(path)
         return True
     if not os.path.exists(lay["config"]):

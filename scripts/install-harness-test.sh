@@ -460,6 +460,13 @@ for plugdir in plugin plugins; do
     && ok "opencode uninstall preserves a local $plugdir file" || bad "opencode uninstall preserves a local $plugdir file (rc=$RC)"
 done
 
+# A plug-in path turned into a symlink is unlinked on uninstall, and the file it points to is kept.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"; moved="$WORK/moved-plugin.js"
+mv "$plug" "$moved" && ln -s "$moved" "$plug"
+run --tool opencode uninstall >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$plug" ] && [ ! -L "$plug" ] && [ -f "$moved" ] && ok "opencode uninstall unlinks a symlinked plugin and keeps its target" || bad "opencode uninstall unlinks a symlinked plugin and keeps its target (rc=$RC)"
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
