@@ -972,7 +972,7 @@ BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
 DT_RE = re.compile(
-    r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+    r"IPHONEOS_DEPLOYMENT_TARGET(\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
@@ -990,7 +990,14 @@ COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
 def majors(settings):
     # Drop /* */ and // comments, but never inside a quoted value such as "$(SRCROOT)/**".
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    return [int(v) for v in DT_RE.findall(settings)]
+    # A simulator- or arch-conditional value never reaches an App Store upload. A device value wins.
+    plain, device = [], []
+    for cond, value in DT_RE.findall(settings):
+        if not cond:
+            plain.append(int(value))
+        elif "sdk=iphoneos" in cond:
+            device.append(int(value))
+    return device or plain
 
 
 worst = 0
@@ -1038,13 +1045,15 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   xcconfig_ios15_state() {
-    # One line per app xcconfig. below15 or ok15, from the last uncommented assignment, as in Xcode.
+    # One line per app xcconfig, below15 or ok15. The last device or unconditional assignment wins.
     [ -s "$FILELIST" ] || return 0
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
       awk '{ sub(/\/\/.*/, "") }
-        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last = p[1] }
+        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
+          if ($0 ~ /IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*=/) plain = p[1]; else if ($0 ~ /sdk=iphoneos/) dev = p[1] }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
-        END { if (last == "13" || last == "14" || plat) print "below15"; else if (last + 0 >= 15) print "ok15" }' "$xf" 2>/dev/null
+        END { last = (dev != "") ? dev : plain
+          if (last == "13" || last == "14" || plat) print "below15"; else if (last + 0 >= 15) print "ok15" }' "$xf" 2>/dev/null
     done
   }
   # Below iOS 13 is refused today (Upcoming Requirements). iOS 13 and 14 stay legal until April 2027,
