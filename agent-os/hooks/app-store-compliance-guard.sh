@@ -1038,8 +1038,14 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   xcconfig_below_ios15() {
+    # The last uncommented assignment in a file wins, as in Xcode. A Podfile-style platform line counts too.
     [ -s "$FILELIST" ] || return 1
-    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
+      awk '{ sub(/\/\/.*/, "") }
+        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=/ { v = $0; sub(/^[^=]*=[[:space:]]*/, "", v); gsub(/["; ]/, "", v); split(v, p, "."); last = p[1] }
+        /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
+        END { if (last == "13" || last == "14" || plat) print "below15" }' "$xf" 2>/dev/null
+    done | grep . >/dev/null
   }
   # Below iOS 13 is refused today (Upcoming Requirements). iOS 13 and 14 stay legal until April 2027,
   # when the Submitting page requires iOS 15, so they warn and do not block. A below-13 target keeps

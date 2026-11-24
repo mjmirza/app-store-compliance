@@ -3154,7 +3154,7 @@ gs_check() {  # $1 label, $2 dir, $3 id, $4 expect present (1) or absent (0)
   if [ "$4" = "1" ]; then
     rr_has "$3" && ok "gs $1" || bad "gs $1 (rc=$RC)"
   else
-    ! rr_has "$3" && ok "gs $1" || bad "gs $1 (rc=$RC)"
+    ! rr_has "$3" && rr_has 'Coverage. complete' && ok "gs $1" || bad "gs $1 (rc=$RC)"
   fi
   rm -rf "$2"
 }
@@ -3210,6 +3210,10 @@ ios15_case "an app target of 15 overrides a Podfile platform 14" 'IPHONEOS_DEPLO
 ios15_case "an app target of 14 still warns beside a Podfile platform 15" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' "platform :ios, '15.0'" warn
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '  IPHONEOS_DEPLOYMENT_TARGET = 14.0 // set for the old devices\n' > "$D/Config/Base.xcconfig"
 gs_check "ios15 an indented xcconfig 14.0 with a trailing comment still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/Config/Release.xcconfig"
+gs_check "ios15 a later 15.0 in the same xcconfig overrides an earlier 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Release.xcconfig"
+gs_check "ios15 a later 14.0 in the same xcconfig still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
