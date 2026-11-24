@@ -792,14 +792,18 @@ def run_rule_scan(rule_id, ios_files, android_files):
                 try:
                     with open(rf, encoding="utf-8", errors="ignore") as fh:
                         for name, value in re.findall(r"<bool\s+name=\"([\w.]+)\"\s*>\s*(true|false)\s*</bool>", fh.read()):
-                            bool_res[name] = value
+                            bool_res.setdefault(name, set()).add(value)
                 except OSError:
                     continue
 
         def resolve(value):
-            # An unresolved resource reference reads as unknown, never as true.
+            # An unresolved resource reads as unknown, never as true. A value that is true in any
+            # resource variant (phone, tablet, night) counts as true, since one device sees it.
             ref = re.fullmatch(r"@bool/([\w.]+)", value.strip())
-            return bool_res.get(ref.group(1), "") if ref else value.lower()
+            if not ref:
+                return value.lower()
+            seen = bool_res.get(ref.group(1), set())
+            return "true" if "true" in seen else ("false" if seen else "")
 
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
         for f in android_files:
@@ -834,7 +838,9 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
                     true_attr = any(resolve(vals.get(k, "")) == "true" for k in ("clickable", "longClickable", "focusable", "textIsSelectable"))
-                    links = vals.get("autoLink", "none").lower() != "none" and vals.get("linksClickable", "").lower() != "false"
+                    # linksClickable defaults to true. An unresolved resource reads as unknown, so no finding.
+                    lc = vals.get("linksClickable", "true")
+                    links = vals.get("autoLink", "none").lower() != "none" and resolve(lc) == "true"
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
                     # A RatingBar with isIndicator only displays a value, it takes no touch.
                     widget = (resolve(vals.get("clickable", "")) != "false" and resolve(vals.get("isIndicator", "")) != "true"

@@ -1079,6 +1079,25 @@ else
   echo "$OUT"
 fi
 rm -rf "$WRAP_DIR"
+# A bool resource that is true in any variant still counts, and a link resource set to false stays silent.
+RES_DIR="$(mktemp -d)"; mkdir -p "$RES_DIR/res/layout" "$RES_DIR/res/values" "$RES_DIR/res/values-sw600dp"
+cat <<'EOF4' > "$RES_DIR/res/layout/x.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <Button android:layout_width="32dp" android:layout_height="48dp" android:clickable="@bool/tap" />
+    <TextView android:layout_width="match_parent" android:layout_height="24dp" android:autoLink="web" android:linksClickable="@bool/links" />
+</LinearLayout>
+EOF4
+printf '<resources><bool name="tap">true</bool><bool name="links">false</bool></resources>\n' > "$RES_DIR/res/values/b.xml"
+printf '<resources><bool name="tap">false</bool></resources>\n' > "$RES_DIR/res/values-sw600dp/b.xml"
+OUT=$($AUDIT "$RES_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_width="32dp"'; then
+  ok "a bool resource true in any variant counts, a link resource set to false stays silent"
+else
+  bad "a bool resource true in any variant counts, a link resource set to false stays silent"
+  echo "$OUT"
+fi
+rm -rf "$RES_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
