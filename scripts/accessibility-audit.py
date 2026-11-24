@@ -831,7 +831,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     if hidden or vals.get("layout_weight", "0").strip() not in ("0", "0.0", ""):
                         continue
                     true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "textIsSelectable"))
-                    handler = any(k in vals for k in ("onClick", "onLongClick"))
+                    # A handler set to @null installs no listener.
+                    handler = any(vals.get(k, "@null").strip() not in ("@null", "") for k in ("onClick", "onLongClick"))
                     style = re.search(r"(?<![\w:])style\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)
                     indicator = vals.get("isIndicator", "false").lower() != "false" or bool(
                         style and re.search(r"ratingBarStyle(Small|Indicator)|RatingBar\.(Small|Indicator)", style.group(1) or style.group(2) or ""))

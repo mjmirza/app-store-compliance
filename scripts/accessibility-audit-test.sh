@@ -1119,14 +1119,15 @@ cat <<'EOF5' > "$TREE_DIR/tree.xml"
     </LinearLayout>
     <Button android:layout_width="12dp" android:layout_height="48dp" android:layout_weight="1" />
     <com.google.android.material.slider.Slider android:layout_width="match_parent" android:layout_height="11dp" />
+    <TextView android:layout_width="10dp" android:layout_height="48dp" android:clickable="false" android:onClick="@null" />
     <Button android:layout_width="33dp" android:layout_height="48dp" />
 </LinearLayout>
 EOF5
 OUT=$($AUDIT "$TREE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
 if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_width="33dp"'; then
-  ok "a hidden parent, a weighted size and a Material Slider stay silent, a sibling is still reported"
+  ok "a hidden parent, a weighted size, a Material Slider and a null handler stay silent, a sibling is still reported"
 else
-  bad "a hidden parent, a weighted size and a Material Slider stay silent, a sibling is still reported"
+  bad "a hidden parent, a weighted size, a Material Slider and a null handler stay silent, a sibling is still reported"
   echo "$OUT"
 fi
 rm -rf "$TREE_DIR"
