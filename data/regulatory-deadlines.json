@@ -1681,6 +1681,22 @@
       "source_url": "https://developer.apple.com/help/app-store-connect/manage-compliance-information/view-china-mainland-compliance-information/",
       "verified_on": "2026-11-22",
       "source_note": "Read on Apple App Store Connect Help, View China mainland compliance information, on 22 November 2026. That page states the 31 January 2027 date for existing apps, the Yes and No answers (including disabled or geoblocked), the evidence for each declaration, the four statuses, and that the app is released in other selected countries and regions but stays unavailable in China mainland until verification succeeds. A failed verification is corrected on the App Compliance page and reviewed with the next submitted version. The page does not state the day the declarations appeared, and it does not say that a new app must supply them at submission. TechNode on 17 November 2026 reports the page and, citing IT Home the same day, says a new app must provide the information at submission while existing apps have until 31 January 2027. IT Home says developers reported the new fields the day before. effective_date is the TechNode report date, not a date printed on Apple's page. https://technode.com/2026/11/17/apple-adds-generative-ai-compliance-filings-to-app-store-connect-in-china/ https://www.ithome.com/1/028/158.htm"
+    },
+    {
+      "id": "GOOGLE-PLAY-CALL-LOG-VERIFICATION-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Use of SMS or Call Log permission groups. account verification via phone call (Play Console Help answer 10208820, reminder in the 29 October 2026 policy announcement, answer 18100766)",
+      "requirement": "From 27 January 2027 account verification via phone call is no longer a permitted use case for the READ_CALL_LOG permission. Until that date the exceptions table on the same page still lists it. Verify the account with the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, or the SMS User Consent API. The 29 October 2026 announcement added the SMS User Consent API as a privacy-preserving alternative for account verification.",
+      "effective_date": "2027-01-27",
+      "grace_period": "none",
+      "mandatory_date": "2027-01-27",
+      "enforcement_date": "2027-01-27",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md, data/rejection-patterns.json",
+      "priority": "high",
+      "source_url": "https://support.google.com/googleplay/android-developer/answer/10208820?hl=en",
+      "verified_on": "2026-11-23",
+      "source_note": "Read on Play Console Help answer 10208820 on 23 November 2026. The page says the SMS and Call Log permissions policy will no longer permit account verification via phone call as a use case for READ_CALL_LOG, effective 27 January 2027, and names the Digital Credentials API (directly or through a verification provider built upon it) and the SMS Retriever API. The exceptions table on the same page still lists account verification via phone call. The 29 October 2026 policy announcement (answer 18100766, https://support.google.com/googleplay/android-developer/answer/18100766?hl=en-GB) repeats the 27 January 2027 date and adds the SMS User Consent API as a privacy-preserving alternative for account verification. The 15 July 2026 announcement (answer 17134731, https://support.google.com/googleplay/android-developer/answer/17134731) named the change and did not state 27 January 2027.",
+      "history": "2026-11-23. Added. docs/GOOGLE-PLAY.md and GOOGLE-PERM-SMS-CALLLOG previously said 26 August 2026, taken from the 15 July 2026 announcement, which named the change and did not state a day. Answers 10208820 and 18100766 state 27 January 2027. The September gap-analysis row is left as written, with a correction note."
     }
   ]
 }
