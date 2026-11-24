@@ -695,10 +695,10 @@ find "$DIR" -mindepth 1 \
   \) -print 2>/dev/null \
   > "$FILELIST" || : 2>/dev/null >> "$FILELIST" || SCAN_ERROR="the file list could not be written to $FILELIST"
 # JS and TS test files (*.test.ts, *.spec.tsx) sit next to the code they test and never ship, unless
-# app code imports one. Then the bundler ships it, so every test file stays in the scan.
+# app code names one in any quoted string (an import over several lines included). Then all stay.
 JS_TEST_RE='[.](test|spec)[.][jt]sx?$'
 TEST_IMPORTERS="$(grep -E '[.][jt]sx?$' "$FILELIST" 2>/dev/null | grep -vE "$JS_TEST_RE" | tr '\n' '\0' \
-  | xargs -0 grep -EIl "(from|require[[:space:]]*[(]|import[[:space:]]*[(]?)[[:space:]]*['\"][^'\"]*[.](test|spec)(['\"]|[.][jt]sx?['\"])" 2>/dev/null || true)"
+  | xargs -0 grep -EIl "['\"\`][^'\"\`]*[.](test|spec)([.][jt]sx?)?['\"\`]" 2>/dev/null || true)"
 if [ -z "$TEST_IMPORTERS" ] && grep -vE "$JS_TEST_RE" "$FILELIST" > "$FILELIST.kept" 2>/dev/null; then
   mv "$FILELIST.kept" "$FILELIST"
 else
