@@ -1040,6 +1040,10 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
     <androidx.appcompat.widget.AppCompatCheckBox android:layout_width="24dp" android:layout_height="48dp" />
     <Button android:onClick="@{() -> viewModel.save()}" android:layout_width="32dp" android:layout_height="48dp" />
     <TextView android:layout_width="30dp" android:layout_height="48dp" android:longClickable="true" />
+    <Button android:text='Save' android:layout_width="28dp" android:layout_height="48dp" />
+    <NumberPicker android:layout_width="26dp" android:layout_height="120dp" />
+    <TextView android:onLongClick="@{() -> vm.showMenu()}" android:layout_width="22dp" android:layout_height="48dp" />
+    <ImageView android:layout_width="24dp" android:layout_height="24dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" />
     <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
     <Button android:layout_width="48dp" android:layout_height="48dp" />
@@ -1047,13 +1051,16 @@ cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
 </LinearLayout>
 EOF2
 OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 7 ] \
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 10 ] \
     && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="40dp"' \
     && echo "$OUT" | grep -q 'context: android:layout_width="32dp"' \
-    && echo "$OUT" | grep -q 'context: android:layout_width="30dp"'; then
+    && echo "$OUT" | grep -q 'context: android:layout_width="30dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="28dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="26dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="22dp"'; then
   ok "wrap_content does not hide an undersized control, and dividers stay silent"
 else
   bad "wrap_content does not hide an undersized control, and dividers stay silent"
