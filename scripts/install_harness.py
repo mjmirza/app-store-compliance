@@ -1302,8 +1302,7 @@ def main(argv):
             print("  would copy the skill to " + shown(skill_dir()))
         if lay["command"]:
             print("  would write the audit command to " + shown(lay["command"]))
-        register(tool, lay, guard, True)
-        return 0
+        return 0 if register(tool, lay, guard, True) else 1
     print("Installing the App Store Compliance Playbook for " + SPECS[tool]["name"])
     copy_payload(tool, lay, guard)
     if not register(tool, lay, guard, False):

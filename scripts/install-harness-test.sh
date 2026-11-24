@@ -374,6 +374,14 @@ OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-stor
 echo "$OUT" | grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
 rm -rf "$APP"
 
+# A preview rejects configs the matching install would not edit, without modifying them.
+fresh; mkdir -p "$H/.codex"
+printf '{"hooks":{"PreToolUse":{}}}\n' > "$(cfg codex)"
+BEFORE="$(cat "$(cfg codex)")"
+OUT="$(run --tool codex --dry-run)"; RC=$?
+[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$(cfg codex)")" ] && [ ! -e "$(gdir codex)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'unexpected shape' \
+  && ok "codex dry run returns failure for a rejected config and writes nothing" || bad "codex dry run returns failure for a rejected config and writes nothing (rc=$RC)"
+
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
 fresh; run --tool gemini >/dev/null; run --tool opencode >/dev/null
 python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); sys.exit(0 if d["description"] and "{{args}}" in d["prompt"] else 1)' "$H/.gemini/commands/app-store-audit.toml" && ok "the gemini command is valid TOML with {{args}}" || bad "the gemini command is valid TOML with {{args}}"
