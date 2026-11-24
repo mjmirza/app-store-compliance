@@ -471,7 +471,8 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
-ANDROID_DECORATIVE_TAG = re.compile(r"^(View|Space|ImageView|TextView|ProgressBar|Guideline|Barrier|Divider|MaterialDivider|Toolbar|Include|Merge|Fragment|ViewStub|SurfaceView|TextureView|WebView|VideoView)$|Layout$|ScrollView$|RecyclerView$|ViewPager2?$|CardView$|AppBarLayout$")
+ANDROID_DECORATIVE_TAG = re.compile(r"^(?:Material|AppCompat|Shapeable)?(?:View|Space|ImageView|TextView|ProgressBar|Guideline|Barrier|Divider|Toolbar"
+                                   r"|Include|Merge|Fragment|ViewStub|SurfaceView|TextureView|WebView|VideoView)$|Layout$|ScrollView$|RecyclerView$|ViewPager2?$|CardView$")
 
 
 def run_rule_scan(rule_id, ios_files, android_files):
@@ -796,9 +797,10 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     tag, attrs = el.group(1).rsplit(".", 1)[-1], el.group(2)
                     vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
                     handler = any(k in vals for k in ("onClick", "onLongClick"))
-                    flagged = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "focusable"))
+                    links = vals.get("autoLink", "none").lower() != "none" or vals.get("linksClickable", "").lower() == "true"
+                    flagged = any(k in vals and vals[k].lower() != "false" for k in ("clickable", "longClickable")) or vals.get("focusable", "").lower() == "true"
                     decorative = vals.get("clickable", "").lower() == "false" or ANDROID_DECORATIVE_TAG.search(tag)
-                    if decorative and not (handler or flagged):
+                    if decorative and not (handler or flagged or links):
                         continue
                     for axis in ("layout_width", "layout_height"):
                         size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
