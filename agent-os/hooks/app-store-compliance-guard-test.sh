@@ -3233,6 +3233,10 @@ gs_check "ios15 a project-level 14.0 with nothing overriding it still warns" "$D
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;'; mkdir -p "$D/Lib/Lib.xcodeproj"
 printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n };\n F1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_NAME = Lib;\n SKIP_INSTALL = YES;\n };\n };\n}\n' > "$D/Lib/Lib.xcodeproj/project.pbxproj"
 gs_check "ios15 a local framework project inheriting 14.0 beside an iOS 15 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0; "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 15.0;'
+gs_check "ios15 a quoted device-SDK key of 15.0, as Cordova writes it, stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0; "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 15.0;'
+gs_check "ios15 a quoted simulator-only key of 15.0 still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean

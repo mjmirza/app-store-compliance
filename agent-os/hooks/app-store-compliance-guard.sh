@@ -972,7 +972,7 @@ BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
 DT_RE = re.compile(
-    r"IPHONEOS_DEPLOYMENT_TARGET(\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+    r"\"?IPHONEOS_DEPLOYMENT_TARGET(\[[^\]]*\])?\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
