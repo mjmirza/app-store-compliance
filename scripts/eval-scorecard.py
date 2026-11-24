@@ -15,14 +15,31 @@ SAFE = {"READY", "READY_WITH_ACTIONS"}
 
 
 def check_gold(gold):
+    cases = gold.get("cases") if isinstance(gold, dict) else None
+    if not isinstance(cases, list) or not cases:
+        return ["no gold cases"]
+
     problems = []
-    for i, c in enumerate(gold.get("cases", [])):
-        if c.get("feature") not in FEATURES:
-            problems.append(f"case {i} has unknown feature {c.get('feature')}")
-        if c.get("expect") not in VERDICTS:
-            problems.append(f"case {i} has unknown verdict {c.get('expect')}")
-    if not gold.get("cases"):
-        problems.append("no gold cases")
+    seen = set()
+    covered = set()
+    for i, c in enumerate(cases):
+        if not isinstance(c, dict):
+            problems.append(f"case {i} is not an object")
+            continue
+        feature, name, expect = c.get("feature"), c.get("name"), c.get("expect")
+        if feature not in FEATURES:
+            problems.append(f"case {i} has unknown feature {feature}")
+        elif not isinstance(name, str) or not name.strip():
+            problems.append(f"case {i} has no name")
+        else:
+            key = (feature, name.strip())
+            if key in seen:
+                problems.append(f"duplicate case {feature}. {name}")
+            seen.add(key)
+            covered.add(feature)
+        if not isinstance(expect, str) or expect not in VERDICTS:
+            problems.append(f"case {i} has unknown verdict {expect}")
+    problems.extend(f"no gold cases for {feature}" for feature in FEATURES if feature not in covered)
     return problems
 
 

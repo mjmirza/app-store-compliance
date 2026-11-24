@@ -359,6 +359,18 @@ for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"a
   [ "$RC" -ne 0 ] && [ "$(cat "$H/.codex/hooks.json")" = "$body" ] && echo "$OUT" | grep -q "Merge this into" && ok "an unsafe codex config is left untouched and a manual block is printed" || bad "an unsafe codex config is left untouched (rc=$RC)"
 done
 
+# A failed hook removal must leave the guard, skill and ownership files in place.
+for config in '{ incomplete' '{"hooks":{"PreToolUse":{}}}'; do
+  fresh; mkdir -p "$H/.codex/hooks" "$H/.agents/skills/app-store-compliance"
+  printf '%s\n' "$config" > "$(cfg codex)"
+  guard="$(gdir codex)/app-store-compliance-guard.sh"
+  printf '#!/bin/bash\nexit 2\n' > "$guard"; chmod +x "$guard"
+  printf 'codex\t%s\n' "$guard" > "$H/.agents/skills/app-store-compliance/.guards"
+  OUT="$(run --tool codex uninstall)"; RC=$?
+  [ "$RC" -eq 1 ] && [ "$config" = "$(cat "$(cfg codex)")" ] && [ -x "$guard" ] && grep -qF "$guard" "$H/.agents/skills/app-store-compliance/.guards" && ! printf '%s\n' "$OUT" | grep -q '^Removed' \
+    && ok "codex keeps its payload when uninstall cannot remove its hook ($config)" || bad "codex keeps its payload when uninstall cannot remove its hook ($config, rc=$RC)"
+done
+
 # 6 the installed guard finds the deadline list and the manifest validator in the shared skill
 fresh; run --tool codex >/dev/null
 APP="$WORK/app$RANDOM"; mkdir -p "$APP/App"; printf '<plist><dict></dict></plist>' > "$APP/App/Info.plist"; printf 'import UIKit\n' > "$APP/App/A.swift"

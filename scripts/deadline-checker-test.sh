@@ -70,4 +70,12 @@ DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief > "$
 check "no platforms flag lists every store" "Apple rule" "$T/none.txt"
 
 echo "----"
+DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief --platforms 'ios, Android' > "$T/spaced.txt" 2>&1
+check "platform list trims tokens and accepts case variants" "Play rule" "$T/spaced.txt"
+check "platform list still keeps the Apple deadline" "Apple rule" "$T/spaced.txt"
+if DEADLINES_FILE="$T/stores.json" python3 scripts/deadline-checker.py --brief --platforms androdi > "$T/typo.txt" 2>&1; then
+  echo "FAIL unknown platform must fail instead of hiding store-specific deadlines"; fails=$((fails+1))
+fi
+check "unknown platform names the rejected spelling" "androdi" "$T/typo.txt"
+
 if [ "$fails" -eq 0 ]; then echo "deadline-checker-test: ALL PASS"; else echo "deadline-checker-test: $fails FAIL"; exit 1; fi
