@@ -4,10 +4,6 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
-### Added
-
-- `APPLE-MIN-DEPLOYMENT-TARGET-IOS15`. Starting April 2027, iOS and iPadOS apps uploaded to App Store Connect must be built with the iOS & iPadOS 27 SDK or later and must target iOS 15 or later. Apple named the month only, so the deadline is 1 April 2027. The Upcoming Requirements page still lists only the iOS 13 floor, in force since 9 September 2026, and the 9 September 2026 submissions news post states the SDK floors without a deployment target. The guard warns, and does not block, when the app target is iOS 13 or 14. Read on Apple's Submitting page on 23 November 2026.
-
 ### Fixed
 
 - The READ_CALL_LOG phone-call account verification cutoff is 27 January 2027, not 26 August 2026. Play Console Help answer 10208820 and the 29 October 2026 announcement (answer 18100766) set that date. Until then the exceptions table still lists the use case. The replacements are the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, and the SMS User Consent API. Added `GOOGLE-PLAY-CALL-LOG-VERIFICATION-2027`. The 15 July 2026 announcement (answer 17134731) named the change and did not state this date. The other 26 August 2026 items are unchanged.
