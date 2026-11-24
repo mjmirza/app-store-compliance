@@ -985,6 +985,7 @@ DEPENDENCY_MARKERS = (
 
 
 def majors(settings):
+    settings = re.sub(r"/[*].*?[*]/", "", settings, flags=re.S)
     return [int(v) for v in DT_RE.findall(settings)]
 
 

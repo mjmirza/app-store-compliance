@@ -3210,6 +3210,7 @@ ios15_case "an app target of 15 overrides a Podfile platform 14" 'IPHONEOS_DEPLO
 ios15_case "an app target of 14 still warns beside a Podfile platform 15" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' "platform :ios, '15.0'" warn
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '  IPHONEOS_DEPLOYMENT_TARGET = 14.0 // set for the old devices\n' > "$D/Config/Base.xcconfig"
 gs_check "ios15 an indented xcconfig 14.0 with a trailing comment still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 
 D="$(gs_ios Net.m 'in_addr_t a = inet_addr("10.0.0.1");')"
 gs_check "ipv6-1 inet_addr is flagged" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 1
