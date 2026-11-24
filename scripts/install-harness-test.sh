@@ -530,6 +530,14 @@ cp "$plug" "$kept" && rm -f "$plug" && ln -s "$kept" "$plug"
 OUT="$(run --tool opencode)"; RC1=$?; run --tool opencode doctor >/dev/null; RC2=$?
 [ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode accepts a symlink to its own plugin" || bad "opencode accepts a symlink to its own plugin (rc=$RC1/$RC2)"
 
+# An editor that saves the plugin with a byte order mark does not make it look user-owned.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"
+python3 -I -c 'import sys; p=sys.argv[1]; d=open(p,"rb").read(); open(p,"wb").write(bytes([239,187,191])+d)' "$plug"
+OUT="$(run --tool opencode 2>&1)"; RC1=$?; run --tool opencode doctor >/dev/null 2>&1; RC2=$?
+run --tool opencode uninstall >/dev/null 2>&1; RC3=$?
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$RC3" -eq 0 ] && [ ! -e "$plug" ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode treats its own plugin saved with a byte order mark as its own" || bad "opencode treats its own plugin saved with a byte order mark as its own (rc=$RC1/$RC2/$RC3)"
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"

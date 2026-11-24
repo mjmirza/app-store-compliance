@@ -477,7 +477,8 @@ def owned_plugin(path):
     if not os.path.isfile(path):
         return False
     try:
-        with open(path, encoding="utf-8") as f:
+        # utf-8-sig drops a byte order mark an editor may add when the file is saved.
+        with open(path, encoding="utf-8-sig") as f:
             return f.read(len(OPENCODE_HEADER)) == OPENCODE_HEADER
     except (OSError, UnicodeError):
         return False
