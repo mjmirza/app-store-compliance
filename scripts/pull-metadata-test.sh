@@ -29,7 +29,7 @@ export APP_ID=fixture VERSION=fixture PACKAGE_NAME=com.example.fixture GOOGLE_AC
 if ASC_STATUS=9 bash "$SCRIPT" apple > "$T/out" 2>&1; then
   echo 'Apple pull hid a failed asc command'; exit 1
 fi
-! grep -q '^Done\.' "$T/out"
+if grep -q '^Done\.' "$T/out"; then echo 'FAIL a failed pull still printed Done'; exit 1; fi
 ASC_STATUS=0 bash "$SCRIPT" apple > "$T/out" 2>&1
 grep -q '^Done\.' "$T/out"
 for mode in transport malformed; do
@@ -37,7 +37,7 @@ for mode in transport malformed; do
   if LISTINGS_MODE="$mode" bash "$SCRIPT" google > "$T/out" 2>&1; then
     echo "Play pull hid a $mode failure"; exit 1
   fi
-  ! grep -q '^Done\.' "$T/out"
+  if grep -q '^Done\.' "$T/out"; then echo 'FAIL a failed pull still printed Done'; exit 1; fi
   test "$(cat "$CALLS")" = delete
 done
 : > "$CALLS"
