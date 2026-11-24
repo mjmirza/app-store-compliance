@@ -1037,11 +1037,13 @@ for path in sys.argv[1:]:
     app, project = [], []
     has_app = False
     app_var = False
+    project_var = False
     for settings in BLOCK_RE.findall(text):
         is_app = ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and not any(
             marker in settings for marker in DEPENDENCY_MARKERS)
         has_app = has_app or is_app
         app_var = app_var or (is_app and unresolved(settings))
+        project_var = project_var or (not ("PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings) and unresolved(settings))
         vals = majors(settings)
         if not vals:
             continue
@@ -1060,7 +1062,8 @@ for path in sys.argv[1:]:
     if not has_app:
         continue
     # An app value set from a variable cannot be checked, and this warning is advisory, so stay quiet.
-    if app_var:
+    # A project-level variable decides too when no app target sets its own value.
+    if app_var or (not app and project_var):
         ok15 = True
         continue
     if chosen and max(chosen) < 15:
