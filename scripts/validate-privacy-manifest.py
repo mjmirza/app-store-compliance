@@ -83,7 +83,10 @@ def _validate(d, path, out):
                             f"{label} NSPrivacyCollectedDataTypePurposes must be an array of strings."))
             purposes = []
         for purpose in purposes:
-            if purpose not in VALID_PURPOSES:
+            if not isinstance(purpose, str):
+                out.append(_rec(path, "critical", "APPLE-MANIFEST-BAD-VALUE",
+                                f"{label} NSPrivacyCollectedDataTypePurposes contains a non-string value."))
+            elif purpose not in VALID_PURPOSES:
                 out.append(_rec(path, "critical", "APPLE-MANIFEST-BAD-PURPOSE",
                                 f"{label} declares unknown purpose {purpose}."))
         if not purposes:

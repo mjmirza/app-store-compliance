@@ -89,6 +89,20 @@ printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NS
 OUT="$($V "$T/l.xcprivacy" 2>&1)"
 echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-BAD-VALUE' && ok "non-boolean tracking is critical" || bad "non-boolean tracking"
 
+# A non-string purpose is a shape finding, not an unreadable manifest; other findings survive.
+TYPES_BAD=${TYPE_OK/<string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising<\/string>/<dict\/><array\/><string>UnknownPurpose<\/string>}
+write_manifest "$T/m.xcprivacy" true '<array/>' "$TYPES_BAD"
+OUT="$($V "$T/m.xcprivacy" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && [ "$(echo "$OUT" | grep -c 'APPLE-MANIFEST-BAD-VALUE.*contains a non-string value')" -eq 2 ] \
+    && echo "$OUT" | grep -q 'APPLE-MANIFEST-BAD-PURPOSE.*UnknownPurpose' \
+    && echo "$OUT" | grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' \
+    && ! echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE'; then
+  ok "reports non-string purposes without dropping other findings"
+else
+  bad "reports non-string purposes without dropping other findings (rc=$RC)"
+  echo "$OUT"
+fi
+
 echo ""
 echo "validate-privacy-manifest-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
