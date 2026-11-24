@@ -78,7 +78,7 @@ grep -rn 'WKWebView\|loadRequest\|Capacitor\|Cordova' --include='*.swift' . | wc
 - What triggers it. Facebook, Google, or similar social login is present without Sign in with Apple or an equal privacy preserving option.
 - How to fix it. Add Sign in with Apple or an equal login that limits data to name and email and allows a private email.
 - Detection signals. FacebookLogin, GoogleSignIn, GIDSignIn, LoginWithFacebook
-- Present means handled. SignInWithApple, ASAuthorizationAppleIDProvider
+- Present means handled. SignInWithApple, ASAuthorizationAppleIDProvider, AppleAuthentication.signInAsync(, appleAuth.performRequest( with appleAuth.Operation.LOGIN
 
 How to detect.
 

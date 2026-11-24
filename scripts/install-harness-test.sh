@@ -395,6 +395,18 @@ for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"a
   [ "$RC" -ne 0 ] && [ "$(cat "$H/.codex/hooks.json")" = "$body" ] && echo "$OUT" | grep -q "Merge this into" && ok "an unsafe codex config is left untouched and a manual block is printed" || bad "an unsafe codex config is left untouched (rc=$RC)"
 done
 
+# A failed hook removal must leave the guard, skill and ownership files in place.
+for config in '{ incomplete' '{"hooks":{"PreToolUse":{}}}'; do
+  fresh; mkdir -p "$H/.codex/hooks" "$H/.agents/skills/app-store-compliance"
+  printf '%s\n' "$config" > "$(cfg codex)"
+  guard="$(gdir codex)/app-store-compliance-guard.sh"
+  printf '#!/bin/bash\nexit 2\n' > "$guard"; chmod +x "$guard"
+  printf 'codex\t%s\n' "$guard" > "$H/.agents/skills/app-store-compliance/.guards"
+  OUT="$(run --tool codex uninstall)"; RC=$?
+  [ "$RC" -eq 1 ] && [ "$config" = "$(cat "$(cfg codex)")" ] && [ -x "$guard" ] && grep -qF "$guard" "$H/.agents/skills/app-store-compliance/.guards" && ! printf '%s\n' "$OUT" | grep -q '^Removed' \
+    && ok "codex keeps its payload when uninstall cannot remove its hook ($config)" || bad "codex keeps its payload when uninstall cannot remove its hook ($config, rc=$RC)"
+done
+
 # 6 the installed guard finds the deadline list and the manifest validator in the shared skill
 fresh; run --tool codex >/dev/null
 APP="$WORK/app$RANDOM"; mkdir -p "$APP/App"; printf '<plist><dict></dict></plist>' > "$APP/App/Info.plist"; printf 'import UIKit\n' > "$APP/App/A.swift"
@@ -409,6 +421,14 @@ run --tool gemini >/dev/null; run --tool codex uninstall >/dev/null
 OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
 echo "$OUT" | grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
 rm -rf "$APP"
+
+# A preview rejects configs the matching install would not edit, without modifying them.
+fresh; mkdir -p "$H/.codex"
+printf '{"hooks":{"PreToolUse":{}}}\n' > "$(cfg codex)"
+BEFORE="$(cat "$(cfg codex)")"
+OUT="$(run --tool codex --dry-run)"; RC=$?
+[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$(cfg codex)")" ] && [ ! -e "$(gdir codex)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'unexpected shape' \
+  && ok "codex dry run returns failure for a rejected config and writes nothing" || bad "codex dry run returns failure for a rejected config and writes nothing (rc=$RC)"
 
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
 fresh; run --tool gemini >/dev/null; run --tool opencode >/dev/null

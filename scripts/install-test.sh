@@ -87,6 +87,18 @@ run >/dev/null
 run uninstall >/dev/null; RC=$?
 [ "$RC" -eq 0 ] && [ ! -e "$C/hooks/app-store-compliance-guard.sh" ] && [ ! -e "$C/skills/app-store-compliance" ] && [ "$(hooks)" = "0" ] && grep -q "other.sh" "$C/settings.json" && ok "uninstall removes the guard, skill and entry, and keeps other hooks" || bad "uninstall removes the guard, skill and entry, and keeps other hooks (rc=$RC)"
 
+# A failed hook removal must leave its executable and payload available until the settings are fixed.
+fresh
+printf '{"hooks":{"PreToolUse":{}}}' > "$C/settings.json"
+BEFORE="$(cat "$C/settings.json")"
+mkdir -p "$C/hooks" "$C/commands" "$C/skills/app-store-compliance"
+printf '#!/bin/bash\nexit 2\n' > "$C/hooks/app-store-compliance-guard.sh"
+chmod +x "$C/hooks/app-store-compliance-guard.sh"
+touch "$C/commands/app-store-audit.md" "$C/skills/app-store-compliance/SKILL.md"
+OUT="$(run uninstall)"; RC=$?
+[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ -x "$C/hooks/app-store-compliance-guard.sh" ] && [ -f "$C/commands/app-store-audit.md" ] && [ -f "$C/skills/app-store-compliance/SKILL.md" ] && ! printf '%s\n' "$OUT" | grep -q '^Removed' \
+  && ok "claude keeps its payload when uninstall cannot remove the hook" || bad "claude keeps its payload when uninstall cannot remove the hook (rc=$RC)"
+
 # 11 an unknown subcommand is refused
 fresh
 run frobnicate >/dev/null; RC=$?

@@ -93,6 +93,7 @@ bash agent-os/hooks/app-store-compliance-guard-test.sh
 
 - Sources linked for every new factual claim.
 - The guard test suite passes if you touched the guard.
+- Tests in both directions for any change to a check. A test that failed before your change and passes after it, and a control that shows the real case still fires. A change that makes a check flag less (an exclusion, a skip, a counter-signal, a narrower match) also lists in the PR what it could now miss, and why that is acceptable.
 - The doc, the JSON taxonomy, and the guard stay consistent with each other.
 - A short description of what changed and why.
 
