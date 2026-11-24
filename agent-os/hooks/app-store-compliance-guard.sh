@@ -930,9 +930,9 @@ if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
     config_has 'NSContactsUsageDescription' || finding high "APPLE-5.1.1-MISSING-USAGE-DESCRIPTION" "Contacts used without NSContactsUsageDescription" "Add NSContactsUsageDescription with a specific reason." src 'CNContactStore'
   fi
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'; then
-    # React Native and Expo sign in with Apple through a JS library. Only a login request, a signInAsync call
-    # or the rendered button counts, in code outside comments. Logout, enums and the package name do not.
-    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || impl_has 'appleAuth\.Operation\.LOGIN|AppleAuthentication\.signInAsync[[:space:]]*\(|<AppleAuthentication\.AppleAuthenticationButton([^A-Za-z]|$)' || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
+    # React Native and Expo sign in with Apple through a JS library. Only a started login counts, in code
+    # outside comments. signInAsync, or performRequest with Operation.LOGIN. Buttons, enums, logout do not.
+    grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || impl_has 'AppleAuthentication\.signInAsync[[:space:]]*\(' || { impl_has 'appleAuth\.performRequest[[:space:]]*\(' && impl_has 'appleAuth\.Operation\.LOGIN'; } || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook'
   fi
   # Hide My Email relay addresses now also come from private.icloud.com (Apple news 1ptvdtcm, corrected 24 Aug 2026).
   if grep_has 'privaterelay\.appleid\.com' && ! grep_has 'private\.icloud\.com'; then

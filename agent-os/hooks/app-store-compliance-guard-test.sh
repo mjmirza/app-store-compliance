@@ -3229,9 +3229,13 @@ D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' '// TODO implement Appl
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-9 a sign-in call inside a comment is still flagged" || bad "siwa-9 a sign-in call inside a comment is still flagged"
 rm -rf "$D"
-D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const B = () => <AppleAuthentication.AppleAuthenticationButton onPress={go} />')"
+D="$(mk_rn_social ',"expo-apple-authentication":"7.2.0"' 'export const B = () => <AppleAuthentication.AppleAuthenticationButton onPress={() => {}} />')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-10 the rendered Expo Apple button counts" || bad "siwa-10 the rendered Expo Apple button counts"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-10 a rendered Expo Apple button with no sign-in call is still flagged" || bad "siwa-10 a rendered Expo Apple button with no sign-in call is still flagged"
+rm -rf "$D"
+D="$(mk_rn_social ',"@invertase/react-native-apple-authentication":"2.5.1"' 'export const o = { requestedOperation: appleAuth.Operation.LOGIN }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && rr_has 'APPLE-4.8-SOCIAL-LOGIN-ONLY' && ok "siwa-11 a LOGIN options object with no performRequest call is still flagged" || bad "siwa-11 a LOGIN options object with no performRequest call is still flagged"
 rm -rf "$D"
 
 D="$(gs_ios H.swift 'let s = HKHealthStore()
