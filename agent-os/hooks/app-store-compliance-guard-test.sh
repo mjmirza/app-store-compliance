@@ -3237,6 +3237,10 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET 
 gs_check "ios15 a quoted device-SDK key of 15.0, as Cordova writes it, stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0; "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 15.0;'
 gs_check "ios15 a quoted simulator-only key of 15.0 still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\n/* old\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n*/\n' > "$D/Config/App.xcconfig"
+gs_check "ios15 a block-commented 14.0 after an xcconfig 15.0 stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '/* IPHONEOS_DEPLOYMENT_TARGET = 15.0 */\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/App.xcconfig"
+gs_check "ios15 an xcconfig 14.0 after a block-commented 15.0 still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
