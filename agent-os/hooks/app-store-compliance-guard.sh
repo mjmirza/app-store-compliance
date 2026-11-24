@@ -1080,7 +1080,9 @@ PBXPY
       awk '{ sub(/\/\/.*/, "") }
         /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
           if (cond ~ /iphonesimulator/) next
-          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, "."); last[cond] = p[1] + 0 }
+          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
+          # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
+          last[cond] = (p[1] ~ /^[0-9]+$/) ? p[1] + 0 : 99 }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
         END { m = -1; for (c in last) if (last[c] > m) m = last[c]
           if (plat && m < 0) m = 14

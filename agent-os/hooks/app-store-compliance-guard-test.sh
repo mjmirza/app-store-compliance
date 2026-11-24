@@ -3245,6 +3245,8 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET 
 gs_check "ios15 a two-condition project override of 15.0 stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*][config=Debug] = 15.0\n' > "$D/Config/App.xcconfig"
 gs_check "ios15 a two-condition simulator override still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'APP_MIN_IOS = 15.0\nIPHONEOS_DEPLOYMENT_TARGET = $(APP_MIN_IOS)\n' > "$D/Config/App.xcconfig"; printf "platform :ios, '14.0'\n" > "$D/Podfile"
+gs_check "ios15 a deployment target set from a variable stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 ios15_case "a commented-out 14.0 in the project file stays clean" '/* old IPHONEOS_DEPLOYMENT_TARGET = 14.0; */ IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a line-commented 14.0 in the project file stays clean" '// IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
