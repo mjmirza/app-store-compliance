@@ -1166,14 +1166,15 @@ cat <<'EOF7' > "$MORE_DIR/more.xml"
         <Button android:layout_width="27dp" android:layout_height="27dp" />
     </LinearLayout>
     <com.google.android.material.textview.MaterialTextView android:layout_width="48dp" android:layout_height="26dp" android:clickable="true" />
+    <ImageButton android:layout_width="24dp" android:layout_height="24dp" android:scaleX="2" android:scaleY="2" />
 </FrameLayout>
 EOF7
 printf '<Button xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="25dp" android:layout_height="wrap_content" />\n' > "$MORE_DIR/root_button.xml"
 OUT=$($AUDIT "$MORE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
 if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="26dp"'; then
-  ok "a styled section and a root view stay silent, a clickable MaterialTextView is still reported"
+  ok "a styled section, a root view and a scaled control stay silent, a clickable MaterialTextView is still reported"
 else
-  bad "a styled section and a root view stay silent, a clickable MaterialTextView is still reported"
+  bad "a styled section, a root view and a scaled control stay silent, a clickable MaterialTextView is still reported"
   echo "$OUT"
 fi
 rm -rf "$MORE_DIR"

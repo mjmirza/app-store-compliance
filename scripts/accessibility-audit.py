@@ -835,6 +835,9 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     # The root is skipped too, since an include can override its size.
                     if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
                         continue
+                    # A scale changes the hit area, so a scaled view is unknown.
+                    if any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY")):
+                        continue
                     # These Material components pad themselves up to a 48dp touch target.
                     ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)
                     if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip"):
