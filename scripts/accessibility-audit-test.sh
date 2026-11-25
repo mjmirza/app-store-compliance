@@ -1229,6 +1229,14 @@ else
   bad "a resource alpha that may be 0 keeps the panel silent"
   echo "$OUT"
 fi
+sed -i.bak 's/android:alpha="@dimen\/panel_alpha"/android:alpha="0.000"/' "$AL_DIR/al.xml" && rm -f "$AL_DIR/al.xml.bak"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "an alpha written as 0.000 is still zero"
+else
+  bad "an alpha written as 0.000 is still zero"
+  echo "$OUT"
+fi
 rm -rf "$AL_DIR"
 SW_DIR="$(mktemp -d)"
 printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><Switch android:layout_width="96dp" android:layout_height="24dp" /><Switch android:layout_width="22dp" android:layout_height="64dp" /><CheckBox android:layout_width="96dp" android:layout_height="23dp" /></FrameLayout>\n' > "$SW_DIR/sw.xml"

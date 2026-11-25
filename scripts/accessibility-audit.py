@@ -846,7 +846,10 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     scaled = any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY"))
                     # Alpha 0 makes a view invisible to touch checks, and a resource or attribute alpha may be 0.
                     alpha = vals.get("alpha", "1").strip()
-                    faded = alpha in ("0", "0.0", "0.00", ".0") or alpha.startswith(("@", "?"))
+                    try:
+                        faded = float(alpha) == 0
+                    except ValueError:
+                        faded = True
                     hidden = bool(parent and parent[0]) or bool(styled) or scaled or faded or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
