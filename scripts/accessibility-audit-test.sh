@@ -1221,6 +1221,14 @@ else
   bad "a control inside a half-faded panel is still reported"
   echo "$OUT"
 fi
+sed -i.bak 's/android:alpha="0.5"/android:alpha="@dimen\/panel_alpha"/' "$AL_DIR/al.xml" && rm -f "$AL_DIR/al.xml.bak"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a resource alpha that may be 0 keeps the panel silent"
+else
+  bad "a resource alpha that may be 0 keeps the panel silent"
+  echo "$OUT"
+fi
 rm -rf "$AL_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
