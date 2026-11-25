@@ -724,19 +724,19 @@ grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -
 # Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
 # CI config, end-to-end flows and npm scripts never ship either, imported or not (issue #2397).
 # Matched below the project root, so a project that itself sits in a folder named e2e is still read.
-NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e|detox)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
+NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
 # package.json ships only when code imports or requires it. Any path naming package.json counts, an
 # extensionless one through a relative or alias path. Vue, Svelte, Astro and .mjs files are not in the source list, so they are found here too.
 { grep -v '/package[.]json$' "$FILELIST" 2>/dev/null
   find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \) -prune \) \
     -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
-  | tr '\n' '\0' | xargs -0 grep -IlE "['\"]([^'\"]*package[.]json|[^'\"]*/package)([?][^'\"]*)?['\"]" 2>/dev/null | grep . >/dev/null \
+  | tr '\n' '\0' | xargs -0 grep -IlE "['\"\`]([^'\"\`]*package[.]json|[^'\"\`]*/package)([?][^'\"\`]*)?['\"\`]" 2>/dev/null | grep . >/dev/null \
   || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
 SHIP_TEST_RE='^$'
 [ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
 SHIPLIST="$FILELIST"
 if awk -v root="${DIR%/}/" -v n="$NOSHIP_RE" -v t="$SHIP_TEST_RE" -v k="$ROUTE_KEEP" \
-     '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } p !~ n && ($0 !~ t || $0 ~ k)' \
+     '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } (p !~ n && $0 !~ t) || $0 ~ k' \
      "$FILELIST" > "$FILELIST.ship" 2>/dev/null && ! cmp -s "$FILELIST" "$FILELIST.ship"; then
   SHIPLIST="$FILELIST.ship"
 fi
