@@ -3967,6 +3967,12 @@ gs_check "ios13-quoted-3 a simulator-only 12.0 does not count" "$D" 'APPLE-MIN-D
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]\" = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13-quoted-4 a simulator-only 15.0 does not hide an inherited 12.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.p;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 15.0;\n };\n name = Release;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.l;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-5 a quoted 15.0 on one app does not hide another app inheriting 12.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-6 a quoted 12.0 in Debug only stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
