@@ -996,8 +996,21 @@ sys.exit(1)
 SIWAPY
   )" 2>/dev/null
   }
-  # The React Native library spells it GoogleSignin. A file only the Android or web build loads never ships on iOS.
-  gsi_ios() { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e 'GoogleSignin' 2>/dev/null | grep . >/dev/null; }
+  # The React Native library spells it GoogleSignin, and only a sign-in call or button is a login.
+  # A file only the Android or web build loads, or one an .ios sibling replaces on iOS, never ships there.
+  gsi_ios() {
+    local hits f stem
+    hits="$(grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' 2>/dev/null || true)"
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      stem="${f%.*}"
+      case "$stem" in *.ios|*.native) return 0 ;; esac
+      ls "$stem".ios.* >/dev/null 2>&1 || ls "$stem".native.* >/dev/null 2>&1 || return 0
+    done <<GSIEOF
+$hits
+GSIEOF
+    return 1
+  }
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook' || gsi_ios; then
     # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
     # with comments and strings removed. Buttons, enums, options objects and logout do not.
