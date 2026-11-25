@@ -1485,6 +1485,10 @@ for path in sys.argv[1:]:
         if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":
             continue
         default = attr(app, "resizeableActivity")
+        # Launcher activities, directly or through an enabled alias that targets them.
+        roots = {attr(el, "name") for el in app if local(el.tag) == "activity" and launcher(el)}
+        roots |= {attr(el, "targetActivity") for el in app if local(el.tag) == "activity-alias"
+                  and launcher(el) and attr(el, "enabled") != "false"}
         app_keeps = opts_out(app)
         for el in app:
             # An alias inherits from its target activity, so only the activity is judged.
@@ -1498,10 +1502,11 @@ for path in sys.argv[1:]:
                     print(path)
                     sys.exit(0)
                 continue
-            # The root activity of a task decides whether the task can be resized. An application
-            # default reaches every root, while a lock on one activity counts only on the launcher.
+            # The root activity of a task decides whether the task can be resized, so the resize
+            # lock is judged on launcher activities. With no launcher declared, any could be a root.
             own = attr(el, "resizeableActivity")
-            resize_lock = (own is None and default == "false") or (own == "false" and launcher(el))
+            root = not roots or attr(el, "name") in roots
+            resize_lock = root and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
                 sys.exit(0)
