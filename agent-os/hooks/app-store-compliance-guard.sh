@@ -1338,14 +1338,14 @@ if [ "$IS_AND" -eq 1 ]; then
     [ -s "$FILELIST" ] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
     local mf hit sdk
-    # Android 16 ignores both locks on large screens for an app that targets API 36 or higher,
-    # so the check fires only when every target SDK it can read is known and below 36.
-    sdk="$(grep -E '/build[.]gradle([.]kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
+    # A quick gate. Each module's own target SDK is read again below.
+    sdk="$(grep -E '/build[.]gradle([.]kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=(]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
     [ -n "$sdk" ] || return 1
     mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
     [ -n "$mf" ] || return 1
-    hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | ADAPT_SDK="$sdk" xargs -0 python3 -c "$(cat <<'PY'
+    hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PY'
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -1370,13 +1370,31 @@ def attr(el, name):
             return val.strip()
     return None
 
-GRADLE_SDK = int(os.environ.get("ADAPT_SDK") or "0")
 OPT_OUT = "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
 
 def module(path):
     return path.split("/src/")[0] if "/src/" in path else path
 
-ONLY_DEVICE = ("android.software.leanback", "android.hardware.type.watch")
+ONLY_DEVICE = ("android.software.leanback", "android.hardware.type.watch",
+               "android.hardware.type.automotive")
+LIBRARY = re.compile(r"com[.]android[.](library|dynamic-feature)|android[.](library|dynamic[.]feature)")
+TARGET = re.compile(r"targetSdk(?:Version)?[ \t]*[=" + chr(40) + r"]?[ \t]*([0-9]+)")
+
+def module_sdk(path):
+    # The target SDK from the build file of the module. None when the module is a library,
+    # has no build file, or does not state a plain number.
+    for name in ("build.gradle", "build.gradle.kts"):
+        build = os.path.join(module(path), name)
+        try:
+            with open(build, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        if LIBRARY.search(text):
+            return None
+        found = [int(n) for n in TARGET.findall(text)]
+        return max(found) if found else 0
+    return None
 
 def single_device(root):
     # A required TV or watch feature limits the app to a device with no foldable. A
@@ -1397,7 +1415,7 @@ def frees(root):
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
             return True
         # A tools:node marker can remove or replace a whole activity or the application.
-        if attr(el, "node") is not None:
+        if attr(el, "node") is not None and local(el.tag) in ("activity", "application"):
             return True
         if local(el.tag) == "uses-feature" and attr(el, "name") in ONLY_DEVICE:
             return True
@@ -1428,7 +1446,13 @@ for path in sys.argv[1:]:
     if unlocked(path):
         continue
     sdk = [el for el in root.iter() if local(el.tag) == "uses-sdk"]
-    target = max([GRADLE_SDK] + [int(attr(el, "targetSdkVersion")) for el in sdk if (attr(el, "targetSdkVersion") or "").isdigit()])
+    gradle = module_sdk(path)
+    if gradle is None:
+        continue
+    target = max([gradle] + [int(attr(el, "targetSdkVersion")) for el in sdk if (attr(el, "targetSdkVersion") or "").isdigit()])
+    # An unknown target SDK is never judged.
+    if target == 0:
+        continue
     # Android 16 ignores the resize and orientation locks on large screens from API 36, except
     # the locked orientation. Only at API 36 can an application or one activity opt out.
     if single_device(root):
