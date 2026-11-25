@@ -1526,9 +1526,28 @@ ABIPY
       finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." manifest 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'
     fi
   fi
-  if grep_has 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'; then
+  # Prints the first file:line that uses the advertising ID, or nothing. A <uses-permission> with tools:node="remove"
+  # strips the AD_ID permission that an SDK such as firebase-analytics merges in, so the merged manifest declares none.
+  # AD_ID after a letter or digit is the end of a longer word (THREAD_ID, UPLOAD_ID, PAYLOAD_ID) and does not count.
+  advertising_id_at() {
+    local re='com\.google\.android\.gms\.permission\.AD_ID|(^|[^A-Za-z0-9])AD_ID|getAdvertisingIdInfo' hits f n
+    grep_has "$re" || return 0
+    hits="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$re" 2>/dev/null)"
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      case "$f" in */AndroidManifest.xml)  # one element per line, so a tools:node on the next line is read
+        # A removal scoped with tools:selector strips one library only, so the others still merge it in.
+        [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']" ; tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -E 'tools:selector')" ] || continue ;;
+      esac
+      n="$(grep -En -m1 -e "$re" "$f" 2>/dev/null | cut -d: -f1)"
+      printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"
+      return 0
+    done <<< "$hits"
+  }
+  ADID_AT="$(advertising_id_at)"
+  if [ -n "$ADID_AT" ]; then
     if ! grep_has 'opt-out|reset AD_ID|advertisingIdConsent|delete AD_ID'; then
-      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy." src 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'
+      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy." at "$ADID_AT"
     fi
   fi
   if grep_has 'requestPermissions|checkSelfPermission|shouldShowRequestPermissionRationale'; then

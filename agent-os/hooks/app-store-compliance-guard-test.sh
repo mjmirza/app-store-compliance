@@ -3363,6 +3363,28 @@ D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { n
 gs_check "abi-14 abiFilters.remove of the 64-bit ABI is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
 D="$(mk_android_perm '')"; printf 'android { compileSdk = 36\n defaultConfig { ndk {\n abiFilters += setOf("arm64-v8a")\n abiFilters.clear()\n abiFilters += "armeabi-v7a"\n } } }\n' > "$D/android/app/build.gradle.kts"
 gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
+# ANDROID-ADVERTISING-ID false positives. tools:node="remove" strips the AD_ID permission that an SDK such as
+# firebase-analytics merges in, and AD_ID at the end of a longer word (THREAD_ID) is not the advertising ID.
+AD_PERM='android:name="com.google.android.gms.permission.AD_ID"'
+D="$(mk_android_perm "<uses-permission $AD_PERM tools:node=\"remove\"/>")"
+gs_check "adid-1 a removed AD_ID permission stays silent" "$D" 'ANDROID-ADVERTISING-ID' 0
+D="$(mk_android_perm "<uses-permission $AD_PERM tools:node=\"remove\" tools:selector=\"com.example.library1\"/>")"
+gs_check "adid-sel a removal scoped to one library still counts" "$D" 'ANDROID-ADVERTISING-ID' 1
+D="$(mk_android_perm "<uses-permission
+    $AD_PERM
+    tools:node=\"remove\" />")"
+gs_check "adid-2 a removed AD_ID permission split across lines stays silent" "$D" 'ANDROID-ADVERTISING-ID' 0
+D="$(mk_android_perm '')"; printf '{ "Values": { "TELEGRAM_THREAD_ID": "" } }\n' > "$D/local.settings.json"
+gs_check "adid-3 THREAD_ID in a config file stays silent" "$D" 'ANDROID-ADVERTISING-ID' 0
+D="$(mk_android_perm "<uses-permission $AD_PERM/>")"
+gs_check "adid-4 a declared AD_ID permission is flagged" "$D" 'ANDROID-ADVERTISING-ID' 1
+D="$(mk_android_perm '<uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID"/>')"
+gs_check "adid-5 a declared ACCESS_ADSERVICES_AD_ID permission is flagged" "$D" 'ANDROID-ADVERTISING-ID' 1
+D="$(mk_android_perm "<uses-permission $AD_PERM tools:node=\"remove\"/>")"; mkdir -p "$D/android/app/src/main/java"
+printf 'val info = AdvertisingIdClient.getAdvertisingIdInfo(context)\n' > "$D/android/app/src/main/java/Ads.kt"
+rr_run "$D"
+printf '%s\n' "$OUT" | grep -A1 'ANDROID-ADVERTISING-ID' | grep -q '^      file\. android/app/src/main/java/Ads\.kt:1$' && ok "gs adid-6 a removed permission never hides a getAdvertisingIdInfo call, and the finding names the call" || bad "gs adid-6 a removed permission never hides a getAdvertisingIdInfo call, and the finding names the call"
+rm -rf "$D"
 # X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
 # Clean fixtures, so a pass means exit 0, CLEAR, and the finding at MEDIUM or absent.
 PP_KEYS='<key>NSLocationWhenInUseUsageDescription</key><string>Shows the nearest mosque on the map.</string><key>NSCameraUsageDescription</key><string>Scans a QR code to join a group.</string>'
