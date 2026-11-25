@@ -1129,8 +1129,8 @@ for path in sys.argv[1:]:
         if not named:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            # A macOS, watchOS, tvOS or visionOS target has no iOS floor. Every block counts on its own.
-            if OTHER_OS_RE.search(settings):
+            # A macOS, watchOS, tvOS or visionOS target has no iOS floor, and a test bundle never ships.
+            if OTHER_OS_RE.search(settings) or "test" in named.group(1).lower():
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
