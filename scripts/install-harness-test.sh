@@ -59,7 +59,7 @@ for t in codex gemini opencode cursor copilot grok qwen kimi droid auggie windsu
   # 1 a fresh install verifies itself end to end
   fresh
   OUT="$(run --tool "$t")"; RC=$?
-  [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && ok "$t fresh install verifies" || { bad "$t fresh install verifies (rc=$RC)"; echo "$OUT" | tail -15; }
+  [ "$RC" -eq 0 ] && grep -q "^Install verified\." <<<"$OUT" && ok "$t fresh install verifies" || { bad "$t fresh install verifies (rc=$RC)"; echo "$OUT" | tail -15; }
   [ -x "$(gdir "$t")/app-store-compliance-guard.sh" ] && ok "$t guard is installed and executable" || bad "$t guard is installed and executable"
   [ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && [ -f "$H/.agents/skills/app-store-compliance/VERSION" ] && ok "$t shared skill and version installed" || bad "$t shared skill and version installed"
   if [ "$t" != "opencode" ]; then
@@ -70,7 +70,7 @@ for t in codex gemini opencode cursor copilot grok qwen kimi droid auggie windsu
     grep -q 'tool.execute.before' "$(cfg "$t")" && ok "$t plugin written" || bad "$t plugin written"
     # OpenCode before 1.0 loads plugin/, current OpenCode loads plugins/. Both must carry it.
     cmp -s "$(cfg "$t")" "$H/.config/opencode/plugin/app-store-compliance.js" && ok "$t plugin also in the plugin/ folder older OpenCode reads" || bad "$t plugin also in the plugin/ folder older OpenCode reads"
-    echo "$OUT" | grep -q "the plugin stops a submit command" && ok "$t plugin blocks a submit command in node" || bad "$t plugin blocks a submit command in node"
+    grep -q "the plugin stops a submit command" <<<"$OUT" && ok "$t plugin blocks a submit command in node" || bad "$t plugin blocks a submit command in node"
   fi
   # 2 doctor passes, and fails after uninstall
   OUT="$(run --tool "$t" doctor)"; RC=$?
@@ -148,7 +148,7 @@ cp "$H/.kimi-code/config.toml" "$WORK/kimi-orig.toml"
 OUT="$(run --tool kimi)"; RC=$?
 [ "$RC" -eq 0 ] && grep -q '= "fixture-not-a-secret"' "$H/.kimi-code/config.toml" && python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); h=d["hooks"][0]; sys.exit(0 if h["event"]=="PreToolUse" and h["matcher"]=="^Bash$" and h["timeout"]==120 else 1)' "$H/.kimi-code/config.toml" \
   && ok "kimi appends a valid hook block and keeps the existing settings" || bad "kimi appends a valid hook block and keeps the existing settings (rc=$RC)"
-! echo "$OUT" | grep -q "fixture-not-a-secret" && ok "kimi install never prints the config contents" || bad "kimi install never prints the config contents"
+! grep -q "fixture-not-a-secret" <<<"$OUT" && ok "kimi install never prints the config contents" || bad "kimi install never prints the config contents"
 run --tool kimi >/dev/null
 [ "$(count kimi)" = "1" ] && ok "kimi a second run adds nothing" || bad "kimi a second run adds nothing"
 run --tool kimi uninstall >/dev/null
@@ -164,13 +164,13 @@ fresh; mkdir -p "$H/kimi-custom"; printf 'default_model = "k2"\n' > "$H/kimi-cus
 OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" KIMI_CODE_HOME="$H/kimi-custom" bash "$INSTALL" --tool kimi 2>&1)"; RC=$?
 [ "$RC" -eq 0 ] && grep -q "app-store-compliance-guard.sh" "$H/kimi-custom/config.toml" && [ ! -e "$H/.kimi-code/config.toml" ] && ok "kimi follows KIMI_CODE_HOME" || bad "kimi follows KIMI_CODE_HOME (rc=$RC)"
 OUT="$(env -u QWEN_HOME -u CODEX_HOME -u XDG_CONFIG_HOME HOME="$H" KIMI_CODE_HOME="$H/kimi-custom" bash "$INSTALL" --tool all 2>&1)"
-echo "$OUT" | grep -q "== kimi ==" && ok "auto discovery finds Kimi under KIMI_CODE_HOME" || bad "auto discovery finds Kimi under KIMI_CODE_HOME"
+grep -q "== kimi ==" <<<"$OUT" && ok "auto discovery finds Kimi under KIMI_CODE_HOME" || bad "auto discovery finds Kimi under KIMI_CODE_HOME"
 # 2d3 an inline hooks array cannot take a [[hooks]] block, so the file is left as it was and the block is shown
 fresh; mkdir -p "$H/.kimi-code"
 printf 'hooks = [{event = "PreToolUse", matcher = "^Bash$", command = "bash /other/check.sh", timeout = 120}]\ndefault_model = "k2"\n' > "$H/.kimi-code/config.toml"
 cp "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml"
 OUT="$(run --tool kimi)"; RC=$?
-[ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml" && echo "$OUT" | grep -q "\[\[hooks\]\]" && ok "kimi refuses an inline hooks array and changes nothing" || bad "kimi refuses an inline hooks array and changes nothing (rc=$RC)"
+[ "$RC" -ne 0 ] && cmp -s "$H/.kimi-code/config.toml" "$WORK/kimi-inline.toml" && grep -q "\[\[hooks\]\]" <<<"$OUT" && ok "kimi refuses an inline hooks array and changes nothing" || bad "kimi refuses an inline hooks array and changes nothing (rc=$RC)"
 
 # 2d4 an async handler runs in the background and cannot block, so doctor fails and install repairs it
 fresh; run --tool qwen >/dev/null
@@ -294,7 +294,7 @@ for markers in partial duplicate; do
     mkdir -p "$(gdir kimi)"
     touch "$(gdir kimi)/app-store-compliance-guard.sh"
     OUT="$(run --tool kimi "$mode")"; RC=$?
-    [ "$RC" -eq 1 ] && cmp -s "$(cfg kimi)" "$WORK/kimi-markers.toml" && [ -f "$(gdir kimi)/app-store-compliance-guard.sh" ] && ! ls "$(cfg kimi)".bak-* >/dev/null 2>&1 && ! printf '%s\n' "$OUT" | grep -q 'Traceback' && printf '%s\n' "$OUT" | grep -q 'ambiguous managed hook markers' \
+    [ "$RC" -eq 1 ] && cmp -s "$(cfg kimi)" "$WORK/kimi-markers.toml" && [ -f "$(gdir kimi)/app-store-compliance-guard.sh" ] && ! ls "$(cfg kimi)".bak-* >/dev/null 2>&1 && ! grep -q 'Traceback' <<<"$OUT" && grep -q 'ambiguous managed hook markers' <<<"$OUT" \
       && ok "kimi $mode preserves config with $markers markers without a traceback" || bad "kimi $mode preserves config with $markers markers (rc=$RC)"
   done
 done
@@ -314,7 +314,7 @@ fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "fixture"\n' > "$(cfg k
 run --tool kimi >/dev/null
 sed -i.tmp 's/^# <<< app-store-compliance guard <<</& # keep this block/' "$(cfg kimi)" && rm -f "$(cfg kimi).tmp"
 OUT="$(run --tool kimi)"; RC=$?
-[ "$RC" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'ambiguous' && ok "kimi reinstall accepts a note after the closing marker" || bad "kimi reinstall accepts a note after the closing marker (rc=$RC)"
+[ "$RC" -eq 0 ] && ! grep -q 'ambiguous' <<<"$OUT" && ok "kimi reinstall accepts a note after the closing marker" || bad "kimi reinstall accepts a note after the closing marker (rc=$RC)"
 run --tool kimi uninstall >/dev/null; RC=$?
 [ "$RC" -eq 0 ] && ! grep -q 'app-store-compliance-guard' "$(cfg kimi)" && ok "kimi uninstall removes a block with a note after its marker" || bad "kimi uninstall removes a block with a note after its marker (rc=$RC)"
 
@@ -332,9 +332,9 @@ sys.exit(0 if (b + ".gemini" + b) in t["prompt"] else 1)
 # 2e Copilot in the app repository (cloud agent, JetBrains, VS Code workspace)
 fresh; APPR="$WORK/apprepo$RANDOM"; mkdir -p "$APPR"
 OUT="$(run --tool copilot-repo)"; RC=$?
-[ "$RC" -eq 2 ] && echo "$OUT" | grep -q "Pass --repo" && ok "copilot-repo without --repo exits 2 and says what to pass" || bad "copilot-repo without --repo exits 2 (rc=$RC)"
+[ "$RC" -eq 2 ] && grep -q "Pass --repo" <<<"$OUT" && ok "copilot-repo without --repo exits 2 and says what to pass" || bad "copilot-repo without --repo exits 2 (rc=$RC)"
 OUT="$(run --tool copilot-repo --repo "$APPR")"; RC=$?
-[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && [ -x "$APPR/.github/hooks/app-store-compliance-guard.sh" ] \
+[ "$RC" -eq 0 ] && grep -q "^Install verified\." <<<"$OUT" && [ -x "$APPR/.github/hooks/app-store-compliance-guard.sh" ] \
   && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["hooks"]["preToolUse"][0]["bash"]=="bash ./.github/hooks/app-store-compliance-guard.sh" else 1)' "$APPR/.github/hooks/app-store-compliance.json" \
   && [ ! -e "$H/.agents" ] && ok "copilot-repo writes a relative hook into the repository and nothing in HOME" || { bad "copilot-repo writes a relative hook into the repository (rc=$RC)"; echo "$OUT" | tail -8; }
 run --tool copilot-repo --repo "$APPR" uninstall >/dev/null
@@ -392,7 +392,7 @@ run --tool kimi >/dev/null; run --tool kimi doctor >/dev/null; RC=$?
 for body in '{"hooks": [broken' '{"permissions":{"deny":["x"]},"permissions":{"allow":["x"]}}'; do
   fresh; mkdir -p "$H/.codex"; printf '%s' "$body" > "$H/.codex/hooks.json"
   OUT="$(run --tool codex)"; RC=$?
-  [ "$RC" -ne 0 ] && [ "$(cat "$H/.codex/hooks.json")" = "$body" ] && echo "$OUT" | grep -q "Merge this into" && ok "an unsafe codex config is left untouched and a manual block is printed" || bad "an unsafe codex config is left untouched (rc=$RC)"
+  [ "$RC" -ne 0 ] && [ "$(cat "$H/.codex/hooks.json")" = "$body" ] && grep -q "Merge this into" <<<"$OUT" && ok "an unsafe codex config is left untouched and a manual block is printed" || bad "an unsafe codex config is left untouched (rc=$RC)"
 done
 
 # A failed hook removal must leave the guard, skill and ownership files in place.
@@ -403,7 +403,7 @@ for config in '{ incomplete' '{"hooks":{"PreToolUse":{}}}'; do
   printf '#!/bin/bash\nexit 2\n' > "$guard"; chmod +x "$guard"
   printf 'codex\t%s\n' "$guard" > "$H/.agents/skills/app-store-compliance/.guards"
   OUT="$(run --tool codex uninstall)"; RC=$?
-  [ "$RC" -eq 1 ] && [ "$config" = "$(cat "$(cfg codex)")" ] && [ -x "$guard" ] && grep -qF "$guard" "$H/.agents/skills/app-store-compliance/.guards" && ! printf '%s\n' "$OUT" | grep -q '^Removed' \
+  [ "$RC" -eq 1 ] && [ "$config" = "$(cat "$(cfg codex)")" ] && [ -x "$guard" ] && grep -qF "$guard" "$H/.agents/skills/app-store-compliance/.guards" && ! grep -q '^Removed' <<<"$OUT" \
     && ok "codex keeps its payload when uninstall cannot remove its hook ($config)" || bad "codex keeps its payload when uninstall cannot remove its hook ($config, rc=$RC)"
 done
 
@@ -411,15 +411,15 @@ done
 fresh; run --tool codex >/dev/null
 APP="$WORK/app$RANDOM"; mkdir -p "$APP/App"; printf '<plist><dict></dict></plist>' > "$APP/App/Info.plist"; printf 'import UIKit\n' > "$APP/App/A.swift"
 OUT="$(env HOME="$H" bash "$H/.codex/hooks/app-store-compliance-guard.sh" "$APP" 2>&1)"
-echo "$OUT" | grep -q "Regulatory Compliance Deadline Status" && ok "the codex guard finds the deadline list in ~/.agents/skills" || bad "the codex guard finds the deadline list in ~/.agents/skills"
+grep -q "Regulatory Compliance Deadline Status" <<<"$OUT" && ok "the codex guard finds the deadline list in ~/.agents/skills" || bad "the codex guard finds the deadline list in ~/.agents/skills"
 
 # 6b release-audit.py run from the shared skill finds the guard installed under the tool's own folder
 fresh; run --tool codex >/dev/null
 OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
-echo "$OUT" | grep -qF "Guard. $H/.codex/hooks/app-store-compliance-guard.sh" && ok "release-audit in the shared skill finds the codex guard" || { bad "release-audit in the shared skill finds the codex guard"; echo "$OUT" | grep -i guard | head -3; }
+grep -qF "Guard. $H/.codex/hooks/app-store-compliance-guard.sh" <<<"$OUT" && ok "release-audit in the shared skill finds the codex guard" || { bad "release-audit in the shared skill finds the codex guard"; echo "$OUT" | grep -i guard | head -3; }
 run --tool gemini >/dev/null; run --tool codex uninstall >/dev/null
 OUT="$(env -u APP_STORE_GUARD_PATH HOME="$H" python3 "$H/.agents/skills/app-store-compliance/scripts/release-audit.py" "$APP" 2>&1)"
-echo "$OUT" | grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
+grep -qF "Guard. $H/.gemini/hooks/app-store-compliance-guard.sh" <<<"$OUT" && ok "after codex is removed release-audit uses the gemini guard" || bad "after codex is removed release-audit uses the gemini guard"
 rm -rf "$APP"
 
 # A preview rejects configs the matching install would not edit, without modifying them.
@@ -427,7 +427,7 @@ fresh; mkdir -p "$H/.codex"
 printf '{"hooks":{"PreToolUse":{}}}\n' > "$(cfg codex)"
 BEFORE="$(cat "$(cfg codex)")"
 OUT="$(run --tool codex --dry-run)"; RC=$?
-[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$(cfg codex)")" ] && [ ! -e "$(gdir codex)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'unexpected shape' \
+[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$(cfg codex)")" ] && [ ! -e "$(gdir codex)" ] && [ ! -e "$H/.agents" ] && grep -q 'unexpected shape' <<<"$OUT" \
   && ok "codex dry run returns failure for a rejected config and writes nothing" || bad "codex dry run returns failure for a rejected config and writes nothing (rc=$RC)"
 
 # 7 the audit command points at the installed paths, and the Gemini command is valid TOML
@@ -438,10 +438,10 @@ python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1],"rb")); sys.exit
 # 8 --tool all installs into every tool it finds, and only those
 fresh; mkdir -p "$H/.codex" "$H/.cursor"
 OUT="$(run --tool all)"; RC=$?
-[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Found. codex cursor$" && [ "$(count codex)" = "1" ] && [ "$(count cursor)" = "1" ] && [ ! -e "$H/.gemini" ] && [ ! -e "$H/.claude" ] \
+[ "$RC" -eq 0 ] && grep -q "^Found. codex cursor$" <<<"$OUT" && [ "$(count codex)" = "1" ] && [ "$(count cursor)" = "1" ] && [ ! -e "$H/.gemini" ] && [ ! -e "$H/.claude" ] \
   && ok "--tool all installs into the found tools only" || { bad "--tool all installs into the found tools only (rc=$RC)"; echo "$OUT" | head -5; }
 fresh; OUT="$(run --tool all)"; RC=$?
-[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "No supported AI coding tool" && ok "--tool all with no tool says so" || bad "--tool all with no tool says so (rc=$RC)"
+[ "$RC" -eq 1 ] && grep -q "No supported AI coding tool" <<<"$OUT" && ok "--tool all with no tool says so" || bad "--tool all with no tool says so (rc=$RC)"
 
 # 8b Qwen reads $QWEN_HOME/settings.json when QWEN_HOME is set, so install, doctor, uninstall and --tool all follow it
 fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
@@ -455,7 +455,7 @@ qrun --tool qwen uninstall >/dev/null
 ! grep -q "app-store-compliance-guard.sh" "$Q/settings.json" 2>/dev/null && ok "qwen uninstall edits \$QWEN_HOME/settings.json" || bad "qwen uninstall edits \$QWEN_HOME/settings.json"
 fresh; Q="$WORK/qhome$RANDOM"; mkdir -p "$Q"
 OUT="$(qrun --tool all --dry-run)"; RC=$?
-echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds qwen through \$QWEN_HOME" || bad "--tool all finds qwen through \$QWEN_HOME (rc=$RC)"
+grep -q "^Found. qwen$" <<<"$OUT" && ok "--tool all finds qwen through \$QWEN_HOME" || bad "--tool all finds qwen through \$QWEN_HOME (rc=$RC)"
 
 # 8c two installs of one tool, in two config folders, each own the shared skill
 fresh; CA="$WORK/codexa$RANDOM"; CB="$WORK/codexb$RANDOM"; mkdir -p "$CA" "$CB"
@@ -470,7 +470,7 @@ crun "$CA" --tool codex uninstall >/dev/null
 # 8d --tool all expands a QWEN_HOME written with a Windows tilde, as the installer does
 fresh; mkdir -p "$H/qwen-config"
 OUT="$(env -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR QWEN_HOME='~\qwen-config' HOME="$H" bash "$INSTALL" --tool all --dry-run 2>&1)"
-echo "$OUT" | grep -q "^Found. qwen$" && ok "--tool all finds a QWEN_HOME written as ~\folder" || bad "--tool all finds a QWEN_HOME written as ~\folder"
+grep -q "^Found. qwen$" <<<"$OUT" && ok "--tool all finds a QWEN_HOME written as ~\folder" || bad "--tool all finds a QWEN_HOME written as ~\folder"
 
 # 8e Kimi keeps CRLF line endings byte for byte through install and uninstall
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n\r\n' > "$H/.kimi-code/config.toml"; cp "$H/.kimi-code/config.toml" "$WORK/kimi-crlf.toml"
@@ -508,7 +508,7 @@ for plugdir in plugin plugins; do
   printf 'export const LocalPlugin = () => ({});\n' > "$foreign"
   cp "$foreign" "$WORK/local-plugin.js"
   OUT="$(run --tool opencode)"; RC=$?
-  [ "$RC" -eq 1 ] && cmp -s "$foreign" "$WORK/local-plugin.js" && [ ! -e "$(gdir opencode)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'not created by this installer' \
+  [ "$RC" -eq 1 ] && cmp -s "$foreign" "$WORK/local-plugin.js" && [ ! -e "$(gdir opencode)" ] && [ ! -e "$H/.agents" ] && grep -q 'not created by this installer' <<<"$OUT" \
     && ok "opencode install leaves a local $plugdir file and payload alone" || bad "opencode install leaves a local $plugdir file and payload alone (rc=$RC)"
   cp "$WORK/local-plugin.js" "$foreign"
   run --tool opencode uninstall >/dev/null; RC=$?
@@ -528,7 +528,7 @@ fresh; run --tool opencode >/dev/null
 plug="$(cfg opencode)"; kept="$WORK/dotfiles-plugin.js"
 cp "$plug" "$kept" && rm -f "$plug" && ln -s "$kept" "$plug"
 OUT="$(run --tool opencode)"; RC1=$?; run --tool opencode doctor >/dev/null; RC2=$?
-[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode accepts a symlink to its own plugin" || bad "opencode accepts a symlink to its own plugin (rc=$RC1/$RC2)"
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && ! grep -q 'not created by this installer' <<<"$OUT" && ok "opencode accepts a symlink to its own plugin" || bad "opencode accepts a symlink to its own plugin (rc=$RC1/$RC2)"
 
 # An editor that saves the plugin with a byte order mark does not make it look user-owned.
 fresh; run --tool opencode >/dev/null
@@ -536,7 +536,7 @@ plug="$(cfg opencode)"
 python3 -I -c 'import sys; p=sys.argv[1]; d=open(p,"rb").read(); open(p,"wb").write(bytes([239,187,191])+d)' "$plug"
 OUT="$(run --tool opencode 2>&1)"; RC1=$?; run --tool opencode doctor >/dev/null 2>&1; RC2=$?
 run --tool opencode uninstall >/dev/null 2>&1; RC3=$?
-[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$RC3" -eq 0 ] && [ ! -e "$plug" ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode treats its own plugin saved with a byte order mark as its own" || bad "opencode treats its own plugin saved with a byte order mark as its own (rc=$RC1/$RC2/$RC3)"
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$RC3" -eq 0 ] && [ ! -e "$plug" ] && ! grep -q 'not created by this installer' <<<"$OUT" && ok "opencode treats its own plugin saved with a byte order mark as its own" || bad "opencode treats its own plugin saved with a byte order mark as its own (rc=$RC1/$RC2/$RC3)"
 
 # A directive the person added above the header, such as @ts-check, still leaves the plugin the installer's own.
 fresh; run --tool opencode >/dev/null
@@ -548,16 +548,16 @@ run --tool opencode uninstall >/dev/null 2>&1; RC=$?
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
-[ "$N1" = "$N2" ] && echo "$OUT" | grep -q 'already registered' && ok "kimi a second run on a CRLF config changes nothing" || bad "kimi a second run on a CRLF config changes nothing ($N1 $N2)"
+[ "$N1" = "$N2" ] && grep -q 'already registered' <<<"$OUT" && ok "kimi a second run on a CRLF config changes nothing" || bad "kimi a second run on a CRLF config changes nothing ($N1 $N2)"
 # 8i without node the OpenCode install never says verified
 fresh; mkdir -p "$H/.config/opencode"
 NONODE="$WORK/nonode$RANDOM"; mkdir -p "$NONODE"; for b in bash sh python3 grep sed awk cat cp mv rm mkdir chmod dirname basename tr head tail find date ls env printf mktemp uname cmp wc sort; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
 OUT="$(env -u QWEN_HOME -u KIMI_CODE_HOME -u COPILOT_HOME -u CODEX_HOME -u XDG_CONFIG_HOME -u CLAUDE_CONFIG_DIR -u CLAUDE_PROJECT_DIR PATH="$NONODE" HOME="$H" bash "$INSTALL" --tool opencode 2>&1)"
-echo "$OUT" | grep -q 'not fully verified' && ! echo "$OUT" | grep -q '^Install verified' && ok "opencode without node says not fully verified" || bad "opencode without node says not fully verified"
+grep -q 'not fully verified' <<<"$OUT" && ! grep -q '^Install verified' <<<"$OUT" && ok "opencode without node says not fully verified" || bad "opencode without node says not fully verified"
 # 8g a non-Claude doctor says when the checkout is newer than the install
 fresh; mkdir -p "$H/.codex"; run --tool codex >/dev/null; printf '1.0.0' > "$H/.agents/skills/app-store-compliance/VERSION"
 OUT="$(run --tool codex doctor)"
-echo "$OUT" | grep -q "this checkout is version" && ok "codex doctor says the checkout is newer" || bad "codex doctor says the checkout is newer"
+grep -q "this checkout is version" <<<"$OUT" && ok "codex doctor says the checkout is newer" || bad "codex doctor says the checkout is newer"
 
 # 9 a home folder with an apostrophe still verifies
 H="$WORK/O'Reilly home"; mkdir -p "$H"
@@ -566,7 +566,7 @@ OUT="$(run --tool cursor)"; RC=$?
 
 # 10 bad input
 fresh; OUT="$(run --tool vim)"; RC=$?
-[ "$RC" -eq 2 ] && echo "$OUT" | grep -q "Unknown tool" && ok "an unknown tool exits 2" || bad "an unknown tool exits 2 (rc=$RC)"
+[ "$RC" -eq 2 ] && grep -q "Unknown tool" <<<"$OUT" && ok "an unknown tool exits 2" || bad "an unknown tool exits 2 (rc=$RC)"
 OUT="$(run --tool)"; RC=$?
 [ "$RC" -eq 2 ] && ok "--tool with no name exits 2" || bad "--tool with no name exits 2 (rc=$RC)"
 OUT="$(run --tool gemini --dry-run)"; RC=$?

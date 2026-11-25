@@ -27,8 +27,8 @@ done
 [ -f "$C/commands/app-store-audit.md" ] && ok "slash command is installed" || bad "slash command is installed"
 [ "$(hooks)" = "1" ] && ok "hook is registered once in settings.json" || bad "hook is registered once in settings.json (got $(hooks))"
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); e=[h for x in d["hooks"]["PreToolUse"] if x.get("matcher")=="Bash" for h in x["hooks"] if "app-store-compliance-guard.sh" in h["command"]]; sys.exit(0 if e and e[0].get("timeout",0)>=120 and e[0].get("type")=="command" else 1)' "$C/settings.json" && ok "hook entry is a Bash PreToolUse command with a 120 second timeout" || bad "hook entry is a Bash PreToolUse command with a 120 second timeout"
-echo "$OUT" | grep -q "^Install verified\." && ok "install ends with a verified line" || bad "install ends with a verified line"
-echo "$OUT" | grep -q "bash .*app-store-compliance-guard.sh /path/to/your/app" && ok "install prints the one command to run next" || bad "install prints the one command to run next"
+grep -q "^Install verified\." <<<"$OUT" && ok "install ends with a verified line" || bad "install ends with a verified line"
+grep -q "bash .*app-store-compliance-guard.sh /path/to/your/app" <<<"$OUT" && ok "install prints the one command to run next" || bad "install prints the one command to run next"
 
 # 2 running it again changes nothing and adds no second entry
 BEFORE="$(cat "$C/settings.json")"
@@ -47,12 +47,12 @@ fresh
 printf '{ "model": "opus", broken' > "$C/settings.json"
 OUT="$(run)"; RC=$?
 [ "$(cat "$C/settings.json")" = '{ "model": "opus", broken' ] && ok "an unreadable settings.json is left untouched" || bad "an unreadable settings.json is left untouched"
-echo "$OUT" | grep -q '"PreToolUse"' && [ "$RC" -eq 1 ] && ok "it prints the block to add by hand and exits 1" || bad "it prints the block to add by hand and exits 1 (rc=$RC)"
+grep -q '"PreToolUse"' <<<"$OUT" && [ "$RC" -eq 1 ] && ok "it prints the block to add by hand and exits 1" || bad "it prints the block to add by hand and exits 1 (rc=$RC)"
 
 # 5 dry run writes nothing
 fresh
 OUT="$(run --dry-run)"; RC=$?
-[ "$RC" -eq 0 ] && [ -z "$(ls -A "$C")" ] && echo "$OUT" | grep -q "Dry run" && ok "dry run writes nothing" || bad "dry run writes nothing (rc=$RC)"
+[ "$RC" -eq 0 ] && [ -z "$(ls -A "$C")" ] && grep -q "Dry run" <<<"$OUT" && ok "dry run writes nothing" || bad "dry run writes nothing (rc=$RC)"
 
 # 6 doctor fails before an install and passes after
 fresh
@@ -60,12 +60,12 @@ run doctor >/dev/null; RC=$?
 [ "$RC" -eq 1 ] && ok "doctor fails when nothing is installed" || bad "doctor fails when nothing is installed (rc=$RC)"
 run >/dev/null
 OUT="$(run doctor)"; RC=$?
-[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && ok "doctor passes after an install" || bad "doctor passes after an install (rc=$RC)"
+[ "$RC" -eq 0 ] && grep -q "^Install verified\." <<<"$OUT" && ok "doctor passes after an install" || bad "doctor passes after an install (rc=$RC)"
 
 # 7 doctor notices a guard that was edited or is stale
 printf '\n# local edit\n' >> "$C/hooks/app-store-compliance-guard.sh"
 OUT="$(run doctor)"; RC=$?
-echo "$OUT" | grep -q "differs from this checkout" && ok "doctor reports a guard that differs from the checkout" || bad "doctor reports a guard that differs from the checkout"
+grep -q "differs from this checkout" <<<"$OUT" && ok "doctor reports a guard that differs from the checkout" || bad "doctor reports a guard that differs from the checkout"
 
 # 8 doctor catches a guard that no longer blocks
 printf '#!/usr/bin/env bash\nexit 0\n' > "$C/hooks/app-store-compliance-guard.sh"
@@ -77,7 +77,7 @@ fresh
 SHIM="$(mktemp -d)"
 for b in bash cp rm mkdir chmod cat grep sed awk find xargs tr head tail mktemp printf wc sort uniq cut dirname basename date cmp mv ls env plutil xmllint; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$SHIM/$b"; done
 OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
-[ -x "$C/hooks/app-store-compliance-guard.sh" ] && [ ! -f "$C/settings.json" ] && echo "$OUT" | grep -q '"PreToolUse"' && [ "$RC" -eq 1 ] && ok "without python3 or jq the block is printed for a manual paste" || bad "without python3 or jq the block is printed for a manual paste (rc=$RC)"
+[ -x "$C/hooks/app-store-compliance-guard.sh" ] && [ ! -f "$C/settings.json" ] && grep -q '"PreToolUse"' <<<"$OUT" && [ "$RC" -eq 1 ] && ok "without python3 or jq the block is printed for a manual paste" || bad "without python3 or jq the block is printed for a manual paste (rc=$RC)"
 rm -rf "$SHIM"
 
 # 10 uninstall removes only what the installer added
@@ -96,7 +96,7 @@ printf '#!/bin/bash\nexit 2\n' > "$C/hooks/app-store-compliance-guard.sh"
 chmod +x "$C/hooks/app-store-compliance-guard.sh"
 touch "$C/commands/app-store-audit.md" "$C/skills/app-store-compliance/SKILL.md"
 OUT="$(run uninstall)"; RC=$?
-[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ -x "$C/hooks/app-store-compliance-guard.sh" ] && [ -f "$C/commands/app-store-audit.md" ] && [ -f "$C/skills/app-store-compliance/SKILL.md" ] && ! printf '%s\n' "$OUT" | grep -q '^Removed' \
+[ "$RC" -eq 1 ] && [ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ -x "$C/hooks/app-store-compliance-guard.sh" ] && [ -f "$C/commands/app-store-audit.md" ] && [ -f "$C/skills/app-store-compliance/SKILL.md" ] && ! grep -q '^Removed' <<<"$OUT" \
   && ok "claude keeps its payload when uninstall cannot remove the hook" || bad "claude keeps its payload when uninstall cannot remove the hook (rc=$RC)"
 
 # 11 an unknown subcommand is refused
@@ -137,7 +137,7 @@ done
 fresh
 printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"x"}]}]},"hooks":{"PreToolUse":[]}}' > "$C/settings.json"; BEFORE="$(cat "$C/settings.json")"
 OUT="$(run)"; RC=$?
-[ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ "$RC" -eq 1 ] && echo "$OUT" | grep -q '"PreToolUse"' && ok "a repeated key leaves settings.json untouched" || bad "a repeated key leaves settings.json untouched (rc=$RC)"
+[ "$BEFORE" = "$(cat "$C/settings.json")" ] && [ "$RC" -eq 1 ] && grep -q '"PreToolUse"' <<<"$OUT" && ok "a repeated key leaves settings.json untouched" || bad "a repeated key leaves settings.json untouched (rc=$RC)"
 
 # 16 a read-only settings.json is respected
 fresh
@@ -154,12 +154,12 @@ if command -v jq >/dev/null 2>&1; then
   printf '{"model":"opus","hooks":{"Stop":[]}}' > "$C/settings.json"
   OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
   PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" >/dev/null 2>&1
-  [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "^Install verified\." && [ "$(hooks)" = "1" ] && grep -q '"opus"' "$C/settings.json" && ok "with jq only the hook is merged once and verified" || bad "with jq only the hook is merged once and verified (rc=$RC entries=$(hooks))"
+  [ "$RC" -eq 0 ] && grep -q "^Install verified\." <<<"$OUT" && [ "$(hooks)" = "1" ] && grep -q '"opus"' "$C/settings.json" && ok "with jq only the hook is merged once and verified" || bad "with jq only the hook is merged once and verified (rc=$RC entries=$(hooks))"
   # jq keeps only the last of two repeated keys, so a repeated key must stop the jq path too
   for body in '{"permissions":{"deny":["Bash(*)"]},"permissions":{"allow":["Bash(*)"]}}' '{"hooks":{"PreToolUse":[]},"a":{"b":1,"b":2}}'; do
     fresh; printf '%s' "$body" > "$C/settings.json"
     OUT="$(PATH="$SHIM" CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" 2>&1)"; RC=$?
-    [ "$RC" -eq 1 ] && [ "$(cat "$C/settings.json")" = "$body" ] && echo "$OUT" | grep -q '"PreToolUse"' && ok "with jq only a repeated key leaves settings.json untouched" || bad "with jq only a repeated key leaves settings.json untouched (rc=$RC)"
+    [ "$RC" -eq 1 ] && [ "$(cat "$C/settings.json")" = "$body" ] && grep -q '"PreToolUse"' <<<"$OUT" && ok "with jq only a repeated key leaves settings.json untouched" || bad "with jq only a repeated key leaves settings.json untouched (rc=$RC)"
   done
   rm -rf "$SHIM"
 fi
@@ -174,10 +174,10 @@ run uninstall >/dev/null
 
 # 19 no HOME and no CLAUDE_CONFIG_DIR is a clear message, never a crash. HOME alone missing still works.
 OUT="$(env -u HOME -u CLAUDE_CONFIG_DIR bash "$INSTALL" --dry-run 2>&1)"; RC=$?
-[ "$RC" -ne 0 ] && echo "$OUT" | grep -q 'HOME is not set' && ! echo "$OUT" | grep -q 'unbound variable' && ok "an unset HOME is reported, not a crash" || bad "an unset HOME is reported, not a crash (rc=$RC)"
+[ "$RC" -ne 0 ] && grep -q 'HOME is not set' <<<"$OUT" && ! grep -q 'unbound variable' <<<"$OUT" && ok "an unset HOME is reported, not a crash" || bad "an unset HOME is reported, not a crash (rc=$RC)"
 fresh
 OUT="$(env -u HOME CLAUDE_CONFIG_DIR="$C" bash "$INSTALL" --dry-run 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q 'unbound variable' && ok "a custom folder works with HOME unset" || bad "a custom folder works with HOME unset (rc=$RC)"
+[ "$RC" -eq 0 ] && ! grep -q 'unbound variable' <<<"$OUT" && ok "a custom folder works with HOME unset" || bad "a custom folder works with HOME unset (rc=$RC)"
 # 20 the default folder written with a braced HOME is still this folder's hook, so no second entry is added.
 H="$WORK/home$RANDOM"; mkdir -p "$H/.claude"
 C="$H/.claude"
@@ -222,14 +222,14 @@ fresh
 run >/dev/null
 V="$(cat VERSION 2>/dev/null)"
 [ -n "$V" ] && [ "$(cat "$C/skills/app-store-compliance/VERSION" 2>/dev/null)" = "$V" ] && ok "install records the playbook version" || bad "install records the playbook version (repo=$V)"
-OUT="$(run doctor)"; echo "$OUT" | grep -q "^  ok    version $V" && ok "doctor prints the installed version" || bad "doctor prints the installed version"
+OUT="$(run doctor)"; grep -q "^  ok    version $V" <<<"$OUT" && ok "doctor prints the installed version" || bad "doctor prints the installed version"
 [ "$(run --version)" = "app-store-compliance $V" ] && ok "--version prints the checkout version" || bad "--version prints the checkout version"
 
 # 25 on Windows (Git Bash, MSYS, Cygwin) the hook also covers PowerShell, and doctor proves a PowerShell call is blocked
 fresh
 OUT="$(ASC_UNAME=MINGW64_NT-10.0 run)"; RC=$?
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash|PowerShell"] else 1)' "$C/settings.json" && [ "$RC" -eq 0 ] && ok "Git Bash registers Bash|PowerShell" || bad "Git Bash registers Bash|PowerShell (rc=$RC)"
-echo "$OUT" | grep -q "blocks a submit command run through PowerShell" && ok "doctor proves the PowerShell path on Windows" || bad "doctor proves the PowerShell path on Windows"
+grep -q "blocks a submit command run through PowerShell" <<<"$OUT" && ok "doctor proves the PowerShell path on Windows" || bad "doctor proves the PowerShell path on Windows"
 fresh; run >/dev/null
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); m=[e["matcher"] for e in d["hooks"]["PreToolUse"]]; sys.exit(0 if m==["Bash"] else 1)' "$C/settings.json" && ok "macOS and Linux keep the Bash matcher" || bad "macOS and Linux keep the Bash matcher"
 

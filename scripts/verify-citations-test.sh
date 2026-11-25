@@ -22,8 +22,8 @@ https://eur-lex.europa.eu/eli/reg/2016/679/oj
 https://support.google.com/googleplay/android-developer/answer/10787469
 EOF
 out="$(python3 "$VERIFY" --dir "$WORK" --offline 2>&1)"
-echo "$out" | grep -q "2 distinct URL" && ok "offline mode finds both URLs" || bad "offline mode URL count"
-echo "$out" | grep -q "P1 https://eur-lex" && ok "trust hierarchy classifies EUR-Lex as P1" || bad "trust classification"
+grep -q "2 distinct URL" <<<"$out" && ok "offline mode finds both URLs" || bad "offline mode URL count"
+grep -q "P1 https://eur-lex" <<<"$out" && ok "trust hierarchy classifies EUR-Lex as P1" || bad "trust classification"
 
 # 2. empty tree is clean, not a crash
 mkdir -p "$WORK/empty"
@@ -38,13 +38,13 @@ mkdir -p "$WORK/hid/.gstack" "$WORK/hid/.github"
 echo "https://example.org/from-a-browser-log" > "$WORK/hid/.gstack/browse-network.log"
 echo "https://www.ftc.gov/legal-library" > "$WORK/hid/.github/CONTRIBUTING.md"
 out="$(python3 "$VERIFY" --dir "$WORK/hid" --offline 2>&1)"
-echo "$out" | grep -q "1 distinct URL" && echo "$out" | grep -q "ftc.gov" && ! echo "$out" | grep -q "browser-log" && ok "hidden tool-state directories are skipped, .github is scanned" || bad "hidden tool-state directories are skipped, .github is scanned"
+grep -q "1 distinct URL" <<<"$out" && grep -q "ftc.gov" <<<"$out" && ! grep -q "browser-log" <<<"$out" && ok "hidden tool-state directories are skipped, .github is scanned" || bad "hidden tool-state directories are skipped, .github is scanned"
 
 # 3c. a --files path that does not exist is an error, and a relative one is tried under --dir
 out="$(cd / && python3 "$VERIFY" --dir "$WORK" --files no-such-folder/ --offline 2>&1)"; rc=$?
-[ "$rc" -eq 2 ] && echo "$out" | grep -q "does not exist" && ok "a missing --files path fails loudly" || bad "a missing --files path fails loudly (rc=$rc)"
+[ "$rc" -eq 2 ] && grep -q "does not exist" <<<"$out" && ok "a missing --files path fails loudly" || bad "a missing --files path fails loudly (rc=$rc)"
 out="$(cd / && python3 "$VERIFY" --dir "$WORK" --files a.md --offline 2>&1)"
-echo "$out" | grep -q "2 distinct URL" && ok "a relative --files path resolves under --dir from any directory" || bad "a relative --files path resolves under --dir from any directory"
+grep -q "2 distinct URL" <<<"$out" && ok "a relative --files path resolves under --dir from any directory" || bad "a relative --files path resolves under --dir from any directory"
 
 if ! net_up; then
   echo "SKIP  network tests (offline)"
@@ -55,7 +55,7 @@ else
   echo "Source: https://developer.apple.com/news/?id=required-reason-apis" > "$WORK/fab/bad.md"
   out="$(python3 "$VERIFY" --dir "$WORK/fab" 2>&1)"
   rc=$?
-  echo "$out" | grep -q "FABRICATED" && ok "catches soft-404 Apple citation that returns HTTP 200" \
+  grep -q "FABRICATED" <<<"$out" && ok "catches soft-404 Apple citation that returns HTTP 200" \
     || bad "MISSED soft-404 Apple citation"
   [ "$rc" -ne 0 ] && ok "exits non-zero on a fabricated citation" || bad "exit code on fabrication"
 
@@ -63,7 +63,7 @@ else
   mkdir -p "$WORK/dead"
   echo "Source: https://support.google.com/googleplay/android-developer/answer/datasafety" > "$WORK/dead/bad.md"
   out="$(python3 "$VERIFY" --dir "$WORK/dead" 2>&1)"
-  echo "$out" | grep -qE "UNREACHABLE|404" && ok "catches hard-404 Google citation" || bad "missed hard-404"
+  grep -qE "UNREACHABLE|404" <<<"$out" && ok "catches hard-404 Google citation" || bad "missed hard-404"
 
   # 6. NEGATIVE CASE. Genuine citations must pass clean, or the gate is noise.
   mkdir -p "$WORK/good"
@@ -73,7 +73,7 @@ https://developer.apple.com/support/privacy-manifest-files
 EOF
   out="$(python3 "$VERIFY" --dir "$WORK/good" 2>&1)"
   rc=$?
-  echo "$out" | grep -q "PASS" && ok "genuine citations pass clean (no false positive)" || bad "false positive on real URLs"
+  grep -q "PASS" <<<"$out" && ok "genuine citations pass clean (no false positive)" || bad "false positive on real URLs"
   [ "$rc" -eq 0 ] && ok "exits 0 when all citations are real" || bad "exit code on clean input"
 
   # 7. allowlist suppresses an intentional unreachable fixture URL
