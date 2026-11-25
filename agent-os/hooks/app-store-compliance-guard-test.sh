@@ -3305,6 +3305,11 @@ D="$(mk_android_perm '<queries>
 gs_check "dlq-2 a scheme inside a multi-line <queries> is not a deep link" "$D" 'BOTH-UNSAFE-DEEPLINK' 0
 D="$(mk_android_perm '<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="tel"/></intent></queries><application><activity android:name=".Main"><intent-filter><action android:name="android.intent.action.VIEW"/><data android:scheme="acme"/></intent-filter></activity></application>')"
 gs_check "dlq-3 a custom scheme in an intent-filter next to <queries> is flagged" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '<!-- Optional <queries> for package visibility --><application><activity android:name=".Main"><intent-filter><data android:scheme="acme"/></intent-filter></activity></application>')"
+gs_check "dlq-comment a <queries> inside a comment does not hide a deep link" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '')"; rm "$D/android/app/src/main/AndroidManifest.xml"
+printf '%s\n' '<manifest><application><activity android:name=".Main"><intent-filter><data android:scheme="acme"/></intent-filter></activity></application></manifest>' > "$D/android/app/src/main/AndroidManifest-release.xml"
+gs_check "dlq-renamed a scheme in a renamed manifest is still read" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
 D="$(mk_android_perm '<application><activity android:name=".Main"><intent-filter><action android:name="android.intent.action.VIEW"/><data android:scheme="acme"/></intent-filter></activity></application>')"
 gs_check "dlq-4 a custom scheme in an intent-filter is flagged" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
 D="$(mk_android_perm '
