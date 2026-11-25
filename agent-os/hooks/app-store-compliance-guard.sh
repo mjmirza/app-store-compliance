@@ -718,11 +718,24 @@ def ident(c):
     return c.isalnum() or c in ("_", chr(36))
 
 
+def back(code, k):
+    # The index of the last character before k that is neither space nor part of a block comment.
+    while k >= 0:
+        if code[k] in (chr(32), chr(9), chr(10), chr(13)):
+            k -= 1
+        elif code[k] == SL and k > 0 and code[k - 1] == ST:
+            start = code.rfind(SL + ST, 0, k - 1)
+            if start < 0:
+                return k
+            k = start - 1
+        else:
+            return k
+    return k
+
+
 def prev_ok(code, i):
     # A word right before a string means prose, unless that word is return.
-    k = i - 1
-    while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
-        k -= 1
+    k = back(code, i - 1)
     if k >= 0 and ident(code[k]):
         return code[max(0, k - 5):k + 1] == "return"
     return True
@@ -733,9 +746,7 @@ def jsx_start(code, i):
     nxt = code[i + 1:i + 2]
     if not (nxt.isalpha() or nxt == ">"):
         return False
-    k = i - 1
-    while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
-        k -= 1
+    k = back(code, i - 1)
     if k < 0:
         return True
     if ident(code[k]):
@@ -848,7 +859,7 @@ ios_google_signin() {
   # any .ios or .native sibling leaves the file out, since the order can no longer be read.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0; stmt = "" }
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "${SHIPLIST:-$FILELIST}" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0; stmt = "" }
       { line = $0
         if (inc) { i = index(line, "*/"); if (!i) next; line = substr(line, i + 2); inc = 0 }
         while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
@@ -864,26 +875,42 @@ import sys
 
 ORDER = ["js", "jsx", "json", "ts", "tsx"]
 custom = os.environ.get("ASCG_CUSTOM") == "1"
-keep = []
-for path in sys.stdin.read().splitlines():
-    base, ext = os.path.splitext(path)
-    ext = ext[1:]
-    stem, plat = os.path.splitext(base)
-    plat = plat[1:]
-    if plat == "ios" or ext not in ORDER:
-        keep.append(path)
-        continue
-    if plat != "native":
-        stem, plat = base, ""
-    rivals = ["ios"] if plat == "native" else ["ios", "native"]
-    limit = len(ORDER) - 1 if custom else ORDER.index(ext)
-    if not any(os.path.exists(stem + chr(46) + r + chr(46) + e) for r in rivals for e in ORDER[:limit + 1]):
-        keep.append(path)
+LOGIN = ("GoogleSignin", "GoogleSigninButton", "GoogleOneTapSignIn")
 IDC = "[A-Za-z0-9_" + chr(36) + "]"
 IMPORT_RE = re.compile(r"import\s+([^;]*?)\s*from\s*[" + chr(34) + chr(39) + r"]@react-native-google-signin/", re.S)
 
 
+def resolved(path):
+    # Metro tries each extension in order, and for each one the .ios file, then .native, then the plain file.
+    # A file counts only when no sibling wins before it. A custom order cannot be read, so any sibling wins.
+    base, ext = os.path.splitext(path)
+    ext = ext[1:]
+    if ext not in ORDER:
+        return True
+    stem, plat = os.path.splitext(base)
+    if plat[1:] not in ("ios", "native"):
+        stem = base
+    order = []
+    for e in ORDER:
+        for p in ("ios", "native", ""):
+            order.append(stem + (chr(46) + p if p else "") + chr(46) + e)
+    if path not in order:
+        return True
+    mine = order.index(path)
+    others = [c for c in order if c != path and os.path.exists(c)]
+    if custom:
+        return not others
+    return not any(order.index(c) < mine for c in others)
+
+
+def used(body, name):
+    n = re.escape(name)
+    return bool(re.search("(?<!typeof )(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body)
+                or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body))
+
+
 def runtime_use(path):
+    # Only the sign-in exports count, by their own name or an alias. Error codes and types never sign in.
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             code = fh.read()
@@ -891,27 +918,33 @@ def runtime_use(path):
         return True
     if re.search(r"require\s*\(\s*.@react-native-google-signin/", code):
         return True
-    names = []
+    names, spaces = [], []
     for clause in IMPORT_RE.findall(code):
-        clause = re.sub(r"\{[^}]*\}", lambda m: m.group(0).replace(",", " , "), clause)
-        for part in re.split(r"[,{}]", clause):
+        braced = re.search(r"\{([^}]*)\}", clause)
+        if braced:
+            for part in braced.group(1).split(","):
+                words = part.split()
+                if words and words[0] != "type" and words[0] in LOGIN:
+                    names.append(words[-1])
+        for part in re.sub(r"\{[^}]*\}", " ", clause).split(","):
             words = part.split()
-            if not words or words[0] == "type":
-                continue
-            names.append(words[-1])
+            if words and words[0] != "type":
+                spaces.append(words[-1])
     body = IMPORT_RE.sub(" ", code)
     # A call inside a comment never runs. The :// of a URL is not a comment.
     body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
     body = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", body)
-    for name in names:
-        n = re.escape(name)
-        if re.search("(?<!typeof )(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body) or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body):
-            return True
+    if any(used(body, name) for name in names):
+        return True
+    for ns in spaces:
+        for login in LOGIN:
+            if re.search("(?<!typeof )(?<!" + IDC + ")" + re.escape(ns) + r"\s*\.\s*" + login + "(?!" + IDC + ")", body):
+                return True
     return False
 
 
-for path in keep:
-    if runtime_use(path):
+for path in sys.stdin.read().splitlines():
+    if resolved(path) and runtime_use(path):
         print(path)
 GSIPY
     )" 2>/dev/null | grep . >/dev/null
