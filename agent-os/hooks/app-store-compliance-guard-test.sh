@@ -3974,6 +3974,9 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13-quoted-6 a quoted 12.0 in Debug only stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Profile;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-10 a quoted 12.0 in Profile only stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13-quoted-7 a quoted project 12.0 that the app overrides stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"

@@ -1080,8 +1080,8 @@ for path in sys.argv[1:]:
         flags = below(settings)
         name = NAME_RE.match(text, block.end())
         is_app = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
-        # Only an app configuration outside Debug, and never a commented-out line.
-        if is_app and not (name and "debug" in name.group(1).lower()):
+        # Only the Release configuration of an app, and never a commented-out line.
+        if is_app and name and name.group(1).strip().strip('"').lower() == "release":
             flags += [True for value in QDT_RE.findall(COMMENT_RE.sub(" ", settings)) if int(value) < 13]
         if not flags:
             continue
