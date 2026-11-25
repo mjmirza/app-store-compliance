@@ -1380,14 +1380,19 @@ ONLY_DEVICE = ("android.software.leanback", "android.hardware.type.watch",
 LIBRARY = re.compile(r"com[.]android[.](library|dynamic-feature)|android[.](library|dynamic[.]feature)")
 TARGET = re.compile(r"targetSdk(?:Version)?[ \t]*[=" + chr(40) + r"]?[ \t]*([0-9]+)")
 
+COMMENT = re.compile(r"/[*].*?[*]/|(?<!:)//[^\n]*", re.S)
+
+def gradle_text(path):
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return COMMENT.sub("", fh.read())
+
 ROOT_REF = re.compile(r"rootProject[.]ext[.]targetSdk(Version)?")
 
 def root_sdk(mod):
     # A module that reads rootProject.ext takes the number from the root build file.
     for name in ("build.gradle", "build.gradle.kts"):
         try:
-            with open(os.path.join(os.path.dirname(mod), name), encoding="utf-8", errors="replace") as fh:
-                return [int(n) for n in TARGET.findall(fh.read())]
+            return [int(n) for n in TARGET.findall(gradle_text(os.path.join(os.path.dirname(mod), name)))]
         except OSError:
             continue
     return []
@@ -1398,8 +1403,7 @@ def module_sdk(path):
     for name in ("build.gradle", "build.gradle.kts"):
         build = os.path.join(module(path), name)
         try:
-            with open(build, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
+            text = gradle_text(build)
         except OSError:
             continue
         if LIBRARY.search(text):
@@ -1427,6 +1431,8 @@ def frees(root):
         if "screenOrientation" in (attr(el, "remove") or "") or "resizeableActivity" in (attr(el, "remove") or ""):
             return True
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
+            return True
+        if local(el.tag) == "activity" and attr(el, "enabled") == "false":
             return True
         # A tools:node marker can remove or replace a whole activity or the application.
         if attr(el, "node") is not None and local(el.tag) in ("activity", "application"):
@@ -1465,8 +1471,7 @@ def package_of(root, path):
         return pkg.strip()
     for name in ("build.gradle", "build.gradle.kts"):
         try:
-            with open(os.path.join(module(path), name), encoding="utf-8", errors="replace") as fh:
-                found = NAMESPACE.search(fh.read())
+            found = NAMESPACE.search(gradle_text(os.path.join(module(path), name)))
         except OSError:
             continue
         if found:
@@ -1483,10 +1488,8 @@ def full_name(name, pkg):
     return name
 
 def same_class(a, b):
-    if a == b:
-        return True
-    short, long_ = (a, b) if a.startswith(".") else (b, a)
-    return short.startswith(".") and not long_.startswith(".") and long_.endswith(short)
+    # Without a known package a short name cannot be matched to a full one.
+    return a == b
 
 OWN_TASK = ("singleTask", "singleInstance", "singleInstancePerTask")
 
