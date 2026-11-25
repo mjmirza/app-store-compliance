@@ -844,8 +844,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     styled = re.search(r"(?<![\w:])style\s*=", attrs)
                     # A scale on a view or any parent changes the hit area, so it makes the subtree unknown too.
                     scaled = any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY"))
-                    # A view with an alpha below 1 is treated as unknown, alpha 0 is invisible to touch checks.
-                    faded = vals.get("alpha", "1").strip() not in ("1", "1.0")
+                    # Alpha 0 makes a view invisible to touch checks. Any other alpha stays visible.
+                    faded = vals.get("alpha", "1").strip() in ("0", "0.0", "0.00", ".0")
                     hidden = bool(parent and parent[0]) or bool(styled) or scaled or faded or vals.get("visibility", "visible").lower() != "visible"
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
