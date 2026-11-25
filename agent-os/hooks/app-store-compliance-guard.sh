@@ -714,24 +714,24 @@ def read_template(code, i):
 
 
 def in_code(code, i):
-    # A string is code when an operator, a bracket, an arrow or return comes before it. A word before it
-    # means prose, and so does a run of JSX text, the text after the closing > of a tag.
+    # A word right before the string means prose, unless it is return. Otherwise the nearest of { } ; = or a
+    # bare > decides. A bare > closes a JSX tag, so the string sits in JSX text and stays prose.
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
         k -= 1
     if k < 0:
         return True
-    c = code[k]
-    if c == ">":
-        return k > 0 and code[k - 1] == "="
-    if c == ":":
-        j = k - 1
-        while j >= 0 and code[j] not in "{(,;[=?>":
-            j -= 1
-        return j < 0 or code[j] != ">" or (j > 0 and code[j - 1] == "=")
-    if c in "=(,[?{|&+!;":
-        return True
-    return code[max(0, k - 5):k + 1] == "return"
+    if code[k].isalnum() or code[k] in ("_", chr(36)):
+        return code[max(0, k - 5):k + 1] == "return"
+    j = k
+    while j >= 0:
+        c = code[j]
+        if c == ">":
+            return j > 0 and code[j - 1] in "=-"
+        if c in "{};=":
+            return True
+        j -= 1
+    return True
 
 
 def literals(code):
@@ -778,12 +778,15 @@ ios_google_signin() {
   # nothing is left out beyond .android files.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0 }
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0; stmt = "" }
       { line = $0
         if (inc) { i = index(line, "*/"); if (!i) next; line = substr(line, i + 2); inc = 0 }
         while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
           if (j) line = substr(line, 1, i - 1) substr(rest, j + 2); else { line = substr(line, 1, i - 1); inc = 1 } }
-        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && line !~ /import[[:space:]]+type/ && line !~ /import[[:space:]]*[{]([[:space:]]*type[[:space:]]+[A-Za-z0-9_$]+([[:space:]]+as[[:space:]]+[A-Za-z0-9_$]+)?[[:space:]]*,?)+[[:space:]]*[}]/) { print FILENAME; nextfile } }' 2>/dev/null \
+        if (line ~ /^[[:space:]]*import([[:space:]]|[{]|$)/) stmt = line; else if (stmt != "") stmt = stmt " " line
+        full = (stmt != "") ? stmt : line
+        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && full !~ /import[[:space:]]+type/ && full !~ /import[[:space:]]*[{]([[:space:]]*type[[:space:]]+[A-Za-z0-9_$]+([[:space:]]+as[[:space:]]+[A-Za-z0-9_$]+)?[[:space:]]*,?)+[[:space:]]*[}]/) { print FILENAME; nextfile }
+        if (line ~ /from|;/) stmt = "" }' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
