@@ -1376,41 +1376,52 @@ OPT_OUT = "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
 def module(path):
     return path.split("/src/")[0] if "/src/" in path else path
 
-def overridden(path):
-    # A variant manifest can replace these values at merge, so its module is left alone.
+def unlocked(path):
+    # A variant manifest that sets a free orientation or allows resizing can replace the
+    # main value at merge, so that module is left alone. A variant repeating a lock is not.
     for other in sys.argv[1:]:
         if other == path or module(other) != module(path):
             continue
         try:
-            with open(other, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
-        except OSError:
+            root = ET.parse(other).getroot()
+        except (ET.ParseError, OSError):
             continue
-        if "screenOrientation" in text or "resizeableActivity" in text:
-            return True
+        for el in root.iter():
+            orientation = attr(el, "screenOrientation")
+            if orientation is not None and orientation not in LOCKED:
+                return True
+            if attr(el, "resizeableActivity") == "true":
+                return True
     return False
+
+def opts_out(el):
+    return any(local(child.tag) == "property" and attr(child, "name") == OPT_OUT
+               and attr(child, "value") == "true" for child in el)
 
 for path in sys.argv[1:]:
     try:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError):
         continue
-    if overridden(path):
+    if unlocked(path):
         continue
     sdk = [el for el in root.iter() if local(el.tag) == "uses-sdk"]
     target = max([GRADLE_SDK] + [int(attr(el, "targetSdkVersion")) for el in sdk if (attr(el, "targetSdkVersion") or "").isdigit()])
-    # Android 16 ignores both locks on large screens from API 36, unless the app opts out.
-    keeps = any(local(el.tag) == "property" and attr(el, "name") == OPT_OUT and attr(el, "value") == "true" for el in root.iter())
-    if target >= 36 and not keeps:
+    # Android 16 ignores both locks on large screens from API 36. Only at API 36 can an
+    # application or one activity opt out, and from API 37 the opt-out is gone.
+    if target >= 37:
         continue
     for app in [el for el in root.iter() if local(el.tag) == "application"]:
         # Games keep a supported orientation and meet their own Tier 3 bar later.
         if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":
             continue
         default = attr(app, "resizeableActivity")
+        app_keeps = opts_out(app)
         for el in app:
             # An alias inherits from its target activity, so only the activity is judged.
             if local(el.tag) != "activity":
+                continue
+            if target == 36 and not (app_keeps or opts_out(el)):
                 continue
             # An activity setting overrides the application default.
             own = attr(el, "resizeableActivity")
