@@ -471,6 +471,14 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
   [ -n "$out" ]
 }
 
+APPLE_SRC_RE='[.](swift|m|mm|h)$'
+apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flutter and JS share names like Image( and Button
+  [ -s "$FILELIST" ] || return 1
+  local out
+  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
+  [ -n "$out" ]
+}
+
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
 CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|\.ya?ml|/project\.json|/config\.xml|/Project\.swift|/Tuist/.*\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
@@ -576,7 +584,7 @@ release_string_has() {
   return 1
 }
 
-# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship or manifest.
+# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship, manifest or apple.
 # ship reads SHIPLIST, so a check that leaves test files out never names one (issue #2397).
 hit_file() {
   [ -s "$FILELIST" ] || return 0
@@ -585,6 +593,8 @@ hit_file() {
     f="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   elif [ "$1" = "ship" ]; then
     f="$(tr '\n' '\0' < "${SHIPLIST:-$FILELIST}" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  elif [ "$1" = "apple" ]; then
+    f="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   else
     f="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   fi
@@ -1183,9 +1193,9 @@ PBXPY
   if grep_has 'fixed-odds|betting'; then
     finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)." src 'fixed-odds|betting'
   fi
-  if grep_has 'Image\('; then
+  if apple_has 'Image\('; then
     if ! grep_has 'accessibilityLabel|accessibilityIdentifier|accessibilityHidden|accessibilityElement'; then
-      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)." src 'Image\('
+      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)." apple 'Image\('
     fi
   fi
   if grep_has '\.system\(size:'; then
@@ -1201,9 +1211,9 @@ PBXPY
       finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)." src 'UIColor\(\s*red:'
     fi
   fi
-  if grep_has 'onTapGesture|Button'; then
+  if apple_has 'onTapGesture|Button'; then
     if ! grep_has 'FeedbackGenerator|CoreHaptics'; then
-      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)." src 'onTapGesture|Button'
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)." apple 'onTapGesture|Button'
     fi
   fi
   if grep_has 'focusable'; then
