@@ -997,32 +997,70 @@ SIWAPY
   )" 2>/dev/null
   }
   # The React Native library spells it GoogleSignin, and only a sign-in call or button is a login.
-  # Android and web files never ship on iOS, and a module with several platform files stays unknown.
+  # Android and web files never ship on iOS, and only the file Metro resolves for iOS counts.
   gsi_ios() {
     command -v python3 >/dev/null 2>&1 || return 1
-    { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' 2>/dev/null || true; } \
-      | python3 -c "$(cat <<'GSIPY'
+    local custom=0
+    grep -lsE 'sourceExts' "$DIR"/metro.config.* >/dev/null 2>&1 && custom=1
+    { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)' 2>/dev/null || true; } \
+      | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import re
 import sys
 
-SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn")
-EXTS = ("js", "jsx", "ts", "tsx", "mjs", "cjs")
-SQ, DQ, ST, SL = chr(39), chr(34), chr(42), chr(47)
+SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)")
+ORDER = ("js", "jsx", "ts", "tsx")
+SQ, DQ, BT, ST, SL, BS, NL = chr(39), chr(34), chr(96), chr(42), chr(47), chr(92), chr(10)
+CUSTOM = os.environ.get("ASCG_CUSTOM") == "1"
 
 
 def strip(code):
-    # Block comments go first, then a line comment that is not part of a URL or a string.
-    code = re.sub(re.escape(SL + ST) + ".*?" + re.escape(ST + SL), " ", code, flags=re.S)
-    return re.sub("(?<![:" + SQ + DQ + "])" + SL + SL + ".*", "", code)
+    # One pass over the code. Comments are dropped, and text inside a string is never read as a comment.
+    out, i, n, quote = [], 0, len(code), None
+    while i < n:
+        c = code[i]
+        if quote:
+            out.append(c)
+            if c == BS and i + 1 < n:
+                out.append(code[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+            i += 1
+        elif c in (SQ, DQ, BT):
+            quote = c
+            out.append(c)
+            i += 1
+        elif code.startswith(SL + SL, i):
+            j = code.find(NL, i)
+            i = n if j < 0 else j
+        elif code.startswith(SL + ST, i):
+            j = code.find(ST + SL, i + 2)
+            i = n if j < 0 else j + 2
+            out.append(" ")
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def resolved(path):
+    # Metro tries each extension in turn, and for each one the .ios file, then .native, then the plain file.
+    # The first that exists is the one iOS loads. A custom extension order cannot be read, so it stays unknown.
+    stem, ext = os.path.splitext(path)
+    base = re.sub("[.](ios|native)$", "", stem)
+    order = [base + plat + "." + e for e in ORDER for plat in (".ios", ".native", "")]
+    present = [v for v in order if os.path.exists(v)]
+    if path not in order:
+        return not present
+    if CUSTOM:
+        return present == [path]
+    return present[:1] == [path]
 
 
 for path in sys.stdin.read().splitlines():
-    stem, ext = os.path.splitext(path)
-    base = re.sub("[.](ios|native)$", "", stem)
-    # A module with more than one iOS-eligible file depends on Metro resolution order, so it stays unknown.
-    variants = [base + plat + "." + e for plat in ("", ".ios", ".native") for e in EXTS]
-    if sum(os.path.exists(v) for v in variants) > 1:
+    if not resolved(path):
         continue
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
