@@ -549,36 +549,42 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
+# RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
+  RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f
+  local f m
   while IFS= read -r f; do
+    # Removed lines print empty, so a line number counts the lines of a DEBUG block too.
     case "$f" in
       *.swift)
-        awk '
-          /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } next }
-          /^[ \t]*#else/  { if (skip && d==dbg) skip=0; next }
-          /^[ \t]*#elseif/ { next }
-          /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; next }
-          !skip { print }
-        ' "$f" 2>/dev/null ;;
-      *) cat "$f" 2>/dev/null ;;
+        m="$(awk '
+          /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } print ""; next }
+          /^[ \t]*#else/  { if (skip && d==dbg) skip=0; print ""; next }
+          /^[ \t]*#elseif/ { print ""; next }
+          /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; print ""; next }
+          skip { print ""; next }
+          { print }
+        ' "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+      *) m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)" ;;
     esac
-  done < "${SHIPLIST:-$FILELIST}" \
-    | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1
-  # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
-  # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
-  # then reports the whole pipeline non-zero even though grep matched. That made this check
-  # silently miss on the CI runner (GNU grep, timing-dependent) while passing on a fast local
-  # machine. Draining all input with plain grep and returning its status is deterministic.
+    # NOTE. no `grep -q` or `-m 1`. Either one stops reading early, the awk producer gets SIGPIPE,
+    # and pipefail reports a miss though grep matched (timing-dependent, seen on the CI runner).
+    # Plain grep drains its input. Only the captured output is read, never the exit status.
+    if [ -n "$m" ]; then RELEASE_HIT="${f#"${DIR%/}"/}:${m%%:*}"; return 0; fi
+  done < "${SHIPLIST:-$FILELIST}"
+  return 1
 }
 
-# Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
+# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship or manifest.
+# ship reads SHIPLIST, so a check that leaves test files out never names one (issue #2397).
 hit_file() {
   [ -s "$FILELIST" ] || return 0
   local f n
   if [ "$1" = "manifest" ]; then
     f="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  elif [ "$1" = "ship" ]; then
+    f="$(tr '\n' '\0' < "${SHIPLIST:-$FILELIST}" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   else
     f="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   fi
@@ -589,11 +595,11 @@ hit_file() {
 
 # Findings are held and printed by flush_findings, critical first (issue #842).
 F_CRIT=(); F_HIGH=(); F_MED=(); FOUND_IDS=""; POOL_PASS=0
-finding() {  # severity id title fix [src|manifest regex]. The optional pair names the file that triggered it.
+finding() {  # severity id title fix [src|manifest regex | at file:line]. The optional pair names the file that triggered it.
   local t w=""
   case "$FOUND_IDS" in *"|$1:$2|"*) [ "$POOL_PASS" -eq 1 ] && return 0 ;; esac
   FOUND_IDS="$FOUND_IDS|$1:$2|"
-  [ -n "${5:-}" ] && w="$(hit_file "$5" "${6:-}")"
+  case "${5:-}" in at) w="${6:-}" ;; ?*) w="$(hit_file "$5" "${6:-}")" ;; esac
   case "$1" in
     critical) CRIT=$((CRIT+1)); t="  [CRITICAL] $2  $3" ;;
     high)     HIGH=$((HIGH+1)); t="  [HIGH]     $2  $3" ;;
@@ -716,8 +722,22 @@ ROUTE_KEEP='^$'
 grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -Il '"expo-router"' 2>/dev/null | grep . >/dev/null && ROUTE_KEEP='/app/'
 # Test files stay in the source list, so they still count as evidence the way they always did.
 # Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
+# CI config, end-to-end flows and npm scripts never ship either, imported or not (issue #2397).
+# Matched below the project root, so a project that itself sits in a folder named e2e is still read.
+NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
+# package.json ships only when code imports or requires it. Any path naming package.json counts, an
+# extensionless one through a relative or alias path. Vue, Svelte, Astro and .mjs files are not in the source list, so they are found here too.
+{ grep -v '/package[.]json$' "$FILELIST" 2>/dev/null
+  find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \) -prune \) \
+    -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
+  | tr '\n' '\0' | xargs -0 grep -IlE "['\"\`]([^'\"\`]*package[.]json|[^'\"\`]*/package)([?][^'\"\`]*)?['\"\`]" 2>/dev/null | grep . >/dev/null \
+  || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
+SHIP_TEST_RE='^$'
+[ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
 SHIPLIST="$FILELIST"
-if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.ship" 2>/dev/null; then
+if awk -v root="${DIR%/}/" -v n="$NOSHIP_RE" -v t="$SHIP_TEST_RE" -v k="$ROUTE_KEEP" \
+     '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } (p !~ n && $0 !~ t) || $0 ~ k' \
+     "$FILELIST" > "$FILELIST.ship" 2>/dev/null && ! cmp -s "$FILELIST" "$FILELIST.ship"; then
   SHIPLIST="$FILELIST.ship"
 fi
 build_blob
@@ -827,7 +847,7 @@ fi
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
 if ship_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
-  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." src 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
+  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." ship 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
 # "call" and "write" match as whole words only, or "renews automatically until cancelled" and
@@ -936,7 +956,7 @@ fi
 # Gated like the framework checks, so an Android-only command never meets an Apple finding.
 if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
-    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." src 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'
+    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." at "$RELEASE_HIT"
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
     if ! impl_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
