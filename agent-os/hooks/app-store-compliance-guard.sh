@@ -1114,9 +1114,9 @@ PBXPY
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
   # Developer Program License Agreement Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
-  # SubscriptionStoreView shows the policy links Apple configures, and any terms text or translation counts as a link.
+  # SubscriptionStoreView shows the policy links Apple configures. Terms as a word, legal, EULA or a translation counts as a link.
   if grep_has 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('; then
-    grep_has '[Tt]erms|TERMS|EULA|[Ee]ula|stdeula|[Nn]utzungsbedingungen|AGB|[Cc]onditions|[Tt][eé]rminos|[Cc]ondizioni' || finding high "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
+    grep_has 'SubscriptionStoreView|(^|[^A-Za-z])([Tt]erms|TERMS)|EULA|[Ee]ula|[Ll]egal|[Nn]utzungsbedingungen|AGB|[Cc]onditions|[Tt][eé]rminos|[Tt]ermos|[Cc]ondizioni|利用規約|服务条款|服務條款|이용약관|[Уу]слови' || finding high "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'

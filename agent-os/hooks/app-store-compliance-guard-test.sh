@@ -3282,6 +3282,15 @@ gs_check "subt-5 SubscriptionStoreView shows the policy links Apple configures" 
 D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
 Link("Terms", destination: URL(string: "https://realbackend.io/terms")!)')"
 gs_check "subt-6 a link labelled Terms stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+SubscriptionStoreView(groupID: "premium").storeButton(.visible, for: .policies)')"
+gs_check "subt-7 a paywall with SubscriptionStoreView stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Link("利用規約", destination: URL(string: "https://realbackend.io/legal")!)')"
+gs_check "subt-8 a translated terms link stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+let searchTerms = query.split(separator: " ")')"
+gs_check "subt-9 a searchTerms variable is not a terms link" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
 
 D="$(mk_android_perm '<application android:debuggable="true"/>')"
 gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1

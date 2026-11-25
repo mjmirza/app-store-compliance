@@ -36,7 +36,7 @@
     "APPLE-2.3-NEGATIVE-APPLE-SENTIMENT": "python3 scripts/metadata-audit.py ./metadata",
     "BOTH-UNREACHABLE-METADATA-URL": "python3 scripts/metadata-audit.py ./metadata --check-urls",
     "APPLE-3.1.2-MISLEADING-PRICING": "python3 scripts/metadata-audit.py ./metadata",
-    "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS": "grep -rn 'subscriptionPeriod\\|\\.autoRenewable\\|getSubscriptions(\\|requestSubscription(' . && ! grep -rniE 'terms|eula|nutzungsbedingungen|agb|conditions|t[eé]rminos|condizioni' .   # Schedule 2 section 3.8(b), Terms of Use and Privacy Policy links in the app",
+    "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS": "grep -rn 'subscriptionPeriod\\|\\.autoRenewable\\|getSubscriptions(\\|requestSubscription(' . && ! grep -rniE 'subscriptionstoreview|(^|[^a-z])terms|eula|legal|nutzungsbedingungen|agb|conditions|t[eé]rminos|termos|condizioni|利用規約|服务条款|服務條款|이용약관|услови' .   # Schedule 2 section 3.8(b), Terms of Use and Privacy Policy links in the app",
     "APPLE-2.1-REVIEW-NOTES-INCOMPLETE": "use templates/REVIEW-NOTES-TEMPLATE.md and fill all six sections",
     "APPLE-2.1-MISSING-DEMO-ACCOUNT": "grep -rn 'signIn\\|LoginView\\|OAuth\\|FirebaseAuth' --include='*.swift' .   # then confirm a demo account is in the review notes",
     "APPLE-5.1.1-MISSING-PRIVACY-POLICY": "grep -rn 'privacyPolicy\\|privacy-policy\\|PrivacyPolicy' --include='*.swift' . || echo 'no privacy policy reference found'",

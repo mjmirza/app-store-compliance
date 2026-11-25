@@ -503,6 +503,9 @@
         "requestSubscription("
       ],
       "counterSignals": [
+        "SubscriptionStoreView",
+        "Terms (as a word)",
+        "legal",
         "Terms of Use",
         "termsOfUse",
         "Terms of Service",
