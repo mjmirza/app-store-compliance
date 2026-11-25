@@ -1046,7 +1046,11 @@ def majors13(settings, name):
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
     vals = []
     for cond, value in DT_RE.findall(settings):
-        if "iphonesimulator" in cond or "arch=" in cond:
+        if "iphonesimulator" in cond:
+            continue
+        # An x86_64 or i386 value only builds for the Intel simulator. An arm64 value can reach a device.
+        arch = re.search(r"arch=([^\],\]]*)", cond)
+        if arch and arch.group(1).strip() in ("x86_64", "i386"):
             continue
         cfg = re.search(r"config=([^\],\]]*)", cond)
         if cfg and "*" not in cfg.group(1) and cfg.group(1).strip() != name:
@@ -1079,10 +1083,10 @@ def project_configs(text):
     # Configuration ids the project itself owns. Their values are inherited by targets, never an app of their own.
     lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
     ids = set()
-    for body in re.findall(r"isa = PBXProject;(.*?)\n\s*\};", text, re.S):
-        lid = re.search(r"buildConfigurationList = (\w+)", body)
-        if lid:
-            ids.update(lists.get(lid.group(1), []))
+    # The first configuration list after the project isa is its own. Nested dictionaries such as attributes
+    # sit in between, so the body is not cut at the first closing brace.
+    for lid in re.findall(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", text, re.S):
+        ids.update(lists.get(lid, []))
     return ids
 OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
 
