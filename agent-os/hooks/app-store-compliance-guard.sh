@@ -722,7 +722,8 @@ def line_comment(code, k):
     # The start of a // comment that holds position k on its line, or -1. A :// is a URL, not a comment.
     ls = code.rfind(NL, 0, k) + 1
     c = code.find(SL + SL, ls, k + 1)
-    while c >= 0 and c > ls and code[c - 1] == chr(58):
+    # A // after a colon is a URL, and a // with an odd count of one quote kind before it sits in a string.
+    while c >= 0 and ((c > ls and code[c - 1] == chr(58)) or any(code.count(q, ls, c) % 2 for q in (SQ, DQ, BT))):
         c = code.find(SL + SL, c + 2, k + 1)
     return c
 
@@ -770,8 +771,15 @@ TYPE_RE = re.compile(r"type\s+[A-Za-z_" + chr(36) + r"][\w" + chr(36) + r"]*\s*(
 
 def type_end(code, j):
     # The end of a type alias. a semicolon, or a line break that no | or & continues.
-    n = len(code)
+    n, depth = len(code), 0
     while j < n:
+        if code[j] in (LB, chr(40), chr(91), chr(60)):
+            depth += 1
+        elif code[j] in (RB, chr(41), chr(93), chr(62)) and depth:
+            depth -= 1
+        if depth:
+            j += 1
+            continue
         if code[j] == ";":
             return j + 1
         if code[j] == NL:
