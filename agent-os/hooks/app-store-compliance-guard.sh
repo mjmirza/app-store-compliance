@@ -721,11 +721,22 @@ def ident(c):
 def line_comment(code, k):
     # The start of a // comment that holds position k on its line, or -1. A :// is a URL, not a comment.
     ls = code.rfind(NL, 0, k) + 1
-    c = code.find(SL + SL, ls, k + 1)
-    # A // after a colon is a URL, and a // with an odd count of one quote kind before it sits in a string.
-    while c >= 0 and ((c > ls and code[c - 1] == chr(58)) or any(code.count(q, ls, c) % 2 for q in (SQ, DQ, BT))):
-        c = code.find(SL + SL, c + 2, k + 1)
-    return c
+    # Walk the line. A // inside a string is not a comment, and a // after a colon is a URL.
+    j, quote = ls, None
+    while j <= k and j < len(code) - 1:
+        ch = code[j]
+        if quote:
+            if ch == chr(92):
+                j += 2
+                continue
+            if ch == quote:
+                quote = None
+        elif ch in (SQ, DQ, BT):
+            quote = ch
+        elif ch == SL and code[j + 1] == SL and not (j > ls and code[j - 1] == chr(58)):
+            return j
+        j += 1
+    return -1
 
 
 def back(code, k):
@@ -769,6 +780,21 @@ def jsx_start(code, i):
 TYPE_RE = re.compile(r"type\s+[A-Za-z_" + chr(36) + r"][\w" + chr(36) + r"]*\s*(<[^=;]*>)?\s*=")
 
 
+IFACE_RE = re.compile(r"interface\s+[A-Za-z_" + chr(36) + r"][\w" + chr(36) + r"]*[^" + LB + ";]*" + re.escape(LB))
+
+
+def iface_end(code, j):
+    # The end of an interface body, the brace that closes the one IFACE_RE opened.
+    depth, n = 1, len(code)
+    while j < n and depth:
+        if code[j] == LB:
+            depth += 1
+        elif code[j] == RB:
+            depth -= 1
+        j += 1
+    return j
+
+
 def type_end(code, j):
     # The end of a type alias. a semicolon, or a line break that no | or & continues.
     n, depth = len(code), 0
@@ -801,6 +827,10 @@ class Scanner:
         code, n, depth = self.code, self.n, 0
         while i < n:
             c = code[i]
+            f = IFACE_RE.match(code, i) if c == "i" and (i == 0 or not ident(code[i - 1])) else None
+            if f:
+                i = iface_end(code, f.end())
+                continue
             t = TYPE_RE.match(code, i) if c == "t" and (i == 0 or not ident(code[i - 1])) else None
             if t:
                 i = type_end(code, t.end())
@@ -960,11 +990,24 @@ def runtime_use(path):
             code = fh.read()
     except OSError:
         return True
-    if re.search(r"require\s*\(\s*.@react-native-google-signin/", code):
-        return True
     code = re.sub(r"/\*.*?\*/", " ", code, flags=re.S)
-    code = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", code)
     names, spaces = [], []
+    code = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", code)
+    lb, rb, op = chr(123), chr(125), chr(40)
+    req_re = (r"(?:(?:const|let|var)\s+(" + re.escape(lb) + "[^" + rb + "]*" + re.escape(rb)
+              + r"|[A-Za-z_" + chr(36) + r"][\w" + chr(36) + r"]*)\s*=\s*)?require\s*"
+              + re.escape(op) + r"\s*.@react-native-google-signin/")
+    for req in re.finditer(req_re, code):
+        target = req.group(1)
+        if not target:
+            return True
+        if target.startswith(lb):
+            for part in target[1:-1].split(","):
+                key, _, alias = part.partition(chr(58))
+                if key.strip() in LOGIN:
+                    names.append((alias or key).strip())
+        else:
+            spaces.append(target)
     for clause in IMPORT_RE.findall(code):
         braced = re.search(r"\{([^}]*)\}", clause)
         if braced:
