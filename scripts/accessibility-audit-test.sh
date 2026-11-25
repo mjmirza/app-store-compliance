@@ -1204,6 +1204,16 @@ else
   echo "$OUT"
 fi
 rm -rf "$TD_DIR"
+AL_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:alpha="0"><ImageButton android:layout_width="24dp" android:layout_height="24dp" /></FrameLayout>\n' > "$AL_DIR/al.xml"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a control inside an alpha 0 panel stays silent"
+else
+  bad "a control inside an alpha 0 panel stays silent"
+  echo "$OUT"
+fi
+rm -rf "$AL_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
