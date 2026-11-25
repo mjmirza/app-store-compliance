@@ -1398,6 +1398,10 @@ for path in sys.argv[1:]:
     # application or one activity opt out, and from API 37 the opt-out is gone.
     if target >= 37:
         continue
+    # A required leanback feature limits the app to Android TV, which has no foldable.
+    if any(local(el.tag) == "uses-feature" and attr(el, "name") == "android.software.leanback"
+           and attr(el, "required") != "false" for el in root.iter()):
+        continue
     for app in [el for el in root.iter() if local(el.tag) == "application"]:
         # Games keep a supported orientation and meet their own Tier 3 bar later.
         if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":

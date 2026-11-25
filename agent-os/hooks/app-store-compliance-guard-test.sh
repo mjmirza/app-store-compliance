@@ -4056,6 +4056,12 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 tier3_id && bad "658 an opt-out on another activity does not keep this lock" || ok "658 an opt-out on another activity does not keep this lock"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf 'android { defaultConfig { targetSdk 34 } }\n' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-feature android:name="android.software.leanback" android:required="true" /><application><activity android:name=".Main" android:screenOrientation="landscape" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 a TV-only app with a landscape activity stays silent" || ok "658 a TV-only app with a landscape activity stays silent"
+rm -rf "$D"
 
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
