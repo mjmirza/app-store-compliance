@@ -1136,7 +1136,13 @@ PBXPY
   fi
   if grep_has 'CFBundleURLSchemes'; then
     # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
-    if ! grep_has 'apple-app-site-association|applinks:[*A-Za-z0-9]'; then
+    # It counts outside an XML comment, and never with ?mode=developer, which only a development-signed app honours.
+    applinks_prod() {
+      grep -E '[.](entitlements|plist)$' "$FILELIST" | while IFS= read -r f; do
+        tr '\n' ' ' < "$f" | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -v 'mode=developer' || true
+      done | grep -q .
+    }
+    if ! grep_has 'apple-app-site-association' && ! applinks_prod; then
       finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking." src 'CFBundleURLSchemes'
     fi
   fi

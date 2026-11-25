@@ -1278,6 +1278,18 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 rm -rf "$D"
 D="$(mk_ios_clean)"
 printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><!-- <string>applinks:acme.example.io</string> --></array></dict></plist>' > "$D/App/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-comment an applinks entry inside an XML comment does not count" || bad "dl-comment an applinks entry inside an XML comment does not count"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=developer</string></array></dict></plist>' > "$D/App/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-dev a developer-mode applinks entry does not count" || bad "dl-dev a developer-mode applinks entry does not count"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
 printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-2 a wildcard applinks domain counts as Universal Links" || bad "dl-2 a wildcard applinks domain counts as Universal Links (rc=$RC)"
