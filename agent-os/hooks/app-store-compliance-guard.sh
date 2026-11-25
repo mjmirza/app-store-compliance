@@ -997,24 +997,43 @@ SIWAPY
   )" 2>/dev/null
   }
   # The React Native library spells it GoogleSignin, and only a sign-in call or button is a login.
-  # A file only the Android or web build loads, or one an .ios sibling replaces on iOS, never ships there.
+  # Android and web files never ship on iOS, and a module with several platform files stays unknown.
   gsi_ios() {
-    local hits f stem
-    hits="$(grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' 2>/dev/null || true)"
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      # A call in a comment never runs. A // after a colon is a URL, not a comment.
-      sed -E -e 's#(^|[^:])//.*#\1#' -e '/^[[:space:]]*([*]|[/][*])/d' "$f" 2>/dev/null | grep -Eq 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' || continue
-      stem="${f%.*}"
-      case "$stem" in
-        *.ios) return 0 ;;
-        *.native) ls "${stem%.native}".ios.* >/dev/null 2>&1 || return 0; continue ;;
-      esac
-      ls "$stem".ios.* >/dev/null 2>&1 || ls "$stem".native.* >/dev/null 2>&1 || return 0
-    done <<GSIEOF
-$hits
-GSIEOF
-    return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' 2>/dev/null || true; } \
+      | python3 -c "$(cat <<'GSIPY'
+import os
+import re
+import sys
+
+SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn")
+EXTS = ("js", "jsx", "ts", "tsx", "mjs", "cjs")
+SQ, DQ, ST, SL = chr(39), chr(34), chr(42), chr(47)
+
+
+def strip(code):
+    # Block comments go first, then a line comment that is not part of a URL or a string.
+    code = re.sub(re.escape(SL + ST) + ".*?" + re.escape(ST + SL), " ", code, flags=re.S)
+    return re.sub("(?<![:" + SQ + DQ + "])" + SL + SL + ".*", "", code)
+
+
+for path in sys.stdin.read().splitlines():
+    stem, ext = os.path.splitext(path)
+    base = re.sub("[.](ios|native)$", "", stem)
+    # A module with more than one iOS-eligible file depends on Metro resolution order, so it stays unknown.
+    variants = [base + plat + "." + e for plat in ("", ".ios", ".native") for e in EXTS]
+    if sum(os.path.exists(v) for v in variants) > 1:
+        continue
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            code = fh.read()
+    except OSError:
+        continue
+    if SIG.search(strip(code)):
+        print(path)
+        break
+GSIPY
+)" 2>/dev/null | grep -q .
   }
   if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook' || gsi_ios; then
     # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
