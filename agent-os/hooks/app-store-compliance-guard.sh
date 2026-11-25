@@ -619,7 +619,8 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
-TEMPLATE_HOST_RE = re.compile(r"://["+chr(32)+"'"+chr(34)+chr(96)+"]*([^/?#"+chr(32)+"'"+chr(34)+chr(96)+"]*)")
+# A scheme counts at the start of the template or right after an expression or quote, never mid-text such as a query.
+TEMPLATE_HOST_RE = re.compile(r"(?:^"+chr(96)+"|["+chr(32)+"'"+chr(34)+chr(96)+"])[A-Za-z][A-Za-z0-9+.-]*://["+chr(32)+"'"+chr(34)+chr(96)+"]*([^/?#"+chr(32)+"'"+chr(34)+chr(96)+"]*)")
 URL_HEAD_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://([^/?#\s]*)")
 
 
@@ -749,7 +750,7 @@ ios_google_signin() {
   # nothing is left out beyond .android files.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -IlE "(from|require[(])[[:space:]]*['\"]@react-native-google-signin/" 2>/dev/null \
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -IlE "^[^/]*(from|require[(])[[:space:]]*['\"]@react-native-google-signin/" 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
