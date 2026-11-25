@@ -1054,6 +1054,9 @@ DT_RE = re.compile(
 QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([0-9]+)')
 CONDITIONAL_RE = re.compile(r'IPHONEOS_DEPLOYMENT_TARGET\[')
 COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
+PROJECT_RE = re.compile(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", re.S)
+ID_RE = re.compile(r"\w+")
+OWNER_RE = re.compile(r"(\w+)(?:\s*/[*][^*]*[*]/)?\s*=\s*" + re.escape(chr(123)) + r"\s*$")
 NAME_RE = re.compile(r"\s*name = ([^;]+);")
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
@@ -1076,7 +1079,15 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     app, project = [], []
+    # The PBXProject configurations are project defaults, never the settings of a target.
+    project_ids = set()
+    pbx = PROJECT_RE.search(text)
+    if pbx:
+        lst = re.search(re.escape(pbx.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+        if lst:
+            project_ids = set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
     for block in BLOCK_RE.finditer(text):
+        owner = OWNER_RE.search(text[max(0, block.start() - 300):block.start()])
         settings = block.group(1)
         flags = below(settings)
         name = NAME_RE.match(text, block.end())
@@ -1086,6 +1097,7 @@ for path in sys.argv[1:]:
         certain = ("PRODUCT_BUNDLE_IDENTIFIER" in live
                    and not any(marker in live for marker in DEPENDENCY_MARKERS)
                    and len(CONDITIONAL_RE.findall(live)) == len(QDT_RE.findall(live)))
+        certain = certain and not (owner and owner.group(1) in project_ids)
         if certain and name and name.group(1).strip().strip('"').lower() == "release":
             flags += [True for value in QDT_RE.findall(live) if int(value) < 13]
         if not flags:
