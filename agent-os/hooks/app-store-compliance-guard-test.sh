@@ -3293,6 +3293,33 @@ D="$(mk_android_perm '<application><service android:name=".S" android:foreground
 gs_check "fgs-1 specialUse without the subtype property is flagged" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 1
 D="$(mk_android_perm '<application><service android:name=".S" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="sync"/></service></application>')"
 gs_check "fgs-2 specialUse with the subtype property stays silent" "$D" 'ANDROID-FGS-SPECIAL-USE-UNDECLARED' 0
+# A <queries> intent names apps this app wants to see (package visibility). It declares no deep link.
+D="$(mk_android_perm '<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="tel"/></intent></queries>')"
+gs_check "dlq-1 a scheme inside <queries> is not a deep link" "$D" 'BOTH-UNSAFE-DEEPLINK' 0
+D="$(mk_android_perm '<queries>
+  <intent>
+    <action android:name="android.intent.action.SENDTO" />
+    <data android:scheme="mailto" />
+  </intent>
+</queries>')"
+gs_check "dlq-2 a scheme inside a multi-line <queries> is not a deep link" "$D" 'BOTH-UNSAFE-DEEPLINK' 0
+D="$(mk_android_perm '<queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="tel"/></intent></queries><application><activity android:name=".Main"><intent-filter><action android:name="android.intent.action.VIEW"/><data android:scheme="acme"/></intent-filter></activity></application>')"
+gs_check "dlq-3 a custom scheme in an intent-filter next to <queries> is flagged" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '<!-- Optional <queries> for package visibility --><application><activity android:name=".Main"><intent-filter><data android:scheme="acme"/></intent-filter></activity></application>')"
+gs_check "dlq-comment a <queries> inside a comment does not hide a deep link" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '')"; rm "$D/android/app/src/main/AndroidManifest.xml"
+printf '%s\n' '<manifest><application><activity android:name=".Main"><intent-filter><data android:scheme="acme"/></intent-filter></activity></application></manifest>' > "$D/android/app/src/main/AndroidManifest-release.xml"
+gs_check "dlq-renamed a scheme in a renamed manifest is still read" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '<application><activity android:name=".Main"><intent-filter><action android:name="android.intent.action.VIEW"/><data android:scheme="acme"/></intent-filter></activity></application>')"
+gs_check "dlq-4 a custom scheme in an intent-filter is flagged" "$D" 'BOTH-UNSAFE-DEEPLINK' 1
+D="$(mk_android_perm '
+<queries><intent><data android:scheme="tel" /></intent></queries>
+<application><activity android:name=".Main"><intent-filter>
+<data android:scheme="acme" />
+</intent-filter></activity></application>')"
+rr_run "$D"
+printf '%s\n' "$OUT" | grep -A1 'BOTH-UNSAFE-DEEPLINK' | grep -q 'file\. android/app/src/main/AndroidManifest\.xml:4$' && ok "gs dlq-5 the finding names the intent-filter scheme, not the <queries> one" || bad "gs dlq-5 the finding names the intent-filter scheme, not the <queries> one (rc=$RC)"
+rm -rf "$D"
 
 D="$(mk_android_perm '')"; printf "android { compileSdk 36\n defaultConfig { ndk { abiFilters 'armeabi-v7a' } } }\n" > "$D/android/app/build.gradle"
 gs_check "abi-1 armeabi-v7a only is flagged" "$D" 'ANDROID-64BIT-ABI-MISSING' 1
