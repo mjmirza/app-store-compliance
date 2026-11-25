@@ -1137,9 +1137,38 @@ PBXPY
   if grep_has 'CFBundleURLSchemes'; then
     # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
     # It counts outside an XML comment and outside a Debug file or folder, never with ?mode=developer (development-signed apps only).
+    # A project file names the entitlements each configuration signs with. Only a non-Debug one counts then.
+    release_entitlements() {
+      command -v python3 >/dev/null 2>&1 || return 0
+      grep '[.]pbxproj$' "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ENTPY'
+import re
+import sys
+
+OPEN, CLOSE, DQ = chr(123), chr(125), chr(34)
+BLOCK = re.compile("isa = XCBuildConfiguration;.*?buildSettings = " + re.escape(OPEN) + "(.*?)" + re.escape(CLOSE) + ";" + "[^;]*?name = ([^;]+);", re.S)
+ENT = re.compile("CODE_SIGN_ENTITLEMENTS[^=]*= *" + DQ + "?([^;" + DQ + "]+)")
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    for block in BLOCK.finditer(text):
+        if "debug" in block.group(2).lower():
+            continue
+        for value in ENT.findall(block.group(1)):
+            print(value.replace("$(SRCROOT)/", "").strip())
+ENTPY
+)" 2>/dev/null
+    }
     applinks_prod() {
+      local ents; ents="$(release_entitlements)"
       grep -E '[.](entitlements|plist)$' "$FILELIST" | while IFS= read -r f; do
-        case "${f#"${DIR%/}"/}" in *[Dd]ebug*|*DEBUG*) continue ;; esac
+        if [ -n "$ents" ] && [ "${f%.entitlements}" != "$f" ]; then
+          printf '%s\n' "$ents" | while IFS= read -r e; do case "$f" in */"$e") echo y ;; esac; done | grep -q . || continue
+        else
+          case "${f#"${DIR%/}"/}" in *[Dd]ebug*|*DEBUG*) continue ;; esac
+        fi
         tr '\n' ' ' < "$f" | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -v 'mode=developer' || true
       done | grep -q .
     }

@@ -1300,6 +1300,14 @@ printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><st
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug-dir an applinks entry only under a Debug folder does not count" || bad "dl-debug-dir an applinks entry only under a Debug folder does not count"
 rm -rf "$D"
+D="$(mk_ios_clean)"; mkdir -p "$D/App.xcodeproj"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Development.entitlements"
+printf '{\n R1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n CODE_SIGN_ENTITLEMENTS = App/Release.entitlements;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-signing an entitlements file no release configuration signs with does not count" || bad "dl-signing an entitlements file no release configuration signs with does not count"
+rm -rf "$D"
 D="$(mk_ios_clean)"
 printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
 printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
