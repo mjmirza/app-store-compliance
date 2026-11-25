@@ -1249,6 +1249,14 @@ else
   bad "a control inside a clickable row is part of the row target"
   echo "$OUT"
 fi
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="openArticle"><ImageButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="showMenu" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ]; then
+  ok "a control with its own different action inside a clickable row is still reported"
+else
+  bad "a control with its own different action inside a clickable row is still reported"
+  echo "$OUT"
+fi
 rm -rf "$CP_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"

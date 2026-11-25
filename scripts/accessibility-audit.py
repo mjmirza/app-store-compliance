@@ -851,10 +851,12 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
                         orient = vals.get("orientation", "horizontal").strip().lower()
-                        # A child of a view with its own click handler is part of that larger target, so it is unknown.
-                        owns_click = vals.get("clickable", "").strip().lower() == "true" or any(
-                            vals.get(k, "@null").strip() not in ("@null", "") for k in ("onClick", "onLongClick"))
-                        stack.append((hidden or owns_click, tag, None if styled or orient not in ("horizontal", "vertical") else orient))
+                        # The nearest clickable ancestor and its handler name. A handler set in code is "?".
+                        own = vals.get("onClick", "@null").strip()
+                        if own in ("@null", ""):
+                            own = "?" if vals.get("clickable", "").strip().lower() == "true" or vals.get("onLongClick", "@null").strip() not in ("@null", "") else None
+                        stack.append((hidden, tag, None if styled or orient not in ("horizontal", "vertical") else orient,
+                                      own or (parent[3] if parent else None)))
                     # The root is skipped too, since an include can override its size.
                     if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
                         continue
@@ -876,6 +878,11 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     # A style can switch clickability off, so a styled widget does not count by its type alone.
                     widget = not indicator and not style and ANDROID_TOUCH_TAG.search(tag)
                     if not (true_attr or handler or widget):
+                        continue
+                    # Inside a clickable ancestor, a child that runs the same action, or none of its own, is part of
+                    # the larger target. Only a child with a different named handler is a separate target.
+                    mine = vals.get("onClick", "@null").strip()
+                    if parent and parent[3] and (parent[3] == "?" or mine in ("@null", "") or mine == parent[3]):
                         continue
                     # A weight in a LinearLayout sizes the child along the layout orientation, so that axis is unknown.
                     weighted = parent and parent[1] != "FrameLayout" and vals.get("layout_weight", "0").strip() not in ("0", "0.0", "")
