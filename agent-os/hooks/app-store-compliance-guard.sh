@@ -1376,10 +1376,42 @@ OPT_OUT = "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
 def module(path):
     return path.split("/src/")[0] if "/src/" in path else path
 
+ONLY_DEVICE = ("android.software.leanback", "android.hardware.type.watch")
+
+def single_device(root):
+    # A required TV or watch feature limits the app to a device with no foldable. A
+    # placeholder value is unknown, so it does not count as required.
+    return any(local(el.tag) == "uses-feature" and attr(el, "name") in ONLY_DEVICE
+               and attr(el, "required") in (None, "true") for el in root.iter())
+
+def frees(root):
+    # What a variant manifest can do to undo a lock at merge.
+    for el in root.iter():
+        orientation = attr(el, "screenOrientation")
+        if orientation is not None and orientation not in LOCKED:
+            return True
+        if attr(el, "resizeableActivity") == "true" or attr(el, "appCategory") == "game":
+            return True
+        if "screenOrientation" in (attr(el, "remove") or "") or "resizeableActivity" in (attr(el, "remove") or ""):
+            return True
+        if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
+            return True
+        if local(el.tag) == "uses-feature" and attr(el, "name") in ONLY_DEVICE:
+            return True
+    return False
+
 def unlocked(path):
-    # A variant manifest is merged over the main one with its own markers and inherited
-    # values, so a module with more than one manifest is left alone.
-    return any(other != path and module(other) == module(path) for other in sys.argv[1:])
+    # A variant manifest of the same module that could undo a lock leaves the module alone.
+    # One that only adds other entries, or repeats the lock, does not.
+    for other in sys.argv[1:]:
+        if other == path or module(other) != module(path):
+            continue
+        try:
+            if frees(ET.parse(other).getroot()):
+                return True
+        except (ET.ParseError, OSError):
+            return True
+    return False
 
 def opts_out(el):
     return any(local(child.tag) == "property" and attr(child, "name") == OPT_OUT
@@ -1394,13 +1426,9 @@ for path in sys.argv[1:]:
         continue
     sdk = [el for el in root.iter() if local(el.tag) == "uses-sdk"]
     target = max([GRADLE_SDK] + [int(attr(el, "targetSdkVersion")) for el in sdk if (attr(el, "targetSdkVersion") or "").isdigit()])
-    # Android 16 ignores both locks on large screens from API 36. Only at API 36 can an
-    # application or one activity opt out, and from API 37 the opt-out is gone.
-    if target >= 37:
-        continue
-    # A required leanback feature limits the app to Android TV, which has no foldable.
-    if any(local(el.tag) == "uses-feature" and attr(el, "name") == "android.software.leanback"
-           and attr(el, "required") != "false" for el in root.iter()):
+    # Android 16 ignores the resize and orientation locks on large screens from API 36, except
+    # the locked orientation. Only at API 36 can an application or one activity opt out.
+    if single_device(root):
         continue
     for app in [el for el in root.iter() if local(el.tag) == "application"]:
         # Games keep a supported orientation and meet their own Tier 3 bar later.
@@ -1412,7 +1440,10 @@ for path in sys.argv[1:]:
             # An alias inherits from its target activity, so only the activity is judged.
             if local(el.tag) != "activity":
                 continue
-            if target == 36 and not (app_keeps or opts_out(el)):
+            if target >= 36 and not (target == 36 and (app_keeps or opts_out(el))):
+                if attr(el, "screenOrientation") == "locked":
+                    print(path)
+                    sys.exit(0)
                 continue
             # An activity setting overrides the application default.
             own = attr(el, "resizeableActivity")
