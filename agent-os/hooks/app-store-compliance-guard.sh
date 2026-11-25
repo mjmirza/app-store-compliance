@@ -1024,7 +1024,6 @@ SIWAPY
       | awk 'NR <= 5' | while IFS= read -r pf; do if grep -Eq "^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.($1)([.][0-9]+)*." "$pf"; then echo hit; fi; done | grep_q hit
   }
   podfile_below_ios13() { podfile_ios_major '8|9|10|11|12'; }
-  podfile_below_ios15() { podfile_ios_major '13|14'; }
   # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
   pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
     # $1 and $2 bound the major versions that count, 0 and 13 by default.
@@ -1070,7 +1069,11 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     app, project = [], []
-    for settings in BLOCK_RE.findall(text):
+    for block in BLOCK_RE.finditer(text):
+        settings = block.group(1)
+        after = re.match(r"\s*name = \"?([^;\"]+)", text[block.end():])
+        if LO > 0 and after and "debug" in after.group(1).lower():
+            continue
         flags = below(settings)
         if not flags:
             continue
@@ -1092,12 +1095,18 @@ PBXPY
   }
   xcconfig_below_ios15() {
     [ -s "$FILELIST" ] || return 1
-    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
+      # The last value per key decides. A simulator-only key never ships.
+      awk 'match($0, /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/) {
+          key = substr($0, RSTART, RLENGTH); if (key ~ /iphonesimulator/) next
+          v = substr($0, RSTART + RLENGTH); sub(/^[[:space:]]*"?/, "", v); split(v, p, "."); last[key] = p[1] }
+        END { for (k in last) if (last[k] == "13" || last[k] == "14") { print "hit"; exit } }' "$xf" 2>/dev/null
+    done | grep_q hit
   }
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
   # iOS 13 and 14 stay legal until April 2027, so they warn. Same reading as the iOS 13 check.
-  elif podfile_below_ios15 || pbx_below_ios13 13 15 || xcconfig_below_ios15; then
+  elif pbx_below_ios13 13 15 || xcconfig_below_ios15; then
     finding medium "APPLE-MIN-DEPLOYMENT-TARGET-IOS15" "iOS deployment target below the April 2027 iOS 15 floor" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 15.0 or later before April 2027. Apple has named the month only. Source. https://developer.apple.com/app-store/submitting/. A target below iOS 13 is already refused at upload." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
