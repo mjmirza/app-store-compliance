@@ -1037,6 +1037,24 @@ DEPENDENCY_MARKERS = (
 COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
 
 
+DT_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;")
+
+
+def majors13(settings, name):
+    # Every device value in a configuration, as main reads it, so the iOS 13 blocker is never weaker than main.
+    # A simulator value never ships, and a value whose condition names another configuration does not apply.
+    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
+    vals = []
+    for cond, value in DT_RE.findall(settings):
+        if "iphonesimulator" in cond:
+            continue
+        cfg = re.search(r"config=([^\],\]]*)", cond)
+        if cfg and "*" not in cfg.group(1) and cfg.group(1).strip() != name:
+            continue
+        vals.append(int(value))
+    return vals
+
+
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
@@ -1117,23 +1135,16 @@ for path in sys.argv[1:]:
         continue
     blocks = BLOCK_RE.findall(text)
     skip = non_app_configs(text)
-    # The iOS 13 blocker reads every configuration with the same rules as the iOS 15 check, so a value whose
-    # condition names another configuration never counts.
-    project13, app13 = {}, []
-    for bid, prefix, settings, name in blocks:
-        if not ID_RE.search(settings):
-            project13[name] = resolve(settings, name)
+    # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
+    app13, project13 = [], []
     for bid, prefix, settings, name in blocks:
         named = ID_RE.search(settings)
-        if not named or bid in skip or OTHER_OS_RE.search(settings):
-            continue
-        if any(marker in settings for marker in DEPENDENCY_MARKERS):
-            continue
-        state = resolve(settings, name)
-        if state[0] == "none" and not "baseConfigurationReference" in prefix:
-            state = project13.get(name, ("none", None))
-        app13.append(state)
-    lows13 = [v for k, v in app13 if k == "value"] if app13 else [v for k, v in project13.values() if k == "value"]
+        vals = majors13(settings, name)
+        if named and bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
+            app13.extend(vals)
+        elif not named:
+            project13.extend(vals)
+    lows13 = app13 if app13 else project13
     if any(v < 13 for v in lows13):
         worst = 13
         break

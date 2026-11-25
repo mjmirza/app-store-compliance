@@ -3294,6 +3294,13 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n "IPHONEOS_DEPLOYMENT_TARGET[config=Debug]" = 12.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13 a config=Debug value does not block a Release of 15" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n "IPHONEOS_DEPLOYMENT_TARGET[arch=x86_64]" = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13 an arch condition does not hide a device target of 12" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X1;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+printf 'SWIFT_VERSION = 5.0\n' > "$D/App.xcconfig"
+gs_check "ios13 an xcconfig without a target still inherits a project 12" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos16.*]" = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a versioned SDK condition does not decide the warning" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
