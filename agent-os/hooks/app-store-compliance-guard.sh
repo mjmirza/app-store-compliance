@@ -1373,12 +1373,24 @@ def attr(el, name):
 OPT_OUT = "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
 
 def module(path):
-    return path.split("/src/")[0] if "/src/" in path else path
+    return path.rsplit("/src/", 1)[0] if "/src/" in path else path
 
 ONLY_DEVICE = ("android.software.leanback", "android.hardware.type.watch",
                "android.hardware.type.automotive")
 LIBRARY = re.compile(r"com[.]android[.](library|dynamic-feature)|android[.](library|dynamic[.]feature)")
 TARGET = re.compile(r"targetSdk(?:Version)?[ \t]*[=" + chr(40) + r"]?[ \t]*([0-9]+)")
+
+ROOT_REF = re.compile(r"rootProject[.]ext[.]targetSdk(Version)?")
+
+def root_sdk(mod):
+    # A module that reads rootProject.ext takes the number from the root build file.
+    for name in ("build.gradle", "build.gradle.kts"):
+        try:
+            with open(os.path.join(os.path.dirname(mod), name), encoding="utf-8", errors="replace") as fh:
+                return [int(n) for n in TARGET.findall(fh.read())]
+        except OSError:
+            continue
+    return []
 
 def module_sdk(path):
     # The target SDK from the build file of the module. None when the module is a library,
@@ -1393,6 +1405,8 @@ def module_sdk(path):
         if LIBRARY.search(text):
             return None
         found = [int(n) for n in TARGET.findall(text)]
+        if not found and ROOT_REF.search(text):
+            found = root_sdk(module(path))
         return max(found) if found else 0
     return None
 
