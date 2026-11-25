@@ -221,12 +221,12 @@ grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|p
 - What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
 - How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
 - Detection signals. CFBundleURLSchemes, android:scheme
-- Present means handled. apple-app-site-association, assetlinks.json
+- Present means handled. apple-app-site-association, applinks:, assetlinks.json
 
 How to detect.
 
 ```bash
-grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
+grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|applinks:\|assetlinks.json' .
 ```
 
 ## RN-OTA-UNDECLARED

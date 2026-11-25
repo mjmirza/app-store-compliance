@@ -1033,6 +1033,7 @@
       ],
       "counterSignals": [
         "apple-app-site-association",
+        "applinks:",
         "assetlinks.json"
       ],
       "fix": "Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters."

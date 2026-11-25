@@ -1269,6 +1269,30 @@ printf 'let x = "https://acme.example.io/.well-known/apple-app-site-association"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "612-12 a mitigation in another file still pairs with its trigger" || bad "612-12 a mitigation in another file still pairs with its trigger (rc=$RC)"
 rm -rf "$D"
+# The app side of Universal Links is the associated domains entitlement. The apple-app-site-association file is on the website.
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-1 an applinks associated domain counts as Universal Links" || bad "dl-1 an applinks associated domain counts as Universal Links (rc=$RC)"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-2 a wildcard applinks domain counts as Universal Links" || bad "dl-2 a wildcard applinks domain counts as Universal Links (rc=$RC)"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>webcredentials:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-UNSAFE-DEEPLINK' && ok "dl-3 a webcredentials only associated domain is still flagged" || bad "dl-3 a webcredentials only associated domain is still flagged"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'BOTH-UNSAFE-DEEPLINK' && ok "dl-4 a URL scheme with no Universal Links is flagged" || bad "dl-4 a URL scheme with no Universal Links is flagged"
+rm -rf "$D"
 
 # ===== Issue #612, second round. The adversarial review findings, pinned =====
 # The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.

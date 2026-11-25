@@ -1135,7 +1135,8 @@ PBXPY
     fi
   fi
   if grep_has 'CFBundleURLSchemes'; then
-    if ! grep_has 'apple-app-site-association'; then
+    # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
+    if ! grep_has 'apple-app-site-association|applinks:[*A-Za-z0-9]'; then
       finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking." src 'CFBundleURLSchemes'
     fi
   fi
