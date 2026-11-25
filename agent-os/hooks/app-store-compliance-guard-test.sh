@@ -575,6 +575,13 @@ printf '// the outgoing page must finish sliding after it is deactivated\n' > "$
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "Words in a lowercase test/ folder are not app source" || ok "Words in a lowercase test/ folder are not app source"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { accountService.remove() }\n' > "$D/App/Settings.swift"
+printf 'func remove() { api.post("/users/me/deactivate") }\n' > "$D/App/AccountService.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "acct-split an account deactivation endpoint in another file still counts" || bad "acct-split an account deactivation endpoint in another file still counts"
+rm -rf "$D"
 # A support mailto: link or a deactivate call in another file is not the way the account is removed.
 D="$(mktemp -d)"; mkdir -p "$D/App"
 printf '<plist/>' > "$D/App/Info.plist"

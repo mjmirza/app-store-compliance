@@ -1178,8 +1178,9 @@ PBXPY
     grep_has "$RESTORE_RE" || finding high "APPLE-RESTORE-PURCHASES-MISSING" "In-app purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"
   fi
   if grep_has 'deleteAccount|delete account'; then
-    # Only a mailto: or deactivate in a file that also deletes the account. A support link elsewhere is not the deletion path.
+    # A mailto: or deactivate in the file that deletes the account, or an account deactivation endpoint anywhere.
     DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e 'deleteAccount|delete account' 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EIl -e 'mailto:|deactivate' 2>/dev/null | head -1)"
+    [ -n "$DEL_WEAK" ] || DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e '/deactivate|deactivate(Account|User)' 2>/dev/null | head -1)"
     if [ -n "$DEL_WEAK" ]; then
       DEL_N="$(grep -En -m1 -e 'mailto:|deactivate' "$DEL_WEAK" 2>/dev/null | cut -d: -f1)"
       finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form." at "${DEL_WEAK#"${DIR%/}"/}${DEL_N:+:$DEL_N}"
