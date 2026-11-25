@@ -619,8 +619,12 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
-# A scheme counts at the start of the template or right after an expression or quote, never mid-text such as a query.
-TEMPLATE_HOST_RE = re.compile(r"(?:^"+chr(96)+"|["+chr(32)+"'"+chr(34)+chr(96)+"])[A-Za-z][A-Za-z0-9+.-]*://["+chr(32)+"'"+chr(34)+chr(96)+"]*([^/?#"+chr(32)+"'"+chr(34)+chr(96)+"]*)")
+# An expression in a template is marked EXPR. A URL counts at the start of the template or right after an
+# expression, so a scheme supplied by a variable is read and a URL in prose or a query string is not.
+EXPR = chr(1)
+GAP = EXPR + SQ + DQ + BT
+TEMPLATE_HOST_RE = re.compile("(?:^" + BT + "|" + EXPR + "[" + GAP + "]*)(?:[A-Za-z][A-Za-z0-9+.-]*)?://[" + GAP
+                              + "]*([^/?#" + GAP + chr(32) + chr(9) + chr(10) + "]*)")
 URL_HEAD_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://([^/?#\s]*)")
 
 
@@ -675,7 +679,7 @@ def read_template(code, i):
             out.append(BT)
             return j + 1, "".join(out)
         if c == DOL and code.startswith(LB, j + 1):
-            out.append(chr(32))
+            out.append(EXPR)
             j, depth = j + 2, 1
             while j < n and depth:
                 c = code[j]
@@ -686,7 +690,7 @@ def read_template(code, i):
                 if c in (SQ, DQ):
                     e = read_quoted(code, j, c)
                     if e is not None:
-                        out.append(chr(32) + code[j:e] + chr(32))
+                        out.append(EXPR + code[j:e] + EXPR)
                         j = e
                         continue
                 if c == SL:
@@ -696,11 +700,11 @@ def read_template(code, i):
                         continue
                 if c == BT:
                     j, t = read_template(code, j)
-                    out.append(chr(32) + t + chr(32))
+                    out.append(EXPR + t + EXPR)
                     continue
                 depth += (c == LB) - (c == RB)
                 j += 1
-            out.append(chr(32))
+            out.append(EXPR)
             continue
         out.append(c)
         j += 1
@@ -750,7 +754,12 @@ ios_google_signin() {
   # nothing is left out beyond .android files.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -IlE "^[^/]*(from|require[(])[[:space:]]*['\"]@react-native-google-signin/" 2>/dev/null \
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0 }
+      { line = $0
+        if (inc) { i = index(line, "*/"); if (!i) next; line = substr(line, i + 2); inc = 0 }
+        while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
+          if (j) line = substr(line, 1, i - 1) substr(rest, j + 2); else { line = substr(line, 1, i - 1); inc = 1 } }
+        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && line !~ /import[[:space:]]+type/) { print FILENAME; nextfile } }' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
