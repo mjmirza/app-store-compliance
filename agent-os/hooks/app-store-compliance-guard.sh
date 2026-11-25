@@ -1049,6 +1049,17 @@ BLOCK_RE = re.compile(
 DT_RE = re.compile(
     r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
+# Xcode writes an SDK-conditional key in quotes. Only the device SDK ships, and only a value
+# below the minimum is read from it, so a quoted key can add a finding but never hide one.
+QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([0-9]+)')
+CONDITIONAL_RE = re.compile(r'IPHONEOS_DEPLOYMENT_TARGET\[')
+COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
+PROJECT_RE = re.compile(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", re.S)
+TARGET_RE = re.compile(r"isa = PBXNativeTarget;((?:(?!isa = ).)*?)productType = " + chr(34) + "?([^" + chr(34) + ";]+)", re.S)
+LIST_REF_RE = re.compile(r"buildConfigurationList = (\w+)")
+ID_RE = re.compile(r"\w+")
+OWNER_RE = re.compile(r"(\w+)(?:\s*/[*][^*]*[*]/)?\s*=\s*" + re.escape(chr(123)) + r"\s*$")
+NAME_RE = re.compile(r"\s*name = ([^;]+);")
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
     "DYLIB_INSTALL_NAME_BASE",
@@ -1070,8 +1081,38 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     app, project = [], []
-    for settings in BLOCK_RE.findall(text):
+    # The PBXProject configurations are project defaults, never the settings of a target.
+    project_ids = set()
+    pbx = PROJECT_RE.search(text)
+    if pbx:
+        lst = re.search(re.escape(pbx.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+        if lst:
+            project_ids = set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
+    # When the file names its targets, only an application target configuration is read.
+    app_ids, has_targets = set(), False
+    for target in TARGET_RE.finditer(text):
+        has_targets = True
+        ref = LIST_REF_RE.search(target.group(1))
+        if ref and target.group(2) == "com.apple.product-type.application":
+            lst = re.search(re.escape(ref.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+            if lst:
+                app_ids |= set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
+    for block in BLOCK_RE.finditer(text):
+        owner = OWNER_RE.search(text[max(0, block.start() - 300):block.start()])
+        settings = block.group(1)
         flags = below(settings)
+        name = NAME_RE.match(text, block.end())
+        live = COMMENT_RE.sub(" ", settings)
+        # Only the Release configuration of an app with its own bundle id, and only when no
+        # other conditional deployment key could override the quoted one.
+        certain = ("PRODUCT_BUNDLE_IDENTIFIER" in live
+                   and not any(marker in live for marker in DEPENDENCY_MARKERS)
+                   and len(CONDITIONAL_RE.findall(live)) == len(QDT_RE.findall(live)))
+        certain = certain and not (owner and owner.group(1) in project_ids)
+        if has_targets:
+            certain = certain and bool(owner) and owner.group(1) in app_ids
+        if certain and name and name.group(1).strip().strip('"').lower() == "release":
+            flags += [True for value in QDT_RE.findall(live) if int(value) < 13]
         if not flags:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
@@ -1091,7 +1132,7 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
-    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
+    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.|"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
   # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.

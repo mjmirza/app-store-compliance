@@ -3950,6 +3950,54 @@ rm -rf "$D"
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
 fi
+
+# Xcode writes SDK-conditional build setting keys in quotes.
+D="$(gs_ios ok.swift 'let a = 1')"
+mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 12.0;'
+gs_check "ios13-quoted-1 a quoted device override below the floor is flagged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"
+mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]" = 15.0;'
+gs_check "ios13-quoted-2 a quoted device override above the floor stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"
+mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+        "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 12.0;'
+gs_check "ios13-quoted-3 a simulator-only 12.0 does not count" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]\" = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-4 a simulator-only 15.0 does not hide an inherited 12.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.p;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 15.0;\n };\n name = Release;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.l;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-5 a quoted 15.0 on one app does not hide another app inheriting 12.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-6 a quoted 12.0 in Debug only stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Profile;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-10 a quoted 12.0 in Profile only stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_NAME = \"$(TARGET_NAME)\";\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-11 a quoted project-level 12.0 the app overrides stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n ARCHS = arm64;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*][arch=arm64]\" = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-12 a more specific arch key may override, so it stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n objects = {\n PR1 = {\n isa = PBXProject;\n buildConfigurationList = CL1;\n };\n CL1 = {\n isa = XCConfigurationList;\n buildConfigurations = (\n P1,\n );\n };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.acme.App;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.acme.App;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-13 a quoted 12.0 in the PBXProject configuration stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n objects = {\n T1 = {\n isa = PBXNativeTarget;\n buildConfigurationList = CL1;\n productType = \"com.apple.product-type.application\";\n };\n T2 = {\n isa = PBXNativeTarget;\n buildConfigurationList = CL2;\n productType = \"com.apple.product-type.bundle.unit-test\";\n };\n CL1 = {\n isa = XCConfigurationList;\n buildConfigurations = (\n A1,\n );\n };\n CL2 = {\n isa = XCConfigurationList;\n buildConfigurations = (\n B1,\n );\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.acme.App;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n B1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.acme.AppTests;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-14 a quoted 12.0 on a unit-test bundle stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 15.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-7 a quoted project 12.0 that the app overrides stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos12.*]\" = 12.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-8 a key tied to an old SDK version stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf "{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.a;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n // \"IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]\" = 12.0;\n };\n name = Release;\n };\n}\n" > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios13-quoted-9 a commented-out quoted key stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
+
 echo ""
 echo "app-store-compliance-guard-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
