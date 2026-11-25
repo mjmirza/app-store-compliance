@@ -1003,8 +1003,13 @@ SIWAPY
     hits="$(grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' 2>/dev/null || true)"
     while IFS= read -r f; do
       [ -n "$f" ] || continue
+      # A call in a comment never runs. A // after a colon is a URL, not a comment.
+      sed -E -e 's#(^|[^:])//.*#\1#' -e '/^[[:space:]]*([*]|[/][*])/d' "$f" 2>/dev/null | grep -Eq 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn' || continue
       stem="${f%.*}"
-      case "$stem" in *.ios|*.native) return 0 ;; esac
+      case "$stem" in
+        *.ios) return 0 ;;
+        *.native) ls "${stem%.native}".ios.* >/dev/null 2>&1 || return 0; continue ;;
+      esac
       ls "$stem".ios.* >/dev/null 2>&1 || ls "$stem".native.* >/dev/null 2>&1 || return 0
     done <<GSIEOF
 $hits
