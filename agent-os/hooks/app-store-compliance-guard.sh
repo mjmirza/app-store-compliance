@@ -1051,6 +1051,7 @@ def majors(settings):
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
+TEST_ID_RE = re.compile(r"(Test|Tests)$")
 OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
 
 
@@ -1130,7 +1131,7 @@ for path in sys.argv[1:]:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
             # A macOS, watchOS, tvOS or visionOS target has no iOS floor, and a test bundle never ships.
-            if OTHER_OS_RE.search(settings) or "test" in named.group(1).lower():
+            if OTHER_OS_RE.search(settings) or TEST_ID_RE.search(named.group(1).strip()):
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
@@ -1145,7 +1146,8 @@ for path in sys.argv[1:]:
         else:
             inherited = project.get(name, ("none", None))
             if inherited[0] == "value":
-                certain.append((inherited[1], True))
+                # The app has no xcconfig of its own, so no file can override the inherited value.
+                certain.append((inherited[1], False))
             elif inherited[0] == "unknown":
                 unknown = True
     low = [inh for v, inh in certain if v < 15]
