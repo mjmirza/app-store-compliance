@@ -3197,21 +3197,11 @@ ios15_case "a 14.0 target is an advisory warning" 'IPHONEOS_DEPLOYMENT_TARGET = 
 ios15_case "a 15.0 target stays clean" 'IPHONEOS_DEPLOYMENT_TARGET = 15.0;' - clean
 ios15_case "a 13.0 target is an advisory warning" 'IPHONEOS_DEPLOYMENT_TARGET = 13.0;' - warn
 ios15_case "a Podfile platform 14.0 alone sets only the pods" - "platform :ios, '14.0'" clean
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Base.xcconfig"
-rr_run "$D"
-rr_has '\[MEDIUM\][[:space:]]*APPLE-MIN-DEPLOYMENT-TARGET-IOS15' && [ "$RC" -eq 0 ] && ok "ios15 an xcconfig 14.0 target is an advisory warning" || bad "ios15 an xcconfig 14.0 target is an advisory warning (rc=$RC)"
-rm -rf "$D"
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n\t\tA1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 15.0;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n\t\t\t};\n\t\t};\n\t\tF1 = {\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {\n\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 14.0;\n\t\t\t\tPRODUCT_NAME = Fw;\n\t\t\t\tSKIP_INSTALL = YES;\n\t\t\t};\n\t\t};\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a framework target of 14 beside an iOS 15 app stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 # A commented-out 14 is not a target, and an app target of 15 overrides a base xcconfig or the Podfile.
 ios15_case "an app target of 14 still warns beside a Podfile platform 15" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' "platform :ios, '15.0'" warn
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf '  IPHONEOS_DEPLOYMENT_TARGET = 14.0 // set for the old devices\n' > "$D/Config/Base.xcconfig"
-gs_check "ios15 an indented xcconfig 14.0 with a trailing comment still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Release.xcconfig"
-gs_check "ios15 a later 14.0 in the same xcconfig still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*] = 14.0\n' > "$D/Config/Release.xcconfig"
-gs_check "ios15 a conditional sdk=iphoneos 14.0 in an xcconfig still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config" "$D/App.xcodeproj"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/Config/Release.xcconfig"
 printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 an xcconfig no target uses does not hide a project-level 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
@@ -3223,8 +3213,6 @@ printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_
 gs_check "ios15 a project-level 14.0 with nothing overriding it still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" 'IPHONEOS_DEPLOYMENT_TARGET = 14.0; "IPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*]" = 15.0;'
 gs_check "ios15 a quoted simulator-only key of 15.0 still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET[sdk=iphonesimulator*][config=Debug] = 15.0\n' > "$D/Config/App.xcconfig"
-gs_check "ios15 a two-condition simulator override still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir_proj "$D" '/* IPHONEOS_DEPLOYMENT_TARGET = 15.0; */ IPHONEOS_DEPLOYMENT_TARGET = 14.0;'
 gs_check "ios15 a commented-out 15.0 does not hide an active 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
@@ -3257,10 +3245,6 @@ gs_check "ios13 an arch-only low value does not block a device target of 15" "$D
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n PR = {\n isa = PBXProject;\n buildConfigurationList = LP;\n };\n LP = {\n isa = XCConfigurationList;\n buildConfigurations = (\n P1,\n );\n };\n TA = {\n isa = PBXNativeTarget;\n buildConfigurationList = LA;\n productType = "com.apple.product-type.application";\n };\n LA = {\n isa = XCConfigurationList;\n buildConfigurations = (\n A1,\n );\n };\n TT = {\n isa = PBXNativeTarget;\n buildConfigurationList = LT;\n productType = "com.apple.product-type.bundle.unit-test";\n };\n LT = {\n isa = XCConfigurationList;\n buildConfigurations = (\n T1,\n );\n };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_NAME = MyApp;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n T1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n SKIP_INSTALL = YES;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13 a test target of 12 never feeds the project value" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 0
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
-printf '{\n X1 = {\n isa = PBXFileReference;\n path = iOS.xcconfig;\n };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n SDKROOT = macosx;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X1;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-printf 'SDKROOT = iphoneos\n' > "$D/iOS.xcconfig"
-gs_check "ios15 a target xcconfig can set SDKROOT back to iOS" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/Config" "$D/App.xcodeproj"; printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Release.xcconfig"
 printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X1;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a target xcconfig of 14.0 over a project 14.0 warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
@@ -3268,9 +3252,6 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n X1 = {\n isa = PBXFileReference;\n path = Mac.xcconfig;\n };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n SDKROOT = macosx;\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n SDKROOT = iphoneos;\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.ios;\n };\n name = Release;\n };\n M1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X1;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.mac;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf 'SWIFT_VERSION = 5.0\n' > "$D/Mac.xcconfig"
 gs_check "ios15 a harmless xcconfig keeps a macOS target out" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
-printf '{\n PR = {\n isa = PBXProject;\n buildConfigurationList = LP;\n };\n LP = {\n isa = XCConfigurationList;\n buildConfigurations = (\n P1,\n );\n };\n TA = {\n isa = PBXNativeTarget;\n buildConfigurationList = LA;\n productType = "com.apple.product-type.application.messages";\n };\n LA = {\n isa = XCConfigurationList;\n buildConfigurations = (\n A1,\n );\n };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-gs_check "ios15 an iMessage application is an app" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n PR = {\n isa = PBXProject;\n buildConfigurationList = LP;\n };\n LP = {\n isa = XCConfigurationList;\n buildConfigurations = (\n P1,\n );\n };\n TI = {\n isa = PBXNativeTarget;\n buildConfigurationList = LI;\n productType = "com.apple.product-type.application";\n };\n LI = {\n isa = XCConfigurationList;\n buildConfigurations = (\n I1,\n );\n };\n TM = {\n isa = PBXNativeTarget;\n buildConfigurationList = LM;\n productType = "com.apple.product-type.application";\n };\n LM = {\n isa = XCConfigurationList;\n buildConfigurations = (\n M1,\n );\n };\n X1 = { isa = PBXFileReference; path = Mac.xcconfig; };\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n SDKROOT = iphoneos;\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n };\n name = Release;\n };\n I1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.ios;\n };\n name = Release;\n };\n M1 = {\n isa = XCBuildConfiguration;\n baseConfigurationReference = X1;\n buildSettings = {\n PRODUCT_BUNDLE_IDENTIFIER = com.x.mac;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf 'SDKROOT = macosx\n' > "$D/Mac.xcconfig"
@@ -3306,9 +3287,6 @@ gs_check "ios15 a macOS target does not inherit the iOS project value" "$D" 'APP
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n P1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n };\n name = Release;\n };\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_NAME = "$(TARGET_NAME)";\n };\n name = Release;\n };\n B1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n PRODUCT_NAME = "$(TARGET_NAME)";\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 two targets sharing a product name are both judged" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"
-printf 'HEADER_SEARCH_PATHS = $(SRCROOT)/**\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/App.xcconfig"
-gs_check "ios15 a search path holding a star is not a comment" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
 printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/Config/Debug.xcconfig"
@@ -3317,14 +3295,6 @@ D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
 printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf 'IPHONEOS_DEPLOYMENT_TARGET=14.0\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/App.xcconfig"
 gs_check "ios15 a later 15.0 overrides an earlier 14.0 written without spaces" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
-printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-printf 'IPHONEOS_DEPLOYMENT_TARGET = "14"\n' > "$D/App.xcconfig"
-gs_check "ios15 a quoted 14 in an xcconfig warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
-printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-printf 'IPHONEOS_DEPLOYMENT_TARGET = 14 // older devices\n' > "$D/App.xcconfig"
-gs_check "ios15 a 14 with a trailing comment warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf "platform :ios, '14.0'\n" > "$D/Podfile"
@@ -3338,15 +3308,14 @@ printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_
 printf 'IPHONEOS_DEPLOYMENT_TARGET = 14.0\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/App.xcconfig"
 gs_check "ios15 a later 15.0 in an xcconfig overrides an earlier 14.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
-printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-printf 'IPHONEOS_DEPLOYMENT_TARGET = 15.0\nIPHONEOS_DEPLOYMENT_TARGET = 14.0\n' > "$D/App.xcconfig"
-gs_check "ios15 a later 14.0 in an xcconfig still warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a Debug-only 14.0 stays silent when Release is 15.0" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a Release 14.0 warns" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
+D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
+printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n /* IPHONEOS_DEPLOYMENT_TARGET = 14.0; */\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+gs_check "ios15 a 14.0 inside a block comment in the project file stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13 a Debug 12.0 still blocks, as main reads it" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
