@@ -730,7 +730,7 @@ NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__
 { grep -v '/package[.]json$' "$FILELIST" 2>/dev/null
   find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \) -prune \) \
     -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
-  | tr '\n' '\0' | xargs -0 grep -IlE "(from|require|import)[[:space:]]*[(]?[[:space:]]*['\"]([^'\"]*package[.]json|([.]{1,2}/|~/|@/|/)([^'\"]*/)?package)['\"]" 2>/dev/null | grep . >/dev/null \
+  | tr '\n' '\0' | xargs -0 grep -IlE "['\"]([^'\"]*package[.]json|[^'\"]*/package)['\"]" 2>/dev/null | grep . >/dev/null \
   || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
 SHIP_TEST_RE='^$'
 [ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
