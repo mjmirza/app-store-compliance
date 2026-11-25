@@ -3294,7 +3294,7 @@ gs_check "ios15 a Debug xcconfig of 14.0 stays silent" "$D" 'APPLE-MIN-DEPLOYMEN
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj" "$D/Config"
 printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf 'IPHONEOS_DEPLOYMENT_TARGET=14.0\nIPHONEOS_DEPLOYMENT_TARGET = 15.0\n' > "$D/App.xcconfig"
-gs_check "ios15 a later 15.0 overrides an earlier 14.0 written without spaces" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
+gs_check "ios15 an xcconfig is not read, so the project file 15.0 decides" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 printf "platform :ios, '14.0'\n" > "$D/Podfile"
@@ -3319,9 +3319,6 @@ gs_check "ios15 a 14.0 inside a block comment in the project file stays silent" 
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n HEADER_SEARCH_PATHS = "$(SRCROOT)/Headers/**";\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n EXCLUDED_SOURCE_FILE_NAMES = "*/Legacy.swift";\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios15 a quoted glob is not a comment and keeps the 14.0 visible" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 1
-D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
-printf '{\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n SDKROOT = macosx;\n IPHONEOS_DEPLOYMENT_TARGET = 14.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.mac;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-gs_check "ios15 a macOS configuration stays silent" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS15' 0
 D="$(gs_ios ok.swift 'let a = 1')"; mkdir -p "$D/App.xcodeproj"
 printf '{\n A1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 12.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Debug;\n };\n A2 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n IPHONEOS_DEPLOYMENT_TARGET = 15.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 gs_check "ios13 a Debug 12.0 still blocks, as main reads it" "$D" 'APPLE-MIN-DEPLOYMENT-TARGET-IOS13' 1
