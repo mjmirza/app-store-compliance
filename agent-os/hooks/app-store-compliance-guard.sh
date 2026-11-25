@@ -1022,10 +1022,7 @@ import re
 import sys
 
 BLOCK_RE = re.compile(
-    r"isa = XCBuildConfiguration;(.*?)buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
-)
-DT_RE = re.compile(
-    r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+    r"(\w+)[^=\n{]*=\s*\{\s*isa = XCBuildConfiguration;(.*?)buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
 )
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
@@ -1040,19 +1037,24 @@ DEPENDENCY_MARKERS = (
 COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
 
 
-def majors(settings):
-    # Drop /* */ and // comments, but never inside a quoted value such as "$(SRCROOT)/**".
-    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    # A simulator-only value never reaches an App Store upload, so it is left out.
-    vals = [int(value) for cond, value in DT_RE.findall(settings) if "iphonesimulator" not in cond]
-    return vals
-
-
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
-# A capitalised Test or Tests suffix, or test after a separator, marks a test bundle. speedtest stays an app.
-TEST_ID_RE = re.compile(r"(?:Tests?|[._-][Tt]ests?)$")
+TARGET_RE = re.compile(r"isa = PBXNativeTarget;(.*?)\n\s*\};", re.S)
+LIST_RE = re.compile(r"(\w+)[^=\n{]*=\s*\{\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", re.S)
+
+
+def non_app_configs(text):
+    # Configuration ids of every target whose product type is not an application, such as a test bundle,
+    # a framework or an extension. The project file states the type, so no name has to be guessed.
+    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
+    ids = set()
+    for body in TARGET_RE.findall(text):
+        kind = re.search(r"productType = \"([^\"]+)\"", body)
+        lid = re.search(r"buildConfigurationList = (\w+)", body)
+        if kind and lid and kind.group(1) != "com.apple.product-type.application":
+            ids.update(lists.get(lid.group(1), []))
+    return ids
 OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
 
 
@@ -1068,7 +1070,14 @@ def resolve(settings, name):
             key, _, val = c.partition("=")
             key, val = key.strip(), val.strip()
             if key == "sdk":
-                applies = applies and (val == "*" or val.startswith("iphoneos"))
+                # Only a condition that covers every device SDK applies. A versioned one such as iphoneos16.*
+                # may not match the SDK an upload is built with, so it is unknown.
+                if val in ("*", "iphoneos*"):
+                    pass
+                elif val.startswith("iphoneos"):
+                    unknown = True
+                else:
+                    applies = False
             elif key == "config" and "*" not in val:
                 applies = applies and val == name
             else:
@@ -1107,32 +1116,41 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     blocks = BLOCK_RE.findall(text)
-    # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
-    app13, project13 = [], []
-    for _, settings, _ in blocks:
-        named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
-        vals = majors(settings)
-        if named and not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            app13.extend(vals)
-        elif not named:
-            project13.extend(vals)
-    if any(v < 13 for v in (app13 if app13 else project13)):
+    skip = non_app_configs(text)
+    # The iOS 13 blocker reads every configuration with the same rules as the iOS 15 check, so a value whose
+    # condition names another configuration never counts.
+    project13, app13 = {}, []
+    for bid, prefix, settings, name in blocks:
+        if not ID_RE.search(settings):
+            project13[name] = resolve(settings, name)
+    for bid, prefix, settings, name in blocks:
+        named = ID_RE.search(settings)
+        if not named or bid in skip or OTHER_OS_RE.search(settings):
+            continue
+        if any(marker in settings for marker in DEPENDENCY_MARKERS):
+            continue
+        state = resolve(settings, name)
+        if state[0] == "none" and not "baseConfigurationReference" in prefix:
+            state = project13.get(name, ("none", None))
+        app13.append(state)
+    lows13 = [v for k, v in app13 if k == "value"] if app13 else [v for k, v in project13.values() if k == "value"]
+    if any(v < 13 for v in lows13):
         worst = 13
         break
     # The iOS 15 warning skips Debug configurations (Debug, Debug-staging). Each app target and configuration
     # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
-    names = {b[2] for b in blocks}
+    names = {b[3] for b in blocks}
     shipped = {n for n in names if "debug" not in n.lower()} or names
     project, apps = {}, []
-    for prefix, settings, name in blocks:
+    for bid, prefix, settings, name in blocks:
         if name not in shipped:
             continue
         named = ID_RE.search(settings)
         if not named:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            # A macOS, watchOS, tvOS or visionOS target has no iOS floor, and a test bundle never ships.
-            if OTHER_OS_RE.search(settings) or TEST_ID_RE.search(named.group(1).strip()):
+            # A non-application target never ships as the app, and another OS has no iOS floor.
+            if bid in skip or OTHER_OS_RE.search(settings):
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
