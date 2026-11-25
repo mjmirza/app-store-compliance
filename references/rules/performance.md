@@ -226,7 +226,7 @@ grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|p
 How to detect.
 
 ```bash
-grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' . && ! grep -rn 'applinks:' --include='*.entitlements' --include='*.plist' . | grep -v 'mode=developer\|<!--\|[Dd]ebug'
+{ grep -rln 'CFBundleURLSchemes' . && ! grep -rlq 'apple-app-site-association' . && ! { find . \( -name '*.entitlements' -o -name '*.plist' \) ! -ipath '*debug*' -exec cat {} + | tr '\n' ' ' | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -qv 'mode=developer'; }; } || { grep -rln 'android:scheme' . && ! grep -rlq 'assetlinks.json' .; }
 ```
 
 ## RN-OTA-UNDECLARED

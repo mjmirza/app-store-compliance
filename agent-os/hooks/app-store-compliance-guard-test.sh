@@ -1294,6 +1294,12 @@ printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><st
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug an applinks entry only in a Debug entitlements file does not count" || bad "dl-debug an applinks entry only in a Debug entitlements file does not count"
 rm -rf "$D"
+D="$(mk_ios_clean)"; mkdir -p "$D/App/Debug"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Debug/App.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug-dir an applinks entry only under a Debug folder does not count" || bad "dl-debug-dir an applinks entry only under a Debug folder does not count"
+rm -rf "$D"
 D="$(mk_ios_clean)"
 printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
 printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
