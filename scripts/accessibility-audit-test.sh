@@ -1230,6 +1230,16 @@ else
   echo "$OUT"
 fi
 rm -rf "$AL_DIR"
+SW_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><Switch android:layout_width="96dp" android:layout_height="24dp" /><CheckBox android:layout_width="96dp" android:layout_height="23dp" /></FrameLayout>\n' > "$SW_DIR/sw.xml"
+OUT=$($AUDIT "$SW_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="23dp"'; then
+  ok "a switch is not judged by its declared size, a checkbox still is"
+else
+  bad "a switch is not judged by its declared size, a checkbox still is"
+  echo "$OUT"
+fi
+rm -rf "$SW_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"

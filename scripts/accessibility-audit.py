@@ -857,7 +857,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         continue
                     # These Material components pad themselves up to a 48dp touch target.
                     ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)
-                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip"):
+                    # A switch measures itself to fit its thumb and track, so its declared size is not final.
+                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip", "Switch", "SwitchCompat", "SwitchMaterial", "MaterialSwitch"):
                         continue
                     # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
                     # false) may switch the listener off, so a handler alone does not count then.
