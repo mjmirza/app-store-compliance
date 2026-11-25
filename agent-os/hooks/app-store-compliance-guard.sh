@@ -1058,6 +1058,11 @@ LO = int(os.environ.get("ASCG_LO", "0"))
 HI = int(os.environ.get("ASCG_HI", "13"))
 
 
+DQ, BS = chr(34), chr(92)
+COMMENT_RE = re.compile(DQ + "(?:" + BS + BS + ".|[^" + DQ + BS + BS + "])*" + DQ + "|/[*].*?[*]/", re.S)
+OTHER_SDK_RE = re.compile("SDKROOT[ ]*=[ ]*" + DQ + "?(macosx|watchos|appletvos|xros)")
+
+
 def below(settings):
     return [LO <= int(v) < HI for v in DT_RE.findall(settings)]
 
@@ -1072,7 +1077,11 @@ for path in sys.argv[1:]:
     for block in BLOCK_RE.finditer(text):
         settings = block.group(1)
         if LO > 0:
-            settings = re.sub(r"/[*].*?[*]/", " ", settings, flags=re.S)
+            # Drop block comments, but never text inside a quoted value such as a glob ending in /*.
+            settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0)[0] == DQ else " ", settings)
+            # A configuration built on another Apple SDK does not ship to iPhone.
+            if OTHER_SDK_RE.search(settings):
+                continue
         after = re.match(r"\s*name = \"?([^;\"]+)", text[block.end():])
         if LO > 0 and after and "debug" in after.group(1).lower():
             continue
