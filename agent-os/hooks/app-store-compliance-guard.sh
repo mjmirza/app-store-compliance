@@ -1457,6 +1457,16 @@ def launcher(el):
             return True
     return False
 
+def tail(name):
+    return (name or "").rsplit(".", 1)[-1]
+
+OWN_TASK = ("singleTask", "singleInstance", "singleInstancePerTask")
+
+def starts_task(el):
+    if launcher(el) or attr(el, "launchMode") in OWN_TASK:
+        return True
+    return attr(el, "documentLaunchMode") in ("intoExisting", "always")
+
 def opts_out(el):
     return any(local(child.tag) == "property" and attr(child, "name") == OPT_OUT
                and attr(child, "value") == "true" for child in el)
@@ -1485,9 +1495,10 @@ for path in sys.argv[1:]:
         if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":
             continue
         default = attr(app, "resizeableActivity")
-        # Launcher activities, directly or through an enabled alias that targets them.
-        roots = {attr(el, "name") for el in app if local(el.tag) == "activity" and launcher(el)}
-        roots |= {attr(el, "targetActivity") for el in app if local(el.tag) == "activity-alias"
+        # Activities that can root a task. a launcher, directly or through an enabled alias,
+        # a document, or one that starts its own task. Names compare by class name.
+        roots = {tail(attr(el, "name")) for el in app if local(el.tag) == "activity" and starts_task(el)}
+        roots |= {tail(attr(el, "targetActivity")) for el in app if local(el.tag) == "activity-alias"
                   and launcher(el) and attr(el, "enabled") != "false"}
         app_keeps = opts_out(app)
         for el in app:
@@ -1505,7 +1516,7 @@ for path in sys.argv[1:]:
             # The root activity of a task decides whether the task can be resized, so the resize
             # lock is judged on launcher activities. With no launcher declared, any could be a root.
             own = attr(el, "resizeableActivity")
-            root = not roots or attr(el, "name") in roots
+            root = not roots or tail(attr(el, "name")) in roots
             resize_lock = root and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
