@@ -1095,11 +1095,11 @@ PBXPY
   }
   xcconfig_below_ios15() {
     [ -s "$FILELIST" ] || return 1
-    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | while IFS= read -r xf; do
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | grep -viE 'debug[^/]*[.]xcconfig$' | while IFS= read -r xf; do
       # The last value per key decides. A simulator-only key never ships.
       awk 'match($0, /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])*[[:space:]]*=/) {
-          key = substr($0, RSTART, RLENGTH); if (key ~ /iphonesimulator/) next
-          v = substr($0, RSTART + RLENGTH); sub(/^[[:space:]]*"?/, "", v); split(v, p, "."); last[key] = p[1] }
+          key = substr($0, RSTART, RLENGTH); gsub(/[[:space:]]/, "", key); if (key ~ /iphonesimulator/) next
+          v = substr($0, RSTART + RLENGTH); sub(/^[[:space:]]*"?/, "", v); last[key] = match(v, /^[0-9]+/) ? substr(v, 1, RLENGTH) : "" }
         END { for (k in last) if (last[k] == "13" || last[k] == "14") { print "hit"; exit } }' "$xf" 2>/dev/null
     done | grep_q hit
   }
