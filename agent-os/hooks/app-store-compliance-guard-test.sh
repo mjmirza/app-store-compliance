@@ -575,6 +575,28 @@ printf '// the outgoing page must finish sliding after it is deactivated\n' > "$
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "Words in a lowercase test/ folder are not app source" || ok "Words in a lowercase test/ folder are not app source"
 rm -rf "$D"
+# A support mailto: link or a deactivate call in another file is not the way the account is removed.
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.delete("/users/me") }\n' > "$D/App/A.swift"
+printf 'let support = URL(string: "mailto:help@acme.example.io")\n' > "$D/App/Support.swift"
+printf 'func pageDidHide() { player.deactivate() }\n' > "$D/App/Pager.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "dw-1 a mailto: or deactivate in another file is not the deletion path" || ok "dw-1 a mailto: or deactivate in another file is not the deletion path"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let support = URL(string: "mailto:help@acme.example.io")\n' > "$D/App/Support.swift"
+printf 'func deleteAccount() {\n  open(URL(string: "mailto:help@acme.example.io?subject=Delete")!)\n}\n' > "$D/App/Settings.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -A1 'APPLE-ACCOUNT-DELETION-WEAK' | grep -q 'file\. App/Settings\.swift:2' && ok "dw-2 a deletion that only opens a mailto: link is flagged at that link" || bad "dw-2 a deletion that only opens a mailto: link is flagged at that link"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.post("/users/me/deactivate") }\n' > "$D/App/Account.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "dw-3 a deletion that only deactivates is flagged" || bad "dw-3 a deletion that only deactivates is flagged"
+rm -rf "$D"
 
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.

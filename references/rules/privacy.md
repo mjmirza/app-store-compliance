@@ -229,7 +229,7 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 How to detect.
 
 ```bash
-grep -rn 'deleteAccount\|delete account' --include='*.swift' . && grep -rn 'mailto:\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate
+grep -rl 'deleteAccount\|delete account' --include='*.swift' . | xargs grep -n 'mailto:\|deactivate'   # deletion must truly delete, not mailto or deactivate, in the file that deletes the account
 ```
 
 ## APPLE-PRIVACY-NUTRITION-LABELS
