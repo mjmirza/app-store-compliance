@@ -1422,7 +1422,7 @@ def frees(root):
         orientation = attr(el, "screenOrientation")
         if orientation is not None and orientation not in LOCKED:
             return True
-        if attr(el, "resizeableActivity") == "true" or attr(el, "appCategory") == "game":
+        if attr(el, "resizeableActivity") == "true" or attr(el, "appCategory") == "game" or attr(el, "isGame") == "true":
             return True
         if "screenOrientation" in (attr(el, "remove") or "") or "resizeableActivity" in (attr(el, "remove") or ""):
             return True
@@ -1445,6 +1445,15 @@ def unlocked(path):
             if frees(ET.parse(other).getroot()):
                 return True
         except (ET.ParseError, OSError):
+            return True
+    return False
+
+def launcher(el):
+    for f in el:
+        if local(f.tag) != "intent-filter":
+            continue
+        names = {attr(x, "name") for x in f}
+        if "android.intent.action.MAIN" in names and "android.intent.category.LAUNCHER" in names:
             return True
     return False
 
@@ -1481,14 +1490,19 @@ for path in sys.argv[1:]:
             # An alias inherits from its target activity, so only the activity is judged.
             if local(el.tag) != "activity":
                 continue
+            # A disabled activity is never started.
+            if attr(el, "enabled") == "false":
+                continue
             if target >= 36 and not (target == 36 and (app_keeps or opts_out(el))):
                 if attr(el, "screenOrientation") == "locked":
                     print(path)
                     sys.exit(0)
                 continue
-            # An activity setting overrides the application default.
+            # The root activity of a task decides whether the task can be resized. An application
+            # default reaches every root, while a lock on one activity counts only on the launcher.
             own = attr(el, "resizeableActivity")
-            if (own if own is not None else default) == "false" or attr(el, "screenOrientation") in LOCKED:
+            resize_lock = (own is None and default == "false") or (own == "false" and launcher(el))
+            if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
                 sys.exit(0)
 sys.exit(1)
