@@ -1188,6 +1188,9 @@ for path in sys.argv[1:]:
     # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
     names = {b[3] for b in blocks}
     shipped = {n for n in names if "debug" not in n.lower()} or names
+    # A target with no SDKROOT of its own takes the project one, so a macOS project setting reaches it.
+    other_os = {name for bid, prefix, settings, name in blocks
+                if not (ID_RE.search(settings) and bid not in owned) and OTHER_OS_RE.search(settings)}
     project, apps = {}, []
     for bid, prefix, settings, name in blocks:
         if name not in shipped:
@@ -1197,7 +1200,8 @@ for path in sys.argv[1:]:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
             # A non-application target never ships as the app, and another OS has no iOS floor.
-            if bid in skip or OTHER_OS_RE.search(settings):
+            sdk = OTHER_OS_RE.search(settings) or ("SDKROOT" not in settings and name in other_os)
+            if bid in skip or sdk:
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
