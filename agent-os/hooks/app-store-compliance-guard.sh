@@ -1018,7 +1018,7 @@ import re
 import sys
 
 BLOCK_RE = re.compile(
-    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
+    r"isa = XCBuildConfiguration;(.*?)buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
 )
 VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?(\$[^;\"\n]*)")
 DT_RE = re.compile(
@@ -1060,9 +1060,13 @@ for path in sys.argv[1:]:
             text = fh.read()
     except OSError:
         continue
+    def app_block(settings):
+        named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
+        return named and not any(marker in settings for marker in DEPENDENCY_MARKERS)
+
     def collect(blocks):
         app, project, has_app, app_var, project_var = [], [], False, False, False
-        for settings, _ in blocks:
+        for _, settings, _ in blocks:
             named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
             is_app = named and not any(marker in settings for marker in DEPENDENCY_MARKERS)
             has_app = has_app or is_app
@@ -1083,14 +1087,19 @@ for path in sys.argv[1:]:
         worst = 13
         break
     # The advisory iOS 15 warning leaves Debug configurations out, since an upload never builds them.
-    shipped = [b for b in blocks if b[1].strip().lower() != "debug"] or blocks
+    shipped = [b for b in blocks if b[2].strip().lower() != "debug"] or blocks
     app, project, has_app, app_var, project_var = collect(shipped)
     # Each shipped configuration decides on its own. Its app value wins, otherwise the project value of the
     # same name is inherited. Within one configuration the highest conditional value counts, and the
     # lowest configuration decides, so a Staging at 15 never hides a Release at 14.
     per_config = []
-    for name in sorted({b[1] for b in shipped}):
-        c_app, c_project, _, _, _ = collect([b for b in shipped if b[1] == name])
+    for name in sorted({b[2] for b in shipped}):
+        named_blocks = [b for b in shipped if b[2] == name]
+        c_app, c_project, _, _, _ = collect(named_blocks)
+        # An app configuration with no value of its own, built on an xcconfig file, takes its value
+        # from that file, which is unknown here, so this configuration does not decide.
+        if not c_app and any("baseConfigurationReference" in b[0] and app_block(b[1]) for b in named_blocks):
+            continue
         c_chosen = c_app if c_app else c_project
         if c_chosen:
             per_config.append(max(c_chosen))
@@ -1140,9 +1149,12 @@ PBXPY
           v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*(\[[^]]*\][[:space:]]*)*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
           # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
           last[cond] = (p[1] ~ /^[0-9]+$/) ? p[1] + 0 : 99 }
+        /^[[:space:]]*\/\*/ { unknown = 1 }
         /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
         END { m = -1; for (c in last) if (last[c] > m) m = last[c]
           if (plat && m < 0) m = 14
+          # A block comment may hide or expose an assignment, so the file value is unknown.
+          if (unknown && m >= 0) m = 99
           if (m >= 0) print m }' "$xf" 2>/dev/null
     done
   }
