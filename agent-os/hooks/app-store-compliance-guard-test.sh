@@ -149,7 +149,7 @@ mk_unrelated_config_xml() {
   echo "$d"
 }
 
-# The real-world Codex-found scenario: a full cross-platform Flutter repo with BOTH ios/ and
+# A real-world scenario: a full cross-platform Flutter repo with BOTH ios/ and
 # android/ folders committed (the normal case), building only for Android.
 mk_flutter_both_platforms() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/android/app/src/main" "$d/lib"
@@ -786,7 +786,7 @@ OUT="$(printf '{"tool_input":{"description":"%s","command":"npx eas submit --pla
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-15 large payload is decoded and scanned" || bad "610-15 large payload is decoded and scanned (rc=$RC bytes=${#OUT})"
 rm -rf "$D"
 
-# ===== Issue #610, second round. Counterexamples from the adversarial review, pinned =====
+# ===== Issue #610. Counterexamples, pinned =====
 NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
 NOJQ="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil python3 xmllint dirname basename date; do p="$([ "$b" = python3 ] && pyenv which python3 2>/dev/null || command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b"; done
 P_ESCBS='{"tool_input":{"command":"gradlew '"$BS$BS$BS$BS$BS"'nbundleRelease"}}'
@@ -858,7 +858,7 @@ echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610
 rm -rf "$D"
 rm -rf "$NOTOOLS" "$NOJQ"
 
-# ===== Issue #610, third round. Reporter persona findings, pinned =====
+# ===== Issue #610. Reporter persona findings, pinned =====
 P_ECHO='{"tool_input":{"command":"echo '"$BS"'"eas submit --platform ios'"$BS"'""}}'
 P_GREP='{"tool_input":{"command":"grep -rn '"'"'eas submit'"'"' docs/"}}'
 P_COMMENT='{"tool_input":{"command":"ls -la # then npx eas submit --platform ios"}}'
@@ -928,7 +928,7 @@ for tier in "$PATH" "$NOJQ" "$NOTOOLS"; do
 done
 rm -rf "$D" "$NOTOOLS" "$NOJQ"
 
-# ===== Issue #610, fourth round. Hook-contract persona findings, pinned =====
+# ===== Issue #610. Hook-contract persona findings, pinned =====
 P_MCP='{"hook_event_name":"PreToolUse","tool_name":"mcp__some__runner","tool_input":{"command":"eas submit --platform ios"}}'
 P_EDIT='{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"x.md","new_string":"run eas submit"},"command":"eas submit --platform ios"}'
 P_NUL='{"tool_name":"Bash","tool_input":{"command":"./gradlew '"$BS"'u0000 bundleRelease"}}'
@@ -954,7 +954,7 @@ ERR="$(printf '%s' "$P_NUL" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1 >/dev/n
 [ "$RC" -eq 0 ] && [ -z "$ERR" ] && ok "610-33 NUL byte in the command keeps stderr empty on a pass" || bad "610-33 NUL byte in the command keeps stderr empty on a pass (rc=$RC err=${ERR:0:80})"
 rm -rf "$D"
 
-# ===== Issue #610, fifth round. Second adversarial review, pinned. A submit can never hide in quotes =====
+# ===== Issue #610. Pinned. A submit can never hide in quotes =====
 P_QSUB='{"tool_input":{"command":"eas '"$BS"'"submit'"$BS"'" --platform ios"}}'
 P_SEMI_SHC='{"tool_input":{"command":"true;bash -c '"'"'eas submit --platform ios'"'"'"}}'
 P_PY_OS='{"tool_input":{"command":"python3 -c '"'"'import os; os.system('"$BS"'"eas submit --platform ios'"$BS"'")'"'"'"}}'
@@ -995,7 +995,7 @@ for tier in "$PATH" "$NOJQ"; do
 done
 rm -rf "$D" "$NOJQ"
 
-# ===== Issue #610, sixth round. Portability persona. the no-tools unescape must stay linear =====
+# ===== Issue #610. Portability persona. the no-tools unescape must stay linear =====
 # 100 a 300KB command reaches the no-tools tier and is unescaped and scanned in seconds, not minutes
 D="$(mk_ios_bad)"
 NOTOOLS="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NOTOOLS/$b"; done
@@ -1004,7 +1004,7 @@ T0=$(date +%s); OUT="$(PATH="$NOTOOLS" CLAUDE_PROJECT_DIR="$D" bash "$GUARD" < "
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && [ $((T1-T0)) -lt 20 ] && ok "610-38 300KB command is scanned on the no-tools tier in $((T1-T0))s" || bad "610-38 300KB command is scanned on the no-tools tier (rc=$RC secs=$((T1-T0)) bytes=${#OUT})"
 rm -rf "$D" "$NOTOOLS"
 
-# ===== Issue #610, seventh round. Fuzz persona. a present but broken parser never disables the guard =====
+# ===== Issue #610. Fuzz persona. a present but broken parser never disables the guard =====
 mk_broken_tool_path() {  # $1 = name of the tool to break, everything else real, jq and python3 otherwise absent
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
@@ -1037,7 +1037,7 @@ OUT="$(printf '%s' "$P_NESTED_TI" | PATH="$NOTOOLS" CLAUDE_PROJECT_DIR="$D" bash
 echo "$OUT" | grep -q 'App Store Compliance Guard' && [ "$RC" -eq 2 ] && ok "610-41 nested object inside tool_input is skipped over" || bad "610-41 nested object inside tool_input is skipped over (rc=$RC bytes=${#OUT})"
 rm -rf "$D" "$NOTOOLS"
 
-# ===== Issue #610, eighth round. Third adversarial review. an inert text command cannot smuggle a submit =====
+# ===== Issue #610. an inert text command cannot smuggle a submit =====
 P_ECHO_SUBST='{"tool_input":{"command":"echo '"$BS"'"$(eas submit --platform ios)'"$BS"'""}}'
 P_ECHO_PIPE='{"tool_input":{"command":"echo '"$BS"'"eas submit --platform ios'"$BS"'" | sh"}}'
 P_GIT_ALIAS='{"tool_input":{"command":"git -c alias.ship='"'"'!npx eas submit --platform ios'"'"' ship"}}'
@@ -1061,7 +1061,7 @@ OUT="$(printf '%s' "$P_GIT_MSG" | CLAUDE_PROJECT_DIR="$D" bash "$GUARD" 2>&1)"; 
 [ "$RC" -eq 0 ] && ok "610-44 git commit message scans and a clean project passes" || bad "610-44 git commit message scans and a clean project passes (rc=$RC)"
 rm -rf "$D"
 
-# ===== Issue #610, ninth round. Fourth adversarial review. a parser that passes its probe but fails for real falls through =====
+# ===== Issue #610. a parser that passes its probe but fails for real falls through =====
 mk_shim_path() {  # $1 tool name to shim, $2 shim body, $3 = jq|python3|none to keep real on PATH besides the shim
   local d; d="$(mktemp -d)"
   for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$d/$b"; done
@@ -1112,7 +1112,7 @@ STDOUT="$(printf '{"tool_input":{"command":"fastlane deliver --submit"}}' | PATH
 echo "$STDOUT" | grep -q 'Summary\.' && [ "$RC" -eq 0 ] && ok "610-50 degraded routing keeps the pass report on stdout" || bad "610-50 degraded routing keeps the pass report on stdout (rc=$RC bytes=${#STDOUT})"
 rm -rf "$D" "$SHIM"
 
-# ===== Issue #610, tenth round. Fifth adversarial review. a backslash before a letter is the letter =====
+# ===== Issue #610. a backslash before a letter is the letter =====
 P_LETTER_ESC='{"tool_input":{"command":"eas s'"$BS$BS"'ubmit --platform ios"}}'
 P_CONT_ESC='{"tool_input":{"command":"eas '"$BS$BS$BS"'n'"$BS$BS"'submit --platform ios"}}'
 
@@ -1124,7 +1124,7 @@ for p in "$P_LETTER_ESC" "$P_CONT_ESC"; do
 done
 rm -rf "$D"
 
-# ===== Issue #610, eleventh round. A heredoc body is data unless an interpreter consumes it =====
+# ===== Issue #610. A heredoc body is data unless an interpreter consumes it =====
 P_HD_GH='{"tool_input":{"command":"gh pr create --title x --body-file - <<'"$BS"'"EOF'"$BS"'"'"$BS"'nFixes the guard so npx eas submit --platform ios is scanned.'"$BS"'nEOF"}}'
 P_HD_CAT='{"tool_input":{"command":"cat > notes.md <<EOF'"$BS"'nrun npx eas submit --platform ios later'"$BS"'nEOF"}}'
 P_HD_BASH='{"tool_input":{"command":"bash <<EOF'"$BS"'nnpx eas submit --platform ios'"$BS"'nEOF"}}'
@@ -1270,7 +1270,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "612-12 a mitigation in another file still pairs with its trigger" || bad "612-12 a mitigation in another file still pairs with its trigger (rc=$RC)"
 rm -rf "$D"
 
-# ===== Issue #612, second round. The adversarial review findings, pinned =====
+# ===== Issue #612. Review findings, pinned =====
 # The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.
 mk_root_app_plus_child() {
   local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/apps/child/ios/Child"
@@ -1398,7 +1398,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 0 ] && ok "612-23 a workspace inside the project bundle never splits the app" || bad "612-23 a workspace inside the project bundle never splits the app (rc=$RC)"
 rm -rf "$D"
 
-# ===== Issue #612, third round. Second adversarial review, pinned =====
+# ===== Issue #612. Pinned =====
 # 136 a trailing slash on the project path still keeps the nested app out of the root scan
 D="$(mk_root_app_plus_child)"
 OUT="$(bash "$GUARD" "$D/" 2>&1)"; RC=$?
@@ -1465,7 +1465,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q 'ANDROID-R8-OPTIMIZATION-MISSING' && ok "612-30 no Gradle file still means the R8 finding" || bad "612-30 no Gradle file still means the R8 finding (rc=$RC)"
 rm -rf "$D"
 
-# ===== Issue #612, fourth round. Third adversarial review, pinned =====
+# ===== Issue #612. Pinned =====
 # 143 a nested app whose name carries glob characters is still kept out of the root scan
 D="$(mktemp -d)"; mkdir -p "$D/ios/App" "$D/apps/[child]/ios/Child"
 printf '{"expo":{"name":"root"}}' > "$D/app.json"
@@ -1512,7 +1512,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^Project\. $D$" && ! echo "$OUT" | grep -q '^App\. ' && [ "$RC" -eq 2 ] && ok "612-34 a React Native module never becomes an app section" || bad "612-34 a React Native module never becomes an app section (rc=$RC)"
 rm -rf "$D"
 
-# ===== Issue #612, fifth round. Hook-contract persona findings, pinned =====
+# ===== Issue #612. Hook-contract persona findings, pinned =====
 # 147 a manifest inside a test fixture directory never becomes an app root
 D="$(mk_ios_bad)"; mkdir -p "$D/__tests__/fixtures/android/app/src/main"
 printf '<manifest><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/></manifest>' > "$D/__tests__/fixtures/android/app/src/main/AndroidManifest.xml"
@@ -1608,7 +1608,7 @@ D="$(mk_linked_app)"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 echo "$OUT" | grep -q "^App\. $D/apps/linked$" && echo "$OUT" | grep -q 'MISSING-USAGE-DESCRIPTION' && [ "$RC" -eq 2 ] && ok "657-2 a linked app that is the only app is still scanned" || bad "657-2 a linked app that is the only app is still scanned (rc=$RC)"
 rm_linked "$D"
-# a clean linked app must never replace the scan of the project's own unmarked source (adversarial review)
+# a clean linked app must never replace the scan of the project's own unmarked source 
 D="$(mk_ios_bad)"; EXT="$(mk_ios_clean)"; mkdir -p "$EXT/App.xcodeproj" "$D/apps"; printf 'X=1;\n' > "$EXT/App.xcodeproj/project.pbxproj"
 ln -s "$EXT" "$D/apps/linked"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
@@ -1739,7 +1739,7 @@ D="$(mk_ios_bad)"; OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && echo "$OUT" | grep -q 'run the same command again' && ok "verdict-5 a block says what to do next" || bad "verdict-5 a block says what to do next (rc=$RC)"
 rm -rf "$D"
 
-# ===== Third review round. Each case failed before its fix. =====
+# ===== Each case failed before its fix. =====
 r3_hook() { python3 -c 'import json,sys; print(json.dumps({"tool_input":{"command":sys.argv[1]}}))' "$1" | CLAUDE_PROJECT_DIR="$2" bash "$GUARD" >/dev/null 2>"${3:-/dev/null}"; }
 D="$(mk_ios_bad)"
 r3_hook 'npm install "$(fastlane deliver)"' "$D"; RC=$?
@@ -2175,7 +2175,7 @@ for c in 'git commit -m x && eas submit -p ios' 'git commit -m "$(eas submit -p 
 done
 rm -rf "$D"
 
-# ===== Codex review round (October 2026). each case failed on the guard before its fix =====
+# ===== Review cases (October 2026). each case failed on the guard before its fix =====
 FL="fast""lane"
 cx_payload() {  # $1 json shape, $2 command, $3 cwd, $4 tool name. prints one payload
   python3 -c '
@@ -2665,7 +2665,7 @@ let s = "x"')"
 rr_hook "$FL deliver" "$D"
 rr_has 'NSCameraUsageDescription' && ok "r6-3 a camera mention in a block comment counts, as in 1.0.0" || bad "r6-3 a camera mention in a block comment counts, as in 1.0.0 (rc=$RC)"
 rm -rf "$D"
-# R7 Codex round 6
+# R7
 # R7-1 a C# verbatim string, a Rust string holding /*, and a mid-line // never hide a camera call
 D="$(mk_rr_ios '' 'let s = "x"')"
 printf '%s\n' 'var path = @"C:\"; var q = " // "; var camera = AVCaptureDevice.GetDefaultDevice(AVMediaTypes.Video);' > "$D/App/Cam.cs"
@@ -2719,7 +2719,7 @@ printf 'let url = CodePush.bundleURL()\n' > "$D/Native/Entry.swift"
 rr_run "$D"
 rr_has 'RN-OTA-UNDECLARED' && ok "r7-4 a brownfield host keeps the React Native checks" || bad "r7-4 a brownfield host keeps the React Native checks (rc=$RC)"
 rm -rf "$D"
-# R8 Codex round 7
+# R8
 # R8-1 a multi-line Rust string holding /* and quotes never hides a camera call
 D="$(mk_rr_ios '' 'let s = "x"')"
 printf '%s\n' 'let pattern = "first' '/* \"quoted\"' 'last";' 'let camera = unsafe {' '    AVCaptureDevice::defaultDeviceWithMediaType(AVMediaTypeVideo)' '};' '/* end */' > "$D/App/cam.rs"
@@ -2759,7 +2759,7 @@ for c in "nx ship mobile" "nx affected --target=ship" "bun run --filter @acme/mo
   [ "$RC" -eq 2 ] && ok "r8-5 scanned. $c" || bad "r8-5 scanned. $c (rc=$RC)"
 done
 rm -rf "$D"
-# R9 Codex round 8
+# R9
 # R9-1 a pointer write led by * and a line with code after a leading /* note */ are code
 D="$(mk_rr_ios '' 'let s = "x"')"
 printf '%s\n' 'void f(void **out) {' '*out = (__bridge void *)[AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' '}' > "$D/App/P.m"
@@ -2798,7 +2798,7 @@ printf '#import <Cordova/CDV.h>\nUIWebView *webView;\n' > "$D/Native/Host.m"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r9-4 a Cordova host keeps the Ionic checks" || bad "r9-4 a Cordova host keeps the Ionic checks (rc=$RC)"
 rm -rf "$D"
-# R10 Codex round 9
+# R10
 # R10-1 a spaced pointer write and code after a closing */ count as triggers
 for src in '* out = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];' ' */ AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];'; do
   D="$(mk_rr_ios '' 'let s = "x"')"
@@ -2844,7 +2844,7 @@ let dev = AVCaptureDevice.default(for: .video)')"
   rm -rf "$D"
 done
 
-# R11 Codex round 10
+# R11
 # R11-1 triggers read every line raw, as in 1.0.0, so a // line holding a live Swift interpolation still counts
 D="$(mk_rr_ios '' 'import AVFoundation
 let message = """
@@ -2882,7 +2882,7 @@ printf '%s\n' "signIn();" "const s = ' /* '; deleteAccount(); const end = ' */ '
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r11-4 quoted block markers keep the deletion between them" || bad "r11-4 quoted block markers keep the deletion between them (rc=$RC)"
 rm -rf "$D"
-# R12 Codex round 11
+# R12
 # R12-1 an Android word inside a quoted lane parameter is text, so an iOS lane keeps the Apple checks
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -2900,7 +2900,7 @@ let dev = AVCaptureDevice.default(for: .video)')"
 rr_hook "./gradlew bundleRelease" "$D"
 ! rr_has 'NSCameraUsageDescription' && ok "r12-1b a plain Android build still skips the Apple checks" || bad "r12-1b a plain Android build still skips the Apple checks (rc=$RC)"
 rm -rf "$D"
-# R13 Codex round 12
+# R13
 # R13-1 a harmless echo, a comment or a second line naming Android never vouches for an iOS lane
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -2927,7 +2927,7 @@ let v = RCTSurfaceHostingProxyRootView(bridge: b, moduleName: "x")' 'class MainA
   rr_has 'RN-PRIVACY-MANIFEST-MISSING' && ok "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*}" || bad "r13-2 a React host keeps the React Native checks. ${host%%$'\n'*} (rc=$RC)"
   rm -rf "$D"
 done
-# R14 Codex round 13
+# R14
 # R14-1 a quoted lane name, a quoted variable or a quoted fastlane still counts as an iOS submit beside an Android one
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -2954,7 +2954,7 @@ printf 'import UIKit\nvar legacy: UIWebView?\n' > "$D/Native/Legacy.swift"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r14-2 a split native app keeps the root framework checks" || bad "r14-2 a split native app keeps the root framework checks (rc=$RC)"
 rm -rf "$D"
-# R15 Codex round 14
+# R15
 # R15-1 a wrapped Apple submit never borrows an Android flag from a harmless command, Android only needs main's rule too
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -2975,7 +2975,7 @@ printf '<widget id="com.acme.native"/>\n' > "$D/Native/config.xml"
 rr_run "$D"
 rr_has 'IONIC-UIWEBVIEW-DEPRECATED' && ok "r15-2 a framework marker in a split native app still counts for the root" || bad "r15-2 a framework marker in a split native app still counts for the root (rc=$RC)"
 rm -rf "$D"
-# R16 Codex round 15
+# R16
 # R16-1 a wrapped Apple submit never borrows an Android flag from an echo beside it
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -2993,7 +2993,7 @@ printf '{"name":"r","scripts":{"ship":"./gradlew %s"}}' "$BR" > "$D/package.json
 rr_hook "npm run ship -- --platform android" "$D"
 rr_has 'Command targets Android only' && ok "r16-2 a wrapped submit naming Android itself stays Android only" || bad "r16-2 a wrapped submit naming Android itself stays Android only (rc=$RC)"
 rm -rf "$D"
-# R17 Codex round 16
+# R17
 # R17-1 a submit quoted inside bash -c never takes an Android word from the outer arguments
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -3015,7 +3015,7 @@ rr_run "$D"
 rr_has 'BOTH-SUBSCRIPTION-HARD-CANCEL' && ok "r17-2 evidence split across a split native app still counts" || bad "r17-2 evidence split across a split native app still counts (rc=$RC)"
 [ "$(printf '%s' "$OUT" | grep -c 'BOTH-SUBSCRIPTION-HARD-CANCEL')" -le 1 ] && ok "r17-2b the pooled pass never lists a finding twice" || bad "r17-2b the pooled pass never lists a finding twice"
 rm -rf "$D"
-# R18 Codex round 17
+# R18
 # R18-1 a submit quoted inside any shell, by path or behind env or sudo, never takes the outer Android arguments
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -3044,7 +3044,7 @@ let dev = AVCaptureDevice.default(for: .video)')"
   [ "$RC" -eq 0 ] && rr_has 'Command targets Android only' && ok "r19 bash 3.2 reads an Android submit as Android only" || bad "r19 bash 3.2 reads an Android submit as Android only (rc=$RC)"
   rm -rf "$D"
 fi
-# R20 Codex round 18
+# R20
 # R20-1 a submit inside python -c or ruby -e never takes the outer Android arguments
 D="$(mk_rr_ios '' 'import AVFoundation
 let dev = AVCaptureDevice.default(for: .video)')"
@@ -3062,7 +3062,7 @@ D="$(mk_rr_ios '' 'class A { func signIn() {} }
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r20-2 a deletion after a closing block comment still counts" || bad "r20-2 a deletion after a closing block comment still counts (rc=$RC)"
 rm -rf "$D"
-# R21 Codex round 19
+# R21
 # R21-1 an exclusion-only pnpm filter reads every other package, so the submitting one is found
 D="$(mktemp -d)"; mkdir -p "$D/apps/docs" "$D/apps/mobile/App"
 printf '{"name":"root","private":true}\n' > "$D/package.json"
@@ -3074,14 +3074,14 @@ printf 'import AVFoundation\nlet d = AVCaptureDevice.default(for: .video)\n' > "
 rr_hook "pnpm --filter '!@acme/docs' run ship" "$D"
 [ "$RC" -eq 2 ] && ok "r21-1 an exclusion-only pnpm filter still finds the submitting package" || bad "r21-1 an exclusion-only pnpm filter still finds the submitting package (rc=$RC)"
 rm -rf "$D"
-# R22 Codex round 20
+# R22
 # R22-1 an escaped quote inside a string never hides a deletion written after it
 D="$(mk_rr_ios '' 'let ready = true')"
 printf '%s\n' 'signIn(); const s = "quote: \" // string"; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r22-1 an escaped quote never hides a deletion after it" || bad "r22-1 an escaped quote never hides a deletion after it (rc=$RC)"
 rm -rf "$D"
-# R23 Codex round 21
+# R23
 # R23-1 the pooled pass keeps a critical finding that shares its id with a high one already listed
 D="$(mktemp -d)"; mkdir -p "$D/ios/Main.xcodeproj" "$D/android/app/src/main" "$D/androidRelease/src/main"
 printf '{"name":"r","dependencies":{"react-native":"0.74.0"}}' > "$D/package.json"
@@ -3103,14 +3103,14 @@ printf '%s\n' 'signIn(); const r = /"/; const s = " // "; function deleteAccount
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r23-2 a quote in a regex literal never hides a deletion" || bad "r23-2 a quote in a regex literal never hides a deletion (rc=$RC)"
 rm -rf "$D"
-# R24 Codex round 22
+# R24
 # R24-1 a JS regex literal holding a quote and a space never hides a deletion after it
 D="$(mk_rr_ios '' 'let ready = true')"
 printf '%s\n' 'signIn(); const r = /" /; const s = " // "; function deleteAccount() { return api.deleteUser(); }' > "$D/App/account.js"
 rr_run "$D"
 ! rr_has 'NO-ACCOUNT-DELETION' && ok "r24-1 a regex literal with a space never hides a deletion" || bad "r24-1 a regex literal with a space never hides a deletion (rc=$RC)"
 rm -rf "$D"
-# R25 Codex round 23
+# R25
 # R25-1 removing an inline comment never joins two words into deletion evidence
 D="$(mk_rr_ios '' 'let ready = true')"
 printf '%s\n' 'extern void sendSignup(void);' 'void createAccount(void) { sendSignup(); }' 'typedef int account;' 'account /* cache */deletion = 0;' > "$D/App/Account.m"

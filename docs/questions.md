@@ -1206,7 +1206,7 @@ An index of 1302 answered discussions on App Store and Google Play rejections, p
 - [Interim Measures for AI Anthropomorphic Interactive Services, CAC Order No. 21, China. Regulatory Timeline](https://github.com/mjmirza/app-store-compliance/discussions/1757)
 - [Ionic / Capacitor / Cordova checks. Cross Platform Frameworks](https://github.com/mjmirza/app-store-compliance/discussions/1317)
 - [Kids category and families. By App Type](https://github.com/mjmirza/app-store-compliance/discussions/1277)
-- [Known gaps (found by Codex and Qwen adversarial review, not yet fixed). Cross Platform Frameworks](https://github.com/mjmirza/app-store-compliance/discussions/1329)
+- [Known gaps (found in review, not yet fixed). Cross Platform Frameworks](https://github.com/mjmirza/app-store-compliance/discussions/1329)
 - [Loot box and paid random reward positions. Gambling Matrix](https://github.com/mjmirza/app-store-compliance/discussions/1451)
 - [Louisiana HB 977 (2026), Act No. 185, R.S. 51:1771 to 1775 (App Store Accountability Act), replacing HB 570 (2025), Louisiana (USA State). Regulatory Timeline](https://github.com/mjmirza/app-store-compliance/discussions/1800)
 - [Malware and mobile unwanted software. Google Play](https://github.com/mjmirza/app-store-compliance/discussions/1520)

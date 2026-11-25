@@ -8,7 +8,7 @@ description: How to avoid common App Store and Google Play rejections. Rejection
 **The short answer.** Many rejections trace back to a few documented causes. A demo account that does not work, a privacy declaration that does not match what the app and its SDKs really collect, missing in-app account deletion, digital goods sold outside in-app purchase, and an incomplete or placeholder build. This playbook maps documented rejection patterns to the rule behind each one and the fix, and ships a guard that flags selected risks in your project before you submit.
 
 - **124 rejection patterns** with the guideline, how to detect it in your code, and the fix.
-- **112 tracked deadlines** across 33 jurisdictions and platform scopes, including the EU AI Act, the Digital Services Act, COPPA and US state age laws.
+- **114 tracked deadlines** across 33 jurisdictions and platform scopes, including the EU AI Act, the Digital Services Act, COPPA and US state age laws.
 - **A pre-submission guard** that runs locally or inside AI coding tools like Claude Code, Codex and Cursor.
 - **An honest split** between what the scan proves and what only a person can check, in [What the scan proves](WHAT-THE-SCAN-PROVES.md). A clean scan is not an approval.
 - Free to read. Source on [GitHub](https://github.com/mjmirza/app-store-compliance).
