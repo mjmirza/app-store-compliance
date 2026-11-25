@@ -151,7 +151,7 @@ Apple.
 
 Android.
 
-- [ ] Developer identity verified if the app is distributed to Brazil, Indonesia, Singapore, or Thailand (required since 30 September 2026), and every Play package name registered in Play Console. From the global rollout in January 2027 (month only, tracked as 1 January 2027), starting with Google Play, Galaxy Store, Honor, Oppo, Xiaomi, Transsion, and Vivo and expanding over several months, a package installed outside Play needs a registered developer in every country, as it already does in those four. A limited distribution account shares to 50 authorized devices.
+- [ ] Developer identity verified if the app is distributed to Brazil, Indonesia, Singapore, or Thailand (required since 30 September 2026), and every Play package name registered in Play Console. The global rollout begins in January 2027 (month only, tracked as 1 January 2027) with Google Play, Galaxy Store, Honor, Oppo, Xiaomi, Transsion, and Vivo, then expands over several months. A limited distribution account shares to 50 authorized devices.
 - [ ] Every foreground service declares `foregroundServiceType` in the manifest with the matching permission, and each type is declared in the Play Console with a demo video.
 - [ ] No SafetyNet Attestation. attestation uses the Play Integrity API, verified server-side.
 - [ ] Play Billing Library at version 8 or later (required for new apps and updates since 31 August 2026, extension available to 1 November 2026), and digital goods route through Play Billing.
@@ -182,7 +182,7 @@ The checks above assume the developer account can submit. In 2026 that assumptio
 - [ ] Any individual-to-organization migration was started a quarter ahead (a 61-day open migration was reported on 1 September 2026).
 - [ ] The social media capability question is answered in App Store Connect before uploading a new version.
 - [ ] Google Play account type is Organization with a D-U-N-S number if the app is financial, health, VPN, or government (30 September 2026).
-- [ ] Every distributed Play package name is registered for Android developer verification (30 September 2026). Packages installed outside Play need registration already in Brazil, Indonesia, Singapore and Thailand, and everywhere from the global rollout in January 2027. Google has named the month only.
+- [ ] Every distributed Play package name is registered for Android developer verification (30 September 2026).
 - [ ] Play content rating questionnaire is complete and current (unrated apps are not allowed).
 - [ ] If enrolled in US alternative billing or external links, transaction reporting is wired for 1 October 2026.
 

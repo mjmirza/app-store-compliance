@@ -186,7 +186,7 @@ grep -rn 'VpnService\|HealthConnect\|health\.connect\|BankAccount\|cryptocurrenc
 - Platform. google
 - Guideline or policy. Android developer verification, Play leg (Play Console Help answers 17125096 and 17134731)
 - Severity. critical
-- What triggers it. Every Play app package name must be registered in Play Console for Android developer verification by 30 September 2026. This leg is global. Unregistered Play apps risk global removal from Google Play. Play Console can also register package names distributed outside Google Play. That is required already for installs in Brazil, Indonesia, Singapore and Thailand, and elsewhere from the global rollout in January 2027. Detection is manual in Play Console. Development-build package names that are never distributed do not need registration.
+- What triggers it. Every Play app package name must be registered in Play Console for Android developer verification by 30 September 2026. This leg is global. Unregistered apps risk global removal from Google Play. Detection is manual in Play Console. Development-build package names that are never distributed do not need registration.
 - How to fix it. Open Play Console, complete developer verification, register every distributed package name, and re-check after adding a new applicationId or product flavor.
 - Detection signals. applicationId
 
