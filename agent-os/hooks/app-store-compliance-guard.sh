@@ -1052,6 +1052,7 @@ DT_RE = re.compile(
 # Xcode writes an SDK-conditional key in quotes. Only the device SDK ships, and only a value
 # below the minimum is read from it, so a quoted key can add a finding but never hide one.
 QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([0-9]+)')
+CONDITIONAL_RE = re.compile(r'IPHONEOS_DEPLOYMENT_TARGET\[')
 COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
 NAME_RE = re.compile(r"\s*name = ([^;]+);")
 DEPENDENCY_MARKERS = (
@@ -1079,10 +1080,14 @@ for path in sys.argv[1:]:
         settings = block.group(1)
         flags = below(settings)
         name = NAME_RE.match(text, block.end())
-        is_app = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
-        # Only the Release configuration of an app, and never a commented-out line.
-        if is_app and name and name.group(1).strip().strip('"').lower() == "release":
-            flags += [True for value in QDT_RE.findall(COMMENT_RE.sub(" ", settings)) if int(value) < 13]
+        live = COMMENT_RE.sub(" ", settings)
+        # Only the Release configuration of an app with its own bundle id, and only when no
+        # other conditional deployment key could override the quoted one.
+        certain = ("PRODUCT_BUNDLE_IDENTIFIER" in live
+                   and not any(marker in live for marker in DEPENDENCY_MARKERS)
+                   and len(CONDITIONAL_RE.findall(live)) == len(QDT_RE.findall(live)))
+        if certain and name and name.group(1).strip().strip('"').lower() == "release":
+            flags += [True for value in QDT_RE.findall(live) if int(value) < 13]
         if not flags:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
