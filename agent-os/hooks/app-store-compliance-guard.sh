@@ -714,11 +714,22 @@ def read_template(code, i):
 
 
 def in_code(code, i):
-    # A string is code when an operator, a bracket or return comes before it. A word before it means prose.
+    # A string is code when an operator, a bracket, an arrow or return comes before it. A word before it
+    # means prose, and so does a run of JSX text, the text after the closing > of a tag.
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
         k -= 1
-    if k < 0 or code[k] in "=(,:[?{|&+!;":
+    if k < 0:
+        return True
+    c = code[k]
+    if c == ">":
+        return k > 0 and code[k - 1] == "="
+    if c == ":":
+        j = k - 1
+        while j >= 0 and code[j] not in "{(,;[=?>":
+            j -= 1
+        return j < 0 or code[j] != ">" or (j > 0 and code[j - 1] == "=")
+    if c in "=(,[?{|&+!;":
         return True
     return code[max(0, k - 5):k + 1] == "return"
 
@@ -772,8 +783,7 @@ ios_google_signin() {
         if (inc) { i = index(line, "*/"); if (!i) next; line = substr(line, i + 2); inc = 0 }
         while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
           if (j) line = substr(line, 1, i - 1) substr(rest, j + 2); else { line = substr(line, 1, i - 1); inc = 1 } }
-        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && line !~ /import[[:space:]]+type/) { print FILENAME; nextfile } }' 2>/dev/null \
-    | tr '\n' '\0' | xargs -0 grep -lE 'GoogleSignin[.]|<GoogleSigninButton' 2>/dev/null \
+        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && line !~ /import[[:space:]]+type/ && line !~ /import[[:space:]]*[{]([[:space:]]*type[[:space:]]+[A-Za-z0-9_$]+([[:space:]]+as[[:space:]]+[A-Za-z0-9_$]+)?[[:space:]]*,?)+[[:space:]]*[}]/) { print FILENAME; nextfile } }' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
