@@ -471,7 +471,7 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
   [ -n "$out" ]
 }
 
-APPLE_SRC_RE='[.](swift|m|mm)$'
+APPLE_SRC_RE='[.](swift|m|mm|h)$'
 apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flutter and JS share names like Image( and Button
   [ -s "$FILELIST" ] || return 1
   local out

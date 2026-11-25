@@ -3186,6 +3186,8 @@ D="$(gs_ios Card.kt 'Image(painter = logo, contentDescription = null)')"
 gs_check "a11y-1 a Compose Image in Kotlin is not a SwiftUI Image" "$D" 'APPLE-ACCESSIBILITY-VOICEOVER' 0
 D="$(gs_ios Logo.swift 'let logo = Image("logo")')"
 gs_check "a11y-2 a SwiftUI Image without a label is flagged" "$D" 'APPLE-ACCESSIBILITY-VOICEOVER' 1
+D="$(gs_ios Controls.h '@interface Controls : UIViewController @property(nonatomic,weak) IBOutlet UIButton *save; @end')"
+gs_check "a11y-h an Objective-C header outlet stays an Apple source" "$D" 'APPLE-ACCESSIBILITY-HAPTICS' 1
 D="$(gs_ios Card.kt 'Button(onClick = { save() }) { Text("Save") }')"
 gs_check "a11y-3 a Compose Button in Kotlin is not a SwiftUI Button" "$D" 'APPLE-ACCESSIBILITY-HAPTICS' 0
 D="$(gs_ios Save.swift 'let save = Button("Save") { store.save() }')"
