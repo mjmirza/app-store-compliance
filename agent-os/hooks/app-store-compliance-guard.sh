@@ -1014,6 +1014,7 @@ SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|<GoogleSigninButton|Go
 ORDER = ("js", "jsx", "ts", "tsx")
 SQ, DQ, BT, ST, SL, BS, NL = chr(39), chr(34), chr(96), chr(42), chr(47), chr(92), chr(10)
 CUSTOM = os.environ.get("ASCG_CUSTOM") == "1"
+TYPE_RE = re.compile(r"typeof\s+GoogleSignin[.]\w+|import\s+type\s[^;]*")
 
 
 def strip(code):
@@ -1070,7 +1071,8 @@ for path in sys.stdin.read().splitlines():
             code = fh.read()
     except OSError:
         continue
-    if SIG.search(strip(code)):
+    # A type position emits no runtime call, so typeof and import type references do not count.
+    if SIG.search(TYPE_RE.sub(" ", strip(code))):
         print(path)
         break
 GSIPY
