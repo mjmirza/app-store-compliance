@@ -549,28 +549,30 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
+# RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
+  RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f
+  local f m
   while IFS= read -r f; do
+    # Removed lines print empty, so a line number counts the lines of a DEBUG block too.
     case "$f" in
       *.swift)
-        awk '
-          /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } next }
-          /^[ \t]*#else/  { if (skip && d==dbg) skip=0; next }
-          /^[ \t]*#elseif/ { next }
-          /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; next }
-          !skip { print }
-        ' "$f" 2>/dev/null ;;
-      *) cat "$f" 2>/dev/null ;;
+        m="$(awk '
+          /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } print ""; next }
+          /^[ \t]*#else/  { if (skip && d==dbg) skip=0; print ""; next }
+          /^[ \t]*#elseif/ { print ""; next }
+          /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; print ""; next }
+          skip { print ""; next }
+          { print }
+        ' "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+      *) m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)" ;;
     esac
-  done < "${SHIPLIST:-$FILELIST}" \
-    | LC_ALL=C grep -E "\"[^\"]*($1)[^\"]*\"" >/dev/null 2>&1 && return 0
-  # NOTE. no `grep -q`. With `set -o pipefail`, `grep -q` exits on the first match and
-  # closes the pipe, so the still-writing awk/cat producer gets SIGPIPE (141) and pipefail
-  # then reports the whole pipeline non-zero even though grep matched. That made this check
-  # silently miss on the CI runner (GNU grep, timing-dependent) while passing on a fast local
-  # machine. Draining all input with plain grep and returning its status is deterministic.
+    # NOTE. no `grep -q` or `-m 1`. Either one stops reading early, the awk producer gets SIGPIPE,
+    # and pipefail reports a miss though grep matched (timing-dependent, seen on the CI runner).
+    # Plain grep drains its input. Only the captured output is read, never the exit status.
+    if [ -n "$m" ]; then RELEASE_HIT="${f#"${DIR%/}"/}:${m%%:*}"; return 0; fi
+  done < "${SHIPLIST:-$FILELIST}"
   js_quoted_string_has "$1"
 }
 
@@ -724,8 +726,8 @@ def in_code(code, i, e):
         m += 1
     if m < len(code) and code[m] == "<":
         return False
-    # A word right before the string means prose, unless it is return. Otherwise the nearest of { } ; = or a
-    # tag-closing > decides. A > that ends a type argument, as in get<User>(), is code and is passed over.
+    # A word right before the string means prose, unless it is return. Otherwise the nearest of { ; = or a
+    # tag-closing > decides. A type argument such as get<User>() and a braced pair are passed over.
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
         k -= 1
@@ -744,7 +746,19 @@ def in_code(code, i, e):
                 j = lt - 1
                 continue
             return False
-        if c in "{};=":
+        if c == RB:
+            depth = 0
+            while j >= 0:
+                if code[j] == RB:
+                    depth += 1
+                elif code[j] == LB:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j -= 1
+            j -= 1
+            continue
+        if c in (LB, ";", "="):
             return True
         j -= 1
     return True
@@ -759,14 +773,14 @@ def literals(code):
             i = e
         elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
             e = read_quoted(code, i, c)
-            yield code[i:e], in_code(code, i, e)
+            yield code[i:e], in_code(code, i, e), i
             i = e
         elif c == SL and skip_regex(code, i) is not None:
             i = skip_regex(code, i)
         elif c == BT:
             start = i
             i, t = read_template(code, i)
-            yield t, in_code(code, start, i)
+            yield t, in_code(code, start, i), start
         else:
             i += 1
 
@@ -777,13 +791,15 @@ for path in sys.argv[1:]:
             code = fh.read()
     except OSError:
         continue
-    for text, code_position in literals(code):
+    for text, code_position, at in literals(code):
         if text[0] in (SQ, BT) and code_position and staged_url(text):
-            print(path)
+            print(path + chr(58) + str(code.count(NL, 0, at) + 1))
             sys.exit(0)
 JSSTRPY
   )" 2>/dev/null)"
-  [ -n "$hit" ]
+  [ -n "$hit" ] || return 1
+  hit="$(printf %s "$hit" | head -1)"
+  RELEASE_HIT="${hit#"${DIR%/}"/}"
 }
 
 # The React Native GoogleSignin export counts only where it can reach the iOS build.
@@ -791,7 +807,7 @@ ios_google_signin() {
   [ -s "$FILELIST" ] || return 1
   # A file is replaced on iOS by an .ios or .native sibling whose extension Metro tries no later, in its
   # default order js, jsx, json, ts, tsx. A metro.config that sets sourceExts changes the order, so then
-  # nothing is left out beyond .android files.
+  # any .ios or .native sibling leaves the file out, since the order can no longer be read.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
   grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'FNR == 1 { inc = 0; stmt = "" }
@@ -805,34 +821,70 @@ ios_google_signin() {
         if (line ~ /from|;/) stmt = "" }' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
+import re
 import sys
 
 ORDER = ["js", "jsx", "json", "ts", "tsx"]
 custom = os.environ.get("ASCG_CUSTOM") == "1"
+keep = []
 for path in sys.stdin.read().splitlines():
     base, ext = os.path.splitext(path)
     ext = ext[1:]
     stem, plat = os.path.splitext(base)
     plat = plat[1:]
-    if plat == "ios" or custom or ext not in ORDER:
-        print(path)
+    if plat == "ios" or ext not in ORDER:
+        keep.append(path)
         continue
     if plat != "native":
         stem, plat = base, ""
     rivals = ["ios"] if plat == "native" else ["ios", "native"]
-    limit = ORDER.index(ext)
+    limit = len(ORDER) - 1 if custom else ORDER.index(ext)
     if not any(os.path.exists(stem + chr(46) + r + chr(46) + e) for r in rivals for e in ORDER[:limit + 1]):
+        keep.append(path)
+IDC = "[A-Za-z0-9_" + chr(36) + "]"
+IMPORT_RE = re.compile(r"import\s+([^;]*?)\s*from\s*[" + chr(34) + chr(39) + r"]@react-native-google-signin/", re.S)
+
+
+def runtime_use(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            code = fh.read()
+    except OSError:
+        return True
+    if re.search(r"require\s*\(\s*.@react-native-google-signin/", code):
+        return True
+    names = []
+    for clause in IMPORT_RE.findall(code):
+        clause = re.sub(r"\{[^}]*\}", lambda m: m.group(0).replace(",", " , "), clause)
+        for part in re.split(r"[,{}]", clause):
+            words = part.split()
+            if not words or words[0] == "type":
+                continue
+            names.append(words[-1])
+    body = IMPORT_RE.sub(" ", code)
+    for name in names:
+        n = re.escape(name)
+        if re.search("(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body) or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body):
+            return True
+    return False
+
+
+for path in keep:
+    if runtime_use(path):
         print(path)
 GSIPY
     )" 2>/dev/null | grep . >/dev/null
 }
 
-# Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
+# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship or manifest.
+# ship reads SHIPLIST, so a check that leaves test files out never names one (issue #2397).
 hit_file() {
   [ -s "$FILELIST" ] || return 0
   local f n
   if [ "$1" = "manifest" ]; then
     f="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  elif [ "$1" = "ship" ]; then
+    f="$(tr '\n' '\0' < "${SHIPLIST:-$FILELIST}" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   else
     f="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   fi
@@ -843,11 +895,11 @@ hit_file() {
 
 # Findings are held and printed by flush_findings, critical first (issue #842).
 F_CRIT=(); F_HIGH=(); F_MED=(); FOUND_IDS=""; POOL_PASS=0
-finding() {  # severity id title fix [src|manifest regex]. The optional pair names the file that triggered it.
+finding() {  # severity id title fix [src|manifest regex | at file:line]. The optional pair names the file that triggered it.
   local t w=""
   case "$FOUND_IDS" in *"|$1:$2|"*) [ "$POOL_PASS" -eq 1 ] && return 0 ;; esac
   FOUND_IDS="$FOUND_IDS|$1:$2|"
-  [ -n "${5:-}" ] && w="$(hit_file "$5" "${6:-}")"
+  case "${5:-}" in at) w="${6:-}" ;; ?*) w="$(hit_file "$5" "${6:-}")" ;; esac
   case "$1" in
     critical) CRIT=$((CRIT+1)); t="  [CRITICAL] $2  $3" ;;
     high)     HIGH=$((HIGH+1)); t="  [HIGH]     $2  $3" ;;
@@ -970,8 +1022,22 @@ ROUTE_KEEP='^$'
 grep '/package[.]json$' "$FILELIST" 2>/dev/null | tr '\n' '\0' | xargs -0 grep -Il '"expo-router"' 2>/dev/null | grep . >/dev/null && ROUTE_KEEP='/app/'
 # Test files stay in the source list, so they still count as evidence the way they always did.
 # Only the release-string checks (staging host, placeholder text) read SHIPLIST, which leaves them out.
+# CI config, end-to-end flows and npm scripts never ship either, imported or not (issue #2397).
+# Matched below the project root, so a project that itself sits in a folder named e2e is still read.
+NOSHIP_RE='(^|/)([.]github|[.]circleci|[.]gitlab|[.]buildkite|[.]maestro|__e2e__|e2e)/|(^|/)([.]gitlab-ci|bitrise|codemagic|[.]travis|azure-pipelines)[.]ya?ml$'
+# package.json ships only when code imports or requires it. Any path naming package.json counts, an
+# extensionless one through a relative or alias path. Vue, Svelte, Astro and .mjs files are not in the source list, so they are found here too.
+{ grep -v '/package[.]json$' "$FILELIST" 2>/dev/null
+  find "$DIR" -mindepth 1 -maxdepth 8 \( -type d \( -name node_modules -o -name .git -o -name Pods -o -name build -o -name dist -o -name DerivedData -o -name vendor \) -prune \) \
+    -o -type f \( -name '*.vue' -o -name '*.svelte' -o -name '*.astro' -o -name '*.mjs' -o -name '*.cjs' \) -print 2>/dev/null; } \
+  | tr '\n' '\0' | xargs -0 grep -IlE "['\"\`]([^'\"\`]*package[.]json|[^'\"\`]*/package)([?][^'\"\`]*)?['\"\`]" 2>/dev/null | grep . >/dev/null \
+  || NOSHIP_RE="$NOSHIP_RE|(^|/)package[.]json\$"
+SHIP_TEST_RE='^$'
+[ -z "$TEST_IMPORTERS" ] && SHIP_TEST_RE="$JS_TEST_RE"
 SHIPLIST="$FILELIST"
-if [ -z "$TEST_IMPORTERS" ] && awk -v t="$JS_TEST_RE" -v k="$ROUTE_KEEP" '$0 !~ t || $0 ~ k' "$FILELIST" > "$FILELIST.ship" 2>/dev/null; then
+if awk -v root="${DIR%/}/" -v n="$NOSHIP_RE" -v t="$SHIP_TEST_RE" -v k="$ROUTE_KEEP" \
+     '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } (p !~ n && $0 !~ t) || $0 ~ k' \
+     "$FILELIST" > "$FILELIST.ship" 2>/dev/null && ! cmp -s "$FILELIST" "$FILELIST.ship"; then
   SHIPLIST="$FILELIST.ship"
 fi
 build_blob
@@ -1081,7 +1147,7 @@ fi
 # `placeholder:` parameter and a "TODO"/"FIXME" matches normal dev comments, neither of which is a
 # rejection cause, so match real placeholder markers a reviewer would actually see.
 if ship_has 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'; then
-  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." src 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
+  finding high "BOTH-PLACEHOLDER" "Placeholder content (lorem ipsum, example.com, dummy text) found in sources" "Replace placeholder text and assets with real content." ship 'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
 fi
 # ROSCA and CA/NY/MA negative-option laws bind regardless of the vacated federal rule.
 # "call" and "write" match as whole words only, or "renews automatically until cancelled" and
@@ -1190,7 +1256,7 @@ fi
 # Gated like the framework checks, so an Android-only command never meets an Apple finding.
 if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
-    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." src 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'
+    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." at "$RELEASE_HIT"
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
     if ! impl_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
