@@ -4,6 +4,10 @@ All notable changes to this playbook are recorded here. The format follows Keep 
 
 ## Unreleased
 
+### Added
+
+- `APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS`. An auto-renewable subscription with no Terms of Use or EULA link in the app. Schedule 2 section 3.8(b) of the Apple Developer Program License Agreement says links to the Privacy Policy and the Terms of Use must be accessible within the app, and guideline 3.1.2(c) points to it. `docs/COMPETITIVE-GAP-ANALYSIS.md` listed this gap, but no pattern or check existed.
+
 ### Fixed
 
 - The READ_CALL_LOG phone-call account verification cutoff is 27 January 2027, not 26 August 2026. Play Console Help answer 10208820 and the 29 October 2026 announcement (answer 18100766) set that date. Until then the exceptions table still lists the use case. The replacements are the Digital Credentials API, either directly or through a verification provider built upon it, the SMS Retriever API, and the SMS User Consent API. Added `GOOGLE-PLAY-CALL-LOG-VERIFICATION-2027`. The 15 July 2026 announcement (answer 17134731) named the change and did not state this date. The other 26 August 2026 items are unchanged.

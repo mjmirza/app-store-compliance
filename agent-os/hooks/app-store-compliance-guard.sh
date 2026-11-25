@@ -1113,6 +1113,10 @@ PBXPY
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
+  # Developer Program License Agreement Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
+  if grep_has 'subscriptionPeriod|SubscriptionStoreView|\.autoRenewable|getSubscriptions\(|requestSubscription\('; then
+    grep_has '[Tt]erms[ _-]?[Oo]f[ _-]?([Uu]se|[Ss]ervice)|EULA|[Ee]ula' || finding high "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|SubscriptionStoreView|\.autoRenewable|getSubscriptions\(|requestSubscription\('
+  fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'
   fi

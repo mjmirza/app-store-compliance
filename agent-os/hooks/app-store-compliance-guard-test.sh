@@ -3266,6 +3266,17 @@ let c = CKContainer.default()')"
 gs_check "health-1 HealthKit plus CloudKit is flagged" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 1
 D="$(gs_ios H.swift 'let s = HKHealthStore()')"
 gs_check "health-2 HealthKit alone stays silent" "$D" 'APPLE-5.1.3-HEALTH-DATA-ICLOUD' 0
+# Schedule 2 section 3.8(b). An auto-renewable subscription needs Terms of Use and Privacy Policy links in the app.
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod')"
+gs_check "subt-1 a subscription with no Terms of Use link is flagged" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Link("Terms of Use", destination: URL(string: "https://realbackend.io/terms")!)')"
+gs_check "subt-2 a Terms of Use link stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'SubscriptionStoreView(groupID: group)
+let eula = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")')"
+gs_check "subt-3 the Apple standard EULA link stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Store.swift 'let result = try await coins.purchase()')"
+gs_check "subt-4 a one-time purchase with no subscription stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
 
 D="$(mk_android_perm '<application android:debuggable="true"/>')"
 gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1
