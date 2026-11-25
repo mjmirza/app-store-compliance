@@ -1013,14 +1013,17 @@ SIWAPY
     local pf
     pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
     [ -n "$pf" ] || return 1
-    printf '%s\n' "$pf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PBXPY'
+    # Whether any xcconfig in the project sets a deployment target, for app configurations built on one.
+    local xcdt=0
+    grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'IPHONEOS_DEPLOYMENT_TARGET' 2>/dev/null | grep . >/dev/null && xcdt=1
+    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" xargs -0 python3 -c "$(cat <<'PBXPY'
+import os
 import re
 import sys
 
 BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;(.*?)buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
 )
-VAR_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?(\$[^;\"\n]*)")
 DT_RE = re.compile(
     r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
@@ -1045,10 +1048,50 @@ def majors(settings):
     return vals
 
 
-def unresolved(settings):
-    # A device value built from a variable, other than inherited, cannot be read here.
+COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
+ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
+XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
+
+
+def resolve(settings, name):
+    # The value Xcode builds this configuration with. A condition naming another configuration or the simulator
+    # does not apply, and an arch condition, a wildcard config or a variable cannot be read here.
+    plain = matched = None
+    unknown = False
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    return any("iphonesimulator" not in cond and "inherited" not in value for cond, value in VAR_RE.findall(settings))
+    for cond, value in COND_RE.findall(settings):
+        applies = True
+        for c in re.findall(r"\[([^\]]*)\]", cond):
+            key, _, val = c.partition("=")
+            key, val = key.strip(), val.strip()
+            if key == "sdk":
+                applies = applies and (val == "*" or val.startswith("iphoneos"))
+            elif key == "config" and "*" not in val:
+                applies = applies and val == name
+            else:
+                unknown = True
+        if not applies:
+            continue
+        value = value.strip()
+        if value.startswith("$"):
+            if "inherited" not in value:
+                unknown = True
+            continue
+        num = re.match(r"([0-9]+)", value)
+        if not num:
+            unknown = True
+            continue
+        if cond:
+            matched = int(num.group(1))
+        else:
+            plain = int(num.group(1))
+    if unknown:
+        return "unknown", None
+    if matched is not None:
+        return "value", matched
+    if plain is not None:
+        return "value", plain
+    return "none", None
 
 
 worst = 0
@@ -1060,65 +1103,53 @@ for path in sys.argv[1:]:
             text = fh.read()
     except OSError:
         continue
-    def app_block(settings):
-        named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
-        return named and not any(marker in settings for marker in DEPENDENCY_MARKERS)
-
-    def collect(blocks):
-        app, project, has_app, app_var, project_var = [], [], False, False, False
-        for _, settings, _ in blocks:
-            named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
-            is_app = named and not any(marker in settings for marker in DEPENDENCY_MARKERS)
-            has_app = has_app or is_app
-            app_var = app_var or (is_app and unresolved(settings))
-            project_var = project_var or (not named and unresolved(settings))
-            vals = majors(settings)
-            if vals and named:
-                if is_app:
-                    app.extend(vals)
-            elif vals:
-                project.extend(vals)
-        return app, project, has_app, app_var, project_var
-
     blocks = BLOCK_RE.findall(text)
     # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
-    app, project, _, _, _ = collect(blocks)
-    if any(v < 13 for v in (app if app else project)):
+    app13, project13 = [], []
+    for _, settings, _ in blocks:
+        named = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
+        vals = majors(settings)
+        if named and not any(marker in settings for marker in DEPENDENCY_MARKERS):
+            app13.extend(vals)
+        elif not named:
+            project13.extend(vals)
+    if any(v < 13 for v in (app13 if app13 else project13)):
         worst = 13
         break
-    # The advisory iOS 15 warning leaves Debug configurations out, since an upload never builds them.
-    shipped = [b for b in blocks if b[2].strip().lower() != "debug"] or blocks
-    app, project, has_app, app_var, project_var = collect(shipped)
-    # Each shipped configuration decides on its own. Its app value wins, otherwise the project value of the
-    # same name is inherited. Within one configuration the highest conditional value counts, and the
-    # lowest configuration decides, so a Staging at 15 never hides a Release at 14.
-    per_config = []
-    for name in sorted({b[2] for b in shipped}):
-        named_blocks = [b for b in shipped if b[2] == name]
-        c_app, c_project, _, _, _ = collect(named_blocks)
-        # An app configuration with no value of its own, built on an xcconfig file, takes its value
-        # from that file, which is unknown here, so this configuration does not decide.
-        if not c_app and any("baseConfigurationReference" in b[0] and app_block(b[1]) for b in named_blocks):
+    # The iOS 15 warning skips Debug configurations (Debug, Debug-staging). Each app target and configuration
+    # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
+    names = {b[2] for b in blocks}
+    shipped = {n for n in names if "debug" not in n.lower()} or names
+    project, apps = {}, {}
+    for prefix, settings, name in blocks:
+        if name not in shipped:
             continue
-        c_chosen = c_app if c_app else c_project
-        if c_chosen:
-            per_config.append(max(c_chosen))
-    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
-    chosen = [min(per_config)] if per_config else []
-    # Advisory, so it warns only when no app setting reaches 15. Configs and conditions can override.
-    # A project with no app target, such as a local framework or library, never decides the iOS 15 status.
-    if not has_app:
+        named = ID_RE.search(settings)
+        if not named:
+            project[name] = resolve(settings, name)
+        elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
+            apps[(named.group(1).strip(), name)] = (resolve(settings, name), "baseConfigurationReference" in prefix)
+    if not apps:
         continue
-    # An app value set from a variable cannot be checked, and this warning is advisory, so stay quiet.
-    # A project-level variable decides too when no app target sets its own value.
-    if app_var or (not app and project_var):
-        ok15 = True
-        continue
-    if chosen and max(chosen) < 15:
+    certain, unknown = [], False
+    for (_, name), (state, has_xc) in apps.items():
+        if state[0] == "value":
+            certain.append((state[1], False))
+        elif state[0] == "unknown" or (has_xc and XC_SETS):
+            # An xcconfig in the project sets a target, so an app built on one may take its value from it.
+            unknown = True
+        else:
+            inherited = project.get(name, ("none", None))
+            if inherited[0] == "value":
+                certain.append((inherited[1], True))
+            elif inherited[0] == "unknown":
+                unknown = True
+    low = [inh for v, inh in certain if v < 15]
+    if low:
         worst = 15
         # A project-level value is inherited, so a target xcconfig can still override it.
-        weak15 = weak15 and not app
-    elif chosen:
+        weak15 = weak15 and all(low)
+    elif certain or unknown:
         ok15 = True
 if worst == 13:
     print("below13")
