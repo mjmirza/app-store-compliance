@@ -713,21 +713,37 @@ def read_template(code, i):
     return n, "".join(out)
 
 
-def in_code(code, i):
+def ident(c):
+    return c.isalnum() or c in ("_", chr(36))
+
+
+def in_code(code, i, e):
+    # A string right before a closing tag sits in JSX text and stays prose.
+    m = e
+    while m < len(code) and code[m] in (chr(32), chr(9), chr(10), chr(13)):
+        m += 1
+    if m < len(code) and code[m] == "<":
+        return False
     # A word right before the string means prose, unless it is return. Otherwise the nearest of { } ; = or a
-    # bare > decides. A bare > closes a JSX tag, so the string sits in JSX text and stays prose.
+    # tag-closing > decides. A > that ends a type argument, as in get<User>(), is code and is passed over.
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
         k -= 1
     if k < 0:
         return True
-    if code[k].isalnum() or code[k] in ("_", chr(36)):
+    if ident(code[k]):
         return code[max(0, k - 5):k + 1] == "return"
     j = k
     while j >= 0:
         c = code[j]
         if c == ">":
-            return j > 0 and code[j - 1] in "=-"
+            if j > 0 and code[j - 1] in "=-":
+                return True
+            lt = code.rfind("<", 0, j)
+            if lt > 0 and ident(code[lt - 1]):
+                j = lt - 1
+                continue
+            return False
         if c in "{};=":
             return True
         j -= 1
@@ -743,14 +759,14 @@ def literals(code):
             i = e
         elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
             e = read_quoted(code, i, c)
-            yield code[i:e], in_code(code, i)
+            yield code[i:e], in_code(code, i, e)
             i = e
         elif c == SL and skip_regex(code, i) is not None:
             i = skip_regex(code, i)
         elif c == BT:
             start = i
             i, t = read_template(code, i)
-            yield t, in_code(code, start)
+            yield t, in_code(code, start, i)
         else:
             i += 1
 
@@ -783,9 +799,9 @@ ios_google_signin() {
         if (inc) { i = index(line, "*/"); if (!i) next; line = substr(line, i + 2); inc = 0 }
         while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
           if (j) line = substr(line, 1, i - 1) substr(rest, j + 2); else { line = substr(line, 1, i - 1); inc = 1 } }
-        if (line ~ /^[[:space:]]*import([[:space:]]|[{]|$)/) stmt = line; else if (stmt != "") stmt = stmt " " line
+        if (line ~ /^[[:space:]]*(import|export)([[:space:]]|[{]|$)/) stmt = line; else if (stmt != "") stmt = stmt " " line
         full = (stmt != "") ? stmt : line
-        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && full !~ /import[[:space:]]+type/ && full !~ /import[[:space:]]*[{]([[:space:]]*type[[:space:]]+[A-Za-z0-9_$]+([[:space:]]+as[[:space:]]+[A-Za-z0-9_$]+)?[[:space:]]*,?)+[[:space:]]*[}]/) { print FILENAME; nextfile }
+        if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && full !~ /(import|export)[[:space:]]+type/ && full !~ /(import|export)[[:space:]]*[{]([[:space:]]*type[[:space:]]+[A-Za-z0-9_$]+([[:space:]]+as[[:space:]]+[A-Za-z0-9_$]+)?[[:space:]]*,?)+[[:space:]]*[}]/) { print FILENAME; nextfile }
         if (line ~ /from|;/) stmt = "" }' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
