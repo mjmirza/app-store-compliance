@@ -1184,6 +1184,26 @@ else
   echo "$OUT"
 fi
 rm -rf "$MORE_DIR"
+# A TouchDelegate in the app can widen a view, so a wrapped file stays silent as before.
+TD_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><ImageButton android:layout_width="24dp" android:layout_height="24dp" /></FrameLayout>\n' > "$TD_DIR/td.xml"
+printf 'class A { void f() { parent.setTouchDelegate(new TouchDelegate(rect, button)); } }\n' > "$TD_DIR/A.java"
+OUT=$($AUDIT "$TD_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a TouchDelegate in the app keeps a wrapped layout silent"
+else
+  bad "a TouchDelegate in the app keeps a wrapped layout silent"
+  echo "$OUT"
+fi
+rm -f "$TD_DIR/A.java"
+OUT=$($AUDIT "$TD_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ]; then
+  ok "without a TouchDelegate the same layout is still reported"
+else
+  bad "without a TouchDelegate the same layout is still reported"
+  echo "$OUT"
+fi
+rm -rf "$TD_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"

@@ -786,6 +786,16 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
+        touch_delegate = False
+        for f in android_files:
+            if f.endswith((".java", ".kt")):
+                try:
+                    with open(f, encoding="utf-8", errors="ignore") as fh:
+                        if "TouchDelegate" in fh.read():
+                            touch_delegate = True
+                            break
+                except OSError:
+                    continue
         for f in android_files:
             if f.endswith(".xml"):
                 try:
@@ -808,6 +818,10 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     # No wrapped axis in the file. Unchanged, every small explicit dimension is reported.
                     for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
                         add_finding(match.group(0), match.start())
+                    continue
+                # A TouchDelegate anywhere in the app can widen a view past its declared size, so the
+                # declared size is not the touch area and the file stays silent, as it did before.
+                if touch_delegate:
                     continue
                 # A wrapped axis used to hide the whole file. Now report controls that are clearly
                 # interactive, judged per element, where an explicit size wins over minWidth.
