@@ -1,6 +1,6 @@
 {
   "version": "2.5.2",
-  "updated": "2026-11-23",
+  "updated": "2026-11-25",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -571,7 +571,7 @@
       "id": "ANDROID-DEVELOPER-VERIFICATION",
       "jurisdiction": "Android (Brazil, Indonesia, Singapore, Thailand)",
       "law": "Android Developer Verification Policy",
-      "requirement": "Sideloading leg. from 30 September 2026 apps installed on certified devices in Brazil, Indonesia, Singapore, and Thailand must be registered to a verified developer identity (Android Developer Console, USD 25 for full distribution, free limited-distribution accounts up to 20 devices, D-U-N-S for organizations). Global expansion is stated only as 2027 with no exact date published. The separate Play leg (register every Play package name in Play Console by 30 September 2026, global) is GOOGLE-PLAY-APP-PACKAGE-REGISTRATION.",
+      "requirement": "Sideloading leg. from 30 September 2026 apps installed on certified devices in Brazil, Indonesia, Singapore, and Thailand must be registered to a verified developer identity (Android Developer Console, USD 25 for full distribution, free limited-distribution accounts for students and hobbyists sharing to 50 authorized devices, D-U-N-S for organizations). The 19 November 2026 Android Developers Blog states that sharing limit was expanded from 20 to 50. The global rollout begins in January 2027 and is tracked as ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027. The separate Play leg (register every Play package name in Play Console by 30 September 2026, global) is GOOGLE-PLAY-APP-PACKAGE-REGISTRATION.",
       "effective_date": "2026-03-15",
       "grace_period": "6 months",
       "mandatory_date": "2026-09-30",
@@ -580,7 +580,9 @@
       "priority": "critical",
       "absorbed_into": "docs/PLATFORM-MECHANICS-2026.md section 2.1, references/rules/android.md",
       "source_url": "https://developer.android.com/developer-verification",
-      "verified_on": "2026-11-14"
+      "verified_on": "2026-11-25",
+      "source_note": "Re-read on 25 November 2026. The page still says protections begin 30 September 2026 for participating stores in Brazil, Indonesia, Singapore, and Thailand on certified devices running Android 8 (API level 26) or higher, and that user protections continue rolling out globally in 2027. It does not name January. A resource card on the same page still says limited distribution accounts share apps with up to 20 devices. The 50-device limit and the January 2027 start were read the same day on https://developer.android.com/blog/posts/android-developer-verification-2027 and are tracked as ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027. This page does not restate the USD 25 fee carried from the 14 November 2026 read.",
+      "history": "2026-11-25. The sharing limit in this sentence was 20 devices. The 19 November 2026 blog states it was expanded from 20 to 50 authorized devices. The sentence that global expansion was stated only as 2027 with no exact date is withdrawn. Google has since named January 2027, with no day, on that blog."
     },
     {
       "id": "GOOGLE-PLAY-PHOTO-VIDEO-PERM",
@@ -694,7 +696,7 @@
       "id": "GOOGLE-PLAY-APP-PACKAGE-REGISTRATION",
       "jurisdiction": "Google Play (Global)",
       "law": "Android developer verification, Play leg. register every Play app package name in Play Console (Play Console Help answers 17125096 and 17134731)",
-      "requirement": "Register your app package names via Play Console to comply with Android developer verification. This leg is global and separate from the Brazil, Indonesia, Singapore, Thailand sideloading leg. Non-registration risks global removal from Google Play.",
+      "requirement": "Register your app package names via Play Console to comply with Android developer verification. This leg is global and separate from the Brazil, Indonesia, Singapore, and Thailand sideloading leg. The same 15 July 2026 announcement says Play Console can also register apps distributed outside Google Play so they can be installed on certified Android devices. Non-registration of a Play app risks global removal from Google Play. The January 2027 start of user protections on certified devices is ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027.",
       "effective_date": "2026-07-15",
       "grace_period": "until 30 September 2026",
       "mandatory_date": "2026-09-30",
@@ -703,7 +705,9 @@
       "priority": "critical",
       "absorbed_into": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2",
       "source_url": "https://support.google.com/googleplay/android-developer/answer/17134731",
-      "verified_on": "2026-11-14"
+      "verified_on": "2026-11-25",
+      "source_note": "Re-read on 25 November 2026. The 15 July 2026 announcement still says register Play apps in Play Console, that 99 percent were registered automatically, and that Play Console can also register apps distributed outside Google Play. It does not state the January 2027 global rollout. That date is on the 19 November 2026 blog, tracked as ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027. https://developer.android.com/blog/posts/android-developer-verification-2027",
+      "history": "2026-11-25. The 30 September 2026 date is unchanged. The requirement now records the outside-Play registration sentence that was already on the 15 July 2026 announcement, and points at the January 2027 global rollout."
     },
     {
       "id": "GOOGLE-US-ALT-BILLING-FEE-REPORTING",
@@ -1695,6 +1699,21 @@
       "source_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283503",
       "verified_on": "2026-11-23",
       "source_note": "law.go.kr loads the decree body by script. The text of Decree No. 36121 was read from its body endpoint for the same lsiSeq. Its Supplementary Provisions put the decree in force six months after promulgation (20 August 2026) and Article 42-2(1)(1) one year after promulgation, and law.go.kr annotates that item [시행일: 2027. 2. 20.]."
+    },
+    {
+      "id": "ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027",
+      "jurisdiction": "Android (Global)",
+      "law": "Android developer verification, global rollout (Android Developers Blog, 19 November 2026)",
+      "requirement": "The global rollout of Android developer verification user protections begins in January 2027 with seven app distributors (Google Play, Galaxy Store, Honor, Oppo, Xiaomi, Transsion, and Vivo). User protections then continue to expand to all countries and to all installation sources on certified Android devices over several months. Google has published the month only, no exact day, so this entry is tracked as 1 January 2027 and must be re-checked when Google names the date. It is the start of that rollout, not a single day on which every country switches on. Protections for participating stores in Brazil, Indonesia, Singapore, and Thailand have been live since 30 September 2026 (ANDROID-DEVELOPER-VERIFICATION). Limited distribution accounts for students and hobbyists have no registration fee and no government ID, and share to 50 authorized devices, expanded from 20. The Android Developer ID Status API and the Android Developer Console API automate registration in continuous integration. An advanced flow lets experienced users install unregistered apps when they accept the risk. Google Play developers check package registration status in Play Console and register unregistered apps, including apps distributed outside Play. The Play package-name leg remains GOOGLE-PLAY-APP-PACKAGE-REGISTRATION.",
+      "effective_date": "2026-11-19",
+      "grace_period": "until January 2027 (month only), then several months of expansion",
+      "mandatory_date": "2027-01-01",
+      "enforcement_date": "2027-01-01",
+      "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.1, docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PRE-SUBMISSION-CHECKLIST.md",
+      "priority": "critical",
+      "source_url": "https://developer.android.com/blog/posts/android-developer-verification-2027",
+      "verified_on": "2026-11-25",
+      "source_note": "Read on 25 November 2026. The post is dated 19 November 2026 and names January 2027 with no day. The same day's https://developer.android.com/developer-verification page says protections continue rolling out globally in 2027 and does not name January. Its 2027 timeline row says verification capability will be expanded globally for all apps on certified Android devices in 2027. A resource card on that page still says limited distribution accounts share apps with up to 20 devices. The blog states the sharing limit was expanded from 20 to 50 authorized devices. Ars Technica on 19 November 2026 reports the same January start and is not the source of this entry. https://arstechnica.com/gadgets/2026/11/google-will-launch-android-app-verification-requirement-globally-in-january-2027/"
     }
   ]
 }

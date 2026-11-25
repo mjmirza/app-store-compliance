@@ -2,6 +2,16 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Added
+
+- `ANDROID-DEVELOPER-VERIFICATION-GLOBAL-2027`. Android developer verification user protections begin a global rollout in January 2027 with Google Play, Galaxy Store, Honor, Oppo, Xiaomi, Transsion, and Vivo, then expand to all countries and all installation sources on certified Android devices over several months. Google published the month only, so the date is tracked as 1 January 2027. Limited distribution accounts share to 50 authorized devices, up from 20. The Android Developer ID Status API and the Android Developer Console API register apps from continuous integration, and an advanced flow lets an experienced user install an unregistered app after accepting the risk. Read on the Android Developers Blog on 25 November 2026. The developer verification overview page, read the same day, still says 2027 with no month, and a card on that page still says 20 devices.
+
+### Changed
+
+- `ANDROID-DEVELOPER-VERIFICATION` no longer says the global date is unpublished or that limited distribution accounts stop at 20 devices. The 30 September 2026 date for Brazil, Indonesia, Singapore, and Thailand is unchanged. `GOOGLE-PLAY-APP-PACKAGE-REGISTRATION` now records that Play Console also registers apps distributed outside Google Play, which the 15 July 2026 announcement already stated.
+
 ## 2.5.2 (2026-11-25)
 
 A patch release of fixes from contributors. Several checks stop firing on text that is not a real finding, and the installers, metadata tools and audits now report a failure instead of a quiet success. Every check change was tested in both directions, against main, before it merged: the real case still fires and the false one stays silent. Nothing that passed 2.5.1 starts to block. It is a patch version.
