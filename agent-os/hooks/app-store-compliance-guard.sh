@@ -1036,9 +1036,7 @@ SIWAPY
     # Whether any xcconfig in the project sets a deployment target, for app configurations built on one.
     local xcdt=0
     grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'IPHONEOS_DEPLOYMENT_TARGET' 2>/dev/null | grep . >/dev/null && xcdt=1
-    local xcsdk=''
-    grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hE '^[[:space:]]*SDKROOT[[:space:]]*=[[:space:]]*iphoneos' 2>/dev/null | grep . >/dev/null && xcsdk=ios
-    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" ASCG_XC_SDK="$xcsdk" xargs -0 python3 -c "$(cat <<'PBXPY'
+    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" xargs -0 python3 -c "$(cat <<'PBXPY'
 import os
 import re
 import sys
@@ -1084,7 +1082,38 @@ def majors13(settings, name):
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
-XC_SDK = os.environ.get("ASCG_XC_SDK", "")
+REF_RE = re.compile(r"baseConfigurationReference = (\w+)")
+
+
+def xcconfig_sdk(text, prefix, pbx):
+    # The SDK a target xcconfig sets. ios, other, none when it sets none, or unknown when it cannot be read.
+    ref = REF_RE.search(prefix)
+    if not ref:
+        return "none"
+    lb, rb, dq = chr(123), chr(125), chr(34)
+    entry = re.search(ref.group(1) + r"[^=" + lb + r"\n]*=\s*" + re.escape(lb) + "[^" + rb + "]*?isa = PBXFileReference;[^" + rb
+                      + "]*?path = " + dq + "?([^;" + dq + "]+)" + dq + "?;", text)
+    if not entry:
+        return "unknown"
+    root = os.path.dirname(os.path.dirname(os.path.abspath(pbx)))
+    name = os.path.basename(entry.group(1))
+    found = [os.path.join(d, name) for d, _, files in os.walk(root) if name in files]
+    if len(found) != 1:
+        return "unknown"
+    try:
+        with open(found[0], encoding="utf-8", errors="replace") as fh:
+            body = fh.read()
+    except OSError:
+        return "unknown"
+    vals = re.findall(r"(?m)^\s*SDKROOT\s*=\s*(.+?)\s*$", body)
+    if not vals:
+        return "unknown" if re.search(r"(?m)^\s*#include", body) else "none"
+    val = vals[-1]
+    if re.search(r"iphoneos", val, re.I):
+        return "ios"
+    if re.search(r"macosx|watchos|appletvos|xros|driverkit", val, re.I):
+        return "other"
+    return "unknown"
 TARGET_RE = re.compile(r"isa = PBXNativeTarget;(.*?)\n\s*\};", re.S)
 LIST_RE = re.compile(r"(\w+)[^=\n{]*=\s*\{\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", re.S)
 
@@ -1096,7 +1125,7 @@ def app_configs(text):
     for body in TARGET_RE.findall(text):
         kind = re.search(r"productType = \"([^\"]+)\"", body)
         lid = re.search(r"buildConfigurationList = (\w+)", body)
-        if kind and lid and kind.group(1) == "com.apple.product-type.application":
+        if kind and lid and kind.group(1).startswith("com.apple.product-type.application"):
             ids.update(lists.get(lid.group(1), []))
     return ids
 
@@ -1109,7 +1138,7 @@ def non_app_configs(text):
     for body in TARGET_RE.findall(text):
         kind = re.search(r"productType = \"([^\"]+)\"", body)
         lid = re.search(r"buildConfigurationList = (\w+)", body)
-        if kind and lid and kind.group(1) != "com.apple.product-type.application":
+        if kind and lid and not kind.group(1).startswith("com.apple.product-type.application"):
             ids.update(lists.get(lid.group(1), []))
     return ids
 
@@ -1224,10 +1253,13 @@ for path in sys.argv[1:]:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
             # A non-application target never ships as the app, and another OS has no iOS floor.
-            # An xcconfig can set SDKROOT too. Only an xcconfig that sets an iOS SDK brings the target back.
+            # A target xcconfig outranks the project, so the one this target names decides its SDK.
             inherited = "SDKROOT" not in settings and name in other_os
-            if inherited and "baseConfigurationReference" in prefix and XC_SDK == "ios":
-                inherited = False
+            if inherited:
+                own = xcconfig_sdk(text, prefix, path)
+                if own == "unknown":
+                    continue
+                inherited = own != "ios"
             sdk = OTHER_OS_RE.search(settings) or inherited
             if bid in skip or sdk or (app_ids and bid not in app_ids):
                 continue
