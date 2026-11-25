@@ -996,7 +996,9 @@ sys.exit(1)
 SIWAPY
   )" 2>/dev/null
   }
-  if grep_has 'FacebookLogin|GoogleSignIn|GoogleSignin|GIDSignIn|LoginWithFacebook'; then
+  # The React Native library spells it GoogleSignin. A file only the Android or web build loads never ships on iOS.
+  gsi_ios() { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e 'GoogleSignin' 2>/dev/null | grep . >/dev/null; }
+  if grep_has 'FacebookLogin|GoogleSignIn|GIDSignIn|LoginWithFacebook' || gsi_ios; then
     # React Native and Expo sign in with Apple through a JS library. Only a started login counts, read
     # with comments and strings removed. Buttons, enums, options objects and logout do not.
     grep_has 'SignInWithApple|ASAuthorizationAppleIDProvider' || js_apple_login_started || finding high "APPLE-4.8-SOCIAL-LOGIN-ONLY" "Third party social login without Sign in with Apple" "Add Sign in with Apple or an equal privacy preserving login (Apple 4.8)." src 'FacebookLogin|GoogleSignIn|GoogleSignin|GIDSignIn|LoginWithFacebook'
