@@ -1341,10 +1341,11 @@ if [ "$IS_AND" -eq 1 ]; then
     # Android 16 ignores both locks on large screens for an app that targets API 36 or higher,
     # so the check fires only when every target SDK it can read is known and below 36.
     sdk="$(grep -E '/build[.]gradle([.]kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
-    [ -n "$sdk" ] && [ "$sdk" -lt 36 ] || return 1
+    [ -n "$sdk" ] || return 1
     mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
     [ -n "$mf" ] || return 1
-    hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PY'
+    hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | ADAPT_SDK="$sdk" xargs -0 python3 -c "$(cat <<'PY'
+import os
 import sys
 import xml.etree.ElementTree as ET
 
@@ -1369,13 +1370,38 @@ def attr(el, name):
             return val.strip()
     return None
 
+GRADLE_SDK = int(os.environ.get("ADAPT_SDK") or "0")
+OPT_OUT = "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+
+def module(path):
+    return path.split("/src/")[0] if "/src/" in path else path
+
+def overridden(path):
+    # A variant manifest can replace these values at merge, so its module is left alone.
+    for other in sys.argv[1:]:
+        if other == path or module(other) != module(path):
+            continue
+        try:
+            with open(other, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        if "screenOrientation" in text or "resizeableActivity" in text:
+            return True
+    return False
+
 for path in sys.argv[1:]:
     try:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError):
         continue
+    if overridden(path):
+        continue
     sdk = [el for el in root.iter() if local(el.tag) == "uses-sdk"]
-    if any((attr(el, "targetSdkVersion") or "0").isdigit() and int(attr(el, "targetSdkVersion") or "0") >= 36 for el in sdk):
+    target = max([GRADLE_SDK] + [int(attr(el, "targetSdkVersion")) for el in sdk if (attr(el, "targetSdkVersion") or "").isdigit()])
+    # Android 16 ignores both locks on large screens from API 36, unless the app opts out.
+    keeps = any(local(el.tag) == "property" and attr(el, "name") == OPT_OUT and attr(el, "value") == "true" for el in root.iter())
+    if target >= 36 and not keeps:
         continue
     for app in [el for el in root.iter() if local(el.tag) == "application"]:
         # Games keep a supported orientation and meet their own Tier 3 bar later.
@@ -1383,7 +1409,8 @@ for path in sys.argv[1:]:
             continue
         default = attr(app, "resizeableActivity")
         for el in app:
-            if local(el.tag) not in ("activity", "activity-alias"):
+            # An alias inherits from its target activity, so only the activity is judged.
+            if local(el.tag) != "activity":
                 continue
             # An activity setting overrides the application default.
             own = attr(el, "resizeableActivity")
