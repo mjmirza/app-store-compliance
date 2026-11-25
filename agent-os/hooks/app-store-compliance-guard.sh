@@ -1033,7 +1033,10 @@ SIWAPY
     local pf
     pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
     [ -n "$pf" ] || return 1
-    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_LO="$lo" ASCG_HI="$hi" xargs -0 python3 -c "$(cat <<'PBXPY'
+    # An xcconfig that sets 15 or later could override an inherited value. Only then is an app that uses one unknown.
+    local xc15=0
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(debug|pods|test)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET[^=]*=[[:space:]]*"?(1[5-9]|[2-9][0-9])' 2>/dev/null | grep -q . && xc15=1
+    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_LO="$lo" ASCG_HI="$hi" ASCG_XC15="$xc15" xargs -0 python3 -c "$(cat <<'PBXPY'
 import os
 import re
 import sys
@@ -1062,6 +1065,11 @@ DQ, BS = chr(34), chr(92)
 COMMENT_RE = re.compile(DQ + "(?:" + BS + BS + ".|[^" + DQ + BS + BS + "])*" + DQ + "|/[*].*?[*]/", re.S)
 
 
+OTHER_SDK_RE = re.compile("SDKROOT[ ]*=[ ]*" + DQ + "?(macosx|watchos|appletvos|xros)")
+XC15 = os.environ.get("ASCG_XC15") == "1"
+IOS_SDK_RE = re.compile("SDKROOT[ ]*=[ ]*" + DQ + "?iphoneos")
+
+
 def below(settings):
     return [LO <= int(v) < HI for v in DT_RE.findall(settings)]
 
@@ -1072,7 +1080,8 @@ for path in sys.argv[1:]:
             text = fh.read()
     except OSError:
         continue
-    app, project = [], []
+    app, project, other = [], [], []
+    ios_app = unknown = False
     for block in BLOCK_RE.finditer(text):
         settings = block.group(1)
         if LO > 0:
@@ -1082,13 +1091,30 @@ for path in sys.argv[1:]:
         if LO > 0 and after and "debug" in after.group(1).lower():
             continue
         flags = below(settings)
+        bundle = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
+        is_app = bundle and not any(marker in settings for marker in DEPENDENCY_MARKERS)
+        if LO > 0 and is_app:
+            # An app on another Apple SDK does not ship to iPhone.
+            if OTHER_SDK_RE.search(settings):
+                continue
+            ios_app = ios_app or bool(IOS_SDK_RE.search(settings))
+            # Its target may come from an xcconfig that sets 15 or later, which this check does not resolve.
+            if not flags and XC15 and "baseConfigurationReference" in block.group(0):
+                unknown = True
         if not flags:
             continue
-        if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
-            if not any(marker in settings for marker in DEPENDENCY_MARKERS):
+        if bundle:
+            if is_app:
                 app.extend(flags)
+        elif LO > 0 and OTHER_SDK_RE.search(settings):
+            other.extend(flags)
         else:
             project.extend(flags)
+    if LO > 0:
+        # A project value set for another SDK reaches an app only when that app sets the iPhone SDK itself.
+        project += other if ios_app else []
+        if unknown and not app:
+            continue
     # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
     if (app and any(app)) or (not app and any(project)):
         sys.exit(0)
