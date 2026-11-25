@@ -4210,6 +4210,12 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 tier3_id && ok "658 a singleTask activity with its own resize lock fires" || bad "658 a singleTask activity with its own resize lock fires"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf 'android { defaultConfig { targetSdk 36 } }\n' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:resizeableActivity="false"><property android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY" android:value="true" /><activity android:name="com.example.home.MainActivity" android:resizeableActivity="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity><activity android:name="com.example.settings.MainActivity" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 activities with the same short name in two packages are not confused" || ok "658 activities with the same short name in two packages are not confused"
+rm -rf "$D"
 
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then

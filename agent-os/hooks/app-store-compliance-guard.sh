@@ -1457,8 +1457,36 @@ def launcher(el):
             return True
     return False
 
-def tail(name):
-    return (name or "").rsplit(".", 1)[-1]
+NAMESPACE = re.compile(r"namespace[ \t]*=?[ \t]*[" + chr(34) + chr(39) + r"]([A-Za-z0-9_.]+)")
+
+def package_of(root, path):
+    pkg = root.get("package")
+    if pkg:
+        return pkg.strip()
+    for name in ("build.gradle", "build.gradle.kts"):
+        try:
+            with open(os.path.join(module(path), name), encoding="utf-8", errors="replace") as fh:
+                found = NAMESPACE.search(fh.read())
+        except OSError:
+            continue
+        if found:
+            return found.group(1)
+    return ""
+
+def full_name(name, pkg):
+    # A short class name resolves against the package. Without one it stays short.
+    name = (name or "").strip()
+    if pkg and name.startswith("."):
+        return pkg + name
+    if pkg and name and "." not in name:
+        return pkg + "." + name
+    return name
+
+def same_class(a, b):
+    if a == b:
+        return True
+    short, long_ = (a, b) if a.startswith(".") else (b, a)
+    return short.startswith(".") and not long_.startswith(".") and long_.endswith(short)
 
 OWN_TASK = ("singleTask", "singleInstance", "singleInstancePerTask")
 
@@ -1495,10 +1523,11 @@ for path in sys.argv[1:]:
         if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":
             continue
         default = attr(app, "resizeableActivity")
+        pkg = package_of(root, path)
         # Activities that can root a task. a launcher, directly or through an enabled alias,
-        # a document, or one that starts its own task. Names compare by class name.
-        roots = {tail(attr(el, "name")) for el in app if local(el.tag) == "activity" and starts_task(el)}
-        roots |= {tail(attr(el, "targetActivity")) for el in app if local(el.tag) == "activity-alias"
+        # a document, or one that starts its own task. Names resolve against the package.
+        roots = {full_name(attr(el, "name"), pkg) for el in app if local(el.tag) == "activity" and starts_task(el)}
+        roots |= {full_name(attr(el, "targetActivity"), pkg) for el in app if local(el.tag) == "activity-alias"
                   and launcher(el) and attr(el, "enabled") != "false"}
         app_keeps = opts_out(app)
         for el in app:
@@ -1516,8 +1545,9 @@ for path in sys.argv[1:]:
             # The root activity of a task decides whether the task can be resized, so the resize
             # lock is judged on launcher activities. With no launcher declared, any could be a root.
             own = attr(el, "resizeableActivity")
-            root = not roots or tail(attr(el, "name")) in roots
-            resize_lock = root and (own if own is not None else default) == "false"
+            mine = full_name(attr(el, "name"), pkg)
+            is_root = not roots or any(same_class(mine, r) for r in roots)
+            resize_lock = is_root and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
                 sys.exit(0)
