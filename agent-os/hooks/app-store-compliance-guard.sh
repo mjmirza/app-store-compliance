@@ -1526,7 +1526,8 @@ ABIPY
     while IFS= read -r f; do
       [ -n "$f" ] || continue
       case "$f" in */AndroidManifest.xml)  # one element per line, so a tools:node on the next line is read
-        [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']")" ] || continue ;;
+        # A removal scoped with tools:selector strips one library only, so the others still merge it in.
+        [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']" ; tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -E 'tools:selector')" ] || continue ;;
       esac
       n="$(grep -En -m1 -e "$re" "$f" 2>/dev/null | cut -d: -f1)"
       printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"

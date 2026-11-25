@@ -3351,6 +3351,8 @@ gs_check "abi-15 abiFilters.clear drops earlier ABIs" "$D" 'ANDROID-64BIT-ABI-MI
 AD_PERM='android:name="com.google.android.gms.permission.AD_ID"'
 D="$(mk_android_perm "<uses-permission $AD_PERM tools:node=\"remove\"/>")"
 gs_check "adid-1 a removed AD_ID permission stays silent" "$D" 'ANDROID-ADVERTISING-ID' 0
+D="$(mk_android_perm "<uses-permission $AD_PERM tools:node=\"remove\" tools:selector=\"com.example.library1\"/>")"
+gs_check "adid-sel a removal scoped to one library still counts" "$D" 'ANDROID-ADVERTISING-ID' 1
 D="$(mk_android_perm "<uses-permission
     $AD_PERM
     tools:node=\"remove\" />")"
