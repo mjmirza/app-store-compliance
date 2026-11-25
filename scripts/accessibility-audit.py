@@ -853,6 +853,9 @@ def run_rule_scan(rule_id, ios_files, android_files):
                         orient = vals.get("orientation", "horizontal").strip().lower()
                         # The nearest clickable ancestor and its handler name. A handler set in code is "?".
                         own = vals.get("onClick", "@null").strip()
+                        # Only a plain method name can be compared. A binding expression is unknown, so it is "?".
+                        if own not in ("@null", "") and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", own):
+                            own = "?"
                         if own in ("@null", ""):
                             own = "?" if vals.get("clickable", "").strip().lower() == "true" or vals.get("onLongClick", "@null").strip() not in ("@null", "") else None
                         stack.append((hidden, tag, None if styled or orient not in ("horizontal", "vertical") else orient,
@@ -882,7 +885,8 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     # Inside a clickable ancestor, a child that runs the same action, or none of its own, is part of
                     # the larger target. Only a child with a different named handler is a separate target.
                     mine = vals.get("onClick", "@null").strip()
-                    if parent and parent[3] and (parent[3] == "?" or mine in ("@null", "") or mine == parent[3]):
+                    plain = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", mine)
+                    if parent and parent[3] and (parent[3] == "?" or not plain or mine == parent[3]):
                         continue
                     # A weight in a LinearLayout sizes the child along the layout orientation, so that axis is unknown.
                     weighted = parent and parent[1] != "FrameLayout" and vals.get("layout_weight", "0").strip() not in ("0", "0.0", "")

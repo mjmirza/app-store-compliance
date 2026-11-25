@@ -1257,6 +1257,14 @@ else
   bad "a control with its own different action inside a clickable row is still reported"
   echo "$OUT"
 fi
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="@{() -> vm.select()}"><RadioButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="@{()->vm.select()}" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "binding callbacks inside a clickable row are not compared as text"
+else
+  bad "binding callbacks inside a clickable row are not compared as text"
+  echo "$OUT"
+fi
 rm -rf "$CP_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
