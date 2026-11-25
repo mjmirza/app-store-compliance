@@ -620,10 +620,11 @@ REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
 # An expression in a template is marked EXPR. A URL counts at the start of the template or right after an
-# expression, so a scheme supplied by a variable is read and a URL in prose or a query string is not.
+# An expression in a template is marked EXPR. A template counts only when it starts with the URL, either the
+# scheme itself or an expression right before ://, so a URL inside template prose never counts.
 EXPR = chr(1)
 GAP = EXPR + SQ + DQ + BT
-TEMPLATE_HOST_RE = re.compile("(?:^" + BT + "|" + EXPR + "[" + GAP + "]*)(?:[A-Za-z][A-Za-z0-9+.-]*)?://[" + GAP
+TEMPLATE_HOST_RE = re.compile("^" + BT + "(?:" + EXPR + "[" + GAP + "]*)?(?:[A-Za-z][A-Za-z0-9+.-]*)?://[" + GAP
                               + "]*([^/?#" + GAP + chr(32) + chr(9) + chr(10) + "]*)")
 URL_HEAD_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://([^/?#\s]*)")
 
@@ -633,7 +634,8 @@ def staged_url(text):
     # a query string or a path that mentions the host stays silent, the same as before this check.
     if text[:1] == BT:
         # A template can build the address from an expression, so read the host after every scheme in it.
-        return any(WANT.search(m.group(1)) for m in TEMPLATE_HOST_RE.finditer(text))
+        m = TEMPLATE_HOST_RE.match(text)
+        return bool(m and WANT.search(m.group(1)))
     m = URL_HEAD_RE.match(text[1:])
     return bool(m and WANT.search(m.group(1)))
 
@@ -711,6 +713,16 @@ def read_template(code, i):
     return n, "".join(out)
 
 
+def in_code(code, i):
+    # A string is code when an operator, a bracket or return comes before it. A word before it means prose.
+    k = i - 1
+    while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
+        k -= 1
+    if k < 0 or code[k] in "=(,:[?{|&+!;":
+        return True
+    return code[max(0, k - 5):k + 1] == "return"
+
+
 def literals(code):
     i, n = 0, len(code)
     while i < n:
@@ -720,13 +732,14 @@ def literals(code):
             i = e
         elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
             e = read_quoted(code, i, c)
-            yield code[i:e]
+            yield code[i:e], in_code(code, i)
             i = e
         elif c == SL and skip_regex(code, i) is not None:
             i = skip_regex(code, i)
         elif c == BT:
+            start = i
             i, t = read_template(code, i)
-            yield t
+            yield t, in_code(code, start)
         else:
             i += 1
 
@@ -737,8 +750,8 @@ for path in sys.argv[1:]:
             code = fh.read()
     except OSError:
         continue
-    for text in literals(code):
-        if text[0] in (SQ, BT) and staged_url(text):
+    for text, code_position in literals(code):
+        if text[0] in (SQ, BT) and code_position and staged_url(text):
             print(path)
             sys.exit(0)
 JSSTRPY
@@ -760,6 +773,7 @@ ios_google_signin() {
         while ((i = index(line, "/*")) > 0) { rest = substr(line, i + 2); j = index(rest, "*/")
           if (j) line = substr(line, 1, i - 1) substr(rest, j + 2); else { line = substr(line, 1, i - 1); inc = 1 } }
         if (line ~ /^[^\/]*(from|require[(])[[:space:]]*.@react-native-google-signin\// && line !~ /import[[:space:]]+type/) { print FILENAME; nextfile } }' 2>/dev/null \
+    | tr '\n' '\0' | xargs -0 grep -lE 'GoogleSignin[.]|<GoogleSigninButton' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
