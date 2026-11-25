@@ -1047,7 +1047,8 @@ BLOCK_RE = re.compile(
     r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
 )
 DT_RE = re.compile(
-    r'\bIPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?"?\s*=\s*"?([0-9]+)(?:\.[0-9]+)*"?\s*;'
+    # A simulator-only key never ships, so it neither sets nor hides the device target.
+    r'\bIPHONEOS_DEPLOYMENT_TARGET(?:\[(?![^\]]*simulator)[^\]]*\])?"?\s*=\s*"?([0-9]+)(?:\.[0-9]+)*"?\s*;'
 )
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
