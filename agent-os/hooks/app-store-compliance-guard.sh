@@ -1161,6 +1161,7 @@ def resolve(settings, name):
 
 worst = 0
 ok15 = False
+xc_decides = False
 weak15 = True
 for path in sys.argv[1:]:
     try:
@@ -1174,8 +1175,15 @@ for path in sys.argv[1:]:
     # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
     app13, project13 = [], []
     for bid, prefix, settings, name in blocks:
-        named = ID_RE.search(settings) and bid not in owned
         vals = majors13(settings, name)
+        if owned:
+            # The project file says which configurations the project owns, so no product name is guessed.
+            if bid in owned:
+                project13.extend(vals)
+            elif bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
+                app13.extend(vals)
+            continue
+        named = ID_RE.search(settings)
         if named and bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
             app13.extend(vals)
         elif not named:
@@ -1190,29 +1198,32 @@ for path in sys.argv[1:]:
     shipped = {n for n in names if "debug" not in n.lower()} or names
     # A target with no SDKROOT of its own takes the project one, so a macOS project setting reaches it.
     other_os = {name for bid, prefix, settings, name in blocks
-                if not (ID_RE.search(settings) and bid not in owned) and OTHER_OS_RE.search(settings)}
+                if (bid in owned if owned else not ID_RE.search(settings)) and OTHER_OS_RE.search(settings)}
     project, apps = {}, []
     for bid, prefix, settings, name in blocks:
         if name not in shipped:
             continue
-        named = ID_RE.search(settings) and bid not in owned
+        named = (bid not in owned) if owned else ID_RE.search(settings)
         if not named:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
             # A non-application target never ships as the app, and another OS has no iOS floor.
-            sdk = OTHER_OS_RE.search(settings) or ("SDKROOT" not in settings and name in other_os)
+            sdk = OTHER_OS_RE.search(settings) or ("SDKROOT" not in settings and name in other_os
+                                                   and "baseConfigurationReference" not in prefix)
             if bid in skip or sdk:
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
         continue
-    certain, unknown = [], False
+    certain, unknown, via_xc = [], False, False
     for name, state, has_xc in apps:
         if state[0] == "value":
             certain.append((state[1], False))
-        elif state[0] == "unknown" or (has_xc and XC_SETS):
-            # An xcconfig in the project sets a target, so an app built on one may take its value from it.
+        elif state[0] == "unknown":
             unknown = True
+        elif has_xc and XC_SETS:
+            # An xcconfig in the project sets a target, so an app built on one takes its value from the xcconfig.
+            via_xc = True
         else:
             inherited = project.get(name, ("none", None))
             if inherited[0] == "value":
@@ -1225,6 +1236,8 @@ for path in sys.argv[1:]:
         worst = 15
         # A project-level value is inherited, so a target xcconfig can still override it.
         weak15 = weak15 and all(low)
+    elif via_xc:
+        xc_decides = True
     elif certain or unknown:
         ok15 = True
 if worst == 13:
@@ -1232,6 +1245,9 @@ if worst == 13:
     sys.exit(0)
 if worst == 15:
     print("below15p" if weak15 else "below15")
+    sys.exit(0)
+if xc_decides:
+    print("xc")
     sys.exit(0)
 if ok15:
     print("ok15")
