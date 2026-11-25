@@ -498,7 +498,6 @@
       "detection": "The app sells an auto-renewable subscription and no Terms of Use or EULA link appears in its sources. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.",
       "signals": [
         "subscriptionPeriod",
-        "SubscriptionStoreView",
         ".autoRenewable",
         "getSubscriptions(",
         "requestSubscription("
