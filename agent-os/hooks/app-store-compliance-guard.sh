@@ -628,6 +628,9 @@ def url_shaped(text, m):
     k, e = m.start(), m.end()
     while k > 0 and text[k - 1] in HOST_CHARS:
         k -= 1
+    # A name after a single slash is a path segment, not a host.
+    if text[k - 1:k] == SL and text[max(0, k - 3):k] != chr(58) + SL + SL:
+        return False
     if text[:1] == BT:
         gap = (SQ, DQ, chr(32))
         while k > 0 and text[k - 1] in gap:
