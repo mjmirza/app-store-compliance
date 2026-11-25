@@ -1051,7 +1051,8 @@ DT_RE = re.compile(
 )
 # Xcode writes an SDK-conditional key in quotes. Only the device SDK ships, and only a value
 # below the minimum is read from it, so a quoted key can add a finding but never hide one.
-QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[^\]]*\]"\s*=\s*"?([0-9]+)')
+QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([0-9]+)')
+COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
 NAME_RE = re.compile(r"\s*name = ([^;]+);")
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
@@ -1078,8 +1079,10 @@ for path in sys.argv[1:]:
         settings = block.group(1)
         flags = below(settings)
         name = NAME_RE.match(text, block.end())
-        if not (name and "debug" in name.group(1).lower()):
-            flags += [True for value in QDT_RE.findall(settings) if int(value) < 13]
+        is_app = "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings
+        # Only an app configuration outside Debug, and never a commented-out line.
+        if is_app and not (name and "debug" in name.group(1).lower()):
+            flags += [True for value in QDT_RE.findall(COMMENT_RE.sub(" ", settings)) if int(value) < 13]
         if not flags:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
@@ -1099,7 +1102,7 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
-    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.|"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[^]]*\]"[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*'
+    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.|"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
   # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.
