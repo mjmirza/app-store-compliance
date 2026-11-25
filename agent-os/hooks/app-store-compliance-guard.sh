@@ -1051,7 +1051,8 @@ def majors(settings):
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
-TEST_ID_RE = re.compile(r"(Test|Tests)$")
+# A capitalised Test or Tests suffix, or test after a separator, marks a test bundle. speedtest stays an app.
+TEST_ID_RE = re.compile(r"(?:Tests?|[._-][Tt]ests?)$")
 OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
 
 
