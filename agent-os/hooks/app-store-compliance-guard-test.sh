@@ -1290,6 +1290,12 @@ echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-dev a developer-mode applinks 
 rm -rf "$D"
 D="$(mk_ios_clean)"
 printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
+printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Debug.entitlements"
+OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
+echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug an applinks entry only in a Debug entitlements file does not count" || bad "dl-debug an applinks entry only in a Debug entitlements file does not count"
+rm -rf "$D"
+D="$(mk_ios_clean)"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
 printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-2 a wildcard applinks domain counts as Universal Links" || bad "dl-2 a wildcard applinks domain counts as Universal Links (rc=$RC)"

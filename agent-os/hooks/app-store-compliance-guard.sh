@@ -1136,9 +1136,9 @@ PBXPY
   fi
   if grep_has 'CFBundleURLSchemes'; then
     # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
-    # It counts outside an XML comment, and never with ?mode=developer, which only a development-signed app honours.
+    # It counts outside an XML comment and outside a Debug file, never with ?mode=developer (development-signed apps only).
     applinks_prod() {
-      grep -E '[.](entitlements|plist)$' "$FILELIST" | while IFS= read -r f; do
+      grep -E '[.](entitlements|plist)$' "$FILELIST" | grep -viE '/[^/]*debug[^/]*$' | while IFS= read -r f; do
         tr '\n' ' ' < "$f" | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -v 'mode=developer' || true
       done | grep -q .
     }

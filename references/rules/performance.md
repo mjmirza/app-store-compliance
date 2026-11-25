@@ -226,7 +226,7 @@ grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|p
 How to detect.
 
 ```bash
-grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|applinks:\|assetlinks.json' .
+grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' . && ! grep -rn 'applinks:' --include='*.entitlements' --include='*.plist' . | grep -v 'mode=developer\|<!--\|[Dd]ebug'
 ```
 
 ## RN-OTA-UNDECLARED
