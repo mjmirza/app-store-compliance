@@ -1004,13 +1004,13 @@ SIWAPY
     # Expo and a custom sourceExts order extensions differently, so a module with several files stays unknown.
     grep -lsE 'sourceExts|expo/metro-config' "$DIR"/metro.config.* >/dev/null 2>&1 && custom=1
     grep -sqE '"expo"[[:space:]]*:' "$DIR/package.json" && custom=1
-    { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)' 2>/dev/null || true; } \
+    { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|<GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)' 2>/dev/null || true; } \
       | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import re
 import sys
 
-SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)")
+SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|<GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)")
 ORDER = ("js", "jsx", "ts", "tsx")
 SQ, DQ, BT, ST, SL, BS, NL = chr(39), chr(34), chr(96), chr(42), chr(47), chr(92), chr(10)
 CUSTOM = os.environ.get("ASCG_CUSTOM") == "1"
