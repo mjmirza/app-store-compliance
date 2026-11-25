@@ -621,7 +621,6 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
-# An expression in a template is marked EXPR. A URL counts at the start of the template or right after an
 # An expression in a template is marked EXPR. A template counts only when it starts with the URL, either the
 # scheme itself or an expression right before ://, so a URL inside template prose never counts.
 EXPR = chr(1)
@@ -719,15 +718,21 @@ def ident(c):
     return c.isalnum() or c in ("_", chr(36))
 
 
-def in_code(code, i, e):
-    # A string right before a closing tag sits in JSX text and stays prose.
-    m = e
-    while m < len(code) and code[m] in (chr(32), chr(9), chr(10), chr(13)):
-        m += 1
-    if m < len(code) and code[m] == "<":
+def prev_ok(code, i):
+    # A word right before a string means prose, unless that word is return.
+    k = i - 1
+    while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
+        k -= 1
+    if k >= 0 and ident(code[k]):
+        return code[max(0, k - 5):k + 1] == "return"
+    return True
+
+
+def jsx_start(code, i):
+    # A < opens JSX when a tag name or > follows, and an operator, a bracket, an arrow or return comes before.
+    nxt = code[i + 1:i + 2]
+    if not (nxt.isalpha() or nxt == ">"):
         return False
-    # A word right before the string means prose, unless it is return. Otherwise the nearest of { ; = or a
-    # tag-closing > decides. A type argument such as get<User>() and a braced pair are passed over.
     k = i - 1
     while k >= 0 and code[k] in (chr(32), chr(9), chr(10), chr(13)):
         k -= 1
@@ -735,63 +740,95 @@ def in_code(code, i, e):
         return True
     if ident(code[k]):
         return code[max(0, k - 5):k + 1] == "return"
-    j = k
-    while j >= 0:
-        c = code[j]
-        if c == ">":
-            if j > 0 and code[j - 1] in "=-":
-                return True
-            lt = code.rfind("<", 0, j)
-            if lt > 0 and ident(code[lt - 1]):
-                j = lt - 1
-                continue
-            return False
-        if c == RB:
-            depth = 0
-            while j >= 0:
-                if code[j] == RB:
+    return code[k] in "(=,?:[&|!;" + LB + RB or code[k] == ">" and code[k - 1:k] == "="
+
+
+class Scanner:
+    # One forward pass. JSX text between tags is skipped, so prose in it is never read as a string.
+    def __init__(self, code, jsx):
+        self.code, self.n, self.jsx, self.out = code, len(code), jsx, []
+
+    def js(self, i, stop):
+        code, n, depth = self.code, self.n, 0
+        while i < n:
+            c = code[i]
+            e = skip_comment(code, i)
+            if e is not None:
+                i = e
+            elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
+                e = read_quoted(code, i, c)
+                self.out.append((code[i:e], prev_ok(code, i), i))
+                i = e
+            elif c == BT:
+                start = i
+                i, t = read_template(code, i)
+                self.out.append((t, prev_ok(code, start), start))
+            elif c == SL and skip_regex(code, i) is not None:
+                i = skip_regex(code, i)
+            elif c == "<" and self.jsx and jsx_start(code, i):
+                i = self.element(i)
+            else:
+                if c == LB:
                     depth += 1
-                elif code[j] == LB:
+                elif c == RB:
+                    if depth == 0 and stop:
+                        return i + 1
                     depth -= 1
-                    if depth == 0:
-                        break
-                j -= 1
-            j -= 1
-            continue
-        if c in (LB, ";", "="):
-            return True
-        j -= 1
-    return True
+                i += 1
+        return i
+
+    def element(self, i):
+        code, n = self.code, self.n
+        j = i + 1
+        if code[j:j + 1] == ">":
+            return self.children(j + 1)
+        while j < n:
+            c = code[j]
+            if code.startswith("/>", j):
+                return j + 2
+            if c == ">":
+                return self.children(j + 1)
+            if c == LB:
+                j = self.js(j + 1, True)
+            elif c in (SQ, DQ) and read_quoted(code, j, c) is not None:
+                e = read_quoted(code, j, c)
+                self.out.append((code[j:e], True, j))
+                j = e
+            else:
+                j += 1
+        return j
+
+    def children(self, j):
+        code, n = self.code, self.n
+        while j < n:
+            c = code[j]
+            if c == LB:
+                j = self.js(j + 1, True)
+            elif code.startswith("</", j):
+                k = code.find(">", j)
+                return n if k < 0 else k + 1
+            elif c == "<" and (code[j + 1:j + 2].isalpha() or code[j + 1:j + 2] == ">"):
+                j = self.element(j)
+            else:
+                j += 1
+        return j
 
 
-def literals(code):
-    i, n = 0, len(code)
-    while i < n:
-        c = code[i]
-        e = skip_comment(code, i)
-        if e is not None:
-            i = e
-        elif c in (SQ, DQ) and read_quoted(code, i, c) is not None:
-            e = read_quoted(code, i, c)
-            yield code[i:e], in_code(code, i, e), i
-            i = e
-        elif c == SL and skip_regex(code, i) is not None:
-            i = skip_regex(code, i)
-        elif c == BT:
-            start = i
-            i, t = read_template(code, i)
-            yield t, in_code(code, start, i), start
-        else:
-            i += 1
+def literals(code, jsx):
+    sc = Scanner(code, jsx)
+    sc.js(0, False)
+    return sc.out
 
 
+sys.setrecursionlimit(20000)
 for path in sys.argv[1:]:
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             code = fh.read()
     except OSError:
         continue
-    for text, code_position, at in literals(code):
+    jsx = True
+    for text, code_position, at in literals(code, jsx):
         if text[0] in (SQ, BT) and code_position and staged_url(text):
             print(path + chr(58) + str(code.count(NL, 0, at) + 1))
             sys.exit(0)
@@ -862,6 +899,9 @@ def runtime_use(path):
                 continue
             names.append(words[-1])
     body = IMPORT_RE.sub(" ", code)
+    # A call inside a comment never runs. The :// of a URL is not a comment.
+    body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
+    body = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", body)
     for name in names:
         n = re.escape(name)
         if re.search("(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body) or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body):
