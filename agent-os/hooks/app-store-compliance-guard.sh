@@ -1326,9 +1326,18 @@ if [ "$IS_AND" -eq 1 ]; then
       finding high "ANDROID-INSECURE-BACKUP" "Android allowBackup is enabled without strict filters" "Disable backups using android:allowBackup=\"false\", or restrict backup folders using dataExtractionRules." src 'allowBackup="true"'
     fi
   fi
-  if grep_has 'android:scheme'; then
+  # A scheme inside <queries> names apps this app wants to see (package visibility), not a link it handles.
+  # Each manifest is read element by element, so the first android:scheme outside <queries> and comments is named.
+  DL_AT="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 awk 'BEGIN { RS = "<" } FNR == 1 { q = 0; ln = 1 }
+    { s = $0
+      if (s ~ /^queries[^>]*\/>/) { }
+      else if (s ~ /^queries[ \t\r\n>]/) q = 1
+      else if (s ~ /^\/queries[ \t\r\n>]/) q = 0
+      else if (!q && s !~ /^!--/ && (p = index(s, "android:scheme")) > 0) { pre = substr(s, 1, p); print FILENAME ":" ln + gsub(/\n/, "", pre); exit }
+      ln += gsub(/\n/, "", s) }' 2>/dev/null | head -1)"
+  if [ -n "$DL_AT" ]; then
     if ! grep_has 'assetlinks.json'; then
-      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." src 'android:scheme'
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." at "${DL_AT#"${DIR%/}"/}"
     fi
   fi
   # Play Console refuses a debuggable APK or app bundle.
