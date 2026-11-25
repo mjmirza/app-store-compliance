@@ -1046,7 +1046,7 @@ def majors13(settings, name):
     settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
     vals = []
     for cond, value in DT_RE.findall(settings):
-        if "iphonesimulator" in cond:
+        if "iphonesimulator" in cond or "arch=" in cond:
             continue
         cfg = re.search(r"config=([^\],\]]*)", cond)
         if cfg and "*" not in cfg.group(1) and cfg.group(1).strip() != name:
@@ -1071,6 +1071,17 @@ def non_app_configs(text):
         kind = re.search(r"productType = \"([^\"]+)\"", body)
         lid = re.search(r"buildConfigurationList = (\w+)", body)
         if kind and lid and kind.group(1) != "com.apple.product-type.application":
+            ids.update(lists.get(lid.group(1), []))
+    return ids
+
+
+def project_configs(text):
+    # Configuration ids the project itself owns. Their values are inherited by targets, never an app of their own.
+    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
+    ids = set()
+    for body in re.findall(r"isa = PBXProject;(.*?)\n\s*\};", text, re.S):
+        lid = re.search(r"buildConfigurationList = (\w+)", body)
+        if lid:
             ids.update(lists.get(lid.group(1), []))
     return ids
 OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
@@ -1135,10 +1146,11 @@ for path in sys.argv[1:]:
         continue
     blocks = BLOCK_RE.findall(text)
     skip = non_app_configs(text)
+    owned = project_configs(text)
     # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
     app13, project13 = [], []
     for bid, prefix, settings, name in blocks:
-        named = ID_RE.search(settings)
+        named = ID_RE.search(settings) and bid not in owned
         vals = majors13(settings, name)
         if named and bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
             app13.extend(vals)
@@ -1156,7 +1168,7 @@ for path in sys.argv[1:]:
     for bid, prefix, settings, name in blocks:
         if name not in shipped:
             continue
-        named = ID_RE.search(settings)
+        named = ID_RE.search(settings) and bid not in owned
         if not named:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
