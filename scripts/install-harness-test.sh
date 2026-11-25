@@ -500,6 +500,51 @@ await a["tool.execute.before"]({ tool: "bash" }, out); await b["tool.execute.bef
 ' "$(cfg opencode)" "$H/.config/opencode/plugin/app-store-compliance.js" "$H" 2>/dev/null
   [ "$(wc -l < "$H/count" | tr -d ' ')" = "1" ] && ok "opencode checks a call once with both plugin folders loaded" || bad "opencode checks a call once with both plugin folders loaded ($(wc -l < "$H/count" 2>/dev/null))"
 else ok "opencode double-load check skipped, node not installed"; fi
+# A same-named local OpenCode plug-in belongs to the user, including in the legacy folder.
+for plugdir in plugin plugins; do
+  fresh
+  foreign="$H/.config/opencode/$plugdir/app-store-compliance.js"
+  mkdir -p "$(dirname "$foreign")"
+  printf 'export const LocalPlugin = () => ({});\n' > "$foreign"
+  cp "$foreign" "$WORK/local-plugin.js"
+  OUT="$(run --tool opencode)"; RC=$?
+  [ "$RC" -eq 1 ] && cmp -s "$foreign" "$WORK/local-plugin.js" && [ ! -e "$(gdir opencode)" ] && [ ! -e "$H/.agents" ] && printf '%s\n' "$OUT" | grep -q 'not created by this installer' \
+    && ok "opencode install leaves a local $plugdir file and payload alone" || bad "opencode install leaves a local $plugdir file and payload alone (rc=$RC)"
+  cp "$WORK/local-plugin.js" "$foreign"
+  run --tool opencode uninstall >/dev/null; RC=$?
+  [ "$RC" -eq 0 ] && cmp -s "$foreign" "$WORK/local-plugin.js" \
+    && ok "opencode uninstall preserves a local $plugdir file" || bad "opencode uninstall preserves a local $plugdir file (rc=$RC)"
+done
+
+# A plug-in path turned into a symlink is unlinked on uninstall, and the file it points to is kept.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"; moved="$WORK/moved-plugin.js"
+mv "$plug" "$moved" && ln -s "$moved" "$plug"
+run --tool opencode uninstall >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$plug" ] && [ ! -L "$plug" ] && [ -f "$moved" ] && ok "opencode uninstall unlinks a symlinked plugin and keeps its target" || bad "opencode uninstall unlinks a symlinked plugin and keeps its target (rc=$RC)"
+
+# A dotfile-managed symlink to the installer's own plugin still reinstalls and passes doctor.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"; kept="$WORK/dotfiles-plugin.js"
+cp "$plug" "$kept" && rm -f "$plug" && ln -s "$kept" "$plug"
+OUT="$(run --tool opencode)"; RC1=$?; run --tool opencode doctor >/dev/null; RC2=$?
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode accepts a symlink to its own plugin" || bad "opencode accepts a symlink to its own plugin (rc=$RC1/$RC2)"
+
+# An editor that saves the plugin with a byte order mark does not make it look user-owned.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"
+python3 -I -c 'import sys; p=sys.argv[1]; d=open(p,"rb").read(); open(p,"wb").write(bytes([239,187,191])+d)' "$plug"
+OUT="$(run --tool opencode 2>&1)"; RC1=$?; run --tool opencode doctor >/dev/null 2>&1; RC2=$?
+run --tool opencode uninstall >/dev/null 2>&1; RC3=$?
+[ "$RC1" -eq 0 ] && [ "$RC2" -eq 0 ] && [ "$RC3" -eq 0 ] && [ ! -e "$plug" ] && ! printf '%s\n' "$OUT" | grep -q 'not created by this installer' && ok "opencode treats its own plugin saved with a byte order mark as its own" || bad "opencode treats its own plugin saved with a byte order mark as its own (rc=$RC1/$RC2/$RC3)"
+
+# A directive the person added above the header, such as @ts-check, still leaves the plugin the installer's own.
+fresh; run --tool opencode >/dev/null
+plug="$(cfg opencode)"
+python3 -I -c 'import sys; p=sys.argv[1]; d=open(p).read(); open(p,"w").write("// @ts-check" + chr(10) + d)' "$plug"
+run --tool opencode uninstall >/dev/null 2>&1; RC=$?
+[ "$RC" -eq 0 ] && [ ! -e "$plug" ] && ok "opencode uninstall removes its own plugin after a directive was added above the header" || bad "opencode uninstall removes its own plugin after a directive was added above the header (rc=$RC)"
+
 # 8h a CRLF Kimi config reinstalls without a rewrite
 fresh; mkdir -p "$H/.kimi-code"; printf 'default_model = "k2"\r\n' > "$H/.kimi-code/config.toml"
 run --tool kimi >/dev/null; N1="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"; OUT="$(run --tool kimi)"; N2="$(find "$H/.kimi-code" -maxdepth 1 -name '*bak*' | wc -l | tr -d ' ')"
