@@ -3181,6 +3181,21 @@ D="$(gs_ios Net.swift 'let r = getaddrinfo(host, nil, &hints, &res)')"
 gs_check "ipv6-2 getaddrinfo stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
 D="$(gs_ios Net.swift 'let my_inet_addr_label = "x"')"
 gs_check "ipv6-3 a word containing inet_addr without a call stays silent" "$D" 'APPLE-2.5.5-IPV4-ONLY-NETWORKING' 0
+# The SwiftUI and UIKit accessibility checks read Swift and Objective-C. Compose uses the same Image( and Button names.
+D="$(gs_ios Card.kt 'Image(painter = logo, contentDescription = null)')"
+gs_check "a11y-1 a Compose Image in Kotlin is not a SwiftUI Image" "$D" 'APPLE-ACCESSIBILITY-VOICEOVER' 0
+D="$(gs_ios Logo.swift 'let logo = Image("logo")')"
+gs_check "a11y-2 a SwiftUI Image without a label is flagged" "$D" 'APPLE-ACCESSIBILITY-VOICEOVER' 1
+D="$(gs_ios Card.kt 'Button(onClick = { save() }) { Text("Save") }')"
+gs_check "a11y-3 a Compose Button in Kotlin is not a SwiftUI Button" "$D" 'APPLE-ACCESSIBILITY-HAPTICS' 0
+D="$(gs_ios Save.swift 'let save = Button("Save") { store.save() }')"
+gs_check "a11y-4 a SwiftUI Button without haptics is flagged" "$D" 'APPLE-ACCESSIBILITY-HAPTICS' 1
+D="$(gs_ios Save.m 'UIButton *save = [UIButton buttonWithType:UIButtonTypeSystem];')"
+gs_check "a11y-5 a UIKit button in Objective-C without haptics is flagged" "$D" 'APPLE-ACCESSIBILITY-HAPTICS' 1
+D="$(gs_ios A.kt 'Image(painter = logo, contentDescription = null)')"; printf 'let logo = Image("logo")\n' > "$D/App/Z.swift"
+rr_run "$D"
+printf '%s\n' "$OUT" | grep -A1 'APPLE-ACCESSIBILITY-VOICEOVER' | grep -q 'file\. App/Z\.swift:1' && ok "gs a11y-6 the finding names the Swift file, not the Kotlin one" || bad "gs a11y-6 the finding names the Swift file, not the Kotlin one (rc=$RC)"
+rm -rf "$D"
 
 # Sign in with Apple in React Native and Expo apps. The JS libraries never name SignInWithApple or
 # ASAuthorizationAppleIDProvider in app code, so the 4.8 check must also know their packages and calls.
