@@ -625,12 +625,16 @@ HOST_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 def url_shaped(text, m):
     # An address has a scheme before its host name, or a port or path right after the host, or sits in a
     # template that builds one (it holds ://). Prose such as JSX text has none of these.
-    k = m.start()
+    k, e = m.start(), m.end()
     while k > 0 and text[k - 1] in HOST_CHARS:
         k -= 1
-    if text[max(0, k - 3):k] == chr(58) + SL + SL or text[m.end():m.end() + 1] in (chr(58), SL):
-        return True
-    return text[:1] == BT and chr(58) + SL + SL in text
+    if text[:1] == BT:
+        gap = (SQ, DQ, chr(32))
+        while k > 0 and text[k - 1] in gap:
+            k -= 1
+        while e < len(text) and text[e] in gap:
+            e += 1
+    return text[max(0, k - 3):k] == chr(58) + SL + SL or text[e:e + 1] in (chr(58), SL)
 
 
 def skip_regex(code, i):
@@ -749,7 +753,7 @@ ios_google_signin() {
   # nothing is left out beyond .android files.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
