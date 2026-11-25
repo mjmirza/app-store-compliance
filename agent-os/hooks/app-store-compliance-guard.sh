@@ -718,11 +718,22 @@ def ident(c):
     return c.isalnum() or c in ("_", chr(36))
 
 
+def line_comment(code, k):
+    # The start of a // comment that holds position k on its line, or -1. A :// is a URL, not a comment.
+    ls = code.rfind(NL, 0, k) + 1
+    c = code.find(SL + SL, ls, k + 1)
+    while c >= 0 and c > ls and code[c - 1] == chr(58):
+        c = code.find(SL + SL, c + 2, k + 1)
+    return c
+
+
 def back(code, k):
     # The index of the last character before k that is neither space nor part of a block comment.
     while k >= 0:
         if code[k] in (chr(32), chr(9), chr(10), chr(13)):
             k -= 1
+        elif line_comment(code, k) >= 0:
+            k = line_comment(code, k) - 1
         elif code[k] == SL and k > 0 and code[k - 1] == ST:
             start = code.rfind(SL + ST, 0, k - 1)
             if start < 0:
@@ -754,6 +765,25 @@ def jsx_start(code, i):
     return code[k] in "(=,?:[&|!;" + LB + RB or code[k] == ">" and code[k - 1:k] == "="
 
 
+TYPE_RE = re.compile(r"type\s+[A-Za-z_" + chr(36) + r"][\w" + chr(36) + r"]*\s*(<[^=;]*>)?\s*=")
+
+
+def type_end(code, j):
+    # The end of a type alias. a semicolon, or a line break that no | or & continues.
+    n = len(code)
+    while j < n:
+        if code[j] == ";":
+            return j + 1
+        if code[j] == NL:
+            k = j + 1
+            while k < n and code[k] in (chr(32), chr(9), chr(10), chr(13)):
+                k += 1
+            if k >= n or code[k] not in "|&":
+                return j
+        j += 1
+    return n
+
+
 class Scanner:
     # One forward pass. JSX text between tags is skipped, so prose in it is never read as a string.
     def __init__(self, code, jsx):
@@ -763,6 +793,10 @@ class Scanner:
         code, n, depth = self.code, self.n, 0
         while i < n:
             c = code[i]
+            t = TYPE_RE.match(code, i) if c == "t" and (i == 0 or not ident(code[i - 1])) else None
+            if t:
+                i = type_end(code, t.end())
+                continue
             e = skip_comment(code, i)
             if e is not None:
                 i = e
@@ -882,7 +916,8 @@ IMPORT_RE = re.compile(r"import\s+([^;]*?)\s*from\s*[" + chr(34) + chr(39) + r"]
 
 def resolved(path):
     # Metro tries each extension in order, and for each one the .ios file, then .native, then the plain file.
-    # A file counts only when no sibling wins before it. A custom order cannot be read, so any sibling wins.
+    # A file counts only when no sibling wins before it. A custom order keeps the platform order within an
+    # extension, so only a sibling with another extension leaves the result unknown.
     base, ext = os.path.splitext(path)
     ext = ext[1:]
     if ext not in ORDER:
@@ -899,7 +934,8 @@ def resolved(path):
     mine = order.index(path)
     others = [c for c in order if c != path and os.path.exists(c)]
     if custom:
-        return not others
+        same = [c for c in others if c.endswith(chr(46) + ext)]
+        return not any(order.index(c) < mine for c in same) and len(same) == len(others)
     return not any(order.index(c) < mine for c in others)
 
 
@@ -918,6 +954,8 @@ def runtime_use(path):
         return True
     if re.search(r"require\s*\(\s*.@react-native-google-signin/", code):
         return True
+    code = re.sub(r"/\*.*?\*/", " ", code, flags=re.S)
+    code = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", code)
     names, spaces = [], []
     for clause in IMPORT_RE.findall(code):
         braced = re.search(r"\{([^}]*)\}", clause)
@@ -930,10 +968,8 @@ def runtime_use(path):
             words = part.split()
             if words and words[0] != "type":
                 spaces.append(words[-1])
+    # A call inside a comment never runs, and the comments are gone already.
     body = IMPORT_RE.sub(" ", code)
-    # A call inside a comment never runs. The :// of a URL is not a comment.
-    body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
-    body = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", body)
     if any(used(body, name) for name in names):
         return True
     for ns in spaces:
