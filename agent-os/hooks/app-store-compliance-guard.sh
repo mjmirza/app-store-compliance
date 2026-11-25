@@ -1055,6 +1055,8 @@ QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([
 CONDITIONAL_RE = re.compile(r'IPHONEOS_DEPLOYMENT_TARGET\[')
 COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
 PROJECT_RE = re.compile(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", re.S)
+TARGET_RE = re.compile(r"isa = PBXNativeTarget;((?:(?!isa = ).)*?)productType = " + chr(34) + "?([^" + chr(34) + ";]+)", re.S)
+LIST_REF_RE = re.compile(r"buildConfigurationList = (\w+)")
 ID_RE = re.compile(r"\w+")
 OWNER_RE = re.compile(r"(\w+)(?:\s*/[*][^*]*[*]/)?\s*=\s*" + re.escape(chr(123)) + r"\s*$")
 NAME_RE = re.compile(r"\s*name = ([^;]+);")
@@ -1086,6 +1088,15 @@ for path in sys.argv[1:]:
         lst = re.search(re.escape(pbx.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
         if lst:
             project_ids = set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
+    # When the file names its targets, only an application target configuration is read.
+    app_ids, has_targets = set(), False
+    for target in TARGET_RE.finditer(text):
+        has_targets = True
+        ref = LIST_REF_RE.search(target.group(1))
+        if ref and target.group(2) == "com.apple.product-type.application":
+            lst = re.search(re.escape(ref.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+            if lst:
+                app_ids |= set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
     for block in BLOCK_RE.finditer(text):
         owner = OWNER_RE.search(text[max(0, block.start() - 300):block.start()])
         settings = block.group(1)
@@ -1098,6 +1109,8 @@ for path in sys.argv[1:]:
                    and not any(marker in live for marker in DEPENDENCY_MARKERS)
                    and len(CONDITIONAL_RE.findall(live)) == len(QDT_RE.findall(live)))
         certain = certain and not (owner and owner.group(1) in project_ids)
+        if has_targets:
+            certain = certain and bool(owner) and owner.group(1) in app_ids
         if certain and name and name.group(1).strip().strip('"').lower() == "release":
             flags += [True for value in QDT_RE.findall(live) if int(value) < 13]
         if not flags:
