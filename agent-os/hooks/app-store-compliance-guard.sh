@@ -1027,12 +1027,15 @@ SIWAPY
   podfile_below_ios15() { podfile_ios_major '13|14'; }
   # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
   pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
+    # $1 and $2 bound the major versions that count, 0 and 13 by default.
+    local lo="${1:-0}" hi="${2:-13}"
     [ -s "$FILELIST" ] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
     local pf
     pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
     [ -n "$pf" ] || return 1
-    printf '%s\n' "$pf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PBXPY'
+    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_LO="$lo" ASCG_HI="$hi" xargs -0 python3 -c "$(cat <<'PBXPY'
+import os
 import re
 import sys
 
@@ -1052,8 +1055,12 @@ DEPENDENCY_MARKERS = (
 )
 
 
+LO = int(os.environ.get("ASCG_LO", "0"))
+HI = int(os.environ.get("ASCG_HI", "13"))
+
+
 def below(settings):
-    return [int(v) < 13 for v in DT_RE.findall(settings)]
+    return [LO <= int(v) < HI for v in DT_RE.findall(settings)]
 
 
 for path in sys.argv[1:]:
@@ -1079,279 +1086,18 @@ sys.exit(1)
 PBXPY
 )" 2>/dev/null
   }
-  # The app target's build settings decide, never a framework's or a test bundle's.
-  # Prints below15 when an app target is iOS 13 or 14, ok15 when every readable one is 15 or later.
-  pbx_ios_floor() {
-    [ -s "$FILELIST" ] || return 1
-    command -v python3 >/dev/null 2>&1 || return 1
-    local pf
-    pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
-    [ -n "$pf" ] || return 1
-    # Whether any xcconfig in the project sets a deployment target, for app configurations built on one.
-    local xcdt=0
-    grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'IPHONEOS_DEPLOYMENT_TARGET' 2>/dev/null | grep . >/dev/null && xcdt=1
-    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" xargs -0 python3 -c "$(cat <<'PBXPY'
-import os
-import re
-import sys
-
-BLOCK_RE = re.compile(
-    r"(\w+)[^=\n{]*=\s*\{\s*isa = XCBuildConfiguration;(.*?)buildSettings = \{(.*?)\n\s*\};(?:\s*name = \"?([^;\"]+)\"?;)?", re.S
-)
-DEPENDENCY_MARKERS = (
-    "SKIP_INSTALL = YES",
-    "DYLIB_INSTALL_NAME_BASE",
-    "TEST_HOST",
-    "BUNDLE_LOADER",
-    "MACH_O_TYPE",
-    "TEST_TARGET_NAME",
-)
-
-
-COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
-
-
-COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
-ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
-XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
-REF_RE = re.compile(r"baseConfigurationReference = (\w+)")
-
-
-def xcconfig_sdk(text, prefix, pbx):
-    # The SDK a target xcconfig sets. ios, other, none when it sets none, or unknown when it cannot be read.
-    ref = REF_RE.search(prefix)
-    if not ref:
-        return "none"
-    lb, rb, dq = chr(123), chr(125), chr(34)
-    entry = re.search(ref.group(1) + r"[^=" + lb + r"\n]*=\s*" + re.escape(lb) + "[^" + rb + "]*?isa = PBXFileReference;[^" + rb
-                      + "]*?path = " + dq + "?([^;" + dq + "]+)" + dq + "?;", text)
-    if not entry:
-        return "unknown"
-    root = os.path.dirname(os.path.dirname(os.path.abspath(pbx)))
-    name = os.path.basename(entry.group(1))
-    found = [os.path.join(d, name) for d, _, files in os.walk(root) if name in files]
-    if len(found) != 1:
-        return "unknown"
-    try:
-        with open(found[0], encoding="utf-8", errors="replace") as fh:
-            body = fh.read()
-    except OSError:
-        return "unknown"
-    vals = re.findall(r"(?m)^\s*SDKROOT\s*=\s*(.+?)\s*$", body)
-    if not vals:
-        return "unknown" if re.search(r"(?m)^\s*#include", body) else "none"
-    val = vals[-1]
-    if re.search(r"iphoneos", val, re.I):
-        return "ios"
-    if re.search(r"macosx|watchos|appletvos|xros|driverkit", val, re.I):
-        return "other"
-    return "unknown"
-TARGET_RE = re.compile(r"isa = PBXNativeTarget;(.*?)\n\s*\};", re.S)
-LIST_RE = re.compile(r"(\w+)[^=\n{]*=\s*\{\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", re.S)
-
-
-def app_configs(text):
-    # Configuration ids of the application targets. An aggregate or legacy target is never one.
-    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
-    ids = set()
-    for body in TARGET_RE.findall(text):
-        kind = re.search(r"productType = \"([^\"]+)\"", body)
-        lid = re.search(r"buildConfigurationList = (\w+)", body)
-        if kind and lid and kind.group(1).startswith("com.apple.product-type.application"):
-            ids.update(lists.get(lid.group(1), []))
-    return ids
-
-
-def non_app_configs(text):
-    # Configuration ids of every target whose product type is not an application, such as a test bundle,
-    # a framework or an extension. The project file states the type, so no name has to be guessed.
-    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
-    ids = set()
-    for body in TARGET_RE.findall(text):
-        kind = re.search(r"productType = \"([^\"]+)\"", body)
-        lid = re.search(r"buildConfigurationList = (\w+)", body)
-        if kind and lid and not kind.group(1).startswith("com.apple.product-type.application"):
-            ids.update(lists.get(lid.group(1), []))
-    return ids
-
-
-def project_configs(text):
-    # Configuration ids the project itself owns. Their values are inherited by targets, never an app of their own.
-    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
-    ids = set()
-    # The first configuration list after the project isa is its own. Nested dictionaries such as attributes
-    # sit in between, so the body is not cut at the first closing brace.
-    for lid in re.findall(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", text, re.S):
-        ids.update(lists.get(lid, []))
-    return ids
-OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
-
-
-def resolve(settings, name):
-    # The value Xcode builds this configuration with. A condition naming another configuration or the simulator
-    # does not apply, and an arch condition, a wildcard config or a variable cannot be read here.
-    plain = matched = None
-    unknown = False
-    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    for cond, value in COND_RE.findall(settings):
-        applies = True
-        for c in re.findall(r"\[([^\]]*)\]", cond):
-            key, _, val = c.partition("=")
-            key, val = key.strip(), val.strip()
-            if key == "sdk":
-                # Only a condition that covers every device SDK applies. A versioned one such as iphoneos16.*
-                # may not match the SDK an upload is built with, so it is unknown.
-                if val in ("*", "iphoneos*"):
-                    pass
-                elif val.startswith("iphoneos"):
-                    unknown = True
-                else:
-                    applies = False
-            elif key == "config" and "*" not in val:
-                applies = applies and val == name
-            else:
-                unknown = True
-        if not applies:
-            continue
-        value = value.strip()
-        if value.startswith("$"):
-            if "inherited" not in value:
-                unknown = True
-            continue
-        num = re.match(r"([0-9]+)", value)
-        if not num:
-            unknown = True
-            continue
-        if cond:
-            matched = int(num.group(1))
-        else:
-            plain = int(num.group(1))
-    if unknown:
-        return "unknown", None
-    if matched is not None:
-        return "value", matched
-    if plain is not None:
-        return "value", plain
-    return "none", None
-
-
-worst = 0
-ok15 = False
-xc_decides = False
-weak15 = True
-for path in sys.argv[1:]:
-    try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
-    except OSError:
-        continue
-    blocks = BLOCK_RE.findall(text)
-    skip = non_app_configs(text)
-    owned = project_configs(text)
-    app_ids = app_configs(text)
-    # The iOS 15 warning skips Debug configurations (Debug, Debug-staging). Each app target and configuration
-    # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
-    names = {b[3] for b in blocks}
-    shipped = {n for n in names if "debug" not in n.lower()} or names
-    # A target with no SDKROOT of its own takes the project one, so a macOS project setting reaches it.
-    other_os = {name for bid, prefix, settings, name in blocks
-                if (bid in owned if owned else not ID_RE.search(settings)) and OTHER_OS_RE.search(settings)}
-    project, apps = {}, []
-    for bid, prefix, settings, name in blocks:
-        if name not in shipped:
-            continue
-        named = (bid not in owned) if owned else ID_RE.search(settings)
-        if not named:
-            project[name] = resolve(settings, name)
-        elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            # A non-application target never ships as the app, and another OS has no iOS floor.
-            # A target xcconfig outranks the project, so the one this target names decides its SDK.
-            inherited = "SDKROOT" not in settings and name in other_os
-            if inherited:
-                own = xcconfig_sdk(text, prefix, path)
-                if own == "unknown":
-                    continue
-                inherited = own != "ios"
-            sdk = OTHER_OS_RE.search(settings) or inherited
-            if bid in skip or sdk or (app_ids and bid not in app_ids):
-                continue
-            apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
-    if not apps:
-        continue
-    certain, unknown, via_xc = [], False, False
-    for name, state, has_xc in apps:
-        if state[0] == "value":
-            certain.append((state[1], False))
-        elif state[0] == "unknown":
-            unknown = True
-        elif has_xc and XC_SETS:
-            # An xcconfig in the project sets a target, so an app built on one takes its value from the xcconfig.
-            via_xc = True
-        else:
-            inherited = project.get(name, ("none", None))
-            if inherited[0] == "value":
-                # The app has no xcconfig of its own, so no file can override the inherited value.
-                certain.append((inherited[1], False))
-            elif inherited[0] == "unknown":
-                unknown = True
-    low = [inh for v, inh in certain if v < 15]
-    if low:
-        worst = 15
-        # A project-level value is inherited, so a target xcconfig can still override it.
-        weak15 = weak15 and all(low)
-    elif via_xc:
-        xc_decides = True
-    elif certain or unknown:
-        ok15 = True
-if worst == 15:
-    print("below15p" if weak15 else "below15")
-    sys.exit(0)
-if xc_decides:
-    print("xc")
-    sys.exit(0)
-if ok15:
-    print("ok15")
-    sys.exit(0)
-sys.exit(1)
-PBXPY
-)" 2>/dev/null
-  }
   xcconfig_below_ios13() {
     [ -s "$FILELIST" ] || return 1
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
-  xcconfig_ios15_state() {
-    # One number per app xcconfig. Per key the last assignment wins, simulator-only keys are left out,
-    # and the file reports its highest value. A Podfile-style platform line counts as 14.
-    [ -s "$FILELIST" ] || return 0
-    # The name filter reads the path below the project, so a parent folder such as contest-app is never matched.
-    grep '[.]xcconfig$' "$FILELIST" | awk -v root="${DIR%/}/" '{ p = (index($0, root) == 1) ? substr($0, length(root) + 1) : $0 } tolower(p) !~ /(test|framework|pods)/' | while IFS= read -r xf; do
-      awk '{ sub(/\/\/.*/, "") }
-        /^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*(\[[^]]*\][[:space:]]*)*=/ { cond = ""; if (match($0, /(\[[^]]*\])+/)) cond = substr($0, RSTART, RLENGTH)
-          if (cond ~ /iphonesimulator/) next
-          v = $0; sub(/^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET[[:space:]]*(\[[^]]*\][[:space:]]*)*=[[:space:]]*/, "", v); gsub(/["; \t]/, "", v); split(v, p, ".")
-          # A value built from a variable cannot be resolved here, so count it as 99 and stay quiet.
-          last[cond] = (p[1] ~ /^[0-9]+$/) ? p[1] + 0 : 99 }
-        /^[[:space:]]*\/\*/ { unknown = 1 }
-        /^[[:space:]]*platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*./ { plat = 1 }
-        END { m = -1; for (c in last) if (last[c] > m) m = last[c]
-          if (plat && m < 0) m = 14
-          # A block comment may hide or expose an assignment, so the file value is unknown.
-          if (unknown && m >= 0) m = 99
-          if (m >= 0) print m }' "$xf" 2>/dev/null
-    done
+  xcconfig_below_ios15() {
+    [ -s "$FILELIST" ] || return 1
+    grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
-  # Below iOS 13 is refused today (Upcoming Requirements). iOS 13 and 14 stay legal until April 2027,
-  # when the Submitting page requires iOS 15, so they warn and do not block. A below-13 target keeps
-  # only the existing finding.
-  pbx_floor="$(pbx_ios_floor || true)"
-  xc_max="$(xcconfig_ios15_state | sort -n | tail -1)"
-  case "$xc_max" in 13|14) xc_state=below15 ;; '') xc_state='' ;; *) [ "$xc_max" -ge 15 ] 2>/dev/null && xc_state=ok15 || xc_state='' ;; esac
-  # An app setting of 15 or later, in the project file or an xcconfig, overrides the Podfile's pod platform.
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
-  # An app target that sets iOS 15 or later overrides a base xcconfig and the Podfile's pod platform.
-  elif printf '%s\n' "$pbx_floor" | grep_q -x below15 || { [ "$pbx_floor" != ok15 ] && { printf '%s\n' "$xc_state" | grep_q -x below15 || { ! printf '%s\n' "$xc_state" | grep_q -x ok15 && { [ "$pbx_floor" = below15p ] || podfile_below_ios15; }; }; }; }; then
+  # iOS 13 and 14 stay legal until April 2027, so they warn. Same reading as the iOS 13 check.
+  elif podfile_below_ios15 || pbx_below_ios13 13 15 || xcconfig_below_ios15; then
     finding medium "APPLE-MIN-DEPLOYMENT-TARGET-IOS15" "iOS deployment target below the April 2027 iOS 15 floor" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 15.0 or later before April 2027. Apple has named the month only. Source. https://developer.apple.com/app-store/submitting/. A target below iOS 13 is already refused at upload." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(13|14)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(13|14)(\.[0-9]+)*.'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
