@@ -619,25 +619,14 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
-HOST_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+URL_HEAD_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://([^/?#\s]*)")
 
 
-def url_shaped(text, m):
-    # An address has a scheme before its host name, or a port or path right after the host, or sits in a
-    # template that builds one (it holds ://). Prose such as JSX text has none of these.
-    k, e = m.start(), m.end()
-    while k > 0 and text[k - 1] in HOST_CHARS:
-        k -= 1
-    # A name after a single slash is a path segment, not a host.
-    if text[k - 1:k] == SL and text[max(0, k - 3):k] != chr(58) + SL + SL:
-        return False
-    if text[:1] == BT:
-        gap = (SQ, DQ, chr(32))
-        while k > 0 and text[k - 1] in gap:
-            k -= 1
-        while e < len(text) and text[e] in gap:
-            e += 1
-    return text[max(0, k - 3):k] == chr(58) + SL + SL or text[e:e + 1] in (chr(58), SL)
+def staged_url(text):
+    # Only a literal that is itself a URL counts, and only when its host is the staging host, so prose,
+    # a query string or a path that mentions the host stays silent, the same as before this check.
+    m = URL_HEAD_RE.match(text[1:])
+    return bool(m and WANT.search(m.group(1)))
 
 
 def skip_regex(code, i):
@@ -740,7 +729,7 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     for text in literals(code):
-        if text[0] in (SQ, BT) and any(url_shaped(text, m) for m in WANT.finditer(text)):
+        if text[0] in (SQ, BT) and staged_url(text):
             print(path)
             sys.exit(0)
 JSSTRPY
@@ -756,7 +745,7 @@ ios_google_signin() {
   # nothing is left out beyond .android files.
   local custom=0
   grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
-  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
+  grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -IlE "(from|require[(])[[:space:]]*['\"]@react-native-google-signin/" 2>/dev/null \
     | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
 import sys
