@@ -417,12 +417,18 @@ do_uninstall() {
   if [ "$DRY" -eq 1 ]; then
     say "Dry run. Would remove the guard, the skill folder, the slash command and the hook entry from $SHOWN."; exit 0
   fi
-  rm -f "$GUARD" "$CMD_FILE"; rm -rf "$SKILL"
   settings_edit remove; local rc=$?
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+    say "Could not edit settings.json. Installed files were kept so any existing hook can still run."
+    return 1
+  fi
+  if ! rm -f "$GUARD" "$CMD_FILE" || ! rm -rf "$SKILL"; then
+    say "Could not remove all installed files from $SHOWN."
+    return 1
+  fi
   case "$rc" in
     0) say "Removed the guard, the skill, the slash command and the hook entry. A backup of settings.json sits next to it." ;;
     3) say "Removed the guard, the skill and the slash command. No hook entry was registered." ;;
-    *) say "Removed the files. Could not edit settings.json, remove the $GUARD_NAME entry by hand."; exit 1 ;;
   esac
 }
 
