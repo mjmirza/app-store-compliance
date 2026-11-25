@@ -1051,6 +1051,7 @@ def majors(settings):
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
+OTHER_OS_RE = re.compile(r"SDKROOT\s*=\s*\"?(macosx|watchos|appletvos|xros|driverkit)")
 
 
 def resolve(settings, name):
@@ -1120,7 +1121,7 @@ for path in sys.argv[1:]:
     # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
     names = {b[2] for b in blocks}
     shipped = {n for n in names if "debug" not in n.lower()} or names
-    project, apps = {}, {}
+    project, apps = {}, []
     for prefix, settings, name in blocks:
         if name not in shipped:
             continue
@@ -1128,11 +1129,14 @@ for path in sys.argv[1:]:
         if not named:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            apps[(named.group(1).strip(), name)] = (resolve(settings, name), "baseConfigurationReference" in prefix)
+            # A macOS, watchOS, tvOS or visionOS target has no iOS floor. Every block counts on its own.
+            if OTHER_OS_RE.search(settings):
+                continue
+            apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
         continue
     certain, unknown = [], False
-    for (_, name), (state, has_xc) in apps.items():
+    for name, state, has_xc in apps:
         if state[0] == "value":
             certain.append((state[1], False))
         elif state[0] == "unknown" or (has_xc and XC_SETS):
