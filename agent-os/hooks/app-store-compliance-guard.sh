@@ -619,12 +619,16 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
+TEMPLATE_HOST_RE = re.compile(r"://["+chr(32)+"'"+chr(34)+chr(96)+"]*([^/?#"+chr(32)+"'"+chr(34)+chr(96)+"]*)")
 URL_HEAD_RE = re.compile(r"\s*[A-Za-z][A-Za-z0-9+.-]*://([^/?#\s]*)")
 
 
 def staged_url(text):
     # Only a literal that is itself a URL counts, and only when its host is the staging host, so prose,
     # a query string or a path that mentions the host stays silent, the same as before this check.
+    if text[:1] == BT:
+        # A template can build the address from an expression, so read the host after every scheme in it.
+        return any(WANT.search(m.group(1)) for m in TEMPLATE_HOST_RE.finditer(text))
     m = URL_HEAD_RE.match(text[1:])
     return bool(m and WANT.search(m.group(1)))
 
