@@ -1396,6 +1396,9 @@ def frees(root):
             return True
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
             return True
+        # A tools:node marker can remove or replace a whole activity or the application.
+        if attr(el, "node") is not None:
+            return True
         if local(el.tag) == "uses-feature" and attr(el, "name") in ONLY_DEVICE:
             return True
     return False
