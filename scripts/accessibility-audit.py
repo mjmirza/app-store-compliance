@@ -475,6 +475,10 @@ def find_icon_only_buttons(code):
         if any(_labels_button(code, name, args) for name, args in mods):
             continue
         yield m.start(), i
+ANDROID_TOUCH_TAG = re.compile(r"(Button|CheckBox|RadioButton|Switch|SwitchCompat|SwitchMaterial|ToggleButton|SeekBar"
+                               r"|Spinner|EditText|AutoCompleteTextView|RatingBar|NumberPicker|Picker)$")
+
+
 def run_rule_scan(rule_id, ios_files, android_files):
     findings = []
 
@@ -782,6 +786,16 @@ def run_rule_scan(rule_id, ios_files, android_files):
 
     elif rule_id == "ANDROID-ACCESSIBILITY-SCANNER":
         # Scan XML and Compose layouts for touch target dimensions or paddings under 48dp
+        touch_delegate = False
+        for f in android_files:
+            if f.endswith((".java", ".kt")):
+                try:
+                    with open(f, encoding="utf-8", errors="ignore") as fh:
+                        if "TouchDelegate" in fh.read():
+                            touch_delegate = True
+                            break
+                except OSError:
+                    continue
         for f in android_files:
             if f.endswith(".xml"):
                 try:
@@ -790,18 +804,108 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     continue
                 # Match layout_width or layout_height with dimensions below 48dp (e.g. 10dp to 47dp)
                 # Let's match layout_width or layout_height or minWidth or minHeight under 48dp
-                for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
-                    if "layout_width=\"wrap_content\"" not in content and "layout_height=\"wrap_content\"" not in content:
-                        start_idx = match.start()
-                        line_no = content.count("\n", 0, start_idx) + 1
-                        findings.append({
-                            "file": f,
-                            "line": line_no,
-                            "rule_id": rule_id,
-                            "match": match.group(0),
-                            "message": f"Component dimension ({match.group(0)}) is below the recommended 48dp touch target threshold.",
-                            "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
-                        })
+                def add_finding(text, start_idx):
+                    findings.append({
+                        "file": f,
+                        "line": content.count("\n", 0, start_idx) + 1,
+                        "rule_id": rule_id,
+                        "match": text,
+                        "message": f"Component dimension ({text}) is below the recommended 48dp touch target threshold.",
+                        "fix": "Increase interactive component width and height to at least 48dp or add layout padding."
+                    })
+
+                if "layout_width=\"wrap_content\"" not in content and "layout_height=\"wrap_content\"" not in content:
+                    # No wrapped axis in the file. Unchanged, every small explicit dimension is reported.
+                    for match in re.finditer(r"android:(layout_width|layout_height|minWidth|minHeight)\s*=\s*\"([1-3][0-9]|4[0-7]|[1-9])dp\"", content):
+                        add_finding(match.group(0), match.start())
+                    continue
+                # A TouchDelegate anywhere in the app can widen a view past its declared size, so the
+                # declared size is not the touch area and the file stays silent, as it did before.
+                if touch_delegate:
+                    continue
+                # A wrapped axis used to hide the whole file. Now report controls that are clearly
+                # interactive, judged per element, where an explicit size wins over minWidth.
+                attr_re = r"\s+[\w:.-]+\s*=\s*(?:\"[^\"]*\"|'[^']*')"
+                # A commented-out element is not a control. Blank comments but keep their line breaks.
+                live = re.sub(r"<!--.*?-->", lambda m: re.sub(r"[^\n]", " ", m.group(0)), content, flags=re.S)
+                # Walk the tree. A view inside a hidden parent is hidden too, and the parent decides the final size.
+                # Only a LinearLayout or FrameLayout keeps an explicit dp as the final size, so only their children,
+                # and the root, are judged. Any other parent can stretch or constrain the child, so it stays silent.
+                stack = []
+                for el in re.finditer(r"<(/?)([A-Za-z_][\w.]*)((?:" + attr_re + r")*)\s*(/?)>", live):
+                    if el.group(1):
+                        if stack:
+                            stack.pop()
+                        continue
+                    tag, attrs = el.group(2).rsplit(".", 1)[-1], el.group(3)
+                    vals = {k: v1 or v2 for k, v1, v2 in re.findall(r"android:(\w+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)}
+                    parent = stack[-1] if stack else None
+                    # A style can set visibility, so a styled view, and everything inside it, is unknown.
+                    styled = re.search(r"(?<![\w:])style\s*=", attrs)
+                    # A scale on a view or any parent changes the hit area, so it makes the subtree unknown too.
+                    scaled = any(vals.get(k, "1").strip() not in ("1", "1.0") for k in ("scaleX", "scaleY"))
+                    # Alpha 0 makes a view invisible to touch checks, and a resource or attribute alpha may be 0.
+                    alpha = vals.get("alpha", "1").strip()
+                    try:
+                        faded = float(alpha) == 0
+                    except ValueError:
+                        faded = True
+                    hidden = bool(parent and parent[0]) or bool(styled) or scaled or faded or vals.get("visibility", "visible").lower() != "visible"
+                    if not el.group(4):
+                        # The orientation is known only when set on the element and no style can override it.
+                        orient = vals.get("orientation", "horizontal").strip().lower()
+                        # The nearest clickable ancestor and its handler name. A handler set in code is "?".
+                        own = vals.get("onClick", "@null").strip()
+                        # Only a plain method name can be compared. A binding expression is unknown, so it is "?".
+                        if own not in ("@null", "") and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", own):
+                            own = "?"
+                        if own in ("@null", ""):
+                            own = "?" if vals.get("clickable", "").strip().lower() == "true" or vals.get("onLongClick", "@null").strip() not in ("@null", "") else None
+                        stack.append((hidden, tag, None if styled or orient not in ("horizontal", "vertical") else orient,
+                                      own or (parent[3] if parent else None)))
+                    # The root is skipped too, since an include can override its size.
+                    if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
+                        continue
+                    # These Material components pad themselves up to a 48dp touch target.
+                    ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)
+                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip"):
+                        continue
+                    # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
+                    # false) may switch the listener off, so a handler alone does not count then.
+                    clickable = vals.get("clickable")
+                    if clickable is not None and clickable.strip().lower() != "true":
+                        continue
+                    true_attr = any(vals.get(k, "").lower() == "true" for k in ("clickable", "longClickable", "textIsSelectable"))
+                    # A handler set to @null installs no listener.
+                    handler = any(vals.get(k, "@null").strip() not in ("@null", "") for k in ("onClick", "onLongClick"))
+                    style = re.search(r"(?<![\w:])style\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", attrs)
+                    indicator = vals.get("isIndicator", "false").lower() != "false" or bool(
+                        style and re.search(r"ratingBarStyle(Small|Indicator)|RatingBar\.(Small|Indicator)", style.group(1) or style.group(2) or ""))
+                    # A style can switch clickability off, so a styled widget does not count by its type alone.
+                    widget = not indicator and not style and ANDROID_TOUCH_TAG.search(tag)
+                    if not (true_attr or handler or widget):
+                        continue
+                    # Inside a clickable ancestor, a child that runs the same action, or none of its own, is part of
+                    # the larger target. Only a child with a different named handler is a separate target.
+                    mine = vals.get("onClick", "@null").strip()
+                    plain = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", mine)
+                    if parent and parent[3] and (parent[3] == "?" or not plain or mine == parent[3]):
+                        continue
+                    # A weight in a LinearLayout sizes the child along the layout orientation, so that axis is unknown.
+                    weighted = parent and parent[1] != "FrameLayout" and vals.get("layout_weight", "0").strip() not in ("0", "0.0", "")
+                    if weighted and parent[2] is None:
+                        continue
+                    skip_axis = ("layout_width" if parent[2] != "vertical" else "layout_height") if weighted else None
+                    # A switch grows its height to fit the thumb, its width stays as declared.
+                    switch = tag in ("Switch", "SwitchCompat", "SwitchMaterial", "MaterialSwitch")
+                    for axis in ("layout_width", "layout_height"):
+                        if axis == skip_axis or (switch and axis == "layout_height"):
+                            continue
+                        size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
+                        if not size or not 0 < int(size.group(1)) < 48:
+                            continue
+                        attr = re.search(r"android:" + axis + r"\s*=\s*(?:\"[^\"]*\"|'[^']*')", attrs)
+                        add_finding(attr.group(0), el.start(3) + attr.start())
             elif f.endswith(".kt"):
                 try:
                     content = open(f, encoding="utf-8", errors="ignore").read()

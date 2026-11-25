@@ -1025,6 +1025,271 @@ printf '%s\n' 'import SwiftUI' 'let q = #"three: """ here"#' 'let text = Text(#"
 OUT=$($AUDIT "$R24_DIR/app" --rule APPLE-ACCESSIBILITY-VOICEOVER 2>&1)
 if echo "$OUT" | grep -q 'Image("hero")'; then ok "a raw-string interpolated Image is still reported"; else bad "a raw-string interpolated Image was lost. Output:"; echo "$OUT"; fi
 rm -rf "$R24_DIR" 2>/dev/null || true
+# A wrapped axis has no explicit size, but must not hide any explicit dimension.
+WRAP_DIR="$(mktemp -d)"
+cat <<'EOF2' > "$WRAP_DIR/mixed_targets.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <Button android:layout_width="36dp" android:layout_height="wrap_content" />
+    <ImageView android:layout_width="24dp" android:layout_height="24dp" android:clickable="true" />
+    <Button android:layout_width="match_parent" android:layout_height="56dp"
+        android:minWidth="40dp" />
+    <Button android:layout_width="96dp" android:layout_height="56dp" android:minWidth="40dp" />
+    <Button android:layout_width="40dp" android:layout_height="48dp" android:minWidth="48dp" />
+    <androidx.appcompat.widget.AppCompatCheckBox android:layout_width="24dp" android:layout_height="48dp" />
+    <Button android:onClick="@{() -> viewModel.save()}" android:layout_width="32dp" android:layout_height="48dp" />
+    <TextView android:layout_width="30dp" android:layout_height="48dp" android:longClickable="true" />
+    <Button android:text='Save' android:layout_width="28dp" android:layout_height="48dp" />
+    <NumberPicker android:layout_width="26dp" android:layout_height="120dp" />
+    <TextView android:onLongClick="@{() -> vm.showMenu()}" android:layout_width="22dp" android:layout_height="48dp" />
+    <ImageView android:layout_width="20dp" android:layout_height="20dp" />
+    <com.google.android.material.textview.MaterialTextView android:layout_width="match_parent" android:layout_height="19dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="40dp" android:autoLink="web" />
+    <ImageView android:layout_width="34dp" android:layout_height="48dp" android:clickable="@bool/image_is_clickable" />
+    <!-- <Button android:layout_width="18dp" android:layout_height="18dp" /> -->
+    <RatingBar android:layout_width="wrap_content" android:layout_height="17dp" android:isIndicator="true" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:clickable="false" />
+    <Button android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" />
+    <CheckedTextView android:layout_width="match_parent" android:layout_height="15dp" android:checked="true" />
+    <CheckBox style="@style/RowCheck" android:layout_width="14dp" android:layout_height="14dp" />
+    <Button android:layout_width="48dp" android:layout_height="48dp" />
+    <Button android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>
+EOF2
+printf '<resources><bool name="image_is_clickable">true</bool></resources>\n' > "$WRAP_DIR/bools.xml"
+OUT=$($AUDIT "$WRAP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 10 ] \
+    && echo "$OUT" | grep -q 'context: android:layout_width="36dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="24dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_height="24dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="40dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="32dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="30dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="28dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="26dp"' \
+    && echo "$OUT" | grep -q 'context: android:layout_width="22dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="40dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="34dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="16dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="15dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="14dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="18dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="17dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_width="20dp"' \
+    && ! echo "$OUT" | grep -q 'context: android:layout_height="19dp"'; then
+  ok "wrap_content does not hide an undersized control, and dividers stay silent"
+else
+  bad "wrap_content does not hide an undersized control, and dividers stay silent"
+  echo "$OUT"
+fi
+rm -rf "$WRAP_DIR"
+# A value read from a resource, a link that depends on the text, and an indicator are unknown or inert, so they stay silent.
+RES_DIR="$(mktemp -d)"; mkdir -p "$RES_DIR/res/layout" "$RES_DIR/res/values" "$RES_DIR/res/values-sw600dp"
+cat <<'EOF4' > "$RES_DIR/res/layout/x.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <Button android:layout_width="32dp" android:layout_height="48dp" android:clickable="@bool/tap" />
+    <TextView android:layout_width="match_parent" android:layout_height="24dp" android:autoLink="web" android:linksClickable="@bool/links" />
+    <TextView android:layout_width="wrap_content" android:layout_height="23dp" android:autoLink="web" android:linksClickable="@bool/alias" />
+    <RatingBar android:layout_width="wrap_content" android:layout_height="22dp" android:isIndicator="@bool/read_only" />
+    <RatingBar style="?android:attr/ratingBarStyleSmall" android:layout_width="wrap_content" android:layout_height="21dp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="20dp" android:focusable="true" />
+    <ImageView android:layout_width="19dp" android:layout_height="48dp" android:clickable="@bool/inert" />
+</LinearLayout>
+EOF4
+printf '<resources><bool name="tap">true</bool><bool name="links">false</bool><bool name="alias">@bool/on</bool><bool name="on">true</bool><bool name="read_only">false</bool><!-- <bool name="inert">true</bool> --><bool name="inert">false</bool></resources>\n' > "$RES_DIR/res/values/b.xml"
+printf '<resources><bool name="tap">false</bool><bool name="read_only">true</bool></resources>\n' > "$RES_DIR/res/values-sw600dp/b.xml"
+OUT=$($AUDIT "$RES_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 0 ]; then
+  ok "resource-driven, text-dependent and indicator controls stay silent"
+else
+  bad "resource-driven, text-dependent and indicator controls stay silent"
+  echo "$OUT"
+fi
+rm -rf "$RES_DIR"
+# A hidden parent, a weighted size and a Material Slider are unknown or enforced, so they stay silent.
+TREE_DIR="$(mktemp -d)"
+cat <<'EOF5' > "$TREE_DIR/tree.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="horizontal"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone">
+        <Button android:layout_width="13dp" android:layout_height="13dp" />
+    </LinearLayout>
+    <Button android:layout_width="12dp" android:layout_height="48dp" android:layout_weight="1" />
+    <com.google.android.material.slider.Slider android:layout_width="match_parent" android:layout_height="11dp" />
+    <TextView android:layout_width="10dp" android:layout_height="48dp" android:onClick="@null" />
+    <Button android:layout_width="33dp" android:layout_height="48dp" />
+</LinearLayout>
+EOF5
+OUT=$($AUDIT "$TREE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_width="33dp"'; then
+  ok "a hidden parent, a weighted size, a Material Slider and a null handler stay silent, a sibling is still reported"
+else
+  bad "a hidden parent, a weighted size, a Material Slider and a null handler stay silent, a sibling is still reported"
+  echo "$OUT"
+fi
+rm -rf "$TREE_DIR"
+# Only a LinearLayout or FrameLayout keeps an explicit size final. A weight hides only its own axis.
+PARENT_DIR="$(mktemp -d)"
+cat <<'EOF6' > "$PARENT_DIR/parents.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:layout_width="0dp" android:layout_height="31dp" android:layout_weight="1" />
+    </LinearLayout>
+    <com.google.android.flexbox.FlexboxLayout android:layout_width="320dp" android:layout_height="wrap_content">
+        <Button android:layout_width="12dp" android:layout_height="48dp" app:layout_flexGrow="1" />
+    </com.google.android.flexbox.FlexboxLayout>
+    <TextView android:layout_width="11dp" android:layout_height="48dp" android:clickable="@{false}" android:onClick="@{() -> vm.save()}" />
+    <LinearLayout style="@style/Col" android:layout_width="wrap_content" android:layout_height="160dp">
+        <Button android:layout_width="100dp" android:layout_height="29dp" android:layout_weight="1" />
+    </LinearLayout>
+    <com.google.android.material.floatingactionbutton.FloatingActionButton android:layout_width="28dp" android:layout_height="28dp" app:fabSize="mini" />
+    <LinearLayout android:orientation="@integer/stack_orientation" android:layout_width="match_parent" android:layout_height="160dp">
+        <Button android:layout_width="wrap_content" android:layout_height="9dp" android:layout_weight="1" />
+    </LinearLayout>
+    <FrameLayout android:scaleX="2" android:scaleY="2" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <ImageButton android:layout_width="8dp" android:layout_height="8dp" />
+    </FrameLayout>
+</LinearLayout>
+EOF6
+OUT=$($AUDIT "$PARENT_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="31dp"'; then
+  ok "a weight hides only its axis, Flexbox, a disabling binding, a styled orientation and Material stay silent"
+else
+  bad "a weight hides only its axis, Flexbox, a disabling binding, a styled orientation and Material stay silent"
+  echo "$OUT"
+fi
+rm -rf "$PARENT_DIR"
+# A styled section is unknown, the root may be resized by an include, and a plain MaterialTextView is still judged.
+MORE_DIR="$(mktemp -d)"
+cat <<'EOF7' > "$MORE_DIR/more.xml"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout style="@style/HiddenSection" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <Button android:layout_width="27dp" android:layout_height="27dp" />
+    </LinearLayout>
+    <com.google.android.material.textview.MaterialTextView android:layout_width="48dp" android:layout_height="26dp" android:clickable="true" />
+    <ImageButton android:layout_width="24dp" android:layout_height="24dp" android:scaleX="2" android:scaleY="2" />
+</FrameLayout>
+EOF7
+printf '<Button xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="25dp" android:layout_height="wrap_content" />\n' > "$MORE_DIR/root_button.xml"
+OUT=$($AUDIT "$MORE_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="26dp"'; then
+  ok "a styled section, a root view and a scaled control stay silent, a clickable MaterialTextView is still reported"
+else
+  bad "a styled section, a root view and a scaled control stay silent, a clickable MaterialTextView is still reported"
+  echo "$OUT"
+fi
+rm -rf "$MORE_DIR"
+# A TouchDelegate in the app can widen a view, so a wrapped file stays silent as before.
+TD_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><ImageButton android:layout_width="24dp" android:layout_height="24dp" /></FrameLayout>\n' > "$TD_DIR/td.xml"
+printf 'class A { void f() { parent.setTouchDelegate(new TouchDelegate(rect, button)); } }\n' > "$TD_DIR/A.java"
+OUT=$($AUDIT "$TD_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a TouchDelegate in the app keeps a wrapped layout silent"
+else
+  bad "a TouchDelegate in the app keeps a wrapped layout silent"
+  echo "$OUT"
+fi
+rm -f "$TD_DIR/A.java"
+OUT=$($AUDIT "$TD_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ]; then
+  ok "without a TouchDelegate the same layout is still reported"
+else
+  bad "without a TouchDelegate the same layout is still reported"
+  echo "$OUT"
+fi
+rm -rf "$TD_DIR"
+AL_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:alpha="0"><ImageButton android:layout_width="24dp" android:layout_height="24dp" /></FrameLayout>\n' > "$AL_DIR/al.xml"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a control inside an alpha 0 panel stays silent"
+else
+  bad "a control inside an alpha 0 panel stays silent"
+  echo "$OUT"
+fi
+sed -i.bak 's/android:alpha="0"/android:alpha="0.5"/' "$AL_DIR/al.xml" && rm -f "$AL_DIR/al.xml.bak"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ]; then
+  ok "a control inside a half-faded panel is still reported"
+else
+  bad "a control inside a half-faded panel is still reported"
+  echo "$OUT"
+fi
+sed -i.bak 's/android:alpha="0.5"/android:alpha="@dimen\/panel_alpha"/' "$AL_DIR/al.xml" && rm -f "$AL_DIR/al.xml.bak"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a resource alpha that may be 0 keeps the panel silent"
+else
+  bad "a resource alpha that may be 0 keeps the panel silent"
+  echo "$OUT"
+fi
+sed -i.bak 's/android:alpha="@dimen\/panel_alpha"/android:alpha="0.000"/' "$AL_DIR/al.xml" && rm -f "$AL_DIR/al.xml.bak"
+OUT=$($AUDIT "$AL_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "an alpha written as 0.000 is still zero"
+else
+  bad "an alpha written as 0.000 is still zero"
+  echo "$OUT"
+fi
+rm -rf "$AL_DIR"
+SW_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><Switch android:layout_width="96dp" android:layout_height="24dp" /><Switch android:layout_width="22dp" android:layout_height="64dp" /><CheckBox android:layout_width="96dp" android:layout_height="23dp" /></FrameLayout>\n' > "$SW_DIR/sw.xml"
+OUT=$($AUDIT "$SW_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ] && echo "$OUT" | grep -q 'context: android:layout_height="23dp"' && echo "$OUT" | grep -q 'context: android:layout_width="22dp"'; then
+  ok "a switch is judged by its width only, a checkbox by both"
+else
+  bad "a switch is judged by its width only, a checkbox by both"
+  echo "$OUT"
+fi
+rm -rf "$SW_DIR"
+CP_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="selectDelivery"><RadioButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="selectDelivery" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a control inside a clickable row is part of the row target"
+else
+  bad "a control inside a clickable row is part of the row target"
+  echo "$OUT"
+fi
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="openArticle"><ImageButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="showMenu" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ]; then
+  ok "a control with its own different action inside a clickable row is still reported"
+else
+  bad "a control with its own different action inside a clickable row is still reported"
+  echo "$OUT"
+fi
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="@{() -> vm.select()}"><RadioButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="@{()->vm.select()}" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "binding callbacks inside a clickable row are not compared as text"
+else
+  bad "binding callbacks inside a clickable row are not compared as text"
+  echo "$OUT"
+fi
+rm -rf "$CP_DIR"
+# A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
+PLAIN_DIR="$(mktemp -d)"
+cat <<'EOF3' > "$PLAIN_DIR/plain.xml"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:layout_width="32dp" android:layout_height="32dp" />
+</LinearLayout>
+EOF3
+OUT=$($AUDIT "$PLAIN_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if [ "$(echo "$OUT" | grep -c 'ANDROID-ACCESSIBILITY-SCANNER  (')" -eq 2 ]; then
+  ok "a layout with no wrap_content still reports every small dimension"
+else
+  bad "a layout with no wrap_content still reports every small dimension"
+  echo "$OUT"
+fi
+rm -rf "$PLAIN_DIR"
 # Long one-line expressions must not inflate output or hide any controls.
 CONTEXT_DIR="$(mktemp -d)"
 python3 - "$CONTEXT_DIR/Controls.swift" <<'PYTHON'
