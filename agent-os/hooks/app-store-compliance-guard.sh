@@ -1036,7 +1036,9 @@ SIWAPY
     # Whether any xcconfig in the project sets a deployment target, for app configurations built on one.
     local xcdt=0
     grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'IPHONEOS_DEPLOYMENT_TARGET' 2>/dev/null | grep . >/dev/null && xcdt=1
-    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" xargs -0 python3 -c "$(cat <<'PBXPY'
+    local xcsdk=''
+    grep '[.]xcconfig$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hE '^[[:space:]]*SDKROOT[[:space:]]*=[[:space:]]*iphoneos' 2>/dev/null | grep . >/dev/null && xcsdk=ios
+    printf '%s\n' "$pf" | tr '\n' '\0' | ASCG_XC_DT="$xcdt" ASCG_XC_SDK="$xcsdk" xargs -0 python3 -c "$(cat <<'PBXPY'
 import os
 import re
 import sys
@@ -1082,8 +1084,21 @@ def majors13(settings, name):
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
 ID_RE = re.compile(r"(?:PRODUCT_BUNDLE_IDENTIFIER|PRODUCT_NAME)\s*=\s*\"?([^;\"\n]+)")
 XC_SETS = os.environ.get("ASCG_XC_DT") == "1"
+XC_SDK = os.environ.get("ASCG_XC_SDK", "")
 TARGET_RE = re.compile(r"isa = PBXNativeTarget;(.*?)\n\s*\};", re.S)
 LIST_RE = re.compile(r"(\w+)[^=\n{]*=\s*\{\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", re.S)
+
+
+def app_configs(text):
+    # Configuration ids of the application targets. An aggregate or legacy target is never one.
+    lists = {lid: re.findall(r"(\w+)\s*(?:/\*.*?\*/)?\s*,", body) for lid, body in LIST_RE.findall(text)}
+    ids = set()
+    for body in TARGET_RE.findall(text):
+        kind = re.search(r"productType = \"([^\"]+)\"", body)
+        lid = re.search(r"buildConfigurationList = (\w+)", body)
+        if kind and lid and kind.group(1) == "com.apple.product-type.application":
+            ids.update(lists.get(lid.group(1), []))
+    return ids
 
 
 def non_app_configs(text):
@@ -1172,6 +1187,7 @@ for path in sys.argv[1:]:
     blocks = BLOCK_RE.findall(text)
     skip = non_app_configs(text)
     owned = project_configs(text)
+    app_ids = app_configs(text)
     # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
     app13, project13 = [], []
     for bid, prefix, settings, name in blocks:
@@ -1180,7 +1196,7 @@ for path in sys.argv[1:]:
             # The project file says which configurations the project owns, so no product name is guessed.
             if bid in owned:
                 project13.extend(vals)
-            elif bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
+            elif (bid in app_ids if app_ids else bid not in skip) and not any(marker in settings for marker in DEPENDENCY_MARKERS):
                 app13.extend(vals)
             continue
         named = ID_RE.search(settings)
@@ -1208,9 +1224,12 @@ for path in sys.argv[1:]:
             project[name] = resolve(settings, name)
         elif not any(marker in settings for marker in DEPENDENCY_MARKERS):
             # A non-application target never ships as the app, and another OS has no iOS floor.
-            sdk = OTHER_OS_RE.search(settings) or ("SDKROOT" not in settings and name in other_os
-                                                   and "baseConfigurationReference" not in prefix)
-            if bid in skip or sdk:
+            # An xcconfig can set SDKROOT too. Only an xcconfig that sets an iOS SDK brings the target back.
+            inherited = "SDKROOT" not in settings and name in other_os
+            if inherited and "baseConfigurationReference" in prefix and XC_SDK == "ios":
+                inherited = False
+            sdk = OTHER_OS_RE.search(settings) or inherited
+            if bid in skip or sdk or (app_ids and bid not in app_ids):
                 continue
             apps.append((name, resolve(settings, name), "baseConfigurationReference" in prefix))
     if not apps:
