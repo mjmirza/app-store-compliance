@@ -827,7 +827,8 @@ for path in sys.argv[1:]:
             code = fh.read()
     except OSError:
         continue
-    jsx = True
+    # JSX is never valid in a plain .ts file, where <T> is a type argument.
+    jsx = not path.endswith((".ts", ".mts", ".cts"))
     for text, code_position, at in literals(code, jsx):
         if text[0] in (SQ, BT) and code_position and staged_url(text):
             print(path + chr(58) + str(code.count(NL, 0, at) + 1))
@@ -904,7 +905,7 @@ def runtime_use(path):
     body = re.sub(r"(?m)(?<![:" + chr(34) + chr(39) + r"])//.*$", " ", body)
     for name in names:
         n = re.escape(name)
-        if re.search("(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body) or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body):
+        if re.search("(?<!typeof )(?<!" + IDC + "|[.])" + n + r"\s*[.(]", body) or re.search("(?<!" + IDC + ")<" + n + "(?!" + IDC + ")", body):
             return True
     return False
 
