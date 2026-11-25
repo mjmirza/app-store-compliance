@@ -4042,7 +4042,7 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 mkdir -p "$D/app/src/release"
 printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"><application><activity android:name=".Main" android:screenOrientation="portrait" tools:replace="android:screenOrientation" /></application></manifest>' > "$D/app/src/release/AndroidManifest.xml"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-tier3_id && ok "658 a release manifest that repeats the lock still fires" || bad "658 a release manifest that repeats the lock still fires"
+tier3_id && bad "658 a module with a variant manifest stays silent" || ok "658 a module with a variant manifest stays silent"
 rm -rf "$D"
 D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
 printf 'android { defaultConfig { targetSdk 37 } }\n' > "$D/app/build.gradle"

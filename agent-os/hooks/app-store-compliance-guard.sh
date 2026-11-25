@@ -1377,22 +1377,9 @@ def module(path):
     return path.split("/src/")[0] if "/src/" in path else path
 
 def unlocked(path):
-    # A variant manifest that sets a free orientation or allows resizing can replace the
-    # main value at merge, so that module is left alone. A variant repeating a lock is not.
-    for other in sys.argv[1:]:
-        if other == path or module(other) != module(path):
-            continue
-        try:
-            root = ET.parse(other).getroot()
-        except (ET.ParseError, OSError):
-            continue
-        for el in root.iter():
-            orientation = attr(el, "screenOrientation")
-            if orientation is not None and orientation not in LOCKED:
-                return True
-            if attr(el, "resizeableActivity") == "true":
-                return True
-    return False
+    # A variant manifest is merged over the main one with its own markers and inherited
+    # values, so a module with more than one manifest is left alone.
+    return any(other != path and module(other) == module(path) for other in sys.argv[1:])
 
 def opts_out(el):
     return any(local(child.tag) == "property" and attr(child, "name") == OPT_OUT
