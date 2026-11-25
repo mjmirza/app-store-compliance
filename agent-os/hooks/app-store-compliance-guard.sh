@@ -619,9 +619,18 @@ def skip_comment(code, j):
 REGEX_BEFORE = set("(,=:[!&|?{};+-*%<>~^" + NL)
 
 
+HOST_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+
+
 def url_shaped(text, m):
-    # A scheme before the host, or a port or path right after it. Prose such as JSX text has neither.
-    return text[max(0, m.start() - 3):m.start()] == chr(58) + SL + SL or text[m.end():m.end() + 1] in (chr(58), SL)
+    # An address has a scheme before its host name, or a port or path right after the host, or sits in a
+    # template that builds one (it holds ://). Prose such as JSX text has none of these.
+    k = m.start()
+    while k > 0 and text[k - 1] in HOST_CHARS:
+        k -= 1
+    if text[max(0, k - 3):k] == chr(58) + SL + SL or text[m.end():m.end() + 1] in (chr(58), SL):
+        return True
+    return text[:1] == BT and chr(58) + SL + SL in text
 
 
 def skip_regex(code, i):
@@ -735,7 +744,34 @@ JSSTRPY
 # The React Native GoogleSignin export counts only where it can reach the iOS build.
 ios_google_signin() {
   [ -s "$FILELIST" ] || return 1
-  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null | grep . >/dev/null
+  # A file is replaced on iOS by an .ios or .native sibling whose extension Metro tries no later, in its
+  # default order js, jsx, json, ts, tsx. A metro.config that sets sourceExts changes the order, so then
+  # nothing is left out beyond .android files.
+  local custom=0
+  grep -E '/metro[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -l 'sourceExts' 2>/dev/null | grep . >/dev/null && custom=1
+  grep -vE '[.]android[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -Il 'GoogleSignin' 2>/dev/null \
+    | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
+import os
+import sys
+
+ORDER = ["js", "jsx", "json", "ts", "tsx"]
+custom = os.environ.get("ASCG_CUSTOM") == "1"
+for path in sys.stdin.read().splitlines():
+    base, ext = os.path.splitext(path)
+    ext = ext[1:]
+    stem, plat = os.path.splitext(base)
+    plat = plat[1:]
+    if plat == "ios" or custom or ext not in ORDER:
+        print(path)
+        continue
+    if plat != "native":
+        stem, plat = base, ""
+    rivals = ["ios"] if plat == "native" else ["ios", "native"]
+    limit = ORDER.index(ext)
+    if not any(os.path.exists(stem + chr(46) + r + chr(46) + e) for r in rivals for e in ORDER[:limit + 1]):
+        print(path)
+GSIPY
+    )" 2>/dev/null | grep . >/dev/null
 }
 
 # Prints the first file and line that match, relative to the scanned folder. $1 is src or manifest.
