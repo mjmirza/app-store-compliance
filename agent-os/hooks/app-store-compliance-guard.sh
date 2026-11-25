@@ -1014,7 +1014,8 @@ SIG = re.compile(r"GoogleSignin[.](signIn|signInSilently)|<GoogleSigninButton|Go
 ORDER = ("js", "jsx", "ts", "tsx")
 SQ, DQ, BT, ST, SL, BS, NL = chr(39), chr(34), chr(96), chr(42), chr(47), chr(92), chr(10)
 CUSTOM = os.environ.get("ASCG_CUSTOM") == "1"
-TYPE_RE = re.compile(r"typeof\s+GoogleSignin[.]\w+|import\s+type\s[^;]*")
+TYPE_RE = re.compile(r"typeof\s+(GoogleSignin|GoogleOneTapSignIn)[.]\w+|import\s+type\s[^;\n]*")
+PLATFORM_RE = re.compile(r"Platform[.](OS|select)")
 
 
 def strip(code):
@@ -1072,7 +1073,9 @@ for path in sys.stdin.read().splitlines():
     except OSError:
         continue
     # A type position emits no runtime call, so typeof and import type references do not count.
-    if SIG.search(TYPE_RE.sub(" ", strip(code))):
+    # A file that branches on the platform cannot be read for iOS alone, so it stays unknown.
+    code = TYPE_RE.sub(" ", strip(code))
+    if SIG.search(code) and not PLATFORM_RE.search(code):
         print(path)
         break
 GSIPY
