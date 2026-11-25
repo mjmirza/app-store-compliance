@@ -1025,8 +1025,62 @@ SIWAPY
   }
   podfile_below_ios13() { podfile_ios_major '8|9|10|11|12'; }
   podfile_below_ios15() { podfile_ios_major '13|14'; }
+  # App Store Connect refuses uploads that target below iOS 13 (Upcoming Requirements page).
+  pbx_below_ios13() {  # reads the app target's build settings, never a framework's or a test bundle's
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local pf
+    pf="$(grep '[.]xcodeproj/project[.]pbxproj$' "$FILELIST")"
+    [ -n "$pf" ] || return 1
+    printf '%s\n' "$pf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PBXPY'
+import re
+import sys
+
+BLOCK_RE = re.compile(
+    r"isa = XCBuildConfiguration;.*?buildSettings = \{(.*?)\n\s*\};", re.S
+)
+DT_RE = re.compile(
+    r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
+)
+DEPENDENCY_MARKERS = (
+    "SKIP_INSTALL = YES",
+    "DYLIB_INSTALL_NAME_BASE",
+    "TEST_HOST",
+    "BUNDLE_LOADER",
+    "MACH_O_TYPE",
+    "TEST_TARGET_NAME",
+)
+
+
+def below(settings):
+    return [int(v) < 13 for v in DT_RE.findall(settings)]
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    app, project = [], []
+    for settings in BLOCK_RE.findall(text):
+        flags = below(settings)
+        if not flags:
+            continue
+        if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
+            if not any(marker in settings for marker in DEPENDENCY_MARKERS):
+                app.extend(flags)
+        else:
+            project.extend(flags)
+    # An app target that sets its own floor decides. Otherwise the project-level value is inherited.
+    if (app and any(app)) or (not app and any(project)):
+        sys.exit(0)
+sys.exit(1)
+PBXPY
+)" 2>/dev/null
+  }
   # The app target's build settings decide, never a framework's or a test bundle's.
-  # Prints below13 when that target is under iOS 13, or below15 when it is iOS 13 or 14.
+  # Prints below15 when an app target is iOS 13 or 14, ok15 when every readable one is 15 or later.
   pbx_ios_floor() {
     [ -s "$FILELIST" ] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
@@ -1055,28 +1109,6 @@ DEPENDENCY_MARKERS = (
 
 
 COMMENT_RE = re.compile(r'"(?:\\.|[^"\\])*"|/[*].*?[*]/|//[^\n]*', re.S)
-
-
-DT_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;")
-
-
-def majors13(settings, name):
-    # Every device value in a configuration, as main reads it, so the iOS 13 blocker is never weaker than main.
-    # A simulator value never ships, and a value whose condition names another configuration does not apply.
-    settings = COMMENT_RE.sub(lambda m: m.group(0) if m.group(0).startswith('"') else "", settings)
-    vals = []
-    for cond, value in DT_RE.findall(settings):
-        if "iphonesimulator" in cond:
-            continue
-        # An x86_64 or i386 value only builds for the Intel simulator. An arm64 value can reach a device.
-        arch = re.search(r"arch=([^\],\]]*)", cond)
-        if arch and arch.group(1).strip() in ("x86_64", "i386"):
-            continue
-        cfg = re.search(r"config=([^\],\]]*)", cond)
-        if cfg and "*" not in cfg.group(1) and cfg.group(1).strip() != name:
-            continue
-        vals.append(int(value))
-    return vals
 
 
 COND_RE = re.compile(r"\"?IPHONEOS_DEPLOYMENT_TARGET((?:\[[^\]]*\])*)\"?\s*=\s*\"?([^;\"\n]*)")
@@ -1217,26 +1249,6 @@ for path in sys.argv[1:]:
     skip = non_app_configs(text)
     owned = project_configs(text)
     app_ids = app_configs(text)
-    # The iOS 13 blocker reads every configuration, so a low Production or custom one is never hidden.
-    app13, project13 = [], []
-    for bid, prefix, settings, name in blocks:
-        vals = majors13(settings, name)
-        if owned:
-            # The project file says which configurations the project owns, so no product name is guessed.
-            if bid in owned:
-                project13.extend(vals)
-            elif (bid in app_ids if app_ids else bid not in skip) and not any(marker in settings for marker in DEPENDENCY_MARKERS):
-                app13.extend(vals)
-            continue
-        named = ID_RE.search(settings)
-        if named and bid not in skip and not any(marker in settings for marker in DEPENDENCY_MARKERS):
-            app13.extend(vals)
-        elif not named:
-            project13.extend(vals)
-    lows13 = app13 if app13 else project13
-    if any(v < 13 for v in lows13):
-        worst = 13
-        break
     # The iOS 15 warning skips Debug configurations (Debug, Debug-staging). Each app target and configuration
     # decides on its own, one that cannot be read stays quiet, and any readable one below 15 warns.
     names = {b[3] for b in blocks}
@@ -1291,9 +1303,6 @@ for path in sys.argv[1:]:
         xc_decides = True
     elif certain or unknown:
         ok15 = True
-if worst == 13:
-    print("below13")
-    sys.exit(0)
 if worst == 15:
     print("below15p" if weak15 else "below15")
     sys.exit(0)
@@ -1339,7 +1348,7 @@ PBXPY
   xc_max="$(xcconfig_ios15_state | sort -n | tail -1)"
   case "$xc_max" in 13|14) xc_state=below15 ;; '') xc_state='' ;; *) [ "$xc_max" -ge 15 ] 2>/dev/null && xc_state=ok15 || xc_state='' ;; esac
   # An app setting of 15 or later, in the project file or an xcconfig, overrides the Podfile's pod platform.
-  if podfile_below_ios13 || xcconfig_below_ios13 || printf '%s\n' "$pbx_floor" | grep_q -x below13; then
+  if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
     finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
   # An app target that sets iOS 15 or later overrides a base xcconfig and the Podfile's pod platform.
   elif printf '%s\n' "$pbx_floor" | grep_q -x below15 || { [ "$pbx_floor" != ok15 ] && { printf '%s\n' "$xc_state" | grep_q -x below15 || { ! printf '%s\n' "$xc_state" | grep_q -x ok15 && { [ "$pbx_floor" = below15p ] || podfile_below_ios15; }; }; }; }; then
