@@ -1001,7 +1001,9 @@ SIWAPY
   gsi_ios() {
     command -v python3 >/dev/null 2>&1 || return 1
     local custom=0
-    grep -lsE 'sourceExts' "$DIR"/metro.config.* >/dev/null 2>&1 && custom=1
+    # Expo and a custom sourceExts order extensions differently, so a module with several files stays unknown.
+    grep -lsE 'sourceExts|expo/metro-config' "$DIR"/metro.config.* >/dev/null 2>&1 && custom=1
+    grep -sqE '"expo"[[:space:]]*:' "$DIR/package.json" && custom=1
     { grep -vE '[.](android|web)[.][cm]?[jt]sx?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIl -e 'GoogleSignin[.](signIn|signInSilently)|GoogleSigninButton|GoogleOneTapSignIn[.](signIn|createAccount|presentExplicitSignIn)' 2>/dev/null || true; } \
       | ASCG_CUSTOM="$custom" python3 -c "$(cat <<'GSIPY'
 import os
@@ -1025,7 +1027,8 @@ def strip(code):
                 out.append(code[i + 1])
                 i += 2
                 continue
-            if c == quote:
+            # A quote or apostrophe string ends at the line end. Only a template string spans lines.
+            if c == quote or (c == NL and quote != BT):
                 quote = None
             i += 1
         elif c in (SQ, DQ, BT):
