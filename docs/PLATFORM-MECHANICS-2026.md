@@ -108,7 +108,9 @@ By 31 August 2026, all new apps and updates to existing apps must use Play Billi
 
 New apps and updates must target Android 16 (API 36) or later from 31 August 2026 (Play Console extension to 1 November 2026), existing apps must target API 35 or later to stay visible to new users on newer devices, Wear OS and Automotive OS must target API 35 or later, TV and XR API 34 or later. Android 17 is API 37, released 16 June 2026, and its Play policy changes land 27 January 2027 (Wear OS, Android TV, and Automotive target API 34 or later), effective 31 August 2025 with an extension window. The 2026 bump to API 36 (Android 16) for new apps and updates, reported for 31 August 2026 with a version-35 minimum for existing apps, is consistent with Google's yearly release pattern but should be verified live on the target-sdk page before it is written as a fixed date. Verify `targetSdkVersion` is at least 35 today and plan for at least 36 by the 2026 deadline.
 
-Sources. [Android target SDK requirement](https://developer.android.com/google/play/requirements/target-sdk), [Play Console target API help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en).
+From August 2027 (exact day not published) new and updated apps must target API level 37 (Android 17). That target removes developer opt-outs for orientation and resizability restrictions on large screens. The Android Developers Blog stated this on 18 November 2026. The target API level page, checked 25 November 2026, still states the 31 August 2026 API 36 floor and does not mention API 37 or August 2027.
+
+Sources. [Android target SDK requirement](https://developer.android.com/google/play/requirements/target-sdk), [Play Console target API help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en), [Adaptive quality standards, 18 November 2026](https://developer.android.com/blog/posts/google-play-adaptive-quality-standards).
 
 ### 2.6 Disruptive ads and unexpected full-screen interstitials (HARD)
 
@@ -139,6 +141,16 @@ Sources. [Google real-money games approach](https://android-developers.googleblo
 - `QUERY_ALL_PACKAGES` (package visibility) and `SCHEDULE_EXACT_ALARM` or `USE_EXACT_ALARM` remain declaration-gated permissions that require a justification against an approved use case.
 
 Sources. [Play Console Photo and Video permissions](https://support.google.com/googleplay/android-developer/answer/14115180?hl=en), [Play Console account deletion](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en).
+
+### 2.10 Adaptive app quality on foldables (April 2027)
+
+Starting April 2027 (exact day not published), an app on Google Play must meet at least Tier 3 (Adaptive ready) of the Android adaptive app quality guidelines for foldables. An app that does not will no longer be able to publish or update, and may have reduced visibility. Existing un-updated apps remain downloadable. Tier 3 means the app fills the available display area without letterboxing or compatibility modes, keeps scroll position, text input, and media playback across rotation, folding and unfolding, and resizing, and supports multi-window. On a large screen (sw >= 600dp), including the 1:1 and 4:3 foldable emulators, the device supports every orientation regardless of `android:screenOrientation`, and multi-window even when `android:resizeableActivity` is false. Remove a fixed orientation and the resize opt-out, and test those two emulators.
+
+Beginning April 2027, a new app or a store-listing update also needs 3 foldable screenshots in addition to the standard 2 phone screenshots. At least one 1:1 unfolded inner display, at least one 4:3 unfolded inner display, and at least one 10:16 portrait folded outer screen. A 16:10 landscape folded screenshot is optional. Phone landscape 16:9 is now optional in addition to portrait 9:16. Upload them in Play Console under Grow, Store presence, Store listings. Screenshots from the foldable 1:1 and 4:3 inner-display emulators are compliant.
+
+Games are on a later quality date. From April 2027 a game needs at least 3 foldable screenshots plus 1 phone screenshot in its primary orientation. From August 2027 a game must meet Tier 3 (Ready) for large screens and foldables to publish a new game or an update. A game may render full screen in its supported orientations and letterbox in-engine when rotated to an unsupported one. The guard therefore does not flag a Unity project for a fixed orientation. The quality framework will later expand to Tier 2 and Tier 1 across foldables, tablets, Googlebooks, and Android XR. No date is published for that expansion.
+
+Sources. [Adaptive quality standards, 18 November 2026](https://developer.android.com/blog/posts/google-play-adaptive-quality-standards), [Games on foldables, 18 November 2026](https://developer.android.com/blog/posts/elevating-game-quality-foldables-large-screens-google-play), [Tier 3 adaptive ready](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3).
 
 ## 3. Cross-cutting (both platforms)
 

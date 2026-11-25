@@ -1330,6 +1330,64 @@ if [ "$IS_AND" -eq 1 ]; then
   if grep_has 'signInWith|CredentialManager|FirebaseAuth|LoginActivity' && ! grep_has 'RestoreCredential'; then
     finding medium "ANDROID-RESTORE-CREDENTIALS-REQUIRED" "Sign-in present without Restore Credentials integration" "Create a restore credential on sign-in and restore it after device transfer (Play technical quality requirement, April 2027)." src 'signInWith|CredentialManager|FirebaseAuth|LoginActivity'
   fi
+  # From April 2027 apps must meet adaptive Tier 3 on foldables. A fixed screenOrientation, or
+  # resizeableActivity="false", is the static opt-out. XML comments do not count. Unity is skipped:
+  # games meet a separate Tier 3 bar from August 2027 and may keep a supported orientation.
+  adaptive_orientation_locked() {
+    ADAPTIVE_HIT=""
+    [ -s "$FILELIST" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    local mf hit
+    mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
+    [ -n "$mf" ] || return 1
+    hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+ANDROID = "{http://schemas.android.com/apk/res/android}"
+LOCKED = {
+    "portrait", "landscape", "sensorPortrait", "sensorLandscape",
+    "reversePortrait", "reverseLandscape", "userPortrait", "userLandscape",
+    "nosensor", "locked",
+}
+
+def local(tag):
+    if not isinstance(tag, str):
+        return ""
+    return tag.rsplit("}", 1)[-1]
+
+def attr(el, name):
+    value = el.get(ANDROID + name)
+    if value is not None:
+        return value.strip()
+    for key, val in el.attrib.items():
+        if key == name or (isinstance(key, str) and key.endswith("}" + name)):
+            return val.strip()
+    return None
+
+for path in sys.argv[1:]:
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError):
+        continue
+    for el in root.iter():
+        tag = local(el.tag)
+        if tag in ("application", "activity", "activity-alias") and attr(el, "resizeableActivity") == "false":
+            print(path)
+            sys.exit(0)
+        if tag in ("activity", "activity-alias") and attr(el, "screenOrientation") in LOCKED:
+            print(path)
+            sys.exit(0)
+sys.exit(1)
+PY
+)" 2>/dev/null)" || return 1
+    [ -n "$hit" ] || return 1
+    ADAPTIVE_HIT="${hit#"${DIR%/}"/}"
+    return 0
+  }
+  if [ "$IS_UNITY" -eq 0 ] && adaptive_orientation_locked; then
+    finding medium "GOOGLE-ADAPTIVE-TIER3-ORIENTATION-LOCK" "Fixed orientation or resizeableActivity false blocks adaptive Tier 3" "Remove the orientation lock and the resizeableActivity opt-out, keep state across configuration changes, and test on the 1:1 and 4:3 foldable emulators (Play adaptive Tier 3, April 2027)." at "$ADAPTIVE_HIT"
+  fi
   if grep_has 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'; then
     finding high "GOOGLE-DATASAFETY-MISMATCH" "Analytics or ad SDK present. Verify the Data Safety form" "Declare every collection and sharing accurately. Data Safety mismatch is the top Google rejection." src 'firebase-analytics|com\.google\.android\.gms\.ads|appsflyer|com\.adjust|com\.facebook'
   fi

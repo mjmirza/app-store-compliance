@@ -3946,6 +3946,54 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 printf '%s\n' "$OUT" | grep -A1 'BOTH-PLACEHOLDER' | grep -q '^      file\. src/copy\.ts:1$' && ok "ptr-4 the placeholder finding names the shipping file, not a test file" || bad "ptr-4 the placeholder finding names the shipping file, not a test file"
 rm -rf "$D"
 
+# 658 Play adaptive Tier 3. a resize opt-out or a fixed orientation fires, a free orientation,
+# a commented-out lock, a Unity game, and a non-Android project stay silent.
+tier3_id() { echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +GOOGLE-ADAPTIVE-TIER3-ORIENTATION-LOCK '; }
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:resizeableActivity="false"><activity android:name=".Main" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && ok "658 resizeableActivity false fires the adaptive Tier 3 finding" || bad "658 resizeableActivity false fires the adaptive Tier 3 finding"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Main" android:screenOrientation="portrait" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && ok "658 portrait lock fires the adaptive Tier 3 finding" || bad "658 portrait lock fires the adaptive Tier 3 finding"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:resizeableActivity="true"><activity android:name=".A" android:screenOrientation="fullSensor" /><activity android:name=".B" android:screenOrientation="unspecified" /><activity android:name=".C" android:screenOrientation="user" /><activity android:name=".D" android:screenOrientation="sensor" /><activity android:name=".E" android:screenOrientation="fullUser" /><activity android:name=".F" android:screenOrientation="behind" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 fullSensor and unspecified stay silent" || ok "658 fullSensor and unspecified stay silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+cat > "$D/app/src/main/AndroidManifest.xml" <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+    <activity
+        android:name=".Old"
+        android:screenOrientation="portrait"
+        android:resizeableActivity="false" />
+    -->
+    <activity android:name=".Main" android:screenOrientation="fullSensor" />
+  </application>
+</manifest>
+EOF
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 a lock only inside a multi-line XML comment stays silent" || ok "658 a lock only inside a multi-line XML comment stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist><dict></dict></plist>' > "$D/App/Info.plist"
+printf 'let note = "android:screenOrientation=\\"portrait\\" android:resizeableActivity=\\"false\\""\n' > "$D/App/Main.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 a non-Android project stays silent" || ok "658 a non-Android project stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/ProjectSettings" "$D/app/src/main"
+printf 'm_EditorVersion: 2022.3.0f1\n' > "$D/ProjectSettings/ProjectVersion.txt"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Main" android:screenOrientation="portrait" android:resizeableActivity="false" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -q 'Unity=1' && ! tier3_id && ok "658 a Unity project with a portrait lock stays silent" || bad "658 a Unity project with a portrait lock stays silent"
+rm -rf "$D"
+
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
