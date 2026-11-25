@@ -1337,7 +1337,11 @@ if [ "$IS_AND" -eq 1 ]; then
     ADAPTIVE_HIT=""
     [ -s "$FILELIST" ] || return 1
     command -v python3 >/dev/null 2>&1 || return 1
-    local mf hit
+    local mf hit sdk
+    # Android 16 ignores both locks on large screens for an app that targets API 36 or higher,
+    # so the check fires only when every target SDK it can read is known and below 36.
+    sdk="$(grep -E '/build[.]gradle([.]kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
+    [ -n "$sdk" ] && [ "$sdk" -lt 36 ] || return 1
     mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|androidTest|test)[^/]*/')"
     [ -n "$mf" ] || return 1
     hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PY'
@@ -1370,14 +1374,22 @@ for path in sys.argv[1:]:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError):
         continue
-    for el in root.iter():
-        tag = local(el.tag)
-        if tag in ("application", "activity", "activity-alias") and attr(el, "resizeableActivity") == "false":
-            print(path)
-            sys.exit(0)
-        if tag in ("activity", "activity-alias") and attr(el, "screenOrientation") in LOCKED:
-            print(path)
-            sys.exit(0)
+    sdk = [el for el in root.iter() if local(el.tag) == "uses-sdk"]
+    if any((attr(el, "targetSdkVersion") or "0").isdigit() and int(attr(el, "targetSdkVersion") or "0") >= 36 for el in sdk):
+        continue
+    for app in [el for el in root.iter() if local(el.tag) == "application"]:
+        # Games keep a supported orientation and meet their own Tier 3 bar later.
+        if attr(app, "appCategory") == "game" or attr(app, "isGame") == "true":
+            continue
+        default = attr(app, "resizeableActivity")
+        for el in app:
+            if local(el.tag) not in ("activity", "activity-alias"):
+                continue
+            # An activity setting overrides the application default.
+            own = attr(el, "resizeableActivity")
+            if (own if own is not None else default) == "false" or attr(el, "screenOrientation") in LOCKED:
+                print(path)
+                sys.exit(0)
 sys.exit(1)
 PY
 )" 2>/dev/null)" || return 1
