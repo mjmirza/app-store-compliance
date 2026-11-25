@@ -1231,15 +1231,25 @@ else
 fi
 rm -rf "$AL_DIR"
 SW_DIR="$(mktemp -d)"
-printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><Switch android:layout_width="96dp" android:layout_height="24dp" /><CheckBox android:layout_width="96dp" android:layout_height="23dp" /></FrameLayout>\n' > "$SW_DIR/sw.xml"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><Switch android:layout_width="96dp" android:layout_height="24dp" /><Switch android:layout_width="22dp" android:layout_height="64dp" /><CheckBox android:layout_width="96dp" android:layout_height="23dp" /></FrameLayout>\n' > "$SW_DIR/sw.xml"
 OUT=$($AUDIT "$SW_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
-if [ "$(echo "$OUT" | grep -c 'context:')" -eq 1 ] && echo "$OUT" | grep -q 'context: android:layout_height="23dp"'; then
-  ok "a switch is not judged by its declared size, a checkbox still is"
+if [ "$(echo "$OUT" | grep -c 'context:')" -eq 2 ] && echo "$OUT" | grep -q 'context: android:layout_height="23dp"' && echo "$OUT" | grep -q 'context: android:layout_width="22dp"'; then
+  ok "a switch is judged by its width only, a checkbox by both"
 else
-  bad "a switch is not judged by its declared size, a checkbox still is"
+  bad "a switch is judged by its width only, a checkbox by both"
   echo "$OUT"
 fi
 rm -rf "$SW_DIR"
+CP_DIR="$(mktemp -d)"
+printf '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"><FrameLayout android:layout_width="320dp" android:layout_height="56dp" android:onClick="selectDelivery"><RadioButton android:layout_width="24dp" android:layout_height="24dp" android:onClick="selectDelivery" /></FrameLayout></FrameLayout>\n' > "$CP_DIR/cp.xml"
+OUT=$($AUDIT "$CP_DIR" --rule ANDROID-ACCESSIBILITY-SCANNER 2>&1)
+if ! echo "$OUT" | grep -q 'context:'; then
+  ok "a control inside a clickable row is part of the row target"
+else
+  bad "a control inside a clickable row is part of the row target"
+  echo "$OUT"
+fi
+rm -rf "$CP_DIR"
 # A file with no wrapped axis keeps the original behaviour, every small explicit dimension is reported.
 PLAIN_DIR="$(mktemp -d)"
 cat <<'EOF3' > "$PLAIN_DIR/plain.xml"

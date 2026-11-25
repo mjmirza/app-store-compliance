@@ -851,14 +851,16 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     if not el.group(4):
                         # The orientation is known only when set on the element and no style can override it.
                         orient = vals.get("orientation", "horizontal").strip().lower()
-                        stack.append((hidden, tag, None if styled or orient not in ("horizontal", "vertical") else orient))
+                        # A child of a view with its own click handler is part of that larger target, so it is unknown.
+                        owns_click = vals.get("clickable", "").strip().lower() == "true" or any(
+                            vals.get(k, "@null").strip() not in ("@null", "") for k in ("onClick", "onLongClick"))
+                        stack.append((hidden or owns_click, tag, None if styled or orient not in ("horizontal", "vertical") else orient))
                     # The root is skipped too, since an include can override its size.
                     if hidden or not parent or parent[1] not in ("LinearLayout", "LinearLayoutCompat", "FrameLayout"):
                         continue
                     # These Material components pad themselves up to a 48dp touch target.
                     ensure = re.search(r"ensureMinTouchTargetSize\s*=\s*[\"']true", attrs)
-                    # A switch measures itself to fit its thumb and track, so its declared size is not final.
-                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip", "Switch", "SwitchCompat", "SwitchMaterial", "MaterialSwitch"):
+                    if ensure or tag in ("FloatingActionButton", "ExtendedFloatingActionButton", "Chip"):
                         continue
                     # Only certain interactivity counts. A clickable value other than true (a resource, a binding,
                     # false) may switch the listener off, so a handler alone does not count then.
@@ -880,8 +882,10 @@ def run_rule_scan(rule_id, ios_files, android_files):
                     if weighted and parent[2] is None:
                         continue
                     skip_axis = ("layout_width" if parent[2] != "vertical" else "layout_height") if weighted else None
+                    # A switch grows its height to fit the thumb, its width stays as declared.
+                    switch = tag in ("Switch", "SwitchCompat", "SwitchMaterial", "MaterialSwitch")
                     for axis in ("layout_width", "layout_height"):
-                        if axis == skip_axis:
+                        if axis == skip_axis or (switch and axis == "layout_height"):
                             continue
                         size = re.fullmatch(r"([0-9]+)dp", vals.get(axis, ""))
                         if not size or not 0 < int(size.group(1)) < 48:
