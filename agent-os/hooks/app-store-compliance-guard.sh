@@ -1432,8 +1432,6 @@ def frees(root):
             return True
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
             return True
-        if local(el.tag) == "meta-data" and attr(el, "name") == "android.supports_size_changes":
-            return True
         # A tools:node marker on the application can replace all of it.
         if attr(el, "node") is not None and local(el.tag) == "application":
             return True
@@ -1474,6 +1472,43 @@ SIZE_CHANGES = "android.supports_size_changes"
 def supports_size_changes(el):
     return any(local(c.tag) == "meta-data" and attr(c, "name") == SIZE_CHANGES
                and attr(c, "value") == "true" for c in el)
+
+def same_module(path):
+    out = []
+    for other in sys.argv[1:]:
+        if module(other) != module(path):
+            continue
+        try:
+            out.append(ET.parse(other).getroot())
+        except (ET.ParseError, OSError):
+            continue
+    return out
+
+def module_roots(path, pkg):
+    # Activities that can root a task, read from every manifest of the module, since a
+    # variant merges into the main one.
+    roots = set()
+    for mroot in same_module(path):
+        for el in mroot.iter():
+            if local(el.tag) == "activity" and starts_task(el):
+                roots.add(full_name(attr(el, "name"), pkg))
+            elif local(el.tag) == "activity-alias" and launcher(el) and attr(el, "enabled") != "false":
+                roots.add(full_name(attr(el, "targetActivity"), pkg))
+    return roots
+
+def variant_sized(path, pkg):
+    # supports_size_changes set by a variant, per activity or for the whole application.
+    names, whole = set(), False
+    for mroot in same_module(path):
+        for app in mroot.iter():
+            if local(app.tag) != "application":
+                continue
+            if supports_size_changes(app):
+                whole = True
+            for el in app:
+                if local(el.tag) == "activity" and supports_size_changes(el):
+                    names.add(full_name(attr(el, "name"), pkg))
+    return names, whole
 
 def launcher(el):
     for f in el:
@@ -1566,11 +1601,12 @@ for path in sys.argv[1:]:
         default = attr(app, "resizeableActivity")
         pkg = package_of(root, path)
         off = variant_off(path)
+        sized_names, sized_app = variant_sized(path, pkg)
+        if sized_app:
+            continue
         # Activities that can root a task. a launcher, directly or through an enabled alias,
         # a document, or one that starts its own task. Names resolve against the package.
-        roots = {full_name(attr(el, "name"), pkg) for el in app if local(el.tag) == "activity" and starts_task(el)}
-        roots |= {full_name(attr(el, "targetActivity"), pkg) for el in app if local(el.tag) == "activity-alias"
-                  and launcher(el) and attr(el, "enabled") != "false"}
+        roots = module_roots(path, pkg)
         app_keeps = opts_out(app)
         for el in app:
             # An alias inherits from its target activity, so only the activity is judged.
@@ -1591,7 +1627,7 @@ for path in sys.argv[1:]:
             own = attr(el, "resizeableActivity")
             mine = full_name(attr(el, "name"), pkg)
             is_root = not roots or any(same_class(mine, r) for r in roots)
-            sized = supports_size_changes(el) or supports_size_changes(app)
+            sized = supports_size_changes(el) or supports_size_changes(app) or full_name(attr(el, "name"), pkg) in sized_names
             resize_lock = is_root and not sized and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
