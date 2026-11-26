@@ -4329,6 +4329,13 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 tier3_id && bad "658 picture-in-picture set in a release manifest stays silent" || ok "658 picture-in-picture set in a release manifest stays silent"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main" "$D/app/src/release"
+printf 'android { defaultConfig { targetSdk 35 } }\n' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"><application><activity android:name=".Player" android:resizeableActivity="false" android:supportsPictureInPicture="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"><application><activity android:name=".Player" android:resizeableActivity="false" android:supportsPictureInPicture="false" tools:replace="android:supportsPictureInPicture" /></application></manifest>' > "$D/app/src/release/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && ok "658 a release manifest that turns picture-in-picture off keeps the resize lock" || bad "658 a release manifest that turns picture-in-picture off keeps the resize lock"
+rm -rf "$D"
 
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then

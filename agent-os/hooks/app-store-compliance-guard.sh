@@ -1499,7 +1499,8 @@ def module_roots(path, pkg):
 
 def variant_sized(path, pkg):
     # supports_size_changes set by a variant, per activity or for the whole application.
-    names, whole = set(), False
+    # Picture-in-picture counts only when no manifest of the module sets it to anything else.
+    names, whole, pip_on, pip_off = set(), False, set(), set()
     for mroot in same_module(path):
         for app in mroot.iter():
             if local(app.tag) != "application":
@@ -1507,11 +1508,17 @@ def variant_sized(path, pkg):
             if supports_size_changes(app):
                 whole = True
             for el in app:
-                # A variant can also turn on picture-in-picture, which makes the activity resizable.
-                pip = attr(el, "supportsPictureInPicture") == "true"
-                if local(el.tag) == "activity" and (supports_size_changes(el) or pip):
-                    names.add(full_name(attr(el, "name"), pkg))
-    return names, whole
+                if local(el.tag) != "activity":
+                    continue
+                name = full_name(attr(el, "name"), pkg)
+                if supports_size_changes(el):
+                    names.add(name)
+                pip = attr(el, "supportsPictureInPicture")
+                if pip == "true":
+                    pip_on.add(name)
+                elif pip is not None:
+                    pip_off.add(name)
+    return names | (pip_on - pip_off), whole, pip_off
 
 def launcher(el):
     for f in el:
@@ -1604,7 +1611,7 @@ for path in sys.argv[1:]:
         default = attr(app, "resizeableActivity")
         pkg = package_of(root, path)
         off = variant_off(path)
-        sized_names, sized_app = variant_sized(path, pkg)
+        sized_names, sized_app, pip_off = variant_sized(path, pkg)
         # Activities that can root a task. a launcher, directly or through an enabled alias,
         # a document, or one that starts its own task. Names resolve against the package.
         roots = module_roots(path, pkg)
@@ -1631,7 +1638,8 @@ for path in sys.argv[1:]:
             is_root = not roots or any(same_class(mine, r) for r in roots)
             # supports_size_changes cancels a resize lock only, never an orientation lock.
             # A picture-in-picture activity is treated as resizable.
-            pip = attr(el, "supportsPictureInPicture") == "true"
+            mine = full_name(attr(el, "name"), pkg)
+            pip = attr(el, "supportsPictureInPicture") == "true" and mine not in pip_off
             sized = sized_app or pip or supports_size_changes(el) or full_name(attr(el, "name"), pkg) in sized_names
             resize_lock = is_root and not sized and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
