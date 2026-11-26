@@ -4310,6 +4310,18 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 tier3_id && bad "658 an activity enabled through a placeholder stays silent" || ok "658 an activity enabled through a placeholder stays silent"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf 'android { defaultConfig { targetSdk 36 } }\n' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Main"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity><activity android:name=".Legacy" android:enabled="@bool/enable_legacy" android:screenOrientation="locked" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 an activity enabled through a resource stays silent" || ok "658 an activity enabled through a resource stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf 'android { defaultConfig { targetSdk 35 } }\n' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Player" android:resizeableActivity="false" android:supportsPictureInPicture="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 a picture-in-picture launcher with a resize lock stays silent" || ok "658 a picture-in-picture launcher with a resize lock stays silent"
+rm -rf "$D"
 
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then

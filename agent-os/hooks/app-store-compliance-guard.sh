@@ -1464,13 +1464,11 @@ def variant_off(path):
         except (ET.ParseError, OSError):
             continue
         for el in vroot.iter():
-            if local(el.tag) == "activity" and (attr(el, "enabled") == "false" or attr(el, "node") is not None):
+            if local(el.tag) == "activity" and (attr(el, "enabled") not in (None, "true") or attr(el, "node") is not None):
                 off.add(attr(el, "name"))
     return off
 
 SIZE_CHANGES = "android.supports_size_changes"
-# A build placeholder value is unknown until Gradle fills it in.
-PLACEHOLDER = chr(36) + chr(123)
 
 def supports_size_changes(el):
     return any(local(c.tag) == "meta-data" and attr(c, "name") == SIZE_CHANGES
@@ -1614,8 +1612,8 @@ for path in sys.argv[1:]:
             if local(el.tag) != "activity":
                 continue
             # A disabled activity is never started, nor is one a variant disables or removes.
-            # An enabled value from a placeholder may be false, so it is not judged.
-            if attr(el, "enabled") == "false" or PLACEHOLDER in (attr(el, "enabled") or ""):
+            # An enabled value from a placeholder or a resource may be false, so it is not judged.
+            if attr(el, "enabled") not in (None, "true"):
                 continue
             if any(full_name(o, pkg) == full_name(attr(el, "name"), pkg) for o in off):
                 continue
@@ -1630,7 +1628,9 @@ for path in sys.argv[1:]:
             mine = full_name(attr(el, "name"), pkg)
             is_root = not roots or any(same_class(mine, r) for r in roots)
             # supports_size_changes cancels a resize lock only, never an orientation lock.
-            sized = sized_app or supports_size_changes(el) or full_name(attr(el, "name"), pkg) in sized_names
+            # A picture-in-picture activity is treated as resizable.
+            pip = attr(el, "supportsPictureInPicture") == "true"
+            sized = sized_app or pip or supports_size_changes(el) or full_name(attr(el, "name"), pkg) in sized_names
             resize_lock = is_root and not sized and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
