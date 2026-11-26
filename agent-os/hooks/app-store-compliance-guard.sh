@@ -508,7 +508,11 @@ def use_at(text, i, end):
     w = b
     while w >= 0 and (text[w].isalnum() or text[w] == "_"):
         w -= 1
-    if text[w + 1:b + 1] in DECL_WORDS:
+    t2 = k
+    while t2 < end and text[t2] in (" ", chr(9)):
+        t2 += 1
+    generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] == ":"
+    if generic or text[w + 1:b + 1] in DECL_WORDS:
         # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
         # app type of this name silences unqualified calls. Missing one is never worse than main.
         DECLARED = True
@@ -536,6 +540,28 @@ NEST = False
 CUR = ""
 DECLARED = False
 HITS = []
+SKIP = dict()
+
+def cond_lines(text):
+    # Lines inside an #if compiler(...) or #if swift(...) block, the usual way to keep an old-SDK fallback.
+    out = set()
+    stack = []
+    for n, raw in enumerate(text.split(chr(10)), 1):
+        s = raw.strip().replace(" ", "")
+        cond = "compiler(" in s or "swift(" in s
+        if s.startswith("#elseif"):
+            if stack and cond:
+                stack[-1] = True
+        elif s.startswith("#if"):
+            stack.append(cond)
+        elif s.startswith("#endif"):
+            if stack:
+                stack.pop()
+            out.add(n)
+            continue
+        if any(stack):
+            out.add(n)
+    return out
 DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation")
 
 def block_end(text, i, end):
@@ -677,8 +703,10 @@ for path in sys.stdin.read().split(chr(10)):
     NEST = path.endswith(".swift")
     CUR = path
     walk(text, 0, len(text), 1, False)
+    if NEST:
+        SKIP[path] = cond_lines(text)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
-pick = [h for h in HITS if h[2] or not DECLARED]
+pick = [h for h in HITS if (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY

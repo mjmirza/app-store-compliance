@@ -4171,6 +4171,27 @@ extension Renderer { func render() { ImageCreator.make() } }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an associatedtype named ImageCreator stays silent" || bad "an associatedtype named ImageCreator stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift 'protocol ImageCreating { init() }
+func create<ImageCreator: ImageCreating>(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter named ImageCreator stays silent" || bad "a generic parameter named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
+let usesSheet = true
+#else
+func legacy() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an old-SDK fallback under #if compiler stays silent" || bad "an old-SDK fallback under #if compiler stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '#if compiler(>=6.3)
+let usesSheet = true
+#endif
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() after a closed #if compiler block still fires" || bad "ImageCreator() after a closed #if compiler block still fires"
+rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}')"
 i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
 printf 'let renderer = ImageCreator()\n' > "$D/App/Z.swift"
