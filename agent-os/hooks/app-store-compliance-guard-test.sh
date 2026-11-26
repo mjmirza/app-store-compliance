@@ -4181,6 +4181,13 @@ func create<ImageCreator>() -> ImageCreator where ImageCreator: ImageCreating { 
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter constrained in a where clause stays silent" || bad "a generic parameter constrained in a where clause stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func create<
+  ImageCreator: P
+>(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter list split across lines stays silent" || bad "a generic parameter list split across lines stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

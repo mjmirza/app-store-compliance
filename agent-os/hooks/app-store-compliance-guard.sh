@@ -509,7 +509,7 @@ def use_at(text, i, end):
     while w >= 0 and (text[w].isalnum() or text[w] == "_"):
         w -= 1
     t2 = k
-    while t2 < end and text[t2] in (" ", chr(9)):
+    while t2 < end and text[t2].isspace():
         t2 += 1
     generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] in (":", ">", ",") and generic_param(text, i)
     if generic or text[w + 1:b + 1] in DECL_WORDS:
@@ -545,19 +545,19 @@ SKIP = dict()
 def generic_param(text, i):
     # True when the name sits in the generic clause of a func, type or init, as in func f<A, ImageCreator>.
     j = i - 1
-    while j >= 0 and (text[j].isalnum() or text[j] in "_ ,:&." or text[j] == chr(9)):
+    while j >= 0 and (text[j].isalnum() or text[j] in "_,:&." or text[j].isspace()):
         j -= 1
     if j < 0 or text[j] != "<":
         return False
     j -= 1
-    while j >= 0 and text[j] in (" ", chr(9)):
+    while j >= 0 and text[j].isspace():
         j -= 1
     e = j
     while j >= 0 and (text[j].isalnum() or text[j] == "_"):
         j -= 1
     if text[j + 1:e + 1] == "init":
         return True
-    while j >= 0 and text[j] in (" ", chr(9)):
+    while j >= 0 and text[j].isspace():
         j -= 1
     e = j
     while j >= 0 and (text[j].isalnum() or text[j] == "_"):
