@@ -3884,6 +3884,20 @@ D="$(mk_rn_ship api.js 'x')"; printf '// Caf\351 settings\nconst api = "http://l
 OUT="$(LC_ALL=en_US.UTF-8 bash "$GUARD" "$D" 2>&1)"
 sh_at 'src/api.js:2' && ok "cmt-13 a non-UTF-8 byte in a comment does not hide the file under a UTF-8 locale" || bad "cmt-13 a non-UTF-8 byte in a comment does not hide the file under a UTF-8 locale"
 rm -rf "$D"
+D="$(mk_rn_ship api.js 'const commentChars = /[/*]/g;
+const api = "http://localhost:3000";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.js:2' && ok "cmt-14 a /* inside a regex literal does not hide the lines after it" || bad "cmt-14 a /* inside a regex literal does not hide the lines after it"
+rm -rf "$D"
+D="$(mk_ship '#if DEBUG
+let text = #"""
+/*
+"""#
+#endif
+let api = "http://localhost:3000"')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'App/Net.swift:6' && ok "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it" || bad "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"

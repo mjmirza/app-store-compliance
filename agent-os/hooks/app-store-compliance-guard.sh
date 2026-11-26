@@ -493,13 +493,18 @@ SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
 # Only the implementation buffer is stripped. Triggers read every line raw, as in 1.0.0, so no comment rule can hide a call.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39) }
     function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
-    { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
+    FNR == 1 { blk=0 }
+    { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { blk=0; print l; next }
       t=l; sub(/^[ \t]+/, "", t)
       if (substr(t, 1, 2) == "//") { print ""; next }
-      if (substr(t, 1, 2) == "*/") { print substr(t, 3); next }
-      if (t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
+      if (substr(t, 1, 2) == "*/") { blk=0; print substr(t, 3); next }
+      # With gate=1 a leading * is comment text only in the unbroken run of lines right under a line that
+      # opens /*. Any other line ends the run, so a /* misread in a string or regex hides no code (#2421).
+      if ((!gate || blk) && (t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t")) { if (index(t, "*/")) blk=0; print ""; next }
       if (substr(t, 1, 2) == "/*") { r=t; sub(/[ \t]+$/, "", r); j=index(substr(r, 3), "*/")
-        if (j == 0 || j + 3 == length(r)) { print ""; next } }
+        if (j == 0) { blk=1; print ""; next }
+        if (j + 3 == length(r)) { print ""; next } }
+      blk=0
       if (tc) {
         while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) { pre=substr(l, 1, o-1); if (pre !~ /#"/) gsub(/\\./, "", pre); gsub(/(^|[=(,:&|!?{};+*%<>~^-]|return)[ \t]*\/[^\/]+\//, " ", pre); p2=pre
           nq=gsub(/[\"`]/, "", pre); ns=gsub(sq, "", p2); if (nq % 2 || ns % 2) break; l=substr(l, 1, o-1) " ; " substr(l, o+c+3) }
@@ -563,11 +568,11 @@ release_string_has() {
   [ -s "$FILELIST" ] || return 1
   local f m src
   while IFS= read -r f; do
-    # Source comments go first (issue #2413). strip_comments reads strings and keeps line numbers, so a
-    # generator method such as `* load()` stays code. It runs in the C locale, and the raw file is read
-    # if awk still fails, so a byte awk cannot decode never hides a file.
+    # Source comments go first (issue #2413). STRIP_AWK keeps one line per line and, with gate=1, only blanks
+    # a line that itself looks like a comment, so a /* in a string or regex never hides later lines (#2421).
+    # It runs in the C locale, and the raw file is read if awk still fails, so no byte can hide a file.
     src=""
-    if [[ "$f" =~ $SRC_EXT_RE ]]; then src="$(LC_ALL=C strip_comments "$f")" || src="$(cat "$f" 2>/dev/null)"; fi
+    if [[ "$f" =~ $SRC_EXT_RE ]]; then src="$(LC_ALL=C awk -v tc=1 -v gate=1 "$STRIP_AWK" "$f" 2>/dev/null)" || src="$(cat "$f" 2>/dev/null)"; fi
     # Removed lines print empty, so a line number counts the lines of a DEBUG block too.
     case "$f" in
       *.swift)
