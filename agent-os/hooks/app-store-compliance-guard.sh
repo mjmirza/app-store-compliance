@@ -500,7 +500,7 @@ def use_at(text, i, end):
     k = i + len(name)
     if k < end and (text[k].isalnum() or text[k] == "_"):
         return False
-    # A type the app declares under this name is the app's own type, not the Image Playground one.
+    # A type the app declares under this name is the app own type, not the Image Playground one.
     global DECLARED
     b = i - 1
     while b >= 0 and text[b].isspace():
@@ -509,7 +509,11 @@ def use_at(text, i, end):
     while w >= 0 and (text[w].isalnum() or text[w] == "_"):
         w -= 1
     if text[w + 1:b + 1] in DECL_WORDS:
-        DECLARED = True
+        # A top-level type shadows the whole app, a nested one only the braces that hold it.
+        if STACK:
+            SHADOW.add((CUR, STACK[-1]))
+        else:
+            DECLARED = True
         return False
     t = k
     while t < end and text[t] in " \t":
@@ -534,6 +538,8 @@ NEST = False
 CUR = ""
 DECLARED = False
 HITS = []
+STACK = []
+SHADOW = set()
 DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "interface", "implementation")
 
 def block_end(text, i, end):
@@ -618,9 +624,15 @@ def walk(text, i, end, line, stop_paren):
                 mod = "ImagePlayground"
                 s0 = a + 1 - len(mod)
                 qual = s0 >= 0 and text[s0:a + 1] == mod and not (s0 and (text[s0 - 1].isalnum() or text[s0 - 1] == "_"))
-            HITS.append((CUR, line, qual))
+            # Under any other namespace, Foo.ImageCreator is the app own type.
+            if qual or not (b >= 0 and text[b] == "."):
+                HITS.append((CUR, line, qual, tuple(STACK)))
             i += len("ImageCreator")
             continue
+        if ch == chr(123):
+            STACK.append(i)
+        elif ch == chr(125) and STACK:
+            STACK.pop()
         if ch == "(":
             depth += 1
         elif ch == ")" and depth:
@@ -672,9 +684,10 @@ for path in sys.stdin.read().split(chr(10)):
         continue
     NEST = path.endswith(".swift")
     CUR = path
+    STACK[:] = []
     walk(text, 0, len(text), 1, False)
-# With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is Apple's.
-pick = [h for h in HITS if h[2]] if DECLARED else HITS
+# With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
+pick = [h for h in HITS if h[2] or not (DECLARED or any((h[0], o) in SHADOW for o in h[3]))]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY

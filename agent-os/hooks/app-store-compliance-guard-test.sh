@@ -4143,6 +4143,23 @@ func probe() async throws { _ = try await ImageCreator() }
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it" || bad "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it"
 rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering { struct ImageCreator {} }
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a nested type named ImageCreator does not hide a top-level call" || bad "a nested type named ImageCreator does not hide a top-level call"
+rm -rf "$D"
+D="$(ic_app A.swift 'enum Rendering {
+  struct ImageCreator {}
+  static func make() -> ImageCreator { ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a call inside the type that nests ImageCreator stays silent" || bad "a call inside the type that nests ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'let c = Rendering.ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator under another namespace stays silent" || bad "ImageCreator under another namespace stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}')"
 i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
 printf 'let renderer = ImageCreator()\n' > "$D/App/Z.swift"
