@@ -509,11 +509,9 @@ def use_at(text, i, end):
     while w >= 0 and (text[w].isalnum() or text[w] == "_"):
         w -= 1
     if text[w + 1:b + 1] in DECL_WORDS:
-        # A top-level type shadows the whole app, a nested one only the braces that hold it.
-        if STACK:
-            SHADOW.add((CUR, STACK[-1]))
-        else:
-            DECLARED = True
+        # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
+        # app type of this name silences unqualified calls. Missing one is never worse than main.
+        DECLARED = True
         return False
     t = k
     while t < end and text[t] in " \t":
@@ -538,9 +536,7 @@ NEST = False
 CUR = ""
 DECLARED = False
 HITS = []
-STACK = []
-SHADOW = set()
-DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "interface", "implementation")
+DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation")
 
 def block_end(text, i, end):
     # Swift block comments nest, Objective-C ones do not. Returns where the comment closes, or -1.
@@ -626,13 +622,9 @@ def walk(text, i, end, line, stop_paren):
                 qual = s0 >= 0 and text[s0:a + 1] == mod and not (s0 and (text[s0 - 1].isalnum() or text[s0 - 1] == "_"))
             # Under any other namespace, Foo.ImageCreator is the app own type.
             if qual or not (b >= 0 and text[b] == "."):
-                HITS.append((CUR, line, qual, tuple(STACK)))
+                HITS.append((CUR, line, qual))
             i += len("ImageCreator")
             continue
-        if ch == chr(123):
-            STACK.append(i)
-        elif ch == chr(125) and STACK:
-            STACK.pop()
         if ch == "(":
             depth += 1
         elif ch == ")" and depth:
@@ -684,10 +676,9 @@ for path in sys.stdin.read().split(chr(10)):
         continue
     NEST = path.endswith(".swift")
     CUR = path
-    STACK[:] = []
     walk(text, 0, len(text), 1, False)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
-pick = [h for h in HITS if h[2] or not (DECLARED or any((h[0], o) in SHADOW for o in h[3]))]
+pick = [h for h in HITS if h[2] or not DECLARED]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY

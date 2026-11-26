@@ -4147,7 +4147,7 @@ D="$(ic_app A.swift 'import ImagePlayground
 enum Rendering { struct ImageCreator {} }
 func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:3' && ok "a nested type named ImageCreator does not hide a top-level call" || bad "a nested type named ImageCreator does not hide a top-level call"
+! ic_has && ok "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup" || bad "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup"
 rm -rf "$D"
 D="$(ic_app A.swift 'enum Rendering {
   struct ImageCreator {}
@@ -4159,6 +4159,17 @@ rm -rf "$D"
 D="$(ic_app A.swift 'let c = Rendering.ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator under another namespace stays silent" || bad "ImageCreator under another namespace stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'enum Rendering { struct ImageCreator {} }
+extension Rendering { static func make() -> ImageCreator { ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested app type used from an extension stays silent" || bad "a nested app type used from an extension stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'protocol ImageCreating { static func make() }
+protocol Renderer { associatedtype ImageCreator: ImageCreating }
+extension Renderer { func render() { ImageCreator.make() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an associatedtype named ImageCreator stays silent" || bad "an associatedtype named ImageCreator stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}')"
 i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
