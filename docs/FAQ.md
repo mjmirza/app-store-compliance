@@ -20,7 +20,7 @@ Discussion. [#2344](https://github.com/mjmirza/app-store-compliance/discussions/
 
 ## Does it cover Google Play and Android, or only the App Store?
 
-Both stores. Of the 124 rejection patterns, 62 are Apple, 43 are Google Play, 13 apply to both, and 6 are web.
+Both stores. Of the 125 rejection patterns, 62 are Apple, 44 are Google Play, 13 apply to both, and 6 are web.
 
 On an Android project the guard checks, among others.
 - Sensitive permissions. background location, all files access, SMS and call log, accessibility service, and photo and video access, each flagged so you can justify it. The guard cannot see your Play Console declarations.
@@ -87,7 +87,7 @@ Discussion. [#2349](https://github.com/mjmirza/app-store-compliance/discussions/
 
 That is exactly right, and the tool is built around saying so.
 
-- 113 of the 124 patterns have a detection recipe in `data/detection-recipes.json`. Some of the rest, such as device frames in a preview video or the Play 12-tester rule, cannot be seen in code at all. A few are checked by the guard directly, without a recipe.
+- 114 of the 125 patterns have a detection recipe in `data/detection-recipes.json`. Some of the rest, such as device frames in a preview video or the Play 12-tester rule, cannot be seen in code at all. A few are checked by the guard directly, without a recipe.
 - Having a recipe does not mean the guard runs it. Some recipes are guidance for a person.
 - For what a scan cannot prove, 2.5.0 added `.app-review-readiness.json`. You record seven checks (demo account, live backend, review notes, screenshots of this build, deletion on a real device, privacy labels against runtime, a reachable purchase). A fail blocks, and with no file the report lists what it could not see.
 - A scan that could not run says NOT CHECKED instead of passing. Set `APP_STORE_GUARD_BLOCK_UNCHECKED=1` to make that block too, and `APP_STORE_GUARD_REQUIRE_READINESS=1` (or `"enforce": true` in the readiness file) to make an open readiness check block. Some unavailable checks, such as a missing manifest validator, stay warnings.

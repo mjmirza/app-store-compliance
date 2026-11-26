@@ -1714,6 +1714,36 @@
       "source_url": "https://developer.android.com/blog/posts/android-developer-verification-2027",
       "verified_on": "2026-11-25",
       "source_note": "Read on 25 November 2026. The post is dated 19 November 2026 and names January 2027 with no day. The same day's https://developer.android.com/developer-verification page says protections continue rolling out globally in 2027 and does not name January. Its 2027 timeline row says verification capability will be expanded globally for all apps on certified Android devices in 2027. A resource card on that page still says limited distribution accounts share apps with up to 20 devices. The blog states the sharing limit was expanded from 20 to 50 authorized devices. Ars Technica on 19 November 2026 reports the same January start and is not the source of this entry. https://arstechnica.com/gadgets/2026/11/google-will-launch-android-app-verification-requirement-globally-in-january-2027/"
+    },
+    {
+      "id": "GOOGLE-PLAY-ADAPTIVE-TIER3-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Google Play adaptive app quality standards for foldables (Android Developers Blog, 18 November 2026)",
+      "requirement": "Google states Starting April 2027 (exact day not published) apps on Google Play need to meet at least Tier 3 (Adaptive ready) of the Android adaptive app quality guidelines for foldables. Apps that do not meet it will no longer be able to publish or update on Google Play, and may have reduced visibility on the store. Existing un-updated apps remain downloadable. Tier 3 means the app fills the available display area without letterboxing or compatibility modes, preserves state (scroll position, text input, media playback) during rotation, folding and unfolding, and resizing, and supports multi-window. Beginning April 2027, new apps and updates must provide 3 foldable screenshots in addition to the standard 2 phone screenshots when publishing a new app or updating the store listing. At least one 1:1 unfolded inner display screenshot, at least one 4:3 unfolded inner display screenshot, and at least one 10:16 portrait folded outer screen screenshot (16:10 landscape optional). Phone landscape 16:9 is now optional in addition to portrait 9:16. Upload in Play Console under Grow, Store presence, Store listings. Screenshots from the foldable 1:1 and 4:3 inner-display emulators are compliant. Games need at least 3 foldable screenshots plus 1 phone screenshot in the game's primary orientation from April 2027, and must meet Tier 3 (Ready) large screen and foldables quality from August 2027 to publish new games and updates. The framework will later expand to Tier 2 and Tier 1 across foldables, tablets, Googlebooks, and Android XR, with no date published.",
+      "effective_date": "2026-11-18",
+      "grace_period": "until April 2027",
+      "mandatory_date": "2027-04-01",
+      "enforcement_date": "2027-04-01",
+      "affected_repository_sections": "docs/GOOGLE-PLAY.md 2026 policy rounds, docs/PLATFORM-MECHANICS-2026.md section 2.10, docs/PRE-SUBMISSION-CHECKLIST.md Google Play specific, references/rules/android.md",
+      "priority": "high",
+      "source_url": "https://developer.android.com/blog/posts/google-play-adaptive-quality-standards",
+      "verified_on": "2026-11-25",
+      "source_note": "Read on the Android Developers Blog on 25 November 2026. The post is dated 18 November 2026, by Mekka Okereke, and names April 2027 without a day. The games screenshot count and the August 2027 games Tier 3 date are on the companion post https://developer.android.com/blog/posts/elevating-game-quality-foldables-large-screens-google-play, read the same day (Aurash Mahbod, 18 November 2026). Tier 3 tests T-Config_Orientation and T-Config_State, including sw >= 600dp and the 1:1 and 4:3 foldable emulators, where orientation and resizability opt-outs are ignored, are on https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3, last updated 2026-11-19 UTC, read 25 November 2026."
+    },
+    {
+      "id": "GOOGLE-PLAY-TARGET-API-37-2027",
+      "jurisdiction": "Google Play (Global)",
+      "law": "Google Play Target API Requirement",
+      "requirement": "Google states In August 2027 (exact day not published) new and updated apps must target API level 37 (Android 17), which removes developer opt-outs for orientation and resizability restrictions on large screens. This is separate from GOOGLE-PLAY-TARGET-API-36, the API 36 floor for 31 August 2026.",
+      "effective_date": "2026-11-18",
+      "grace_period": "until August 2027",
+      "mandatory_date": "2027-08-01",
+      "enforcement_date": "2027-08-01",
+      "affected_repository_sections": "docs/PLATFORM-MECHANICS-2026.md section 2.5, docs/GOOGLE-PLAY.md 2026 policy rounds, references/rules/android.md",
+      "priority": "high",
+      "source_url": "https://developer.android.com/blog/posts/google-play-adaptive-quality-standards",
+      "verified_on": "2026-11-25",
+      "source_note": "Read on the Android Developers Blog on 25 November 2026. The post says August 2027 and does not name a day. Google's target API level page (https://developer.android.com/google/play/requirements/target-sdk, last updated 2026-10-28 UTC) was checked the same day. It still states the 31 August 2026 API level 36 floor, with an extension to 1 November 2026, and does not mention API level 37 or August 2027."
     }
   ]
 }
