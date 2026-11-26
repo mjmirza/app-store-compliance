@@ -471,6 +471,25 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
   [ -n "$out" ]
 }
 
+# Prints the first file:line that matches $1, or nothing. With $2 = manifest only AndroidManifest.xml counts.
+# A <uses-permission> with tools:node="remove" strips a permission that an SDK merges in, so the merged manifest
+# declares none. A removal scoped with tools:selector strips one library only, so the others still merge it in.
+permission_at() {
+  local re="$1" hits f n
+  grep_has "$re" || return 0
+  hits="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$re" 2>/dev/null)"
+  [ "${2:-}" = "manifest" ] && hits="$(grep '/AndroidManifest[.]xml$' <<< "$hits")"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$f" in */AndroidManifest.xml)  # one element per line, so a tools:node on the next line is read
+      [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']" ; tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -E 'tools:selector')" ] || continue ;;
+    esac
+    n="$(grep -En -m1 -e "$re" "$f" 2>/dev/null | cut -d: -f1)"
+    printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"
+    return 0
+  done <<< "$hits"
+}
+
 APPLE_SRC_RE='[.](swift|m|mm|h)$'
 apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flutter and JS share names like Image( and Button
   [ -s "$FILELIST" ] || return 1
@@ -1287,14 +1306,17 @@ fi
 
 # ===== Android checks =====
 if [ "$IS_AND" -eq 1 ]; then
-  if grep_has 'ACCESS_BACKGROUND_LOCATION'; then
-    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location." src 'ACCESS_BACKGROUND_LOCATION'
+  PERM_AT="$(permission_at 'ACCESS_BACKGROUND_LOCATION')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location." at "$PERM_AT"
   fi
-  if grep_has 'MANAGE_EXTERNAL_STORAGE'; then
-    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case." src 'MANAGE_EXTERNAL_STORAGE'
+  PERM_AT="$(permission_at 'MANAGE_EXTERNAL_STORAGE')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case." at "$PERM_AT"
   fi
-  if grep_has 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'; then
-    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it." src 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'
+  PERM_AT="$(permission_at 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it." at "$PERM_AT"
   fi
   if grep_has 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'; then
     finding critical "GOOGLE-PERM-ACCESSIBILITY-MISUSE" "AccessibilityService present" "Use it only for genuine accessibility and declare the use, or remove it." src 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'
@@ -1588,28 +1610,16 @@ ABIPY
   fi
   # Declared permissions in AndroidManifest.xml, the surface Play enforces on (#542). English words matched prose,
   # and bare API symbols match imports, comments and vendored SDKs. READ_MEDIA_* has its own check below.
-  if manifest_has 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'; then
+  PERM_AT="$(permission_at 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)' manifest)"
+  if [ -n "$PERM_AT" ]; then
     if ! grep_has 'prominent disclosure|user consent|privacy consent|accept policy|[Pp]rominentDisclosure|[Dd]isclosureDialog|[Cc]onsentDialog|showDisclosure|requestConsent'; then
-      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." manifest 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'
+      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." at "$PERM_AT"
     fi
   fi
-  # Prints the first file:line that uses the advertising ID, or nothing. A <uses-permission> with tools:node="remove"
-  # strips the AD_ID permission that an SDK such as firebase-analytics merges in, so the merged manifest declares none.
-  # AD_ID after a letter or digit is the end of a longer word (THREAD_ID, UPLOAD_ID, PAYLOAD_ID) and does not count.
+  # Prints the first file:line that uses the advertising ID, or nothing. A removed AD_ID permission (firebase-analytics
+  # merges one in) does not count. AD_ID after a letter or digit is the end of a longer word (THREAD_ID, UPLOAD_ID).
   advertising_id_at() {
-    local re='com\.google\.android\.gms\.permission\.AD_ID|(^|[^A-Za-z0-9])AD_ID|getAdvertisingIdInfo' hits f n
-    grep_has "$re" || return 0
-    hits="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$re" 2>/dev/null)"
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      case "$f" in */AndroidManifest.xml)  # one element per line, so a tools:node on the next line is read
-        # A removal scoped with tools:selector strips one library only, so the others still merge it in.
-        [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']" ; tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -E 'tools:selector')" ] || continue ;;
-      esac
-      n="$(grep -En -m1 -e "$re" "$f" 2>/dev/null | cut -d: -f1)"
-      printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"
-      return 0
-    done <<< "$hits"
+    permission_at 'com\.google\.android\.gms\.permission\.AD_ID|(^|[^A-Za-z0-9])AD_ID|getAdvertisingIdInfo'
   }
   ADID_AT="$(advertising_id_at)"
   if [ -n "$ADID_AT" ]; then
