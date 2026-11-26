@@ -4020,17 +4020,18 @@ ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() in Swift fires and names t
 rm -rf "$D"
 D="$(ic_app A.swift 'let creator = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:1' && ok "ImageCreator() without an import still fires" || bad "ImageCreator() without an import still fires"
+! ic_has && ok "ImageCreator() in a Swift file without an ImagePlayground import stays silent" || bad "ImageCreator() in a Swift file without an ImagePlayground import stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'let styles = ImageCreator.availableStyles')"
+D="$(ic_app A.swift 'import ImagePlayground
+let styles = ImageCreator.availableStyles')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:1' && ok "ImageCreator. member use fires" || bad "ImageCreator. member use fires"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator. member use fires" || bad "ImageCreator. member use fires"
 rm -rf "$D"
 D="$(ic_app A.m '@import ImagePlayground;
 NSString *note = @"ImageCreator()";
 ImageCreator *c = [[ImageCreator alloc] init];')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.m:3' && ok "Objective-C [[ImageCreator alloc] init] fires, the string does not" || bad "Objective-C [[ImageCreator alloc] init] fires, the string does not"
+! ic_has && ok "Objective-C never fires, ImageCreator is a Swift-only API" || bad "Objective-C never fires, ImageCreator is a Swift-only API"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let creator = try ImageCreator()
@@ -4038,12 +4039,13 @@ let sheet = ImagePlaygroundViewController()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() still fires when the sheet is in the same file" || bad "ImageCreator() still fires when the sheet is in the same file"
 rm -rf "$D"
-D="$(ic_app A.swift 'let help = """
+D="$(ic_app A.swift 'import ImagePlayground
+let help = """
 /* Start a comment using this marker
 """
 let creator = ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:4' && ok "a comment marker inside a multiline string does not hide ImageCreator()" || bad "a comment marker inside a multiline string does not hide ImageCreator()"
+ic_has && ic_at 'App/A.swift:5' && ok "a comment marker inside a multiline string does not hide ImageCreator()" || bad "a comment marker inside a multiline string does not hide ImageCreator()"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let sheet = ImagePlaygroundViewController()')"
@@ -4081,14 +4083,15 @@ let sheet = ImagePlaygroundViewController()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() in a nested Swift block comment stays silent" || bad "ImageCreator() in a nested Swift block comment stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '/* outer /* inner */ still a comment */
+D="$(ic_app A.swift 'import ImagePlayground
+/* outer /* inner */ still a comment */
 let creator = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() after a closed nested Swift comment fires" || bad "ImageCreator() after a closed nested Swift comment fires"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() after a closed nested Swift comment fires" || bad "ImageCreator() after a closed nested Swift comment fires"
 rm -rf "$D"
 D="$(ic_app A.m '/* a /* b */ ImageCreator *c = [[ImageCreator alloc] init];')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.m:1' && ok "an Objective-C block comment ends at the first close, so the call fires" || bad "an Objective-C block comment ends at the first close, so the call fires"
+! ic_has && ok "an Objective-C file stays silent even with nested block comments" || bad "an Objective-C file stays silent even with nested block comments"
 rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}
 let renderer = ImageCreator()')"
@@ -4106,23 +4109,26 @@ ImageCreator *c = [[ImageCreator alloc] init];')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an Objective-C class named ImageCreator stays silent" || bad "an Objective-C class named ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '// class ImageCreator wraps the system type
+D="$(ic_app A.swift 'import ImagePlayground
+// class ImageCreator wraps the system type
 let creator = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "a declaration in a comment does not hide ImageCreator()" || bad "a declaration in a comment does not hide ImageCreator()"
+ic_has && ic_at 'App/A.swift:3' && ok "a declaration in a comment does not hide ImageCreator()" || bad "a declaration in a comment does not hide ImageCreator()"
 rm -rf "$D"
-D="$(ic_app A.swift 'final class ImageCreator {
+D="$(ic_app A.swift 'import ImagePlayground
+final class ImageCreator {
   func make() async throws { let c = try await ImagePlayground.ImageCreator() }
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "ImagePlayground.ImageCreator() fires next to an app type of that name" || bad "ImagePlayground.ImageCreator() fires next to an app type of that name"
+ic_has && ic_at 'App/A.swift:3' && ok "ImagePlayground.ImageCreator() fires next to an app type of that name" || bad "ImagePlayground.ImageCreator() fires next to an app type of that name"
 rm -rf "$D"
-D="$(ic_app A.swift '/*
+D="$(ic_app A.swift 'import ImagePlayground
+/*
 class ImageCreator wraps the system type
 */
 let creator = try await ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:4' && ok "a declaration in a block comment does not hide ImageCreator()" || bad "a declaration in a block comment does not hide ImageCreator()"
+ic_has && ic_at 'App/A.swift:5' && ok "a declaration in a block comment does not hide ImageCreator()" || bad "a declaration in a block comment does not hide ImageCreator()"
 rm -rf "$D"
 D="$(ic_app A.swift '@available(iOS 15.0, *) final class ImageCreator {}
 let renderer = ImageCreator()')"
@@ -4207,7 +4213,8 @@ func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageC
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a nested generic constraint stays silent" || bad "a generic parameter after a nested generic constraint stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '#if DEBUG && targetEnvironment(simulator)
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(iOS)
 let probe = true
 #elseif DEBUG
 func probe() async throws { _ = try await ImageCreator() }
@@ -4227,11 +4234,12 @@ func make() async throws { _ = try await ImageCreator() }
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if canImport fires, Release keeps it" || bad "ImageCreator() under #if canImport fires, Release keeps it"
 rm -rf "$D"
-D="$(ic_app A.swift '#if os(iOS) && !targetEnvironment(macCatalyst)
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(iOS) && !targetEnvironment(macCatalyst)
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() under a platform-only #if fires" || bad "ImageCreator() under a platform-only #if fires"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under a platform-only #if fires" || bad "ImageCreator() under a platform-only #if fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if INTERNAL_BUILD
@@ -4284,10 +4292,43 @@ func make<T: Collection<() -> Void>, ImageCreator: P>(_: T, creator: ImageCreato
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a function-type constraint stays silent" || bad "a generic parameter after a function-type constraint stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
+D="$(ic_app A.swift 'import ImagePlayground
+func creatorType<ImageCreator>(_: ImageCreator.Type) -> Any.Type { ImageCreator.self }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an unconstrained generic parameter named ImageCreator stays silent" || bad "an unconstrained generic parameter named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<ImageCreator /* implementation */: P>() -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter with a comment before its constraint stays silent" || bad "a generic parameter with a comment before its constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import RenderingKit
+let renderer = RenderingKit::ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "another module selector, RenderingKit::ImageCreator, stays silent" || bad "another module selector, RenderingKit::ImageCreator, stays silent"
+rm -rf "$D"
+D="$(ic_app Model.swift 'struct ImageCreator {}')"
+printf 'import ImagePlayground\nlet renderer = ImageCreator()\n' > "$D/App/Editor.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type in a file without the import still silences an importing file" || bad "an app type in a file without the import still silences an importing file"
+rm -rf "$D"
+D="$(ic_app A.swift '@preconcurrency import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an attributed import counts as an ImagePlayground import" || bad "an attributed import counts as an ImagePlayground import"
+rm -rf "$D"
+D="$(ic_app A.swift '// import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a commented-out import does not count" || bad "a commented-out import does not count"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "Array<ImageCreator> is a use, so the call still fires" || bad "Array<ImageCreator> is a use, so the call still fires"
+ic_has && ic_at 'App/A.swift:3' && ok "Array<ImageCreator> is a use, so the call still fires" || bad "Array<ImageCreator> is a use, so the call still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if compiler(>=6.3)
@@ -4298,16 +4339,17 @@ func legacy() async throws { _ = try await ImageCreator() }
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an old-SDK fallback under #if compiler stays silent" || bad "an old-SDK fallback under #if compiler stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '#if compiler(>=6.3)
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
 let usesSheet = true
 #endif
 func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() after a closed #if compiler block still fires" || bad "ImageCreator() after a closed #if compiler block still fires"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() after a closed #if compiler block still fires" || bad "ImageCreator() after a closed #if compiler block still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}')"
 i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
-printf 'let renderer = ImageCreator()\n' > "$D/App/Z.swift"
+printf 'import ImagePlayground\nlet renderer = ImageCreator()\n' > "$D/App/Z.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an app type still counts when the project has more than 5000 source files" || bad "an app type still counts when the project has more than 5000 source files"
 rm -rf "$D"

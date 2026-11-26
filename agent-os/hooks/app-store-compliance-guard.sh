@@ -520,8 +520,11 @@ def use_at(text, i, end):
     t2 = k
     while t2 < end and text[t2].isspace():
         t2 += 1
+    # A type from another module, as in RenderingKit::ImageCreator.
+    if i >= 2 and text[i - 2:i] == "::" and not text[:i - 2].endswith("ImagePlayground"):
+        return False
     # A constrained type parameter, as in <ImageCreator: P>, <T, ImageCreator: P> or where ImageCreator: P.
-    generic = t2 < end and text[t2] == ":" and not text.startswith("::", t2) and b >= 0 and (text[b] in ("<", ",") or text[w + 1:b + 1] == "where")
+    generic = decl_generic(text, b) or t2 < end and text[t2] == ":" and not text.startswith("::", t2) and b >= 0 and (text[b] in ("<", ",") or text[w + 1:b + 1] == "where")
     # A C typedef names its alias last, as in typedef Renderer ImageCreator;
     st = max(text.rfind(";", 0, i), text.rfind(chr(123), 0, i), text.rfind(chr(125), 0, i)) + 1
     typedef = t2 < end and text[t2] in (";", ",") and "typedef" in text[st:i].split()
@@ -554,6 +557,42 @@ CUR = ""
 DECLARED = False
 HITS = []
 SKIP = dict()
+IMPORTS = set()
+
+def decl_generic(text, b):
+    # True when the name opens or follows a comma in a generic parameter list, as in func f<T, ImageCreator>.
+    if b < 0 or text[b] not in ("<", ","):
+        return False
+    depth = 0
+    j = b if text[b] == "<" else b - 1
+    while j >= 0:
+        c = text[j]
+        if c in "{};":
+            return False
+        if c == ">" and not (j and text[j - 1] == "-"):
+            depth += 1
+        elif c == "<":
+            if depth == 0:
+                break
+            depth -= 1
+        j -= 1
+    if j < 0:
+        return False
+    head = text[max(0, j - 200):j].split()
+    if head and head[-1] in ("init", "subscript"):
+        return True
+    return len(head) >= 2 and head[-2] in ("func", "struct", "class", "enum", "actor", "typealias", "protocol")
+
+def imports_ip(text):
+    # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
+    for line in text.split(chr(10)):
+        words = [w for w in line.split() if not w.startswith("@") and w not in ("public", "internal", "package", "private", "fileprivate")]
+        if len(words) < 2 or words[0] != "import":
+            continue
+        m = words[2] if words[1] in ("typealias", "struct", "class", "enum", "protocol", "let", "var", "func") and len(words) > 2 else words[1]
+        if m == "ImagePlayground" or m.startswith("ImagePlayground."):
+            return True
+    return False
 
 def cond_unknown(cond):
     # True unless the condition is only platform checks, which a Release build for that platform keeps.
@@ -734,8 +773,11 @@ for path in sys.stdin.read().split(chr(10)):
     walk(text, 0, len(text), 1, False)
     if NEST:
         SKIP[path] = cond_lines(text)
+        if imports_ip(text):
+            IMPORTS.add(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
-pick = [h for h in HITS if (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+# ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
+pick = [h for h in HITS if h[0] in IMPORTS and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY
