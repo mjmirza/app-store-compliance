@@ -4093,12 +4093,14 @@ D="$(ic_app A.m '/* a /* b */ ImageCreator *c = [[ImageCreator alloc] init];')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an Objective-C file stays silent even with nested block comments" || bad "an Objective-C file stays silent even with nested block comments"
 rm -rf "$D"
-D="$(ic_app A.swift 'struct ImageCreator {}
+D="$(ic_app A.swift 'import ImagePlayground
+struct ImageCreator {}
 let renderer = ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an app type named ImageCreator stays silent" || bad "an app type named ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'let renderer = ImageCreator()')"
+D="$(ic_app A.swift 'import ImagePlayground
+let renderer = ImageCreator()')"
 printf 'final class ImageCreator {\n}\n' > "$D/App/Renderer.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an app type named ImageCreator in another file stays silent" || bad "an app type named ImageCreator in another file stays silent"
@@ -4130,12 +4132,14 @@ let creator = try await ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:5' && ok "a declaration in a block comment does not hide ImageCreator()" || bad "a declaration in a block comment does not hide ImageCreator()"
 rm -rf "$D"
-D="$(ic_app A.swift '@available(iOS 15.0, *) final class ImageCreator {}
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS 15.0, *) final class ImageCreator {}
 let renderer = ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an app type behind @available(...) stays silent" || bad "an app type behind @available(...) stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'enum MyImagePlayground {
+D="$(ic_app A.swift 'import ImagePlayground
+enum MyImagePlayground {
   struct ImageCreator {}
 }
 let c = MyImagePlayground.ImageCreator()')"
@@ -4155,46 +4159,54 @@ func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup" || bad "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup"
 rm -rf "$D"
-D="$(ic_app A.swift 'enum Rendering {
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering {
   struct ImageCreator {}
   static func make() -> ImageCreator { ImageCreator() }
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a call inside the type that nests ImageCreator stays silent" || bad "a call inside the type that nests ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'let c = Rendering.ImageCreator()')"
+D="$(ic_app A.swift 'import ImagePlayground
+let c = Rendering.ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator under another namespace stays silent" || bad "ImageCreator under another namespace stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'enum Rendering { struct ImageCreator {} }
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering { struct ImageCreator {} }
 extension Rendering { static func make() -> ImageCreator { ImageCreator() } }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a nested app type used from an extension stays silent" || bad "a nested app type used from an extension stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol ImageCreating { static func make() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { static func make() }
 protocol Renderer { associatedtype ImageCreator: ImageCreating }
 extension Renderer { func render() { ImageCreator.make() } }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an associatedtype named ImageCreator stays silent" || bad "an associatedtype named ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol ImageCreating { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { init() }
 func create<ImageCreator: ImageCreating>(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter named ImageCreator stays silent" || bad "a generic parameter named ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol ImageCreating { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { init() }
 func create<ImageCreator>() -> ImageCreator where ImageCreator: ImageCreating { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter constrained in a where clause stays silent" || bad "a generic parameter constrained in a where clause stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func create<
   ImageCreator: P
 >(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter list split across lines stays silent" || bad "a generic parameter list split across lines stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '#if DEBUG
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
 let mode = 1
 #else
 func make() async throws { _ = try await ImageCreator() }
@@ -4202,13 +4214,15 @@ func make() async throws { _ = try await ImageCreator() }
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated" || bad "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated"
 rm -rf "$D"
-D="$(ic_app A.swift '#if !DEBUG
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated" || bad "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a nested generic constraint stays silent" || bad "a generic parameter after a nested generic constraint stays silent"
@@ -4222,7 +4236,8 @@ func probe() async throws { _ = try await ImageCreator() }
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() under #elseif DEBUG stays silent" || bad "ImageCreator() under #elseif DEBUG stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func make<T: Collection<(String, Int)>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a tuple constraint stays silent" || bad "a generic parameter after a tuple constraint stays silent"
@@ -4248,7 +4263,8 @@ let creatorType = ImageCreator.self
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator under a custom build flag stays silent" || bad "ImageCreator under a custom build flag stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '#if !(DEBUG)
+D="$(ic_app A.swift 'import ImagePlayground
+#if !(DEBUG)
 func release() {}
 #else
 let creator = ImageCreator()
@@ -4256,7 +4272,8 @@ let creator = ImageCreator()
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() under #if !(DEBUG) stays silent" || bad "ImageCreator() under #if !(DEBUG) stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift '#if !DEBUG
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
 func release() {}
 #elseif os(macOS)
 let creator = ImageCreator()
@@ -4276,18 +4293,21 @@ inline auto makeRenderer() { return ImageCreator(); }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a C typedef named ImageCreator stays silent" || bad "a C typedef named ImageCreator stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func make<T, /* renderer */ ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a block comment stays silent" || bad "a generic parameter after a block comment stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func make<T, // renderer
 ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a line comment stays silent" || bad "a generic parameter after a line comment stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'protocol P { init() }
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
 func make<T: Collection<() -> Void>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a function-type constraint stays silent" || bad "a generic parameter after a function-type constraint stays silent"
@@ -4323,6 +4343,16 @@ D="$(ic_app A.swift '// import ImagePlayground
 func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a commented-out import does not count" || bad "a commented-out import does not count"
+rm -rf "$D"
+D="$(ic_app Exports.swift '@_exported import ImagePlayground')"
+printf 'func make() async throws { _ = try await ImageCreator() }\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/Use.swift:1' && ok "an @_exported import in another file counts for every Swift file" || bad "an @_exported import in another file counts for every Swift file"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground;
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an import with a trailing semicolon counts" || bad "an import with a trailing semicolon counts"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let pool: Array<ImageCreator> = []
@@ -4360,7 +4390,8 @@ let sheet = ImagePlaygroundViewController()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() in a string or a raw string stays silent" || bad "ImageCreator() in a string or a raw string stays silent"
 rm -rf "$D"
-D="$(ic_app A.swift 'func MyImageCreator() {}
+D="$(ic_app A.swift 'import ImagePlayground
+func MyImageCreator() {}
 let view = ImageCreatorView()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator inside a longer name stays silent" || bad "ImageCreator inside a longer name stays silent"
