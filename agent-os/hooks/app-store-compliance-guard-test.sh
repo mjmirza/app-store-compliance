@@ -4257,6 +4257,19 @@ printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/andro
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 tier3_id && bad "658 a resize lock with supports_size_changes stays silent" || ok "658 a resize lock with supports_size_changes stays silent"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main" "$D/app/src/release"
+printf '%s\n' 'android { defaultConfig { targetSdk 36 } }' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><property android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY" android:value="true" /><activity android:name=".Main" android:resizeableActivity="false"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity><activity android:name=".Legacy" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Main"><meta-data android:name="android.supports_size_changes" android:value="true" /></activity><activity android:name=".Legacy" android:enabled="false" /></application></manifest>' > "$D/app/src/release/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && bad "658 supports_size_changes in a release manifest stays silent" || ok "658 supports_size_changes in a release manifest stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/app/src/main"
+printf '%s\n' 'android { defaultConfig { targetSdk 36 } }' > "$D/app/build.gradle"
+printf '%s\n' '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".Main" android:screenOrientation="nosensor" /></application></manifest>' > "$D/app/src/main/AndroidManifest.xml"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+tier3_id && ok "658 a nosensor orientation still fires at API 36" || bad "658 a nosensor orientation still fires at API 36"
+rm -rf "$D"
 
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then

@@ -1432,6 +1432,8 @@ def frees(root):
             return True
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
             return True
+        if local(el.tag) == "meta-data" and attr(el, "name") == "android.supports_size_changes":
+            return True
         # A tools:node marker on the application can replace all of it.
         if attr(el, "node") is not None and local(el.tag) == "application":
             return True
@@ -1554,7 +1556,7 @@ for path in sys.argv[1:]:
     if target == 0:
         continue
     # Android 16 ignores the resize and orientation locks on large screens from API 36, except
-    # the locked orientation. Only at API 36 can an application or one activity opt out.
+    # the locked and nosensor orientations. Only at API 36 can an application or one activity opt out.
     if single_device(root):
         continue
     for app in [el for el in root.iter() if local(el.tag) == "application"]:
@@ -1580,7 +1582,7 @@ for path in sys.argv[1:]:
             if any(full_name(o, pkg) == full_name(attr(el, "name"), pkg) for o in off):
                 continue
             if target >= 36 and not (target == 36 and (app_keeps or opts_out(el))):
-                if attr(el, "screenOrientation") == "locked":
+                if attr(el, "screenOrientation") in ("locked", "nosensor"):
                     print(path)
                     sys.exit(0)
                 continue
