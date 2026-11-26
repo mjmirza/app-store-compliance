@@ -3982,6 +3982,12 @@ module.exports = cfg;"
   js_case "js-23 a double-quoted require() path stays silent too" 0 api.js 'const cfg = require("./staging.config");
 module.exports = cfg;'
   js_case "js-24 a URL passed to fetch() still fires" src/api.ts:1 api.ts "export const r = fetch('http://localhost:3000');"
+  # RequireJS (common in Cordova apps) configures its loader with require.config(), whose first argument
+  # is an options object that can hold a real backend URL, so only require.resolve() names a module path.
+  js_case "js-25 a double-quoted URL in require.config() still fires" src/api.js:1 api.js 'require.config({baseUrl: "http://localhost:3000/scripts"});'
+  js_case "js-26 a single-quoted URL in require.config() fires" src/api.js:1 api.js "require.config({baseUrl: 'http://localhost:3000/scripts'});"
+  js_case "js-27 a single-quoted require.resolve() path stays silent" 0 api.js "const p = require.resolve('./staging.config');
+module.exports = p;"
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -3989,7 +3995,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-24 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-27 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

@@ -614,9 +614,12 @@ function firstHits(ast) {
       if (best === null || n.start < best.start) best = n;
       if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
     }
-    // A module path is never a backend URL: the first argument of require(), require.resolve() and import().
+    // A module path is never a backend URL: the first argument of require(), import() and a string-literal
+    // require.resolve(). No other require member: RequireJS require.config() takes an options object that can
+    // hold a real backend URL.
     const c = n.type === "CallExpression" ? n.callee : null;
-    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || (c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "require"));
+    const resolvesPath = !!c && c.type === "MemberExpression" && !c.computed && c.object.type === "Identifier" && c.object.name === "require" && c.property.type === "Identifier" && c.property.name === "resolve" && !!n.arguments[0] && n.arguments[0].type === "StringLiteral";
+    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath);
     for (const k of Object.keys(n)) {
       if (SKIP_KEYS.has(k)) continue;
       if ((k === "source" && /^(Import|Export)/.test(n.type)) || (k === "directives")) continue;
