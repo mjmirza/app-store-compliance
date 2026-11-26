@@ -32,12 +32,12 @@ DOMAINS='<array><string>att.attr.appsflyersdk.com</string></array>'
 # 1 tracking true with no domains is the ITMS-91064 rejection
 write_manifest "$T/a.xcprivacy" true '<array/>' "$TYPE_OK"
 OUT="$($V "$T/a.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' && ok "flags tracking true with empty domains" || bad "tracking/no-domains"
+grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' <<<"$OUT" && ok "flags tracking true with empty domains" || bad "tracking/no-domains"
 
 # 2 domains without tracking true is the converse
 write_manifest "$T/b.xcprivacy" false "$DOMAINS" '<array/>'
 OUT="$($V "$T/b.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'APPLE-ITMS-91064-DOMAINS-NO-TRACKING' && ok "flags domains with tracking false" || bad "domains/no-tracking"
+grep -q 'APPLE-ITMS-91064-DOMAINS-NO-TRACKING' <<<"$OUT" && ok "flags domains with tracking false" || bad "domains/no-tracking"
 
 # 3 a consistent manifest passes
 write_manifest "$T/c.xcprivacy" true "$DOMAINS" "$TYPE_OK"
@@ -52,12 +52,12 @@ $V "$T/d.xcprivacy" >/dev/null 2>&1
 # 5 a type used for tracking while the manifest says otherwise
 write_manifest "$T/e.xcprivacy" false '<array/>' "$TYPE_OK"
 OUT="$($V "$T/e.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'APPLE-MANIFEST-TRACKING-CONTRADICTION' && ok "flags per-type tracking contradiction" || bad "type contradiction"
+grep -q 'APPLE-MANIFEST-TRACKING-CONTRADICTION' <<<"$OUT" && ok "flags per-type tracking contradiction" || bad "type contradiction"
 
 # 6 unknown purpose constant
 write_manifest "$T/f.xcprivacy" true "$DOMAINS" "${TYPE_OK/NSPrivacyCollectedDataTypePurposeDeveloperAdvertising/NSPrivacyCollectedDataTypePurposeMarketing}"
 OUT="$($V "$T/f.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'APPLE-MANIFEST-BAD-PURPOSE' && ok "flags unknown purpose" || bad "bad purpose"
+grep -q 'APPLE-MANIFEST-BAD-PURPOSE' <<<"$OUT" && ok "flags unknown purpose" || bad "bad purpose"
 
 # 7 unreadable manifest exits 2 rather than passing silently
 printf 'not a plist' > "$T/g.xcprivacy"
@@ -67,36 +67,36 @@ $V "$T/g.xcprivacy" >/dev/null 2>&1
 # 8 a plist whose root is an array is not a manifest, and must be a finding rather than a crash into a silent pass
 printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><string>x</string></array></plist>' > "$T/h.xcprivacy"
 OUT="$($V "$T/h.xcprivacy" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE' && [ $RC -eq 2 ] && ok "root array is unreadable, exit 2" || bad "root array (rc=$RC)"
+grep -q 'APPLE-MANIFEST-UNREADABLE' <<<"$OUT" && [ $RC -eq 2 ] && ok "root array is unreadable, exit 2" || bad "root array (rc=$RC)"
 
 # 9 an empty NSPrivacyAccessedAPITypes array is invalid per TN3181
 printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyAccessedAPITypes</key><array/></dict></plist>' > "$T/i.xcprivacy"
 OUT="$($V "$T/i.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-API-TYPES-EMPTY' && ok "empty accessed API array is critical" || bad "empty accessed API array"
+grep -q 'critical.APPLE-MANIFEST-API-TYPES-EMPTY' <<<"$OUT" && ok "empty accessed API array is critical" || bad "empty accessed API array"
 
 # 10 an accessed API with an empty reasons array is invalid per TN3181, and blocks
 printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyAccessedAPITypes</key><array><dict><key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string><key>NSPrivacyAccessedAPITypeReasons</key><array/></dict></array></dict></plist>' > "$T/j.xcprivacy"
 OUT="$($V "$T/j.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-API-NO-REASON' && ok "empty reason array is critical" || bad "empty reason array"
+grep -q 'critical.APPLE-MANIFEST-API-NO-REASON' <<<"$OUT" && ok "empty reason array is critical" || bad "empty reason array"
 
 # 11 a collected type with the wrong value type is reported, never a crash
 printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyCollectedDataTypes</key><string>oops</string></dict></plist>' > "$T/k.xcprivacy"
 OUT="$($V "$T/k.xcprivacy" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'APPLE-MANIFEST-BAD-VALUE' && [ $RC -eq 1 ] && ok "wrong value type is a finding" || bad "wrong value type (rc=$RC)"
+grep -q 'APPLE-MANIFEST-BAD-VALUE' <<<"$OUT" && [ $RC -eq 1 ] && ok "wrong value type is a finding" || bad "wrong value type (rc=$RC)"
 
 # 12 a NSPrivacyTracking that is not a Boolean is invalid per TN3181
 printf '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>NSPrivacyTracking</key><string>yes</string></dict></plist>' > "$T/l.xcprivacy"
 OUT="$($V "$T/l.xcprivacy" 2>&1)"
-echo "$OUT" | grep -q 'critical.APPLE-MANIFEST-BAD-VALUE' && ok "non-boolean tracking is critical" || bad "non-boolean tracking"
+grep -q 'critical.APPLE-MANIFEST-BAD-VALUE' <<<"$OUT" && ok "non-boolean tracking is critical" || bad "non-boolean tracking"
 
 # A non-string purpose is a shape finding, not an unreadable manifest; other findings survive.
 TYPES_BAD=${TYPE_OK/<string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising<\/string>/<dict\/><array\/><string>UnknownPurpose<\/string>}
 write_manifest "$T/m.xcprivacy" true '<array/>' "$TYPES_BAD"
 OUT="$($V "$T/m.xcprivacy" 2>&1)"; RC=$?
 if [ "$RC" -eq 1 ] && [ "$(echo "$OUT" | grep -c 'APPLE-MANIFEST-BAD-VALUE.*contains a non-string value')" -eq 2 ] \
-    && echo "$OUT" | grep -q 'APPLE-MANIFEST-BAD-PURPOSE.*UnknownPurpose' \
-    && echo "$OUT" | grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' \
-    && ! echo "$OUT" | grep -q 'APPLE-MANIFEST-UNREADABLE'; then
+    && grep -q 'APPLE-MANIFEST-BAD-PURPOSE.*UnknownPurpose' <<<"$OUT" \
+    && grep -q 'APPLE-ITMS-91064-TRACKING-NO-DOMAINS' <<<"$OUT" \
+    && ! grep -q 'APPLE-MANIFEST-UNREADABLE' <<<"$OUT"; then
   ok "reports non-string purposes without dropping other findings"
 else
   bad "reports non-string purposes without dropping other findings (rc=$RC)"
