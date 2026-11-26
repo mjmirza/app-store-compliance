@@ -574,47 +574,43 @@ def generic_param(text, i):
         j -= 1
     return text[j + 1:e + 1] in ("func", "struct", "class", "enum", "actor", "typealias", "subscript")
 
+def cond_unknown(cond):
+    # True unless the condition is only platform checks, which a Release build for that platform keeps.
+    c = cond.split("//")[0]
+    for name in ("os(", "canImport(", "arch(", "targetEnvironment("):
+        while True:
+            k = c.find(name)
+            if k < 0:
+                break
+            e = c.find(")", k)
+            if e < 0:
+                return True
+            c = c[:k] + c[e + 1:]
+    for ch in "!&|()":
+        c = c.replace(ch, "")
+    return c != ""
+
 def cond_lines(text):
-    # Lines a Release build never compiles. #if compiler and #if swift fallbacks, and #if DEBUG code.
-    # The #else of an #if DEBUG is release code, so it stays live.
+    # Any #if chain with DEBUG, compiler(), swift() or a custom flag may be dropped from Release,
+    # so every branch of it is skipped. Branch selection is never evaluated.
     out = set()
     stack = []
     for n, raw in enumerate(text.split(chr(10)), 1):
-        s = raw.strip().replace(" ", "")
-        cond = "compiler(" in s or "swift(" in s
+        s = raw.strip().replace(" ", "").replace(chr(9), "")
         if s.startswith("#elseif"):
-            if stack and stack[-1] != "skip":
-                if cond:
-                    stack[-1] = "skip"
-                elif "!DEBUG" in s:
-                    stack[-1] = "nodebug"
-                elif "DEBUG" in s:
-                    stack[-1] = "debug"
-                else:
-                    stack[-1] = "live"
+            if stack and cond_unknown(s[7:]):
+                stack[-1][1] = True
         elif s.startswith("#else"):
-            if stack and stack[-1] == "debug":
-                stack[-1] = "live"
-            elif stack and stack[-1] == "nodebug":
-                stack[-1] = "debugonly"
+            pass
         elif s.startswith("#if"):
-            if cond:
-                stack.append("skip")
-            elif "!DEBUG" in s:
-                stack.append("nodebug")
-            elif "DEBUG" in s:
-                stack.append("debug")
-            else:
-                stack.append("live")
+            stack.append([n, cond_unknown(s[3:])])
         elif s.startswith("#endif"):
             if stack:
-                stack.pop()
-            out.add(n)
-            continue
-        if any(x in ("skip", "debug", "debugonly") for x in stack):
-            out.add(n)
+                start, unknown = stack.pop()
+                if unknown:
+                    out.update(range(start, n + 1))
     return out
-DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation")
+DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation", "using")
 
 def block_end(text, i, end):
     # Swift block comments nest, Objective-C ones do not. Returns where the comment closes, or -1.
@@ -1333,7 +1329,7 @@ SIWAPY
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
   # ImageCreator is discontinued in iOS 27, iPadOS 27, macOS 27, and visionOS 27 (Apple news dz9wvq0r, 11 June 2026).
-  # A call or member use in release code counts. #if DEBUG and #if compiler blocks do not, nor does the sheet.
+  # A call or member use counts outside #if chains that Release may drop. The sheet does not.
   if apple_imagecreator_hit; then
     finding high "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED" "ImageCreator will not work on iOS 27 or later" "Present the Image Playground sheet (ImagePlaygroundViewController or imagePlaygroundSheet), or use another image generation service, before the public release of iOS 27, iPadOS 27, macOS 27, and visionOS 27." at "$IMAGECREATOR_HIT"
   fi

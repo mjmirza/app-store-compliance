@@ -4194,13 +4194,13 @@ let mode = 1
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() in the #else of #if DEBUG is release code and fires" || bad "ImageCreator() in the #else of #if DEBUG is release code and fires"
+! ic_has && ok "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated" || bad "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated"
 rm -rf "$D"
 D="$(ic_app A.swift '#if !DEBUG
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() under #if !DEBUG fires" || bad "ImageCreator() under #if !DEBUG fires"
+! ic_has && ok "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated" || bad "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated"
 rm -rf "$D"
 D="$(ic_app A.swift 'protocol P { init() }
 func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
@@ -4219,6 +4219,48 @@ D="$(ic_app A.swift 'protocol P { init() }
 func make<T: Collection<(String, Int)>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a tuple constraint stays silent" || bad "a generic parameter after a tuple constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if canImport(ImagePlayground)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if canImport fires, Release keeps it" || bad "ImageCreator() under #if canImport fires, Release keeps it"
+rm -rf "$D"
+D="$(ic_app A.swift '#if os(iOS) && !targetEnvironment(macCatalyst)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() under a platform-only #if fires" || bad "ImageCreator() under a platform-only #if fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if INTERNAL_BUILD
+let creatorType = ImageCreator.self
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator under a custom build flag stays silent" || bad "ImageCreator under a custom build flag stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '#if !(DEBUG)
+func release() {}
+#else
+let creator = ImageCreator()
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if !(DEBUG) stays silent" || bad "ImageCreator() under #if !(DEBUG) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '#if !DEBUG
+func release() {}
+#elseif os(macOS)
+let creator = ImageCreator()
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in an #elseif after #if !DEBUG stays silent" || bad "ImageCreator() in an #elseif after #if !DEBUG stays silent"
+rm -rf "$D"
+D="$(ic_app Renderer.h 'struct Renderer {};
+using ImageCreator = Renderer;
+inline auto makeRenderer() { return ImageCreator(); }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a C++ using alias named ImageCreator stays silent" || bad "a C++ using alias named ImageCreator stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
