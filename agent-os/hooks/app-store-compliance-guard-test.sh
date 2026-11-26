@@ -4346,6 +4346,30 @@ func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a commented-out import does not count" || bad "a commented-out import does not count"
 rm -rf "$D"
+D="$(ic_app A.swift 'import RenderingKit
+/*
+import ImagePlayground
+*/
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an import inside a block comment does not count" || bad "an import inside a block comment does not count"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS 18.4, *) func make() async throws { if #unavailable(iOS 27.0) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() kept for systems before 27 stays silent" || bad "ImageCreator() kept for systems before 27 stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { if #available(iOS 26, *) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an #available check below 27 still fires" || bad "an #available check below 27 still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+printf 'import struct Graphics.ImageCreator\n' > "$D/App/Render.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a selective import in another file does not silence this file" || bad "a selective import in another file does not silence this file"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 let c = ImageCreator()')"

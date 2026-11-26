@@ -559,6 +559,7 @@ HITS = []
 SKIP = dict()
 IMPORTS = set()
 EXPORTED = []
+QUIET = set()
 
 def decl_generic(text, b):
     # True when the name opens or follows a comma in a generic parameter list, as in func f<T, ImageCreator>.
@@ -584,9 +585,41 @@ def decl_generic(text, b):
         return True
     return len(head) >= 2 and head[-2] in ("func", "struct", "class", "enum", "actor", "typealias", "protocol")
 
+def no_comments(text):
+    # Drop line and nested block comments, keeping the line breaks.
+    out = []
+    i, n, depth = 0, len(text), 0
+    while i < n:
+        if text.startswith("/*", i):
+            depth += 1
+            i += 2
+        elif depth and text.startswith("*/", i):
+            depth -= 1
+            i += 2
+        elif not depth and text.startswith("//", i):
+            e = text.find(chr(10), i)
+            i = n if e < 0 else e
+        else:
+            if not depth or text[i] == chr(10):
+                out.append(text[i])
+            i += 1
+    return "".join(out)
+
+def gates_27(code):
+    # An #available or #unavailable check on version 27 or later marks code kept for older systems.
+    for key in ("#available(", "#unavailable("):
+        k = code.find(key)
+        while k >= 0:
+            e = code.find(")", k)
+            for part in code[k + len(key):e if e > 0 else len(code)].replace(",", " ").split():
+                major = part.split(".")[0]
+                if major.isdigit() and int(major) >= 27:
+                    return True
+            k = code.find(key, k + 1)
+    return False
+
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
-    global DECLARED
     how = ""
     for line in text.split(chr(10)):
         words = [w for w in line.split() if not w.startswith("@") and w not in ("public", "internal", "package", "private", "fileprivate")]
@@ -595,8 +628,8 @@ def imports_ip(text):
         m = words[2] if words[1] in ("typealias", "struct", "class", "enum", "protocol", "let", "var", "func") and len(words) > 2 else words[1]
         m = m.rstrip(";")
         if m.endswith(".ImageCreator") and not m.startswith("ImagePlayground."):
-            # import struct Graphics.ImageCreator brings in a type of that name from another module.
-            DECLARED = True
+            # import struct Graphics.ImageCreator brings in a type of that name for this file only.
+            return "other"
         if m == "ImagePlayground" or m.startswith("ImagePlayground."):
             # @_exported makes the module visible in every file of the app.
             if "@_exported" in line.split():
@@ -784,14 +817,18 @@ for path in sys.stdin.read().split(chr(10)):
     walk(text, 0, len(text), 1, False)
     if NEST:
         SKIP[path] = cond_lines(text)
-        how = imports_ip(text)
+        code = no_comments(text)
+        how = imports_ip(code)
+        if how == "other" or gates_27(code):
+            QUIET.add(path)
+            how = ""
         if how:
             IMPORTS.add(path)
         if how == "exported":
             EXPORTED.append(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
-pick = [h for h in HITS if (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+pick = [h for h in HITS if h[0] not in QUIET and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY
