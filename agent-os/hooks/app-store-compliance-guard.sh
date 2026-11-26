@@ -1602,8 +1602,6 @@ for path in sys.argv[1:]:
         pkg = package_of(root, path)
         off = variant_off(path)
         sized_names, sized_app = variant_sized(path, pkg)
-        if sized_app:
-            continue
         # Activities that can root a task. a launcher, directly or through an enabled alias,
         # a document, or one that starts its own task. Names resolve against the package.
         roots = module_roots(path, pkg)
@@ -1627,7 +1625,8 @@ for path in sys.argv[1:]:
             own = attr(el, "resizeableActivity")
             mine = full_name(attr(el, "name"), pkg)
             is_root = not roots or any(same_class(mine, r) for r in roots)
-            sized = supports_size_changes(el) or supports_size_changes(app) or full_name(attr(el, "name"), pkg) in sized_names
+            # supports_size_changes cancels a resize lock only, never an orientation lock.
+            sized = sized_app or supports_size_changes(el) or full_name(attr(el, "name"), pkg) in sized_names
             resize_lock = is_root and not sized and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
