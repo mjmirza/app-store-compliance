@@ -1469,6 +1469,8 @@ def variant_off(path):
     return off
 
 SIZE_CHANGES = "android.supports_size_changes"
+# A build placeholder value is unknown until Gradle fills it in.
+PLACEHOLDER = chr(36) + chr(123)
 
 def supports_size_changes(el):
     return any(local(c.tag) == "meta-data" and attr(c, "name") == SIZE_CHANGES
@@ -1612,7 +1614,8 @@ for path in sys.argv[1:]:
             if local(el.tag) != "activity":
                 continue
             # A disabled activity is never started, nor is one a variant disables or removes.
-            if attr(el, "enabled") == "false":
+            # An enabled value from a placeholder may be false, so it is not judged.
+            if attr(el, "enabled") == "false" or PLACEHOLDER in (attr(el, "enabled") or ""):
                 continue
             if any(full_name(o, pkg) == full_name(attr(el, "name"), pkg) for o in off):
                 continue
