@@ -614,9 +614,13 @@ function firstHits(ast) {
       if (best === null || n.start < best.start) best = n;
       if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
     }
+    // A module path is never a backend URL: the first argument of require(), require.resolve() and import().
+    const c = n.type === "CallExpression" ? n.callee : null;
+    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || (c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "require"));
     for (const k of Object.keys(n)) {
       if (SKIP_KEYS.has(k)) continue;
       if ((k === "source" && /^(Import|Export)/.test(n.type)) || (k === "directives")) continue;
+      if (loadsModule && k === "arguments") { for (const a of n.arguments.slice(1)) stack.push(a); continue; }
       const v = n[k];
       if (v && typeof v === "object") stack.push(v);
     }

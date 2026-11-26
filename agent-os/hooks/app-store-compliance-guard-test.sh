@@ -3976,6 +3976,12 @@ namespace Cfg { export const api = 'https://staging.acme.io'; }"
   OUT="$(bash "$GUARD" "$D" 2>&1)"
   ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent" || bad "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent"
   rm -rf "$D"
+  js_case "js-21 a single-quoted require() path stays silent" 0 api.js "const cfg = require('./staging.config');
+module.exports = cfg;"
+  js_case "js-22 a single-quoted dynamic import() path stays silent" 0 api.ts "export const m = import('./staging.config');"
+  js_case "js-23 a double-quoted require() path stays silent too" 0 api.js 'const cfg = require("./staging.config");
+module.exports = cfg;'
+  js_case "js-24 a URL passed to fetch() still fires" src/api.ts:1 api.ts "export const r = fetch('http://localhost:3000');"
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -3983,7 +3989,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-20 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-24 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
