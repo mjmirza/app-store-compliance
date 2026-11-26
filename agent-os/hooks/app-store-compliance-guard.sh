@@ -545,9 +545,19 @@ SKIP = dict()
 def generic_param(text, i):
     # True when the name sits in the generic clause of a func, type or init, as in func f<A, ImageCreator>.
     j = i - 1
-    while j >= 0 and (text[j].isalnum() or text[j] in "_,:&." or text[j].isspace()):
+    depth = 0
+    while j >= 0:
+        c = text[j]
+        if c == ">":
+            depth += 1
+        elif c == "<":
+            if depth == 0:
+                break
+            depth -= 1
+        elif not (c.isalnum() or c in "_,:&.?[]" or c.isspace()):
+            return False
         j -= 1
-    if j < 0 or text[j] != "<":
+    if j < 0:
         return False
     j -= 1
     while j >= 0 and text[j].isspace():
@@ -565,7 +575,8 @@ def generic_param(text, i):
     return text[j + 1:e + 1] in ("func", "struct", "class", "enum", "actor", "typealias", "subscript")
 
 def cond_lines(text):
-    # Lines inside an #if compiler(...) or #if swift(...) block, the usual way to keep an old-SDK fallback.
+    # Lines a Release build never compiles. #if compiler and #if swift fallbacks, and #if DEBUG code.
+    # The #else of an #if DEBUG is release code, so it stays live.
     out = set()
     stack = []
     for n, raw in enumerate(text.split(chr(10)), 1):
@@ -573,15 +584,29 @@ def cond_lines(text):
         cond = "compiler(" in s or "swift(" in s
         if s.startswith("#elseif"):
             if stack and cond:
-                stack[-1] = True
+                stack[-1] = "skip"
+            elif stack and stack[-1] in ("debug", "nodebug", "debugonly"):
+                stack[-1] = "live"
+        elif s.startswith("#else"):
+            if stack and stack[-1] == "debug":
+                stack[-1] = "live"
+            elif stack and stack[-1] == "nodebug":
+                stack[-1] = "debugonly"
         elif s.startswith("#if"):
-            stack.append(cond)
+            if cond:
+                stack.append("skip")
+            elif "!DEBUG" in s:
+                stack.append("nodebug")
+            elif "DEBUG" in s:
+                stack.append("debug")
+            else:
+                stack.append("live")
         elif s.startswith("#endif"):
             if stack:
                 stack.pop()
             out.add(n)
             continue
-        if any(stack):
+        if any(x in ("skip", "debug", "debugonly") for x in stack):
             out.add(n)
     return out
 DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation")
@@ -1303,7 +1328,7 @@ SIWAPY
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
   fi
   # ImageCreator is discontinued in iOS 27, iPadOS 27, macOS 27, and visionOS 27 (Apple news dz9wvq0r, 11 June 2026).
-  # A call or member use counts, under #if DEBUG too, since the 27 SDK will not compile it. The sheet does not.
+  # A call or member use in release code counts. #if DEBUG and #if compiler blocks do not, nor does the sheet.
   if apple_imagecreator_hit; then
     finding high "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED" "ImageCreator will not work on iOS 27 or later" "Present the Image Playground sheet (ImagePlaygroundViewController or imagePlaygroundSheet), or use another image generation service, before the public release of iOS 27, iPadOS 27, macOS 27, and visionOS 27." at "$IMAGECREATOR_HIT"
   fi

@@ -4141,7 +4141,7 @@ D="$(ic_app A.swift 'import ImagePlayground
 func probe() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it" || bad "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it"
+! ic_has && ok "ImageCreator() under #if DEBUG stays silent, a Release build never compiles it" || bad "ImageCreator() under #if DEBUG stays silent, a Release build never compiles it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 enum Rendering { struct ImageCreator {} }
@@ -4187,6 +4187,25 @@ func create<
 >(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter list split across lines stays silent" || bad "a generic parameter list split across lines stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '#if DEBUG
+let mode = 1
+#else
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() in the #else of #if DEBUG is release code and fires" || bad "ImageCreator() in the #else of #if DEBUG is release code and fires"
+rm -rf "$D"
+D="$(ic_app A.swift '#if !DEBUG
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() under #if !DEBUG fires" || bad "ImageCreator() under #if !DEBUG fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a nested generic constraint stays silent" || bad "a generic parameter after a nested generic constraint stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
