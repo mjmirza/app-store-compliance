@@ -4207,6 +4207,19 @@ func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageC
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a nested generic constraint stays silent" || bad "a generic parameter after a nested generic constraint stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift '#if DEBUG && targetEnvironment(simulator)
+let probe = true
+#elseif DEBUG
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #elseif DEBUG stays silent" || bad "ImageCreator() under #elseif DEBUG stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func make<T: Collection<(String, Int)>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a tuple constraint stays silent" || bad "a generic parameter after a tuple constraint stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

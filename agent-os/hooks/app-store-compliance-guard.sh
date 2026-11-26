@@ -554,7 +554,7 @@ def generic_param(text, i):
             if depth == 0:
                 break
             depth -= 1
-        elif not (c.isalnum() or c in "_,:&.?[]" or c.isspace()):
+        elif not (c.isalnum() or c in "_,:&.?[]()" or c.isspace()):
             return False
         j -= 1
     if j < 0:
@@ -583,10 +583,15 @@ def cond_lines(text):
         s = raw.strip().replace(" ", "")
         cond = "compiler(" in s or "swift(" in s
         if s.startswith("#elseif"):
-            if stack and cond:
-                stack[-1] = "skip"
-            elif stack and stack[-1] in ("debug", "nodebug", "debugonly"):
-                stack[-1] = "live"
+            if stack and stack[-1] != "skip":
+                if cond:
+                    stack[-1] = "skip"
+                elif "!DEBUG" in s:
+                    stack[-1] = "nodebug"
+                elif "DEBUG" in s:
+                    stack[-1] = "debug"
+                else:
+                    stack[-1] = "live"
         elif s.startswith("#else"):
             if stack and stack[-1] == "debug":
                 stack[-1] = "live"
