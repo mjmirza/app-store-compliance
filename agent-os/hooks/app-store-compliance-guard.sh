@@ -560,6 +560,7 @@ SKIP = dict()
 IMPORTS = set()
 EXPORTED = []
 QUIET = set()
+CODE = dict()
 
 def decl_generic(text, b):
     # True when the name opens or follows a comma in a generic parameter list, as in func f<T, ImageCreator>.
@@ -605,9 +606,9 @@ def no_comments(text):
             i += 1
     return "".join(out)
 
-def gates_27(code):
-    # An #available or #unavailable check on version 27 or later marks code kept for older systems.
-    for key in ("#available(", "#unavailable("):
+def gates_27(code, keys=("#unavailable(",)):
+    # A version check on 27 or later. Code under #unavailable, or in the else of #available, is kept for older systems.
+    for key in keys:
         k = code.find(key)
         while k >= 0:
             e = code.find(")", k)
@@ -617,6 +618,35 @@ def gates_27(code):
                     return True
             k = code.find(key, k + 1)
     return False
+
+def gated_line(code, line):
+    # True when the line, or a block around its start, checks a version of 27 or later.
+    lines = code.split(chr(10))
+    if line <= len(lines):
+        own = lines[line - 1]
+        if gates_27(own) or (gates_27(own, ("#available(",)) and "else" in own.split()):
+            return True
+    stop = len(chr(10).join(lines[:line - 1]))
+    stack = []
+    heads = []
+    closed = ""
+    start = 0
+    for k in range(min(stop, len(code))):
+        c = code[k]
+        if c == chr(123):
+            head = code[start:k]
+            is_else = bool(head.split()) and head.split()[-1] == "else"
+            stack.append(gates_27(head) or (is_else and gates_27(closed, ("#available(",))))
+            heads.append(head)
+            start = k + 1
+        elif c == chr(125):
+            if stack:
+                stack.pop()
+            closed = heads.pop() if heads else ""
+            start = k + 1
+        elif c == ";":
+            start = k + 1
+    return any(stack)
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
@@ -819,16 +849,17 @@ for path in sys.stdin.read().split(chr(10)):
         SKIP[path] = cond_lines(text)
         code = no_comments(text)
         how = imports_ip(code)
-        if how == "other" or gates_27(code):
+        CODE[path] = code
+        if how == "other":
             QUIET.add(path)
-            how = ""
+            how = "file"
         if how:
             IMPORTS.add(path)
         if how == "exported":
             EXPORTED.append(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
-pick = [h for h in HITS if h[0] not in QUIET and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_line(CODE.get(h[0], ""), h[1]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY

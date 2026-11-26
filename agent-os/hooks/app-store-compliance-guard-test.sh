@@ -4360,6 +4360,38 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() kept for systems before 27 stays silent" || bad "ImageCreator() kept for systems before 27 stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        print(27)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in the else of #available(iOS 27) stays silent" || bad "ImageCreator() in the else of #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }
+func refresh() { if #available(iOS 27, *) { print(27) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a version 27 check elsewhere in the file does not hide a call" || bad "a version 27 check elsewhere in the file does not hide a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone" || bad "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import struct Graphics.ImageCreator
+func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a qualified call fires next to a selective import of another module" || bad "a qualified call fires next to a selective import of another module"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func make() async throws { if #available(iOS 26, *) { _ = try await ImageCreator() } }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "an #available check below 27 still fires" || bad "an #available check below 27 still fires"
