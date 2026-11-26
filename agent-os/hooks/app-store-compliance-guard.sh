@@ -486,9 +486,6 @@ apple_imagecreator_hit() {
   IMAGECREATOR_HIT=""
   [ -s "$FILELIST" ] || return 1
   command -v python3 >/dev/null 2>&1 || return 1
-  # An app that declares its own ImageCreator type is calling that type, not the Image Playground one.
-  grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' \
-    | xargs -0 grep -lE '^[[:space:]]*((public|private|internal|fileprivate|open|final|@[A-Za-z]+)[[:space:]]+)*(struct|class|enum|actor|typealias)[[:space:]]+ImageCreator([^A-Za-z0-9_]|$)|^[[:space:]]*@interface[[:space:]]+ImageCreator([^A-Za-z0-9_]|$)' 2>/dev/null | grep -q . && return 1
   local out
   out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ICPY'
 import sys
@@ -501,6 +498,17 @@ def use_at(text, i, end):
         return False
     k = i + len(name)
     if k < end and (text[k].isalnum() or text[k] == "_"):
+        return False
+    # A type the app declares under this name is the app's own type, not the Image Playground one.
+    global DECLARED
+    b = i - 1
+    while b >= 0 and text[b].isspace():
+        b -= 1
+    w = b
+    while w >= 0 and (text[w].isalnum() or text[w] == "_"):
+        w -= 1
+    if text[w + 1:b + 1] in DECL_WORDS:
+        DECLARED = True
         return False
     t = k
     while t < end and text[t] in " \t":
@@ -522,6 +530,10 @@ def use_at(text, i, end):
     return False
 
 NEST = False
+CUR = ""
+DECLARED = False
+HITS = []
+DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "interface", "implementation")
 
 def block_end(text, i, end):
     # Swift block comments nest, Objective-C ones do not. Returns where the comment closes, or -1.
@@ -594,7 +606,13 @@ def walk(text, i, end, line, stop_paren):
             i = skip_char(text, i, end)
             continue
         if use_at(text, i, end):
-            return line, i, line
+            b = i - 1
+            while b >= 0 and text[b] in (" ", chr(9)):
+                b -= 1
+            qual = b >= 0 and text[b] == "." and text[max(0, b - 40):b].rstrip().endswith("ImagePlayground")
+            HITS.append((CUR, line, qual))
+            i += len("ImageCreator")
+            continue
         if ch == "(":
             depth += 1
         elif ch == ")" and depth:
@@ -643,10 +661,12 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     NEST = path.endswith(".swift")
-    got, _, _ = walk(text, 0, len(text), 1, False)
-    if got:
-        sys.stdout.write("%s:%s\n" % (path, got))
-        break
+    CUR = path
+    walk(text, 0, len(text), 1, False)
+# With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is Apple's.
+pick = [h for h in HITS if h[2]] if DECLARED else HITS
+if pick:
+    sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY
 )" 2>/dev/null)" || true
   [ -n "$out" ] || return 1

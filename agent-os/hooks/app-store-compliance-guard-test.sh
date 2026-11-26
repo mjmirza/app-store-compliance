@@ -4111,6 +4111,24 @@ let creator = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a declaration in a comment does not hide ImageCreator()" || bad "a declaration in a comment does not hide ImageCreator()"
 rm -rf "$D"
+D="$(ic_app A.swift 'final class ImageCreator {
+  func make() async throws { let c = try await ImagePlayground.ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImagePlayground.ImageCreator() fires next to an app type of that name" || bad "ImagePlayground.ImageCreator() fires next to an app type of that name"
+rm -rf "$D"
+D="$(ic_app A.swift '/*
+class ImageCreator wraps the system type
+*/
+let creator = try await ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a declaration in a block comment does not hide ImageCreator()" || bad "a declaration in a block comment does not hide ImageCreator()"
+rm -rf "$D"
+D="$(ic_app A.swift '@available(iOS 15.0, *) final class ImageCreator {}
+let renderer = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type behind @available(...) stays silent" || bad "an app type behind @available(...) stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let note = "say \"ImageCreator()\""
 let raw = #"ImageCreator()"#
