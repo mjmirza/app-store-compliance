@@ -11,7 +11,7 @@ A structured, AI loadable reference tree. Load the rule category and the app typ
 - [rules/performance.md](rules/performance.md). Performance and completeness. 34 rules
 - [rules/entitlements.md](rules/entitlements.md). Entitlements. 1 rules
 - [rules/safety.md](rules/safety.md). Safety and user generated content. 4 rules
-- [rules/android.md](rules/android.md). Google Play specific. 38 rules
+- [rules/android.md](rules/android.md). Google Play specific. 39 rules
 - [rules/export.md](rules/export.md). Export and build. 1 rules
 
 ## Guidelines by app type

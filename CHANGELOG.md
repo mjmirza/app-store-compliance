@@ -2,6 +2,12 @@
 
 All notable changes to this playbook are recorded here. The format follows Keep a Changelog, adapted to plain punctuation.
 
+## Unreleased
+
+### Added
+
+- `GOOGLE-AGENTIC-DIGITAL-PURCHASE`. A digital purchase that an AI or agent makes or initiates inside a Play app follows the Payments policy. The 29 October 2026 announcement (answer 18100766) lists this under clarifications, so it is already in force and enforcement standards are unchanged. The linked guidance (answer 10281818) says a Play-managed app that facilitates a purchase of digital goods, services, content, features, or functionality must comply with Google Play's Payments policy, including when the transaction starts in a chat agent or a third-party embedded experience or plugin. The Payments policy page (answer 9858738), read 26 November 2026, has no separate AI section. Sections 1 to 4 and 8 to 9 are the standing rules.
+
 ## 2.5.3 (2026-11-26)
 
 A patch release. It records the 2027 Google Play dates for adaptive apps on foldables, the API 37 target, and the global rollout of Android developer verification. The guard now reads quoted Xcode deployment target keys, so a lower iOS target hidden in a quoted setting is reported. The adaptive orientation lock ships as a manual check, and reading it from the merged release manifest is tracked in #2415. It is a patch version.

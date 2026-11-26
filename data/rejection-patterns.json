@@ -2064,6 +2064,20 @@
       ],
       "fix": "Remove the orientation lock and the resizeableActivity opt-out, keep state across configuration changes, and test on the 1:1 and 4:3 foldable emulators.",
       "added": "2026-11-25"
+    },
+    {
+      "id": "GOOGLE-AGENTIC-DIGITAL-PURCHASE",
+      "platform": "google",
+      "guideline": "Payments policy clarification of 29 October 2026 (Play Console Help answers 18100766, 10281818, and 9858738)",
+      "title": "Digital purchase through an AI or agent outside Play Billing",
+      "severity": "high",
+      "detection": "An in-app AI assistant, chat agent, or third-party embedded experience or plugin buys or initiates a purchase of digital content, credits, a subscription, or a feature. The 29 October 2026 announcement (https://support.google.com/googleplay/android-developer/answer/18100766) places this under clarifications and says enforcement standards and practices remain the same. It says: Payments: We're providing additional guidance on how our Payments policy applies to Google Play apps that facilitate digital purchases through AI or agentic experiences. The linked guidance (https://support.google.com/googleplay/android-developer/answer/10281818#AI_agentic_experience), read 26 November 2026, answers: Yes, if a Play-managed app facilitates the purchase of digital goods, services, content, features, or functionality, it must comply with Google Play's Payments policy. This applies across all implementations, including but not limited to, when the transaction is initiated within a chat agent or inside a third-party embedded app experience or plugin. The Payments policy page (https://support.google.com/googleplay/android-developer/answer/9858738), read the same day, has no AI or agentic section. Sections 1 and 2 require Google Play's billing system for paid downloads and for in-app digital goods and services. Section 4 bars leading the user to another payment method. Section 3 keeps physical goods and physical services, and the other cases it lists, outside Play Billing. Sections 8 and 9 are the enrolled alternative billing program and the enrolled program for leading the user outside the app. A digital purchase completed on a web checkout the user was not led to under section 8 or 9 is the same violation as any other digital purchase. Checked by hand.",
+      "signals": [
+        "chat agent",
+        "agentic"
+      ],
+      "fix": "Route the purchase through Google Play's billing system, or through an alternative billing system inside the app (section 8) or an outside-the-app flow (section 9) that the app is enrolled in. Do not complete a digital purchase on a web checkout the user was not led to under those programs. Physical goods and services stay outside Play Billing under section 3.",
+      "added": "2026-11-26"
     }
   ]
 }
