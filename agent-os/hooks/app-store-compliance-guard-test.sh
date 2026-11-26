@@ -3911,6 +3911,80 @@ let api = "http://localhost:3000"')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'App/Net.swift:6' && ok "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it" || bad "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it"
 rm -rf "$D"
+# Issue #2402. JS and TS strings in every quote style, read by @babel/parser from the scanned app.
+# CI installs @babel/parser globally. Elsewhere set BABEL_PARSER_DIR, or these print SKIP.
+BABEL_PARSER_DIR="${BABEL_PARSER_DIR:-$(npm root -g 2>/dev/null)/@babel/parser}"
+mk_js() {  # a React Native app whose src/$1 holds $2, with @babel/parser in node_modules as Metro brings it
+  local d; d="$(mk_rn_ship "$1" "$2")"
+  mkdir -p "$d/node_modules/@babel" && ln -s "$BABEL_PARSER_DIR" "$d/node_modules/@babel/parser"
+  echo "$d"
+}
+js_case() {  # name, expect (file:line that fires, or 0 for silent), file name, file content
+  local d; d="$(mk_js "$3" "$4")"
+  OUT="$(bash "$GUARD" "$d" 2>&1)"
+  if [ "$2" = 0 ]; then ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "$1" || bad "$1"
+  else sh_at "$2" && ok "$1" || bad "$1"; fi
+  rm -rf "$d"
+}
+if command -v node >/dev/null 2>&1 && [ -f "$BABEL_PARSER_DIR/package.json" ]; then
+  js_case "js-1 a single-quoted staging URL fires" src/api.ts:1 api.ts "export const api = 'https://staging.acme.io';"
+  js_case "js-2 a template-literal localhost URL fires" src/api.ts:2 api.ts 'const port = 3000;
+export const api = `http://localhost:${port}/v1`;'
+  js_case "js-3 a host after a nested \${...} in a template fires" src/api.ts:1 api.ts 'export const api = `${`https://`}${"x"}staging.acme.io/${1 + 1}`;'
+  js_case "js-4 a single-quoted URL in a JSX attribute fires" src/App.tsx:1 App.tsx "export const A = () => <WebView source={{ uri: 'http://localhost:8081' }} />;"
+  js_case "js-5 a double-quoted URL still fires" src/api.js:1 api.js 'export const api = "http://localhost:3000";'
+  js_case "js-6 a host in a comment after an apostrophe string stays silent" 0 api.ts "const s = \"don't\"; // try 'http://localhost:3000'
+export const api = 'https://api.acme.io';"
+  js_case "js-7 JSX text that quotes a host stays silent" 0 App.tsx 'export const A = () => <Text>Open "http://localhost:3000" in a browser</Text>;'
+  js_case "js-8 a multi-line union type alias with a leading | stays silent" 0 env.ts "type Env =
+  | 'https://staging.acme.io'
+  | 'https://api.acme.io';
+export const env: Env = 'https://api.acme.io';"
+  js_case "js-9 an interface with generic arguments stays silent" 0 cfg.ts "interface Cfg extends Base<'http://localhost:1'> { url: 'http://localhost:3000' }
+export const n = 1;"
+  js_case "js-10 typeof in a type position stays silent" 0 map.ts "const MAP = { a: 1 };
+type K = (typeof MAP)['http://localhost:3000'];
+export const k = 1;"
+  js_case "js-11 a regex literal with quotes stays silent" 0 re.js 'export const re = /"http:\/\/localhost:3000"/;'
+  js_case "js-12 an import path stays silent" 0 api.ts "import cfg from './staging.config';
+export default cfg;"
+  js_case "js-13 a Flow type alias stays silent, its code string fires" src/api.js:3 api.js "// @flow
+type T = 'http://localhost:1';
+export const api = 'https://staging.acme.io';"
+  js_case "js-14 a file Babel cannot parse falls back to the double-quoted grep" src/api.js:2 api.js 'export const = {
+const api = "http://localhost:3000";'
+  js_case "js-16 a string in a TypeScript namespace fires, a declare module stays silent" src/api.ts:2 api.ts "declare module 'x' { const u: 'http://localhost:1'; }
+namespace Cfg { export const api = 'https://staging.acme.io'; }"
+  D="$(mk_js index.ts "import './api.test';")"
+  printf "const a = 'http://localhost:1';\n" > "$D/src/api.test.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-17 a single-quoted host in an imported test file stays silent" || bad "js-17 a single-quoted host in an imported test file stays silent"
+  printf "const a = 'http://localhost:1';\nconst b = \"http://localhost:2\";\n" > "$D/src/api.test.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.test.ts:2' && ok "js-18 a double-quoted host in an imported test file still fires, as before" || bad "js-18 a double-quoted host in an imported test file still fires, as before"
+  rm -rf "$D"
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  printf "export default { use: { baseURL: 'http://localhost:8100' } };\n" > "$D/playwright.config.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-19 a single-quoted host in playwright.config.ts stays silent" || bad "js-19 a single-quoted host in playwright.config.ts stays silent"
+  rm -rf "$D"
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  mkdir -p "$D/src/url" "$D/detox"
+  printf "export const u = 'http://localhost:8065';\n" > "$D/src/url/test.ts"
+  printf "export const c = 'http://localhost:3000';\n" > "$D/src/TestCtrls.e2e.tsx"
+  printf "module.exports = 'http://localhost:3000';\n" > "$D/detox/server.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent" || bad "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent"
+  rm -rf "$D"
+  D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
+export const b = \"http://localhost:3000\";")"
+  NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
+  OUT="$(PATH="$NONODE" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
+  rm -rf "$D" "$NONODE"
+else
+  echo "SKIP  js-1 to js-20 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"

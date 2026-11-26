@@ -15,7 +15,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" "$FILELIST.js" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -581,12 +581,84 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
+# JS and TS strings in every quote style (#2402). @babel/parser comes from the scanned app: Metro compiles
+# React Native code with Babel, so every React Native and Expo app has it. It reads single quotes, template
+# literals, JSX, TypeScript and Flow as a compiler does, so comments, JSX text, regex literals, import paths
+# and type-only code are never read as strings. Prints "file<TAB>line<TAB>dq" for each file with a matching
+# string, where line is the first match in any quote style and dq the first double-quoted one ("-" if none),
+# and "file<TAB>?" for a file it could not parse, which then falls back to the double-quoted grep.
+JS_STR_EXT_RE='\.(js|jsx|ts|tsx|mjs|cjs)$'
+# Test files, test folders and build and test tool configs never ship. The new quote styles do not count in
+# them, so only today's double-quoted strings can fire there, as before (#2402).
+JS_NOSHIP_RE='(^|/|[.])(test|spec)[.][cm]?[jt]sx?$|[.]e2e[.][cm]?[jt]sx?$|(^|/)(__tests__|__mocks__|__fixtures__|test|tests|e2e|detox|cypress|playwright)/|(^|/)(playwright|jest|vitest|cypress|detox|karma|wdio|metro|babel|webpack|rollup|vite|eslint|prettier|tailwind|postcss)[.]config[.][cm]?[jt]s$'
+# shellcheck disable=SC2016
+JS_STRINGS_JS='const fs = require("fs");
+const [parserPath, pattern] = process.argv.slice(1);
+const { parse } = require(parserPath);
+const re = new RegExp(pattern);
+const TS_CODE = /^TS(AsExpression|SatisfiesExpression|NonNullExpression|TypeAssertion|InstantiationExpression|ParameterProperty|EnumDeclaration|EnumBody|EnumMember|ExportAssignment|ModuleDeclaration|ModuleBlock)$/;
+const FLOW_TYPE = new Set(["TypeAlias", "OpaqueType", "InterfaceDeclaration", "TypeAnnotation", "TypeParameterDeclaration", "TypeParameterInstantiation", "DeclareModule", "DeclareModuleExports", "DeclareVariable", "DeclareFunction", "DeclareClass", "DeclareTypeAlias", "DeclareOpaqueType", "DeclareInterface", "DeclareExportDeclaration", "DeclareExportAllDeclaration"]);
+const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", "leadingComments", "trailingComments", "innerComments", "tokens"]);
+const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
+function firstHits(ast) {
+  let best = null, dq = null;
+  const stack = [ast.program];
+  while (stack.length) {
+    const n = stack.pop();
+    if (Array.isArray(n)) { for (const c of n) stack.push(c); continue; }
+    if (!n || typeof n.type !== "string" || typeOnly(n)) continue;
+    let text = null;
+    if (n.type === "StringLiteral") text = n.value;
+    else if (n.type === "TemplateElement") text = n.value.cooked == null ? n.value.raw : n.value.cooked;
+    if (text !== null && re.test(text)) {
+      if (best === null || n.start < best.start) best = n;
+      if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
+    }
+    for (const k of Object.keys(n)) {
+      if (SKIP_KEYS.has(k)) continue;
+      if ((k === "source" && /^(Import|Export)/.test(n.type)) || (k === "directives")) continue;
+      const v = n[k];
+      if (v && typeof v === "object") stack.push(v);
+    }
+  }
+  return [best, dq];
+}
+const out = [];
+for (const f of fs.readFileSync(0, "utf8").split("\n")) {
+  if (!f) continue;
+  let code;
+  try { if (fs.statSync(f).size > 4194304) { out.push(f + "\t?"); continue; } code = fs.readFileSync(f, "utf8"); } catch (e) { out.push(f + "\t?"); continue; }
+  const ts = /\.(ts|tsx|mts|cts)$/.test(f);
+  const plugins = ts ? (/\.tsx$/.test(f) ? ["typescript", "jsx"] : ["typescript"]) : ["jsx", "flow"];
+  let ast;
+  try { ast = parse(code, { sourceType: "unambiguous", errorRecovery: false, allowReturnOutsideFunction: true, allowImportExportEverywhere: true, allowAwaitOutsideFunction: true, allowUndeclaredExports: true, plugins: plugins.concat(["decorators-legacy"]) }); }
+  catch (e) { out.push(f + "\t?"); continue; }
+  const [hit, dq] = firstHits(ast);
+  if (hit) out.push(f + "\t" + hit.loc.start.line + "\t" + (dq ? dq.loc.start.line : "-"));
+}
+process.stdout.write(out.join("\n") + (out.length ? "\n" : ""));'
+js_strings() {  # $1 regex. Writes $FILELIST.js and returns 0 when Node and @babel/parser read the shipped JS and TS files
+  : > "$FILELIST.js" 2>/dev/null || return 1
+  command -v node >/dev/null 2>&1 || return 1
+  local parser
+  parser="$(node -e 'try { process.stdout.write(require.resolve("@babel/parser", { paths: [process.argv[1]] })) } catch (e) {}' "$DIR" 2>/dev/null)"
+  [ -n "$parser" ] || return 1
+  grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}" | node -e "$JS_STRINGS_JS" "$parser" "$1" > "$FILELIST.js" 2>/dev/null
+}
 # RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
   RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f m src
+  local f m src js=0 r
+  js_strings "$1" && js=1
   while IFS= read -r f; do
+    # A JS or TS file Babel read is decided by its strings alone. One it could not parse takes the path below.
+    if [ "$js" -eq 1 ] && [[ "$f" =~ $JS_STR_EXT_RE ]]; then
+      if [[ "${f#"${DIR%/}"/}" =~ $JS_NOSHIP_RE ]]; then r=3; else r=2; fi
+      r="$(awk -F'\t' -v f="$f" -v c="$r" '$1 == f { print ($2 == "?") ? "?" : $c; exit }' "$FILELIST.js" 2>/dev/null)"
+      if [ -z "$r" ] || [ "$r" = "-" ]; then continue; fi
+      if [ "$r" != "?" ]; then RELEASE_HIT="${f#"${DIR%/}"/}:$r"; return 0; fi
+    fi
     # Source comments go first (issue #2413). STRIP_AWK keeps one line per line and, with gate=1, only blanks
     # a line that itself looks like a comment, so a /* in a string or regex never hides later lines (#2421).
     # It runs in the C locale, and the raw file is read if awk still fails, so no byte can hide a file.

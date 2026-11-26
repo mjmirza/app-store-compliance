@@ -23,6 +23,10 @@ jobs:
       - name: Check approaching and overdue regulatory deadlines
         run: python3 scripts/deadline-checker.py
 
+      - name: Babel parser for the guard's JS and TS string tests
+        # The guard reads it from the scanned app's node_modules. The js-* tests link this copy into their fixtures.
+        run: npm install --global @babel/parser@7.29.15
+
       - name: Guard test suite
         run: bash agent-os/hooks/app-store-compliance-guard-test.sh
 
