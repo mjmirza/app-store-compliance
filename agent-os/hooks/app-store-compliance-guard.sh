@@ -1507,7 +1507,9 @@ def variant_sized(path, pkg):
             if supports_size_changes(app):
                 whole = True
             for el in app:
-                if local(el.tag) == "activity" and supports_size_changes(el):
+                # A variant can also turn on picture-in-picture, which makes the activity resizable.
+                pip = attr(el, "supportsPictureInPicture") == "true"
+                if local(el.tag) == "activity" and (supports_size_changes(el) or pip):
                     names.add(full_name(attr(el, "name"), pkg))
     return names, whole
 
