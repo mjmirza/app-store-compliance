@@ -4073,6 +4073,24 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "ImageCreator() in a block comment stays silent" || bad "ImageCreator() in a block comment stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+/* outer
+/* inner */
+let creator = try ImageCreator()
+*/
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a nested Swift block comment stays silent" || bad "ImageCreator() in a nested Swift block comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '/* outer /* inner */ still a comment */
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() after a closed nested Swift comment fires" || bad "ImageCreator() after a closed nested Swift comment fires"
+rm -rf "$D"
+D="$(ic_app A.m '/* a /* b */ ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.m:1' && ok "an Objective-C block comment ends at the first close, so the call fires" || bad "an Objective-C block comment ends at the first close, so the call fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 let note = "say \"ImageCreator()\""
 let raw = #"ImageCreator()"#
 let sheet = ImagePlaygroundViewController()')"

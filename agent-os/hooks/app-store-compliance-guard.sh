@@ -518,6 +518,26 @@ def use_at(text, i, end):
             return True
     return False
 
+NEST = False
+
+def block_end(text, i, end):
+    # Swift block comments nest, Objective-C ones do not. Returns where the comment closes, or -1.
+    if not NEST:
+        return text.find("*/", i + 2, end)
+    depth = 0
+    while i < end:
+        if text.startswith("/*", i):
+            depth += 1
+            i += 2
+        elif text.startswith("*/", i):
+            depth -= 1
+            if depth == 0:
+                return i
+            i += 2
+        else:
+            i += 1
+    return -1
+
 def walk(text, i, end, line, stop_paren):
     depth = 0
     while i < end:
@@ -535,7 +555,7 @@ def walk(text, i, end, line, stop_paren):
             i = nl
             continue
         if text.startswith("/*", i):
-            close = text.find("*/", i + 2, end)
+            close = block_end(text, i, end)
             if close < 0:
                 line += text.count("\n", i, end)
                 return 0, end, line
@@ -619,6 +639,7 @@ for path in sys.argv[1:]:
             text = fh.read()
     except OSError:
         continue
+    NEST = path.endswith(".swift")
     got, _, _ = walk(text, 0, len(text), 1, False)
     if got:
         sys.stdout.write("%s:%s\n" % (path, got))
