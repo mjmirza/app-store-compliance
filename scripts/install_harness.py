@@ -795,9 +795,10 @@ def register_kimi(lay, cmd, dry):
 # Kiro keeps a standalone hook file: {"version":"v1","hooks":[ {name,trigger,matcher,action:{type,command},...} ]}.
 # The hooks value is a flat list of self-describing entries, not the event-keyed map the other JSON tools use,
 # so Kiro gets its own register/unregister/check, as Kimi (TOML) and OpenCode (plugin) do.
-# Kiro V3's shell tools. A matcher must cover all of them, so a narrower one is replaced. (kiro.dev/docs/hooks)
-KIRO_TOOLS = ("shell", "execute_bash", "execute_pwsh", "execute_cmd")
-KIRO_MATCHER = "^(" + "|".join(KIRO_TOOLS) + ")$"
+# Kiro's shell tool IDs. A matcher must reach all of them, so a narrower one is replaced. Kiro CLI 3.6.1 on macOS sends
+# execute_bash; execute_pwsh and execute_cmd are the Windows ones (kiro.dev/docs/hooks). shell is a category, not an ID.
+KIRO_TOOLS = ("execute_bash", "execute_pwsh", "execute_cmd")
+KIRO_MATCHER = "^(shell|execute_bash|execute_pwsh|execute_cmd)$"
 
 
 def kiro_entry(cmd):
@@ -823,11 +824,23 @@ def kiro_is_ours(h, cmd, guard):
 KIRO_SHELL_SELECTORS = ("shell", "@builtin")
 
 
-def kiro_matcher_ok(m):
-    """True when Kiro would run this matcher for every shell tool. Kiro reads it as a selector, a regex or a * ? wildcard."""
-    if m in KIRO_SHELL_SELECTORS:
+def kiro_hits(m, tool_id):
+    """Kiro's own rule. No matcher means every tool, a regex may match anywhere in the ID, and * ? are wildcards."""
+    if m is None or m in ("", "*"):
         return True
-    return all(matcher_hits(m, t) or (isinstance(m, str) and fnmatch.fnmatchcase(t, m)) for t in KIRO_TOOLS)
+    if not isinstance(m, str):
+        return False
+    try:
+        if re.search(m, tool_id):
+            return True
+    except re.error:
+        pass
+    return fnmatch.fnmatchcase(tool_id, m)
+
+
+def kiro_matcher_ok(m):
+    """True when Kiro would run this matcher for every shell tool."""
+    return m in KIRO_SHELL_SELECTORS or all(kiro_hits(m, t) for t in KIRO_TOOLS)
 
 
 def kiro_timeout_ok(t):

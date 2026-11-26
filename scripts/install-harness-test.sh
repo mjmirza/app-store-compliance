@@ -173,7 +173,7 @@ kiro_set() {  # $1 a python statement on h, our hook entry
 kiro_get() {  # prints our entry's value for key $1 as JSON
   python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); h=[x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]; print(json.dumps(h.get(sys.argv[2])))' "$(cfg kiro)" "$1"
 }
-for m in shell @builtin '*' 'execute_.*|shell' '?*'; do
+for m in shell @builtin '*' 'execute_.*|shell' '?*' 'shell|execute_' 'execute_'; do  # Kiro matches a regex anywhere in the tool ID
   fresh; run --tool kiro >/dev/null
   kiro_set "h['matcher']='$m'; h['description']='mine'"
   run --tool kiro doctor >/dev/null; RC=$?
@@ -182,6 +182,10 @@ for m in shell @builtin '*' 'execute_.*|shell' '?*'; do
   [ "$(kiro_get matcher)" = "\"$m\"" ] && [ "$(kiro_get description)" = '"mine"' ] && [ "$(count kiro)" = "1" ] \
     && ok "kiro install keeps the matcher $m and the person's own fields" || bad "kiro install keeps the matcher $m and the person's own fields (matcher=$(kiro_get matcher))"
 done
+fresh; run --tool kiro >/dev/null
+kiro_set "h['matcher']='read'"
+run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "kiro doctor fails on a matcher no shell tool ID contains" || bad "kiro doctor fails on a matcher no shell tool ID contains (rc=$RC)"
 fresh; run --tool kiro >/dev/null
 kiro_set "h['timeout']=0"
 run --tool kiro doctor >/dev/null; RC=$?
