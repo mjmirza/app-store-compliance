@@ -1498,10 +1498,18 @@ def module_roots(path, pkg):
     return roots
 
 def variant_sized(path, pkg):
-    # supports_size_changes set by a variant, per activity or for the whole application.
-    # Picture-in-picture counts only when no manifest of the module sets it to anything else.
-    names, whole, pip_on, pip_off = set(), False, set(), set()
-    for mroot in same_module(path):
+    # supports_size_changes set anywhere in the module, per activity or for the application,
+    # and the picture-in-picture value each activity ends up with after the merge.
+    names, whole = set(), False
+    main_pip, variant_pip = {}, {}
+    for other in sys.argv[1:]:
+        if module(other) != module(path):
+            continue
+        try:
+            mroot = ET.parse(other).getroot()
+        except (ET.ParseError, OSError):
+            continue
+        is_main = "/src/main/" in other
         for app in mroot.iter():
             if local(app.tag) != "application":
                 continue
@@ -1514,11 +1522,20 @@ def variant_sized(path, pkg):
                 if supports_size_changes(el):
                     names.add(name)
                 pip = attr(el, "supportsPictureInPicture")
-                if pip == "true":
-                    pip_on.add(name)
-                elif pip is not None:
-                    pip_off.add(name)
-    return names | (pip_on - pip_off), whole, pip_off
+                if pip is None:
+                    continue
+                target = main_pip if is_main else variant_pip
+                target.setdefault(name, set()).add(pip)
+    # A variant value overrides the main one. Two variants that disagree leave it unknown,
+    # and an unknown value is treated as picture-in-picture so nothing is reported.
+    pip_on, pip_off = set(), set()
+    for name in set(main_pip) | set(variant_pip):
+        values = variant_pip.get(name) or main_pip.get(name)
+        if values == {"false"}:
+            pip_off.add(name)
+        elif values:
+            pip_on.add(name)
+    return names | pip_on, whole, pip_off
 
 def launcher(el):
     for f in el:
