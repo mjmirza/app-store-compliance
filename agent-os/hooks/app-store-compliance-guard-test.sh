@@ -4129,6 +4129,19 @@ let renderer = ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an app type behind @available(...) stays silent" || bad "an app type behind @available(...) stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift 'enum MyImagePlayground {
+  struct ImageCreator {}
+}
+let c = MyImagePlayground.ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a namespace ending in ImagePlayground is not the Image Playground module" || bad "a namespace ending in ImagePlayground is not the Image Playground module"
+rm -rf "$D"
+D="$(ic_app A.swift 'struct ImageCreator {}')"
+i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
+printf 'let renderer = ImageCreator()\n' > "$D/App/Z.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type still counts when the project has more than 5000 source files" || bad "an app type still counts when the project has more than 5000 source files"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let note = "say \"ImageCreator()\""
 let raw = #"ImageCreator()"#

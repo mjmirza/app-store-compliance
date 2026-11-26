@@ -487,7 +487,8 @@ apple_imagecreator_hit() {
   [ -s "$FILELIST" ] || return 1
   command -v python3 >/dev/null 2>&1 || return 1
   local out
-  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ICPY'
+  # The list goes in on stdin, so one process sees every file and a declaration in any of them counts.
+  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | python3 -c "$(cat <<'ICPY'
 import sys
 
 def use_at(text, i, end):
@@ -609,7 +610,14 @@ def walk(text, i, end, line, stop_paren):
             b = i - 1
             while b >= 0 and text[b] in (" ", chr(9)):
                 b -= 1
-            qual = b >= 0 and text[b] == "." and text[max(0, b - 40):b].rstrip().endswith("ImagePlayground")
+            qual = False
+            if b >= 0 and text[b] == ".":
+                a = b - 1
+                while a >= 0 and text[a] in (" ", chr(9)):
+                    a -= 1
+                mod = "ImagePlayground"
+                s0 = a + 1 - len(mod)
+                qual = s0 >= 0 and text[s0:a + 1] == mod and not (s0 and (text[s0 - 1].isalnum() or text[s0 - 1] == "_"))
             HITS.append((CUR, line, qual))
             i += len("ImageCreator")
             continue
@@ -654,7 +662,9 @@ def skip_delim(text, i, end, line, h, triple, objc=False):
         i += 1
     return 0, i, line
 
-for path in sys.argv[1:]:
+for path in sys.stdin.read().split(chr(10)):
+    if not path:
+        continue
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()
