@@ -586,16 +586,24 @@ def decl_generic(text, b):
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
+    global DECLARED
+    how = ""
     for line in text.split(chr(10)):
         words = [w for w in line.split() if not w.startswith("@") and w not in ("public", "internal", "package", "private", "fileprivate")]
         if len(words) < 2 or words[0] != "import":
             continue
         m = words[2] if words[1] in ("typealias", "struct", "class", "enum", "protocol", "let", "var", "func") and len(words) > 2 else words[1]
         m = m.rstrip(";")
+        if m.endswith(".ImageCreator") and not m.startswith("ImagePlayground."):
+            # import struct Graphics.ImageCreator brings in a type of that name from another module.
+            DECLARED = True
         if m == "ImagePlayground" or m.startswith("ImagePlayground."):
             # @_exported makes the module visible in every file of the app.
-            return "exported" if "@_exported" in line.split() else "file"
-    return ""
+            if "@_exported" in line.split():
+                how = "exported"
+            elif not how:
+                how = "file"
+    return how
 
 def cond_unknown(cond):
     # True unless the condition is only platform checks, which a Release build for that platform keeps.

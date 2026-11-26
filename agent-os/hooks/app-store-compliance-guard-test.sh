@@ -4284,14 +4284,16 @@ rm -rf "$D"
 D="$(ic_app Renderer.h 'struct Renderer {};
 using ImageCreator = Renderer;
 inline auto makeRenderer() { return ImageCreator(); }')"
+printf 'import ImagePlayground\nlet r = ImageCreator()\n' > "$D/App/Use.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "a C++ using alias named ImageCreator stays silent" || bad "a C++ using alias named ImageCreator stays silent"
+! ic_has && ok "a C++ using alias named ImageCreator silences a Swift call" || bad "a C++ using alias named ImageCreator silences a Swift call"
 rm -rf "$D"
 D="$(ic_app Renderer.h 'struct Renderer {};
 typedef Renderer ImageCreator;
 inline auto makeRenderer() { return ImageCreator(); }')"
+printf 'import ImagePlayground\nlet r = ImageCreator()\n' > "$D/App/Use.swift"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "a C typedef named ImageCreator stays silent" || bad "a C typedef named ImageCreator stays silent"
+! ic_has && ok "a C typedef named ImageCreator silences a Swift call" || bad "a C typedef named ImageCreator silences a Swift call"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 protocol P { init() }
@@ -4343,6 +4345,17 @@ D="$(ic_app A.swift '// import ImagePlayground
 func make() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a commented-out import does not count" || bad "a commented-out import does not count"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import struct Graphics.ImageCreator
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a selective import of another module ImageCreator stays silent" || bad "a selective import of another module ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import class ImagePlayground.ImageCreator
+let c = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a selective import of the ImagePlayground ImageCreator fires" || bad "a selective import of the ImagePlayground ImageCreator fires"
 rm -rf "$D"
 D="$(ic_app Exports.swift '@_exported import ImagePlayground')"
 printf 'func make() async throws { _ = try await ImageCreator() }\n' > "$D/App/Use.swift"
