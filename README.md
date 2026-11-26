@@ -89,6 +89,7 @@ bash ~/repositories/app-store-compliance/scripts/install.sh --tool all
 | Grok | `install.sh --tool grok` | Hook, skill | Start a new Grok session |
 | Qwen Code | `install.sh --tool qwen` | Hook, skill, in `$QWEN_HOME` when it is set | Restart Qwen Code |
 | Kimi Code | `install.sh --tool kimi` | Hook, skill | Restart Kimi Code |
+| Kiro | `install.sh --tool kiro` | Hook, skill | Start a new Kiro CLI session, or restart Kiro. The global hook in `~/.kiro/hooks/` needs Kiro CLI V3 |
 | Factory Droid | `install.sh --tool droid` | Hook, skill | Start a new Droid session |
 | Augment Auggie | `install.sh --tool auggie` | Hook, skill | Start a new Auggie session |
 | Windsurf | `install.sh --tool windsurf` | Hook, skill | Restart Windsurf |
@@ -102,6 +103,7 @@ What it writes, so you can check it.
 - One hook entry in that tool's config (`~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`, `~/.cursor/hooks.json`, `~/.copilot/hooks/` or `$COPILOT_HOME/hooks/`), or for OpenCode one plugin file in `~/.config/opencode/plugins/`. Every other setting is kept, and a dated backup sits next to a file that already existed. A config that is not valid JSON or repeats a key is never rewritten. You get the exact block to paste instead.
 - For Gemini CLI it also turns on `tools.enableHooks`, which Gemini needs before version 0.26 to run any hook.
 - For Kimi Code it appends one marked `[[hooks]]` block to `~/.kimi-code/config.toml` (or `$KIMI_CODE_HOME/config.toml`) and never rewrites or prints the rest of that file, which can hold API keys. Uninstall removes exactly that block.
+- For Kiro it writes one standalone `v1` hook file at `~/.kiro/hooks/app-store-compliance.json`, keeping any other hook already in it, with a `PreToolUse` matcher that covers Kiro's `shell`, `execute_bash`, `execute_pwsh` and `execute_cmd` tools. Kiro reads a global hook from `~/.kiro/hooks/` only on CLI V3.
 - For Factory Droid it writes to `~/.factory/settings.json` when your hooks already live there, because Droid ignores them once `~/.factory/hooks.json` exists.
 
 #### Tools the installer does not wire, and what to do instead
@@ -110,7 +112,6 @@ Each of these was checked against its own documentation. Where a tool can block 
 
 | Tool | What to do |
 |---|---|
-| Kiro CLI | Kiro sends the event as JSON on stdin and blocks the tool when a `PreToolUse` command hook exits non-zero, and the guard reads Kiro's `shell`, `execute_bash`, `execute_pwsh` and `execute_cmd` payloads. The installer does not wire it yet. After `install.sh`, add `.kiro/hooks/app-store-compliance.json` to the project with `{"version":"v1","hooks":[{"name":"app-store-compliance","trigger":"PreToolUse","matcher":"^(shell\|execute_bash\|execute_pwsh\|execute_cmd)$","action":{"type":"command","command":"bash ~/.claude/hooks/app-store-compliance-guard.sh"}}]}`. Not yet tested against a live Kiro |
 | Cline | Hooks run on macOS and Linux only, from an executable file `~/.cline/hooks/PreToolUse` that answers `{"cancel":true}`. Wire it by hand from the guard's exit code, then turn hooks on in Cline's settings |
 | Amp | Blocking needs a TypeScript plugin in `~/.config/amp/plugins/`. Not installed automatically yet. Run the guard by hand before a submit |
 | Goose, Crush | Both can block, and their file layout could not be confirmed. Run the guard by hand before a submit |
@@ -128,8 +129,8 @@ Set up the App Store Compliance Playbook from https://github.com/mjmirza/app-sto
 
 Steps:
 1. Clone https://github.com/mjmirza/app-store-compliance into ~/repositories/app-store-compliance.
-2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Factory Droid, Auggie, or Windsurf) and run the installer for it, showing me the full output.
-   bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|droid|auggie|windsurf>
+2. Find out which AI coding tool you are (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Kiro, Factory Droid, Auggie, or Windsurf) and run the installer for it, showing me the full output.
+   bash ~/repositories/app-store-compliance/scripts/install.sh --tool <claude|codex|gemini|opencode|cursor|copilot|grok|qwen|kimi|kiro|droid|auggie|windsurf>
    It must end with "Install verified." (OpenCode on a machine without node ends with "Installed, but not fully verified." instead, install node and run doctor.) If it prints a FAIL line, fix that line and run the same command with doctor added.
    If you are none of these, tell me so and stop. Do not wire the hook by hand.
 3. Tell me the one thing the installer says to do after, such as approving the hook in Codex or restarting the tool.
@@ -432,7 +433,7 @@ python3 scripts/deadline-checker.py
 | `scripts/validate.py` | Validates that `data/rejection-patterns.json`, `data/detection-recipes.json`, and `data/regulatory-deadlines.json` stay internally consistent. Runs in CI |
 | `scripts/generate-references.py` | Regenerates `references/` from the pattern and recipe data, so the reference tree never drifts from the taxonomy |
 | `scripts/metadata-audit.py` | Audits the live store listing (name, subtitle, keywords, description, URLs) against the metadata rejection rules, with a propose and re validate loop. Every locale folder is audited on its own, filled from a fastlane `default/` folder and parent folders like fastlane does, and each finding names its locale. `--platform google` applies the Google Play limits and rules, and a fastlane `android` folder gets them automatically. It checks that every URL is a real http or https address, that an Apple listing has a support URL, and that a Google listing has a contact email. A large share of rejections live in the listing, not the code |
-| `scripts/install.sh` | One command install for Claude Code, and with `--tool` for Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Factory Droid, Auggie and Windsurf. `doctor` proves the hook blocks a submit command, `uninstall` removes it, `--version` prints the version |
+| `scripts/install.sh` | One command install for Claude Code, and with `--tool` for Codex, Gemini CLI, OpenCode, Cursor, Copilot, Grok, Qwen Code, Kimi Code, Kiro, Factory Droid, Auggie and Windsurf. `doctor` proves the hook blocks a submit command, `uninstall` removes it, `--version` prints the version |
 | `scripts/install_harness.py` | The part of the install for the tools other than Claude Code. Merges each tool's own config file and writes the OpenCode plugin |
 | `scripts/pull-metadata.sh` | Pulls the live App Store Connect listing into a metadata directory via the asc CLI, with the Play API path documented |
 | `references/` | A structured, AI loadable reference tree. Rules by category (metadata, privacy, payments, design, performance, entitlements, safety, Android) and guidelines by app type, each with a detection command, generated from the taxonomy. Load the slices that match the task |

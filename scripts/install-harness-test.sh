@@ -23,6 +23,7 @@ cfg() {
     grok) echo "$H/.grok/hooks/app-store-compliance.json" ;;
     qwen) echo "$H/.qwen/settings.json" ;;
     kimi) echo "$H/.kimi-code/config.toml" ;;
+    kiro) echo "$H/.kiro/hooks/app-store-compliance.json" ;;
     droid) echo "$H/.factory/hooks.json" ;;
     auggie) echo "$H/.augment/settings.json" ;;
     windsurf) echo "$H/.codeium/windsurf/hooks.json" ;;
@@ -35,7 +36,9 @@ gdir() {  # where each tool's guard lands
   esac
 }
 count() {  # how many hook entries point at the guard
-  if [ "$1" = "kimi" ]; then grep -c "app-store-compliance-guard.sh" "$(cfg kimi)" 2>/dev/null || true; return; fi
+  if [ "$1" = "kimi" ] || [ "$1" = "kiro" ]; then
+    if [ -f "$(cfg "$1")" ]; then grep -c "app-store-compliance-guard.sh" "$(cfg "$1")" 2>/dev/null || true; else echo 0; fi; return
+  fi
   python3 - "$1" "$(cfg "$1")" <<'PY'
 import json, sys
 tool, path = sys.argv[1], sys.argv[2]
@@ -55,7 +58,7 @@ print(n)
 PY
 }
 
-for t in codex gemini opencode cursor copilot grok qwen kimi droid auggie windsurf; do
+for t in codex gemini opencode cursor copilot grok qwen kimi kiro droid auggie windsurf; do
   # 1 a fresh install verifies itself end to end
   fresh
   OUT="$(run --tool "$t")"; RC=$?
@@ -130,6 +133,30 @@ run --tool grok doctor >/dev/null; RC=$?
 run --tool grok >/dev/null; run --tool grok doctor >/dev/null; RC=$?
 python3 -c 'import json,sys; g=json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]; sys.exit(0 if [x["matcher"] for x in g]==["Bash|run_terminal_command|run_terminal_cmd|bash|monitor"] else 1)' "$(cfg grok)" && [ "$RC" -eq 0 ] && [ "$(count grok)" = "1" ] \
   && ok "grok install repairs a Bash-only matcher once and doctor then passes" || bad "grok install repairs a Bash-only matcher once and doctor then passes (rc=$RC entries=$(count grok))"
+
+# 2b3 Kiro writes a standalone v1 hook file whose matcher covers every Kiro shell tool, keeping any other hook
+fresh; mkdir -p "$H/.kiro/hooks"
+printf '{\n  "version": "v1",\n  "hooks": [\n    {"name": "my-lint", "trigger": "PreToolUse", "matcher": "read", "action": {"type": "command", "command": "npm run lint"}}\n  ]\n}\n' > "$(cfg kiro)"
+run --tool kiro >/dev/null
+python3 -c 'import json,re,sys
+d=json.load(open(sys.argv[1])); assert d["version"]=="v1"
+names=[h["name"] for h in d["hooks"]]; assert "my-lint" in names, names
+h=[x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]
+m=h["matcher"]
+assert h["trigger"]=="PreToolUse" and h["action"]["type"]=="command" and h["timeout"]==120 and h["enabled"] is True
+sys.exit(0 if all(re.fullmatch(m,t) for t in ("shell","execute_bash","execute_pwsh","execute_cmd")) else 1)' "$(cfg kiro)" \
+  && ok "kiro writes a v1 hook whose matcher covers every Kiro shell tool and keeps the existing hook" || bad "kiro writes a v1 hook whose matcher covers every Kiro shell tool and keeps the existing hook"
+KLOG="$WORK/kiro-payload$RANDOM.json"; KG="$(gdir kiro)/app-store-compliance-guard.sh"; cp "$KG" "$WORK/kiro-guard.bak"
+printf '#!/usr/bin/env bash\ncat > "%s"\ngrep -q deliver "%s" && exit 2\nexit 0\n' "$KLOG" "$KLOG" > "$KG"
+run --tool kiro doctor >/dev/null
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("hook_event_name")=="PreToolUse" and "command" in d.get("tool_input",{}) else 1)' "$KLOG" 2>/dev/null \
+  && ok "kiro doctor feeds a PreToolUse shell payload" || bad "kiro doctor feeds a PreToolUse shell payload"
+cp "$WORK/kiro-guard.bak" "$KG"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]["matcher"]="^shell$"; json.dump(d,open(p,"w"))' "$(cfg kiro)"
+run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "kiro doctor fails on a matcher that misses a shell tool" || bad "kiro doctor fails on a matcher that misses a shell tool (rc=$RC)"
+run --tool kiro >/dev/null; run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(count kiro)" = "1" ] && ok "kiro install repairs a narrowed matcher once and doctor then passes" || bad "kiro install repairs a narrowed matcher once and doctor then passes (rc=$RC entries=$(count kiro))"
 
 # 2c Droid keeps using settings.json when its hooks live there, and never shadows them with a new hooks.json
 fresh; mkdir -p "$H/.factory"

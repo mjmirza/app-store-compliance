@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One command setup for Claude Code and, with --tool, eleven other AI coding tools. Installs the guard,
+# One command setup for Claude Code and, with --tool, twelve other AI coding tools. Installs the guard,
 # skill and command, registers the hook, then proves it blocks a bad app. Run with --help for usage.
 set -uo pipefail
 
@@ -33,7 +33,7 @@ else
 fi
 
 MODE="install"; DRY=0; TOOL="claude"; REPO_DIR=""
-TOOL_NAMES="claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|droid|auggie|windsurf|all"
+TOOL_NAMES="claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|kiro|droid|auggie|windsurf|all"
 USAGE="Usage. install.sh [install|doctor|uninstall] [--tool $TOOL_NAMES] [--repo DIR] [--dry-run] [--version]"
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -50,7 +50,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 case "$TOOL" in
-  claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|droid|auggie|windsurf|all) ;;
+  claude|codex|gemini|opencode|cursor|copilot|copilot-repo|grok|qwen|kimi|kiro|droid|auggie|windsurf|all) ;;
   *) echo "Unknown tool. $TOOL" >&2; echo "$USAGE" >&2; exit 2 ;;
 esac
 
@@ -77,6 +77,7 @@ if [ "$TOOL" = "all" ] && [ "$MODE" != "help" ] && [ "$MODE" != "version" ]; the
   [ -d "$QDIR" ] && found="$found qwen"
   KDIR="${KIMI_CODE_HOME:-${HOME:-}/.kimi-code}"; case "$KDIR" in [~]|[~]/*|[~]\\*) KDIR="${KDIR#\~}"; KDIR="${HOME:-}/${KDIR#?}" ;; esac
   [ -d "$KDIR" ] && found="$found kimi"
+  [ -d "${HOME:-}/.kiro" ] && found="$found kiro"
   [ -d "${HOME:-}/.factory" ] && found="$found droid"
   [ -d "${HOME:-}/.augment" ] && found="$found auggie"
   [ -d "${HOME:-}/.codeium/windsurf" ] && found="$found windsurf"

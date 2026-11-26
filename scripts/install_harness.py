@@ -77,6 +77,7 @@ SPECS = {
     "copilot-repo": {"name": "Copilot cloud agent and JetBrains", "style": "copilot"},
     "windsurf": {"name": "Windsurf", "style": "flat", "event": "pre_run_command"},
     "kimi": {"name": "Kimi Code", "style": "toml"},
+    "kiro": {"name": "Kiro", "style": "kiro"},
     "opencode": {"name": "OpenCode", "style": "plugin"},
 }
 TOOLS = tuple(SPECS)
@@ -92,6 +93,7 @@ AFTER = {
     "copilot-repo": "Commit .github/hooks to your default branch. The Copilot cloud agent reads hooks only from there.",
     "windsurf": "Restart Windsurf so it loads the hook.",
     "kimi": "Restart Kimi Code so it loads the hook.",
+    "kiro": "Start a new Kiro CLI session, or restart Kiro, so it loads the hook. Kiro reads a global hook from ~/.kiro/hooks/ only on CLI V3.",
     "opencode": "Restart OpenCode so it loads the plugin.",
 }
 
@@ -182,6 +184,7 @@ def layout(tool, repo_dir=None):
         "copilot": copilot_dir(),
         "windsurf": os.path.join(h, ".codeium", "windsurf"),
         "kimi": kimi_dir(),
+        "kiro": os.path.join(h, ".kiro"),
     }
     base = bases[tool]
     configs = {
@@ -194,6 +197,7 @@ def layout(tool, repo_dir=None):
         "copilot": os.path.join("hooks", "app-store-compliance.json"),
         "windsurf": "hooks.json",
         "kimi": "config.toml",
+        "kiro": os.path.join("hooks", "app-store-compliance.json"),
     }
     command = (
         os.path.join(base, "commands", "app-store-audit.toml")
@@ -579,6 +583,14 @@ def manual_block(tool, lay, cmd):
             + " yourself.\n\n"
             + kimi_block(cmd)
         )
+    if tool == "kiro":
+        return (
+            "\nMerge this hook into the \"hooks\" list of "
+            + shown(lay["config"])
+            + " yourself.\n\n"
+            + json.dumps(kiro_entry(cmd), indent=2)
+            + "\n"
+        )
     events_map = {ev: [new_entry(tool, st, cmd)] for ev, st in events(tool)}
     data = {"hooks": events_map} if lay["wrap"] else events_map
     if tool == "gemini":
@@ -617,6 +629,8 @@ def register(tool, lay, guard, dry):
         return True
     if style == "toml":
         return register_kimi(lay, cmd, dry)
+    if style == "kiro":
+        return register_kiro(lay, cmd, dry)
     data = load_json(lay["config"])
     if data is None:
         fail(
@@ -774,6 +788,130 @@ def register_kimi(lay, cmd, dry):
     return True
 
 
+# Kiro keeps a standalone hook file: {"version":"v1","hooks":[ {name,trigger,matcher,action:{type,command},...} ]}.
+# The hooks value is a flat list of self-describing entries, not the event-keyed map the other JSON tools use,
+# so Kiro gets its own register/unregister/check, as Kimi (TOML) and OpenCode (plugin) do.
+# Kiro V3's shell tools. A matcher must cover all of them, so a narrower one is replaced. (kiro.dev/docs/hooks)
+KIRO_TOOLS = ("shell", "execute_bash", "execute_pwsh", "execute_cmd")
+KIRO_MATCHER = "^(" + "|".join(KIRO_TOOLS) + ")$"
+
+
+def kiro_entry(cmd):
+    return {
+        "name": "app-store-compliance",
+        "trigger": "PreToolUse",
+        "matcher": KIRO_MATCHER,
+        "action": {"type": "command", "command": cmd},
+        "timeout": 120,
+        "enabled": True,
+    }
+
+
+def kiro_is_ours(h, cmd, guard):
+    if not isinstance(h, dict):
+        return False
+    a = h.get("action")
+    c = str(a.get("command", "")).strip() if isinstance(a, dict) else ""
+    return c in (cmd, "bash " + guard, 'bash "' + guard + '"', "bash '" + guard + "'")
+
+
+def kiro_live(h):
+    """True when Kiro would run this hook before a shell command and give it time to finish."""
+    if not isinstance(h, dict) or h.get("trigger") != "PreToolUse" or h.get("enabled") is False:
+        return False
+    a = h.get("action")
+    if not isinstance(a, dict) or a.get("type") != "command" or not isinstance(a.get("command"), str):
+        return False
+    if not all(matcher_hits(h.get("matcher"), t) for t in KIRO_TOOLS):
+        return False
+    t = h.get("timeout")
+    # A missing timeout defaults to 60s in Kiro, too short for the guard, so our entry sets 120.
+    return isinstance(t, (int, float)) and not isinstance(t, bool) and t >= 120
+
+
+def register_kiro(lay, cmd, dry):
+    guard = guard_of(cmd)
+    data = load_json(lay["config"])
+    if data is None:
+        fail(
+            shown(lay["config"])
+            + " is not valid JSON, repeats a key, is read-only, or has an unexpected shape. It was not changed."
+        )
+        print(manual_block("kiro", lay, cmd))
+        return False
+    changed = False
+    if data.get("version") != "v1":
+        data["version"] = "v1"  # Kiro reads the versioned standalone schema
+        changed = True
+    hooks = data.setdefault("hooks", [])
+    if not isinstance(hooks, list) or not all(isinstance(h, dict) for h in hooks):
+        fail(shown(lay["config"]) + " has a hooks value with an unexpected shape. It was not changed.")
+        print(manual_block("kiro", lay, cmd))
+        return False
+    if not any(kiro_is_ours(h, cmd, guard) and kiro_live(h) for h in hooks):
+        # An entry of ours that would never run is replaced, never left beside the new one.
+        hooks[:] = [h for h in hooks if not kiro_is_ours(h, cmd, guard)]
+        hooks.append(kiro_entry(cmd))
+        changed = True
+    if not changed:
+        ok("hook already registered in " + shown(lay["config"]))
+        return True
+    if dry:
+        print(
+            "  would write the standalone hook file "
+            + shown(lay["config"])
+            + ", keeping every other key, with a backup"
+        )
+        return True
+    write_atomic(lay["config"], json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    ok(
+        "hook added to "
+        + shown(lay["config"])
+        + " (a backup sits next to it when the file already existed)"
+    )
+    return True
+
+
+def unregister_kiro(lay, guard):
+    cmd = hook_cmd("kiro", guard)
+    data = load_json(lay["config"])
+    if data is None:
+        return False
+    hooks = data.get("hooks")
+    if not isinstance(hooks, list):
+        return True
+    kept = [h for h in hooks if not (isinstance(h, dict) and kiro_is_ours(h, cmd, guard))]
+    if len(kept) == len(hooks):
+        return True
+    if not kept and set(data) <= {"version", "hooks"}:
+        os.remove(lay["config"])
+        return True
+    data["hooks"] = kept
+    write_atomic(lay["config"], json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    return True
+
+
+def check_kiro(lay, guard, app):
+    cmd = hook_cmd("kiro", guard)
+    data = load_json(lay["config"]) or {}
+    if data.get("version") != "v1":
+        fail("version is not \"v1\" in " + shown(lay["config"]) + ", so Kiro rejects the standalone hook file")
+    hooks = data.get("hooks") if isinstance(data.get("hooks"), list) else []
+    ours = [h for h in hooks if isinstance(h, dict) and kiro_is_ours(h, cmd, guard)]
+    live = [h for h in ours if kiro_live(h)]
+    if not live:
+        if ours:
+            fail(
+                "the hook in " + shown(lay["config"])
+                + " names the guard but would never run it. Check its trigger, matcher, action and timeout, or run install again"
+            )
+        else:
+            fail("no PreToolUse hook entry for the guard in " + shown(lay["config"]))
+        return
+    ok("hook registered in " + shown(lay["config"]))
+    prove(live[0]["action"]["command"], "kiro", "kiro", app, app)
+
+
 def unregister(tool, lay, guard):
     cmd = hook_cmd(tool, guard)
     style = SPECS[tool]["style"]
@@ -783,6 +921,8 @@ def unregister(tool, lay, guard):
             if owned_plugin(path) or os.path.islink(path):
                 os.remove(path)
         return True
+    if style == "kiro":
+        return unregister_kiro(lay, guard)
     if not os.path.exists(lay["config"]):
         return True
     if style == "toml":
@@ -984,6 +1124,13 @@ def payload_for(tool, style, command, cwd):
             "tool_name": "Bash",
             "tool_input": {"command": command},
         }
+    if tool == "kiro":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "execute_bash",
+            "tool_input": {"command": command},
+            "cwd": cwd,
+        }
     return {
         "hook_event_name": "PreToolUse",
         "tool_name": "Bash",
@@ -1084,6 +1231,8 @@ def verify(tool, lay, guard, repo_dir):
             check_plugin(lay, app)
         elif style == "toml":
             check_kimi(lay, guard, app)
+        elif style == "kiro":
+            check_kiro(lay, guard, app)
         else:
             check_hooks(tool, lay, guard, app, repo_dir)
     finally:
