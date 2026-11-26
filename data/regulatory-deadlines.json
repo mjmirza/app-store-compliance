@@ -1,6 +1,6 @@
 {
   "version": "2.5.3",
-  "updated": "2026-11-25",
+  "updated": "2026-11-26",
   "description": "Database of global regional, national, and platform regulatory deadlines compiled from App Store Compliance Playbook records.",
   "deadlines": [
     {
@@ -283,17 +283,18 @@
     {
       "id": "US-AL-ASAA",
       "jurisdiction": "Alabama (USA State)",
-      "law": "Alabama HB 161 (App Store Accountability Act)",
-      "requirement": "App stores verify age category, link minors to a parent account, and obtain verifiable parental consent per download and in-app purchase. Effective 1 January 2027 per HB 161 Section 14 (enrolled text). Accounts in existence on 2 October 2026 must be age-verified with consent before 1 October 2027.",
+      "law": "Alabama HB 161 (Ala. Acts No. 2026-59, App Store Accountability Act)",
+      "requirement": "App stores request and verify age category for an Alabama account, link a minor account to a parent account, and obtain verifiable parental consent before a download, a purchase, or an in-app purchase (Sections 2 and 3). Effective 1 January 2027 under Section 15 of enrolled HB 161 (Ala. Acts No. 2026-59). Section 14 does not set that date. It states that nothing in the act relieves any person from compliance with any other law of this state that requires age verification. Section 2(a): accounts in existence on 2 October 2026 must have age category requested and verified before 1 October 2027. Section 9: a developer verifies, through the store's data sharing methods, the age category of users located in Alabama and, for a minor account, whether verifiable parental consent has been obtained. It notifies the store of a significant change. It limits use of age category data to age-related restrictions, legal compliance, or safety features. It requests age category data or verifiable parental consent when an account holder downloads an app, purchases an app, or launches a pre-installed app for the first time, when implementing a significant change, and to comply with law. When applying age-related restrictions, safety-related features, or defaults, it uses the lowest age category from the store signal or the developer's own age data. Section 11: a knowing or reckless violation is a deceptive trade practice in the Attorney General's exclusive jurisdiction, with a civil penalty of up to 7,500 dollars per violation, plus reasonable attorney fees and court costs. Section 12(a): a developer safe harbor where the developer relied in good faith on the store's age category data and consent notification and complied with the act. Section 13(5): no requirement to block an app downloaded or installed before 1 October 2026 unless a parent revokes verifiable consent or there is a significant change. The Attorney General's Section 10 rules, establishing how a store may verify whether an account holder is a minor, are not yet adopted. The request for information says responses are due by 8 January 2027, and the Office expects that most app store providers will use the commercially available option.",
       "effective_date": "2027-01-01",
       "grace_period": "none",
       "mandatory_date": "2027-01-01",
       "enforcement_date": "2027-01-01",
       "affected_repository_sections": "docs/GLOBAL-REGULATORY-2026.md section 2.2, references/rules/privacy.md",
       "priority": "critical",
-      "source_url": "https://fpf.org/blog/comparing-enacted-app-store-accountability-acts/",
-      "verified_on": "2026-11-14",
-      "source_note": "Secondary comparison by the Future of Privacy Forum. The enrolled Alabama bill was not read."
+      "source_url": "https://alison.legislature.state.al.us/files/pdf/SearchableInstruments/2026RS/HB161-enr.pdf",
+      "verified_on": "2026-11-26",
+      "source_note": "Read on 26 November 2026 from the enrolled bill, HB 161 of the 2026 Regular Session. Section 15 states the act shall become effective on January 1, 2027. Section 14 states that nothing in the act relieves any person from compliance with any other law of this state that requires age verification. The Attorney General request for information at https://www.alabamaag.gov/alabama-app-store-accountability-act/ cites the act as Ala. Acts No. 2026-59 and Ala. Code section 8-19K-1 et seq., says responses are due by January 8, 2027, and says the Office expects that most app store providers will use the commercially available option. The news release at https://www.alabamaag.gov/wp-content/uploads/2026/11/2026.12.19-Attorney-General-Marshall-Seeks-Public-Input-on-Future-Age-Verification-Rules-for-App-Stores.pdf is headed FOR IMMEDIATE RELEASE November 19, 2026. The filename begins 2026.12.19. The release text says November 19, 2026, and says responses may be uploaded by January 8, 2027.",
+      "history": "2026-11-26. Requirement corrected in place. The 1 January 2027 effective date is unchanged, as are the 2 October 2026 and 1 October 2027 account dates in Section 2(a). The previous text cited Section 14 for the effective date and a Future of Privacy Forum comparison, and said the enrolled bill was not read. Section 15 of the enrolled bill sets the effective date."
     },
     {
       "id": "US-CA-CPRA",
