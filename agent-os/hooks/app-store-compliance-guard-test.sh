@@ -4445,6 +4445,55 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:6' && ok "an else after #available(iOS 18) still fires" || bad "an else after #available(iOS 18) still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #unavailable(iOS 27),
+       enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a multi-line #unavailable(iOS 27) condition stays silent" || bad "a multi-line #unavailable(iOS 27) condition stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    guard #available(iOS 27, *), enabled else {
+        _ = try await ImageCreator()
+        return
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "the else of a compound guard #available(iOS 27) fires" || bad "the else of a compound guard #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #available(iOS 27, *), enabled {
+        print(27)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "the else of a compound if #available(iOS 27) fires" || bad "the else of a compound if #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #unavailable(iOS 27) || enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 27) joined by || fires" || bad "#unavailable(iOS 27) joined by || fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #unavailable(iOS 27) && enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#unavailable(iOS 27) joined by && stays silent" || bad "#unavailable(iOS 27) joined by && stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

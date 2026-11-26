@@ -619,6 +619,29 @@ def gates_27(code, keys=("#unavailable(",)):
             k = code.find(key, k + 1)
     return False
 
+def head_of(code, k):
+    # The condition before the brace at k, joined across continuation lines.
+    ls = code.rfind(chr(10), 0, k) + 1
+    h = code[ls:k]
+    while ls > 0:
+        prev_end = ls - 1
+        ps = code.rfind(chr(10), 0, prev_end) + 1
+        prev = code[ps:prev_end].rstrip()
+        cur = h.lstrip()
+        if prev.endswith((",", "&&", "||", "(")) or cur.startswith((",", "&&", "||", ")")):
+            h = prev + " " + h
+            ls = ps
+        else:
+            break
+    return h.strip().lstrip(chr(125)).strip()
+
+def alone(h, key, joins):
+    # True when nothing but the availability check, apart from if, guard, else and let, is joined by joins.
+    k = h.find(key)
+    e = h.find(")", k)
+    rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
+    return not any(j in rest for j in joins)
+
 def gated_line(code, line):
     # True when the line, or a block around its start, checks a version of 27 or later.
     lines = code.split(chr(10))
@@ -634,11 +657,12 @@ def gated_line(code, line):
     for k in range(min(stop, len(code))):
         c = code[k]
         if c == chr(123):
-            h = code[code.rfind(chr(10), 0, k) + 1:k].strip().lstrip(chr(125)).strip()
+            h = head_of(code, k)
             words = h.split()
             first = words[0] if words else ""
-            avail = gates_27(h, ("#available(",))
-            unavail = gates_27(h)
+            # An else runs on 27 whenever another condition fails, so only a pure #available check counts.
+            avail = gates_27(h, ("#available(",)) and alone(h, "#available(", (",", "&&", "||"))
+            unavail = gates_27(h) and alone(h, "#unavailable(", ("||",))
             if first == "else":
                 stack.append([chain or unavail, chain, False])
             elif "guard" in words:
