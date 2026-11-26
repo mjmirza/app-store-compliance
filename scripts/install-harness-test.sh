@@ -35,6 +35,9 @@ gdir() {  # where each tool's guard lands
     auggie) echo "$H/.augment/hooks" ;; windsurf) echo "$H/.codeium/windsurf/hooks" ;; *) echo "$H/.$1/hooks" ;;
   esac
 }
+skdir() {  # where each tool's skill lands. Kiro loads skills only from ~/.kiro/skills
+  if [ "$1" = "kiro" ]; then echo "$H/.kiro/skills/app-store-compliance"; else echo "$H/.agents/skills/app-store-compliance"; fi
+}
 count() {  # how many hook entries point at the guard
   if [ "$1" = "kimi" ] || [ "$1" = "kiro" ]; then
     if [ -f "$(cfg "$1")" ]; then grep -c "app-store-compliance-guard.sh" "$(cfg "$1")" 2>/dev/null || true; else echo 0; fi; return
@@ -64,7 +67,7 @@ for t in codex gemini opencode cursor copilot grok qwen kimi kiro droid auggie w
   OUT="$(run --tool "$t")"; RC=$?
   [ "$RC" -eq 0 ] && grep -q "^Install verified\." <<<"$OUT" && ok "$t fresh install verifies" || { bad "$t fresh install verifies (rc=$RC)"; echo "$OUT" | tail -15; }
   [ -x "$(gdir "$t")/app-store-compliance-guard.sh" ] && ok "$t guard is installed and executable" || bad "$t guard is installed and executable"
-  [ -f "$H/.agents/skills/app-store-compliance/SKILL.md" ] && [ -f "$H/.agents/skills/app-store-compliance/VERSION" ] && ok "$t shared skill and version installed" || bad "$t shared skill and version installed"
+  [ -f "$(skdir "$t")/SKILL.md" ] && [ -f "$(skdir "$t")/VERSION" ] && ok "$t shared skill and version installed" || bad "$t shared skill and version installed"
   if [ "$t" != "opencode" ]; then
     [ "$(count "$t")" = "1" ] && ok "$t hook registered once" || bad "$t hook registered once (got $(count "$t"))"
     BEFORE="$(cat "$(cfg "$t")")"; run --tool "$t" >/dev/null
@@ -79,7 +82,7 @@ for t in codex gemini opencode cursor copilot grok qwen kimi kiro droid auggie w
   OUT="$(run --tool "$t" doctor)"; RC=$?
   [ "$RC" -eq 0 ] && ok "$t doctor passes" || bad "$t doctor passes (rc=$RC)"
   run --tool "$t" uninstall >/dev/null
-  [ ! -e "$H/.agents/skills/app-store-compliance" ] && ok "$t uninstall removes the shared skill when no tool is left" || bad "$t uninstall removes the shared skill when no tool is left"
+  [ ! -e "$(skdir "$t")" ] && ok "$t uninstall removes the shared skill when no tool is left" || bad "$t uninstall removes the shared skill when no tool is left"
   if [ "$t" = "opencode" ]; then
     [ ! -e "$(cfg "$t")" ] && [ ! -e "$H/.config/opencode/plugin/app-store-compliance.js" ] && ok "$t uninstall removes the plugin from both folders" || bad "$t uninstall removes the plugin from both folders"
   else
@@ -149,14 +152,49 @@ sys.exit(0 if all(re.fullmatch(m,t) for t in ("shell","execute_bash","execute_pw
 KLOG="$WORK/kiro-payload$RANDOM.json"; KG="$(gdir kiro)/app-store-compliance-guard.sh"; cp "$KG" "$WORK/kiro-guard.bak"
 printf '#!/usr/bin/env bash\ncat > "%s"\ngrep -q deliver "%s" && exit 2\nexit 0\n' "$KLOG" "$KLOG" > "$KG"
 run --tool kiro doctor >/dev/null
-python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("hook_event_name")=="PreToolUse" and "command" in d.get("tool_input",{}) else 1)' "$KLOG" 2>/dev/null \
-  && ok "kiro doctor feeds a PreToolUse shell payload" || bad "kiro doctor feeds a PreToolUse shell payload"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("hook_event_name")=="PreToolUse" and d.get("tool_name") in ("shell","execute_bash","execute_pwsh","execute_cmd") and "command" in d.get("tool_input",{}) else 1)' "$KLOG" 2>/dev/null \
+  && ok "kiro doctor feeds a PreToolUse payload named for a Kiro shell tool" || bad "kiro doctor feeds a PreToolUse payload named for a Kiro shell tool"
 cp "$WORK/kiro-guard.bak" "$KG"
 python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); [x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]["matcher"]="^shell$"; json.dump(d,open(p,"w"))' "$(cfg kiro)"
 run --tool kiro doctor >/dev/null; RC=$?
 [ "$RC" -eq 1 ] && ok "kiro doctor fails on a matcher that misses a shell tool" || bad "kiro doctor fails on a matcher that misses a shell tool (rc=$RC)"
 run --tool kiro >/dev/null; run --tool kiro doctor >/dev/null; RC=$?
 [ "$RC" -eq 0 ] && [ "$(count kiro)" = "1" ] && ok "kiro install repairs a narrowed matcher once and doctor then passes" || bad "kiro install repairs a narrowed matcher once and doctor then passes (rc=$RC entries=$(count kiro))"
+
+# 2b4 Kiro loads skills only from ~/.kiro/skills, so a Kiro install puts the skill there and nowhere else
+fresh; run --tool kiro >/dev/null
+[ -f "$H/.kiro/skills/app-store-compliance/SKILL.md" ] && [ ! -e "$H/.agents/skills/app-store-compliance" ] \
+  && ok "kiro installs the skill into ~/.kiro/skills, where Kiro loads it" || bad "kiro installs the skill into ~/.kiro/skills, where Kiro loads it"
+
+# 2b5 Kiro selectors and a disabled timeout are valid. Doctor passes on them and install keeps them and the person's fields
+kiro_set() {  # $1 a python statement on h, our hook entry
+  python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); h=[x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]; exec(sys.argv[2]); json.dump(d,open(p,"w"))' "$(cfg kiro)" "$1"
+}
+kiro_get() {  # prints our entry's value for key $1 as JSON
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); h=[x for x in d["hooks"] if x["name"]=="app-store-compliance"][0]; print(json.dumps(h.get(sys.argv[2])))' "$(cfg kiro)" "$1"
+}
+for m in shell @builtin '*' 'execute_.*|shell' '?*'; do
+  fresh; run --tool kiro >/dev/null
+  kiro_set "h['matcher']='$m'; h['description']='mine'"
+  run --tool kiro doctor >/dev/null; RC=$?
+  [ "$RC" -eq 0 ] && ok "kiro doctor accepts the matcher $m" || bad "kiro doctor accepts the matcher $m (rc=$RC)"
+  run --tool kiro >/dev/null
+  [ "$(kiro_get matcher)" = "\"$m\"" ] && [ "$(kiro_get description)" = '"mine"' ] && [ "$(count kiro)" = "1" ] \
+    && ok "kiro install keeps the matcher $m and the person's own fields" || bad "kiro install keeps the matcher $m and the person's own fields (matcher=$(kiro_get matcher))"
+done
+fresh; run --tool kiro >/dev/null
+kiro_set "h['timeout']=0"
+run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && ok "kiro doctor accepts timeout 0, which disables Kiro's timeout" || bad "kiro doctor accepts timeout 0, which disables Kiro's timeout (rc=$RC)"
+run --tool kiro >/dev/null
+[ "$(kiro_get timeout)" = "0" ] && ok "kiro install keeps timeout 0" || bad "kiro install keeps timeout 0 (got $(kiro_get timeout))"
+# a broken entry of ours is repaired in place: only the fields that stop it change
+kiro_set "h['timeout']=30; h['enabled']=False; h['matcher']='^read$'; h['description']='mine'"
+run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 1 ] && ok "kiro doctor fails on a short timeout, a disabled hook and a matcher that skips the shell" || bad "kiro doctor fails on a short timeout, a disabled hook and a matcher that skips the shell (rc=$RC)"
+run --tool kiro >/dev/null; run --tool kiro doctor >/dev/null; RC=$?
+[ "$RC" -eq 0 ] && [ "$(kiro_get timeout)" = "120" ] && [ "$(kiro_get enabled)" = "true" ] && [ "$(kiro_get description)" = '"mine"' ] && [ "$(count kiro)" = "1" ] \
+  && ok "kiro install repairs a broken entry in place and keeps the person's fields" || bad "kiro install repairs a broken entry in place and keeps the person's fields (rc=$RC)"
 
 # 2c Droid keeps using settings.json when its hooks live there, and never shadows them with a new hooks.json
 fresh; mkdir -p "$H/.factory"

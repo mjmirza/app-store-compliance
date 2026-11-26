@@ -99,11 +99,11 @@ Every run ends with `Install verified.` only after it has fed a submit command t
 What it writes, so you can check it.
 
 - The guard, into that tool's own folder, for example `~/.codex/hooks/` or `~/.gemini/hooks/`.
-- The skill. Claude Code reads it from `~/.claude/skills/`. Every other tool reads one shared copy in `~/.agents/skills/`.
+- The skill. Claude Code reads it from `~/.claude/skills/` and Kiro from `~/.kiro/skills/`. Every other tool reads one shared copy in `~/.agents/skills/`.
 - One hook entry in that tool's config (`~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`, `~/.cursor/hooks.json`, `~/.copilot/hooks/` or `$COPILOT_HOME/hooks/`), or for OpenCode one plugin file in `~/.config/opencode/plugins/`. Every other setting is kept, and a dated backup sits next to a file that already existed. A config that is not valid JSON or repeats a key is never rewritten. You get the exact block to paste instead.
 - For Gemini CLI it also turns on `tools.enableHooks`, which Gemini needs before version 0.26 to run any hook.
 - For Kimi Code it appends one marked `[[hooks]]` block to `~/.kimi-code/config.toml` (or `$KIMI_CODE_HOME/config.toml`) and never rewrites or prints the rest of that file, which can hold API keys. Uninstall removes exactly that block.
-- For Kiro it writes one standalone `v1` hook file at `~/.kiro/hooks/app-store-compliance.json`, keeping any other hook already in it, with a `PreToolUse` matcher that covers Kiro's `shell`, `execute_bash`, `execute_pwsh` and `execute_cmd` tools. Kiro reads a global hook from `~/.kiro/hooks/` only on CLI V3.
+- For Kiro it writes one standalone `v1` hook file at `~/.kiro/hooks/app-store-compliance.json`, keeping any other hook already in it, with a `PreToolUse` matcher that covers Kiro's `shell`, `execute_bash`, `execute_pwsh` and `execute_cmd` tools. A matcher you change to another form that still covers them, such as `shell` or `@builtin`, is kept, and so is a `timeout` of 0. Kiro reads a global hook from `~/.kiro/hooks/` only on CLI V3.
 - For Factory Droid it writes to `~/.factory/settings.json` when your hooks already live there, because Droid ignores them once `~/.factory/hooks.json` exists.
 
 #### Tools the installer does not wire, and what to do instead
