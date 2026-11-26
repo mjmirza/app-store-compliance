@@ -561,23 +561,27 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
 release_string_has() {
   RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f m
+  local f m src
   while IFS= read -r f; do
+    # Source comments go first (issue #2413). strip_comments reads strings and keeps line numbers, so a
+    # generator method such as `* load()` stays code. It runs in the C locale, and the raw file is read
+    # if awk still fails, so a byte awk cannot decode never hides a file.
+    src=""
+    if [[ "$f" =~ $SRC_EXT_RE ]]; then src="$(LC_ALL=C strip_comments "$f")" || src="$(cat "$f" 2>/dev/null)"; fi
     # Removed lines print empty, so a line number counts the lines of a DEBUG block too.
     case "$f" in
       *.swift)
-        m="$(awk '
+        m="$(printf '%s\n' "$src" | LC_ALL=C awk '
           /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } print ""; next }
           /^[ \t]*#else/  { if (skip && d==dbg) skip=0; print ""; next }
           /^[ \t]*#elseif/ { print ""; next }
           /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; print ""; next }
           skip { print ""; next }
           { print }
-        ' "$f" 2>/dev/null | awk -v tc=1 "$STRIP_AWK" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+        ' 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
       *)
-        # Source comments go first (issue #2413). STRIP_AWK prints one line per line, so line numbers hold.
         if [[ "$f" =~ $SRC_EXT_RE ]]; then
-          m="$(awk -v tc=1 "$STRIP_AWK" "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)"
+          m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" <<< "$src" 2>/dev/null)"
         else
           m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)"
         fi ;;

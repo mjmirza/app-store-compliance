@@ -3874,6 +3874,16 @@ D="$(mk_rn_ship api.ts 'export const api = "http://localhost:3000"; // dev')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "cmt-11 a TypeScript localhost string with a trailing comment still fires" || bad "cmt-11 a TypeScript localhost string with a trailing comment still fires"
 rm -rf "$D"
+D="$(mk_rn_ship store.js 'class Store {
+  * load() { return fetch("http://localhost:3000"); }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/store.js:2' && ok "cmt-12 a generator method that starts with * is code, not a comment line" || bad "cmt-12 a generator method that starts with * is code, not a comment line"
+rm -rf "$D"
+D="$(mk_rn_ship api.js 'x')"; printf '// Caf\351 settings\nconst api = "http://localhost:3000";\n' > "$D/src/api.js"
+OUT="$(LC_ALL=en_US.UTF-8 bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.js:2' && ok "cmt-13 a non-UTF-8 byte in a comment does not hide the file under a UTF-8 locale" || bad "cmt-13 a non-UTF-8 byte in a comment does not hide the file under a UTF-8 locale"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"
