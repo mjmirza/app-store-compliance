@@ -627,26 +627,34 @@ def gated_line(code, line):
         if gates_27(own) or (gates_27(own, ("#available(",)) and "else" in own.split()):
             return True
     stop = len(chr(10).join(lines[:line - 1]))
+    # One frame per open block: kept for older systems, starts a #available(27) chain, is a guard #unavailable(27).
     stack = []
-    heads = []
-    closed = ""
-    start = 0
+    chain = False
+    top = False
     for k in range(min(stop, len(code))):
         c = code[k]
         if c == chr(123):
-            head = code[start:k]
-            is_else = bool(head.split()) and head.split()[-1] == "else"
-            stack.append(gates_27(head) or (is_else and gates_27(closed, ("#available(",))))
-            heads.append(head)
-            start = k + 1
-        elif c == chr(125):
-            if stack:
-                stack.pop()
-            closed = heads.pop() if heads else ""
-            start = k + 1
-        elif c == ";":
-            start = k + 1
-    return any(stack)
+            h = code[code.rfind(chr(10), 0, k) + 1:k].strip().lstrip(chr(125)).strip()
+            words = h.split()
+            first = words[0] if words else ""
+            avail = gates_27(h, ("#available(",))
+            unavail = gates_27(h)
+            if first == "else":
+                stack.append([chain or unavail, chain, False])
+            elif "guard" in words:
+                stack.append([avail, False, unavail])
+            else:
+                stack.append([unavail, avail, False])
+        elif c == chr(125) and stack:
+            done = stack.pop()
+            chain = done[1]
+            if done[2]:
+                # Code after guard #unavailable(iOS 27) else { return } runs only on older systems.
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
+    return top or any(f[0] for f in stack)
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.

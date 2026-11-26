@@ -4386,6 +4386,65 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone" || bad "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #unavailable(iOS 27) else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "code after guard #unavailable(iOS 27) stays silent" || bad "code after guard #unavailable(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func a() {
+    guard #unavailable(iOS 27) else { return }
+}
+func make() async throws {
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a guard #unavailable in another function does not hide a call" || bad "a guard #unavailable in another function does not hide a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #available(iOS 27, *) else {
+        _ = try await ImageCreator()
+        return
+    }
+    print(27)
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of guard #available(iOS 27) stays silent" || bad "the else of guard #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #available(iOS 27, *) else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "code after guard #available(iOS 27) fires" || bad "code after guard #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(f: Bool) async throws {
+    if #available(iOS 27, *) {
+        print(27)
+    } else if f {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if after #available(iOS 27) stays silent" || bad "an else if after #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 18, *) {
+        print(18)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "an else after #available(iOS 18) still fires" || bad "an else after #available(iOS 18) still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
