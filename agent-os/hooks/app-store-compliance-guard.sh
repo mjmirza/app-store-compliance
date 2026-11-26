@@ -607,15 +607,16 @@ def no_comments(text):
     return "".join(out)
 
 def gates_27(code, keys=("#unavailable(",)):
-    # A version check on 27 or later. Code under #unavailable, or in the else of #available, is kept for older systems.
+    # Code under #unavailable(iOS N), or in the else of #available(iOS N), runs only below N.
+    # It never reaches 27 when every listed version N is 27 or lower.
     for key in keys:
         k = code.find(key)
         while k >= 0:
             e = code.find(")", k)
-            for part in code[k + len(key):e if e > 0 else len(code)].replace(",", " ").split():
-                major = part.split(".")[0]
-                if major.isdigit() and int(major) >= 27:
-                    return True
+            majors = [p.split(".")[0] for p in code[k + len(key):e if e > 0 else len(code)].replace(",", " ").split()]
+            majors = [int(m) for m in majors if m.isdigit()]
+            if majors and max(majors) <= 27:
+                return True
             k = code.find(key, k + 1)
     return False
 
@@ -623,6 +624,11 @@ def head_of(code, k):
     # The condition before the brace at k, joined across continuation lines.
     ls = code.rfind(chr(10), 0, k) + 1
     h = code[ls:k]
+    if not h.strip().strip(chr(125)).strip() and ls > 0:
+        # A brace on its own line belongs to the condition on the line above.
+        ps = code.rfind(chr(10), 0, ls - 1) + 1
+        h = code[ps:ls - 1]
+        ls = ps
     while ls > 0:
         prev_end = ls - 1
         ps = code.rfind(chr(10), 0, prev_end) + 1
@@ -636,21 +642,21 @@ def head_of(code, k):
     return h.strip().lstrip(chr(125)).strip()
 
 def alone(h, key, joins):
-    # True when nothing but the availability check, apart from if, guard, else and let, is joined by joins.
+    # True when no other clause is joined to the availability check by joins.
     k = h.find(key)
     e = h.find(")", k)
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
 def gated_line(code, line):
-    # True when the line, or a block around its start, checks a version of 27 or later.
+    # True when the line, or a block around its start, only runs below version 27.
     lines = code.split(chr(10))
     if line <= len(lines):
         own = lines[line - 1]
         if gates_27(own) or (gates_27(own, ("#available(",)) and "else" in own.split()):
             return True
     stop = len(chr(10).join(lines[:line - 1]))
-    # One frame per open block: kept for older systems, starts a #available(27) chain, is a guard #unavailable(27).
+    # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
     stack = []
     chain = False
     top = False
@@ -660,9 +666,9 @@ def gated_line(code, line):
             h = head_of(code, k)
             words = h.split()
             first = words[0] if words else ""
-            # An else runs on 27 whenever another condition fails, so only a pure #available check counts.
-            avail = gates_27(h, ("#available(",)) and alone(h, "#available(", (",", "&&", "||"))
-            unavail = gates_27(h) and alone(h, "#unavailable(", ("||",))
+            # An else runs whenever any comma clause fails, so only a lone #available check counts.
+            avail = gates_27(h, ("#available(",)) and alone(h, "#available(", (",",))
+            unavail = gates_27(h)
             if first == "else":
                 stack.append([chain or unavail, chain, False])
             elif "guard" in words:
@@ -673,7 +679,7 @@ def gated_line(code, line):
             done = stack.pop()
             chain = done[1]
             if done[2]:
-                # Code after guard #unavailable(iOS 27) else { return } runs only on older systems.
+                # Code after guard #unavailable(iOS 27) else { return } runs only below 27.
                 if stack:
                     stack[-1][0] = True
                 else:

@@ -4442,7 +4442,7 @@ func make() async throws {
     }
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:6' && ok "an else after #available(iOS 18) still fires" || bad "an else after #available(iOS 18) still fires"
+! ic_has && ok "an else after #available(iOS 18) stays silent, it only runs below 18" || bad "an else after #available(iOS 18) stays silent, it only runs below 18"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 func make(enabled: Bool) async throws {
@@ -4476,22 +4476,54 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:6' && ok "the else of a compound if #available(iOS 27) fires" || bad "the else of a compound if #available(iOS 27) fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
-func make(enabled: Bool) async throws {
-    if #unavailable(iOS 27) || enabled {
+func make(enabled: Bool, fallback: Bool) async throws {
+    if #unavailable(iOS 27), enabled || fallback {
         _ = try await ImageCreator()
     }
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 27) joined by || fires" || bad "#unavailable(iOS 27) joined by || fires"
+! ic_has && ok "#unavailable(iOS 27) with a comma clause holding || stays silent" || bad "#unavailable(iOS 27) with a comma clause holding || stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
-func make(enabled: Bool) async throws {
-    if #unavailable(iOS 27) && enabled {
+func make() async throws {
+    if #unavailable(iOS 30) {
         _ = try await ImageCreator()
     }
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "#unavailable(iOS 27) joined by && stays silent" || bad "#unavailable(iOS 27) joined by && stays silent"
+ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 30) fires, it runs on 27 to 29" || bad "#unavailable(iOS 30) fires, it runs on 27 to 29"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 30, *) {
+        print(30)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "the else of #available(iOS 30) fires, it runs on 27 to 29" || bad "the else of #available(iOS 30) fires, it runs on 27 to 29"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 26, *) {
+        print(26)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of #available(iOS 26) stays silent" || bad "the else of #available(iOS 26) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #unavailable(iOS 27)
+    {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#unavailable(iOS 27) with the brace on its own line stays silent" || bad "#unavailable(iOS 27) with the brace on its own line stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
