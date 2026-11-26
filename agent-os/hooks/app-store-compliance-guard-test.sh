@@ -3841,6 +3841,39 @@ let api = "https://staging.acme.io"')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'App/Net.swift:4' && ok "ptr-3 the line number counts the lines of a removed DEBUG block" || bad "ptr-3 the line number counts the lines of a removed DEBUG block"
 rm -rf "$D"
+# Issue #2413. A host quoted inside a comment is not a release string. A string that holds // is still one.
+cmt_case() {  # name, expect (1 fires / 0 silent), Net.swift body after the api line
+  D="$(mk_ship "let api = \"https://api.acme.io\"
+$3")"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  if rr_has 'APPLE-2.1-STAGING-BACKEND'; then got=1; else got=0; fi
+  [ "$got" -eq "$2" ] && ok "$1" || bad "$1"
+  rm -rf "$D"
+}
+cmt_case "cmt-1 a host quoted in a /// doc comment stays silent" 0 '/// The host, e.g. "localhost:8080"'
+cmt_case "cmt-2 a host quoted in a // comment stays silent" 0 '// Point at "http://localhost:3000" when debugging'
+cmt_case "cmt-3 a host quoted in a one-line /* */ comment stays silent" 0 '/* old: "https://staging.acme.io" */'
+cmt_case "cmt-4 a host quoted in a multi-line /* */ comment stays silent" 0 '/*
+ * Dev server: "http://localhost:3000"
+ */'
+cmt_case "cmt-5 a localhost string still fires" 1 'let dev = "http://localhost:3000"'
+cmt_case "cmt-6 a localhost string with a trailing comment still fires" 1 'let dev = "http://localhost:3000" // TODO prod'
+cmt_case "cmt-7 a string that holds // before the host still fires" 1 'let note = "see // http://localhost:3000"'
+cmt_case "cmt-8 a string after a closed /* */ comment on the same line still fires" 1 '/* dev */ let dev = "http://localhost:3000"'
+D="$(mk_ship '/// e.g. "localhost:8080"
+let api = "https://staging.acme.io"')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'App/Net.swift:2' && ok "cmt-9 the finding names the string, not the comment above it" || bad "cmt-9 the finding names the string, not the comment above it"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts '// Point at "http://localhost:3000" when debugging
+export const api = "https://api.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "cmt-10 a host quoted in a TypeScript comment stays silent" || bad "cmt-10 a host quoted in a TypeScript comment stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'export const api = "http://localhost:3000"; // dev')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "cmt-11 a TypeScript localhost string with a trailing comment still fires" || bad "cmt-11 a TypeScript localhost string with a trailing comment still fires"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"

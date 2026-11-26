@@ -573,8 +573,14 @@ release_string_has() {
           /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; print ""; next }
           skip { print ""; next }
           { print }
-        ' "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
-      *) m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)" ;;
+        ' "$f" 2>/dev/null | awk -v tc=1 "$STRIP_AWK" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+      *)
+        # Source comments go first (issue #2413). STRIP_AWK prints one line per line, so line numbers hold.
+        if [[ "$f" =~ $SRC_EXT_RE ]]; then
+          m="$(awk -v tc=1 "$STRIP_AWK" "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)"
+        else
+          m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)"
+        fi ;;
     esac
     # NOTE. no `grep -q` or `-m 1`. Either one stops reading early, the awk producer gets SIGPIPE,
     # and pipefail reports a miss though grep matched (timing-dependent, seen on the CI runner).
