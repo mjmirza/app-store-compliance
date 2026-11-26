@@ -1342,7 +1342,7 @@ if [ "$IS_AND" -eq 1 ]; then
     sdk="$(grep -E '/build[.]gradle([.]kts)?$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -hoE 'targetSdk(Version)?[[:space:]=(]+[0-9]+' 2>/dev/null | grep -oE '[0-9]+' | sort -n | tail -1)"
     [ -n "$sdk" ] || return 1
     # A debug or test source set, in any flavor, never reaches a release build.
-    mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/[A-Za-z0-9]*([Dd]ebug|[Tt]est)[A-Za-z0-9]*/')"
+    mf="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | grep -vE '/src/(debug|test[A-Za-z0-9]*|androidTest[A-Za-z0-9]*|[a-z][A-Za-z0-9]*(Debug|Test))/AndroidManifest[.]xml$')"
     [ -n "$mf" ] || return 1
     hit="$(printf '%s\n' "$mf" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'PY'
 import os
