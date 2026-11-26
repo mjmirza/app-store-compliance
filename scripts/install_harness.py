@@ -2,6 +2,7 @@
 """Install the guard, skill and audit command into every supported AI coding tool other than Claude Code.
 Usage. install_harness.py <tool> [install|doctor|uninstall] [--dry-run] [--repo DIR]. Configs are merged, never replaced."""
 
+import fnmatch
 import json
 import os
 import re
@@ -77,6 +78,7 @@ SPECS = {
     "copilot-repo": {"name": "Copilot cloud agent and JetBrains", "style": "copilot"},
     "windsurf": {"name": "Windsurf", "style": "flat", "event": "pre_run_command"},
     "kimi": {"name": "Kimi Code", "style": "toml"},
+    "kiro": {"name": "Kiro", "style": "kiro"},
     "opencode": {"name": "OpenCode", "style": "plugin"},
 }
 TOOLS = tuple(SPECS)
@@ -92,6 +94,7 @@ AFTER = {
     "copilot-repo": "Commit .github/hooks to your default branch. The Copilot cloud agent reads hooks only from there.",
     "windsurf": "Restart Windsurf so it loads the hook.",
     "kimi": "Restart Kimi Code so it loads the hook.",
+    "kiro": "Start a new Kiro CLI session, or restart Kiro, so it loads the hook. Kiro reads a global hook from ~/.kiro/hooks/ only on CLI V3.",
     "opencode": "Restart OpenCode so it loads the plugin.",
 }
 
@@ -133,7 +136,10 @@ def copilot_dir():
     return os.path.abspath(v)
 
 
-def skill_dir():
+def skill_dir(tool=None):
+    if tool == "kiro":
+        # Kiro loads skills only from ~/.kiro/skills/ and .kiro/skills/, never ~/.agents/skills (kiro.dev/docs/skills)
+        return os.path.join(home(), ".kiro", "skills", "app-store-compliance")
     return os.path.join(home(), ".agents", "skills", "app-store-compliance")
 
 
@@ -182,6 +188,7 @@ def layout(tool, repo_dir=None):
         "copilot": copilot_dir(),
         "windsurf": os.path.join(h, ".codeium", "windsurf"),
         "kimi": kimi_dir(),
+        "kiro": os.path.join(h, ".kiro"),
     }
     base = bases[tool]
     configs = {
@@ -194,6 +201,7 @@ def layout(tool, repo_dir=None):
         "copilot": os.path.join("hooks", "app-store-compliance.json"),
         "windsurf": "hooks.json",
         "kimi": "config.toml",
+        "kiro": os.path.join("hooks", "app-store-compliance.json"),
     }
     command = (
         os.path.join(base, "commands", "app-store-audit.toml")
@@ -556,7 +564,7 @@ def command_text(tool, guard):
     ) as f:
         md = f.read()
     md = md.replace("~/.claude/hooks/" + GUARD_NAME, shown(guard)).replace(
-        "~/.claude/skills/app-store-compliance", shown(skill_dir())
+        "~/.claude/skills/app-store-compliance", shown(skill_dir(tool))
     )
     if tool == "opencode":
         return md
@@ -578,6 +586,14 @@ def manual_block(tool, lay, cmd):
             + shown(lay["config"])
             + " yourself.\n\n"
             + kimi_block(cmd)
+        )
+    if tool == "kiro":
+        return (
+            "\nMerge this hook into the \"hooks\" list of "
+            + shown(lay["config"])
+            + " yourself.\n\n"
+            + json.dumps(kiro_entry(cmd), indent=2)
+            + "\n"
         )
     events_map = {ev: [new_entry(tool, st, cmd)] for ev, st in events(tool)}
     data = {"hooks": events_map} if lay["wrap"] else events_map
@@ -617,6 +633,8 @@ def register(tool, lay, guard, dry):
         return True
     if style == "toml":
         return register_kimi(lay, cmd, dry)
+    if style == "kiro":
+        return register_kiro(lay, cmd, dry)
     data = load_json(lay["config"])
     if data is None:
         fail(
@@ -774,6 +792,173 @@ def register_kimi(lay, cmd, dry):
     return True
 
 
+# Kiro keeps a standalone hook file: {"version":"v1","hooks":[ {name,trigger,matcher,action:{type,command},...} ]}.
+# The hooks value is a flat list of self-describing entries, not the event-keyed map the other JSON tools use,
+# so Kiro gets its own register/unregister/check, as Kimi (TOML) and OpenCode (plugin) do.
+# Kiro's shell tool IDs. A matcher must reach all of them, so a narrower one is replaced. Kiro CLI 3.6.1 on macOS sends
+# execute_bash; execute_pwsh and execute_cmd are the Windows ones (kiro.dev/docs/hooks). shell is a category, not an ID.
+KIRO_TOOLS = ("execute_bash", "execute_pwsh", "execute_cmd")
+KIRO_MATCHER = "^(shell|execute_bash|execute_pwsh|execute_cmd)$"
+
+
+def kiro_entry(cmd):
+    return {
+        "name": "app-store-compliance",
+        "trigger": "PreToolUse",
+        "matcher": KIRO_MATCHER,
+        "action": {"type": "command", "command": cmd},
+        "timeout": 120,
+        "enabled": True,
+    }
+
+
+def kiro_is_ours(h, cmd, guard):
+    if not isinstance(h, dict):
+        return False
+    a = h.get("action")
+    c = str(a.get("command", "")).strip() if isinstance(a, dict) else ""
+    return c in (cmd, "bash " + guard, 'bash "' + guard + '"', "bash '" + guard + "'")
+
+
+# Kiro selectors that cover every built-in shell tool: the shell category and all built-in tools (kiro.dev/docs/hooks/types)
+KIRO_SHELL_SELECTORS = ("shell", "@builtin")
+
+
+def kiro_hits(m, tool_id):
+    """Kiro's own rule. No matcher means every tool, a regex may match anywhere in the ID, and * ? are wildcards."""
+    if m is None or m in ("", "*"):
+        return True
+    if not isinstance(m, str):
+        return False
+    try:
+        if re.search(m, tool_id):
+            return True
+    except re.error:
+        pass
+    return fnmatch.fnmatchcase(tool_id, m)
+
+
+def kiro_matcher_ok(m):
+    """True when Kiro would run this matcher for every shell tool."""
+    return m in KIRO_SHELL_SELECTORS or all(kiro_hits(m, t) for t in KIRO_TOOLS)
+
+
+def kiro_timeout_ok(t):
+    # 0 disables Kiro's timeout. A missing one defaults to 60s, too short for the guard, so ours sets 120.
+    return isinstance(t, (int, float)) and not isinstance(t, bool) and (t == 0 or t >= 120)
+
+
+def kiro_live(h):
+    """True when Kiro would run this hook before a shell command and give it time to finish."""
+    if not isinstance(h, dict) or h.get("trigger") != "PreToolUse" or h.get("enabled") is False:
+        return False
+    a = h.get("action")
+    if not isinstance(a, dict) or a.get("type") != "command" or not isinstance(a.get("command"), str):
+        return False
+    return kiro_matcher_ok(h.get("matcher")) and kiro_timeout_ok(h.get("timeout"))
+
+
+def kiro_repair(h, cmd):
+    """Makes our entry runnable in place, changing only the fields that stop it and keeping every other one."""
+    h["trigger"] = "PreToolUse"
+    a = h.get("action") if isinstance(h.get("action"), dict) else {}
+    a.update({"type": "command", "command": cmd})
+    h["action"] = a
+    if h.get("enabled") is False:
+        h["enabled"] = True
+    if not kiro_matcher_ok(h.get("matcher")):
+        h["matcher"] = KIRO_MATCHER
+    if not kiro_timeout_ok(h.get("timeout")):
+        h["timeout"] = 120
+
+
+def register_kiro(lay, cmd, dry):
+    guard = guard_of(cmd)
+    data = load_json(lay["config"])
+    if data is None:
+        fail(
+            shown(lay["config"])
+            + " is not valid JSON, repeats a key, is read-only, or has an unexpected shape. It was not changed."
+        )
+        print(manual_block("kiro", lay, cmd))
+        return False
+    changed = False
+    if data.get("version") != "v1":
+        data["version"] = "v1"  # Kiro reads the versioned standalone schema
+        changed = True
+    hooks = data.setdefault("hooks", [])
+    if not isinstance(hooks, list) or not all(isinstance(h, dict) for h in hooks):
+        fail(shown(lay["config"]) + " has a hooks value with an unexpected shape. It was not changed.")
+        print(manual_block("kiro", lay, cmd))
+        return False
+    ours = [h for h in hooks if kiro_is_ours(h, cmd, guard)]
+    if not any(kiro_live(h) for h in ours):
+        if ours:
+            # Repair the first entry of ours in place so the person's own fields survive, and drop any duplicate.
+            kiro_repair(ours[0], cmd)
+            hooks[:] = [h for h in hooks if h is ours[0] or not kiro_is_ours(h, cmd, guard)]
+        else:
+            hooks.append(kiro_entry(cmd))
+        changed = True
+    if not changed:
+        ok("hook already registered in " + shown(lay["config"]))
+        return True
+    if dry:
+        print(
+            "  would write the standalone hook file "
+            + shown(lay["config"])
+            + ", keeping every other key, with a backup"
+        )
+        return True
+    write_atomic(lay["config"], json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    ok(
+        "hook added to "
+        + shown(lay["config"])
+        + " (a backup sits next to it when the file already existed)"
+    )
+    return True
+
+
+def unregister_kiro(lay, guard):
+    cmd = hook_cmd("kiro", guard)
+    data = load_json(lay["config"])
+    if data is None:
+        return False
+    hooks = data.get("hooks")
+    if not isinstance(hooks, list):
+        return True
+    kept = [h for h in hooks if not (isinstance(h, dict) and kiro_is_ours(h, cmd, guard))]
+    if len(kept) == len(hooks):
+        return True
+    if not kept and set(data) <= {"version", "hooks"}:
+        os.remove(lay["config"])
+        return True
+    data["hooks"] = kept
+    write_atomic(lay["config"], json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    return True
+
+
+def check_kiro(lay, guard, app):
+    cmd = hook_cmd("kiro", guard)
+    data = load_json(lay["config"]) or {}
+    if data.get("version") != "v1":
+        fail("version is not \"v1\" in " + shown(lay["config"]) + ", so Kiro rejects the standalone hook file")
+    hooks = data.get("hooks") if isinstance(data.get("hooks"), list) else []
+    ours = [h for h in hooks if isinstance(h, dict) and kiro_is_ours(h, cmd, guard)]
+    live = [h for h in ours if kiro_live(h)]
+    if not live:
+        if ours:
+            fail(
+                "the hook in " + shown(lay["config"])
+                + " names the guard but would never run it. Check its trigger, matcher, action and timeout, or run install again"
+            )
+        else:
+            fail("no PreToolUse hook entry for the guard in " + shown(lay["config"]))
+        return
+    ok("hook registered in " + shown(lay["config"]))
+    prove(live[0]["action"]["command"], "kiro", "kiro", app, app)
+
+
 def unregister(tool, lay, guard):
     cmd = hook_cmd(tool, guard)
     style = SPECS[tool]["style"]
@@ -783,6 +968,8 @@ def unregister(tool, lay, guard):
             if owned_plugin(path) or os.path.islink(path):
                 os.remove(path)
         return True
+    if style == "kiro":
+        return unregister_kiro(lay, guard)
     if not os.path.exists(lay["config"]):
         return True
     if style == "toml":
@@ -845,28 +1032,28 @@ def unregister(tool, lay, guard):
     return True
 
 
-def read_owners():
+def read_owners(tool):
     try:
-        with open(os.path.join(skill_dir(), ".installed-by"), encoding="utf-8") as f:
+        with open(os.path.join(skill_dir(tool), ".installed-by"), encoding="utf-8") as f:
             return {line.strip() for line in f if line.strip() in TOOLS}
     except OSError:
         return set()
 
 
-def write_owners(owners):
+def write_owners(tool, owners):
     """Replaces .installed-by in one step, so a reader never sees it empty or half written."""
-    sk = skill_dir()
+    sk = skill_dir(tool)
     fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-owners-")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(owners)) + "\n")
     os.replace(tmp, os.path.join(sk, ".installed-by"))
 
 
-def read_guards():
+def read_guards(tool):
     """Every installed guard path and its tool, so two folders of one tool each own the skill."""
     out = {}
     try:
-        with open(os.path.join(skill_dir(), ".guards"), encoding="utf-8") as f:
+        with open(os.path.join(skill_dir(tool), ".guards"), encoding="utf-8") as f:
             for line in f:
                 t, tab, path = line.rstrip("\n").partition("\t")
                 if tab and t in TOOLS and path:
@@ -876,8 +1063,8 @@ def read_guards():
     return out
 
 
-def write_guards(guards):
-    sk = skill_dir()
+def write_guards(tool, guards):
+    sk = skill_dir(tool)
     fd, tmp = tempfile.mkstemp(dir=sk, prefix=".asc-guards-")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write("".join(guards[g] + "\t" + g + "\n" for g in sorted(guards)))
@@ -886,7 +1073,7 @@ def write_guards(guards):
 
 def copy_payload(tool, lay, guard):
     if tool != "copilot-repo":
-        sk = skill_dir()
+        sk = skill_dir(tool)
         os.makedirs(sk, exist_ok=True)
         shutil.copy2(
             os.path.join(REPO, "agent-os", "skill", "SKILL.md"),
@@ -905,8 +1092,8 @@ def copy_payload(tool, lay, guard):
                 os.path.join(sk, d),
                 ignore=shutil.ignore_patterns("__pycache__"),
             )
-        write_owners(read_owners() | {tool})
-        write_guards(dict(read_guards(), **{guard: tool}))
+        write_owners(tool, read_owners(tool) | {tool})
+        write_guards(tool, dict(read_guards(tool), **{guard: tool}))
     os.makedirs(lay["hooks"], exist_ok=True)
     shutil.copy2(os.path.join(REPO, "agent-os", "hooks", GUARD_NAME), guard)
     os.chmod(guard, 0o755)
@@ -984,6 +1171,13 @@ def payload_for(tool, style, command, cwd):
             "tool_name": "Bash",
             "tool_input": {"command": command},
         }
+    if tool == "kiro":
+        return {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "execute_bash",
+            "tool_input": {"command": command},
+            "cwd": cwd,
+        }
     return {
         "hook_event_name": "PreToolUse",
         "tool_name": "Bash",
@@ -1047,7 +1241,7 @@ def verify(tool, lay, guard, repo_dir):
     else:
         fail("guard missing at " + shown(guard))
     if tool != "copilot-repo":
-        sk = skill_dir()
+        sk = skill_dir(tool)
         need = (
             "SKILL.md",
             "data/rejection-patterns.json",
@@ -1084,6 +1278,8 @@ def verify(tool, lay, guard, repo_dir):
             check_plugin(lay, app)
         elif style == "toml":
             check_kimi(lay, guard, app)
+        elif style == "kiro":
+            check_kiro(lay, guard, app)
         else:
             check_hooks(tool, lay, guard, app, repo_dir)
     finally:
@@ -1285,12 +1481,12 @@ def uninstall(tool, lay, guard, dry):
     if tool == "copilot-repo":
         print("Removed the guard and the hook from the repository.")
     else:
-        guards = read_guards()
+        guards = read_guards(tool)
         guards.pop(guard, None)
-        owners = (read_owners() - {tool}) | set(guards.values())
+        owners = (read_owners(tool) - {tool}) | set(guards.values())
         if owners:
-            write_owners(owners)
-            write_guards(guards)
+            write_owners(tool, owners)
+            write_guards(tool, guards)
             print(
                 "Removed the "
                 + SPECS[tool]["name"]
@@ -1299,7 +1495,7 @@ def uninstall(tool, lay, guard, dry):
                 + "."
             )
         else:
-            shutil.rmtree(skill_dir(), ignore_errors=True)
+            shutil.rmtree(skill_dir(tool), ignore_errors=True)
             print(
                 "Removed the "
                 + SPECS[tool]["name"]
@@ -1353,7 +1549,7 @@ def main(argv):
         print("Dry run. Nothing is written.")
         print("  would copy the guard to " + shown(guard))
         if tool != "copilot-repo":
-            print("  would copy the skill to " + shown(skill_dir()))
+            print("  would copy the skill to " + shown(skill_dir(tool)))
         if lay["command"]:
             print("  would write the audit command to " + shown(lay["command"]))
         return 0 if register(tool, lay, guard, True) else 1
