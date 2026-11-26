@@ -511,7 +511,7 @@ def use_at(text, i, end):
     t2 = k
     while t2 < end and text[t2] in (" ", chr(9)):
         t2 += 1
-    generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] == ":"
+    generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] in (":", ">", ",") and generic_param(text, i)
     if generic or text[w + 1:b + 1] in DECL_WORDS:
         # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
         # app type of this name silences unqualified calls. Missing one is never worse than main.
@@ -541,6 +541,28 @@ CUR = ""
 DECLARED = False
 HITS = []
 SKIP = dict()
+
+def generic_param(text, i):
+    # True when the name sits in the generic clause of a func, type or init, as in func f<A, ImageCreator>.
+    j = i - 1
+    while j >= 0 and (text[j].isalnum() or text[j] in "_ ,:&." or text[j] == chr(9)):
+        j -= 1
+    if j < 0 or text[j] != "<":
+        return False
+    j -= 1
+    while j >= 0 and text[j] in (" ", chr(9)):
+        j -= 1
+    e = j
+    while j >= 0 and (text[j].isalnum() or text[j] == "_"):
+        j -= 1
+    if text[j + 1:e + 1] == "init":
+        return True
+    while j >= 0 and text[j] in (" ", chr(9)):
+        j -= 1
+    e = j
+    while j >= 0 and (text[j].isalnum() or text[j] == "_"):
+        j -= 1
+    return text[j + 1:e + 1] in ("func", "struct", "class", "enum", "actor", "typealias", "subscript")
 
 def cond_lines(text):
     # Lines inside an #if compiler(...) or #if swift(...) block, the usual way to keep an old-SDK fallback.

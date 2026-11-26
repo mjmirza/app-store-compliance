@@ -4176,6 +4176,16 @@ func create<ImageCreator: ImageCreating>(_: ImageCreator.Type) -> ImageCreator {
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter named ImageCreator stays silent" || bad "a generic parameter named ImageCreator stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift 'protocol ImageCreating { init() }
+func create<ImageCreator>() -> ImageCreator where ImageCreator: ImageCreating { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter constrained in a where clause stays silent" || bad "a generic parameter constrained in a where clause stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
+let c = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "Array<ImageCreator> is a use, so the call still fires" || bad "Array<ImageCreator> is a use, so the call still fires"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if compiler(>=6.3)
 let usesSheet = true
