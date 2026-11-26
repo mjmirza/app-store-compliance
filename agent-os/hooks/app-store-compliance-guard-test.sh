@@ -4090,6 +4090,27 @@ D="$(ic_app A.m '/* a /* b */ ImageCreator *c = [[ImageCreator alloc] init];')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.m:1' && ok "an Objective-C block comment ends at the first close, so the call fires" || bad "an Objective-C block comment ends at the first close, so the call fires"
 rm -rf "$D"
+D="$(ic_app A.swift 'struct ImageCreator {}
+let renderer = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type named ImageCreator stays silent" || bad "an app type named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'let renderer = ImageCreator()')"
+printf 'final class ImageCreator {\n}\n' > "$D/App/Renderer.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type named ImageCreator in another file stays silent" || bad "an app type named ImageCreator in another file stays silent"
+rm -rf "$D"
+D="$(ic_app A.m '@interface ImageCreator : NSObject
+@end
+ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an Objective-C class named ImageCreator stays silent" || bad "an Objective-C class named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift '// class ImageCreator wraps the system type
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a declaration in a comment does not hide ImageCreator()" || bad "a declaration in a comment does not hide ImageCreator()"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 let note = "say \"ImageCreator()\""
 let raw = #"ImageCreator()"#

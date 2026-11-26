@@ -486,6 +486,9 @@ apple_imagecreator_hit() {
   IMAGECREATOR_HIT=""
   [ -s "$FILELIST" ] || return 1
   command -v python3 >/dev/null 2>&1 || return 1
+  # An app that declares its own ImageCreator type is calling that type, not the Image Playground one.
+  grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' \
+    | xargs -0 grep -lE '^[[:space:]]*((public|private|internal|fileprivate|open|final|@[A-Za-z]+)[[:space:]]+)*(struct|class|enum|actor|typealias)[[:space:]]+ImageCreator([^A-Za-z0-9_]|$)|^[[:space:]]*@interface[[:space:]]+ImageCreator([^A-Za-z0-9_]|$)' 2>/dev/null | grep -q . && return 1
   local out
   out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ICPY'
 import sys
