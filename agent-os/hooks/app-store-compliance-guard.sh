@@ -1432,10 +1432,8 @@ def frees(root):
             return True
         if local(el.tag) == "property" and attr(el, "name") == OPT_OUT:
             return True
-        if local(el.tag) == "activity" and attr(el, "enabled") == "false":
-            return True
-        # A tools:node marker can remove or replace a whole activity or the application.
-        if attr(el, "node") is not None and local(el.tag) in ("activity", "application"):
+        # A tools:node marker on the application can replace all of it.
+        if attr(el, "node") is not None and local(el.tag) == "application":
             return True
         if local(el.tag) == "uses-feature" and attr(el, "name") in ONLY_DEVICE:
             return True
@@ -1454,6 +1452,27 @@ def unlocked(path):
             return True
     return False
 
+def variant_off(path):
+    # Activities a variant manifest of the same module disables, removes, or replaces.
+    off = set()
+    for other in sys.argv[1:]:
+        if other == path or module(other) != module(path):
+            continue
+        try:
+            vroot = ET.parse(other).getroot()
+        except (ET.ParseError, OSError):
+            continue
+        for el in vroot.iter():
+            if local(el.tag) == "activity" and (attr(el, "enabled") == "false" or attr(el, "node") is not None):
+                off.add(attr(el, "name"))
+    return off
+
+SIZE_CHANGES = "android.supports_size_changes"
+
+def supports_size_changes(el):
+    return any(local(c.tag) == "meta-data" and attr(c, "name") == SIZE_CHANGES
+               and attr(c, "value") == "true" for c in el)
+
 def launcher(el):
     for f in el:
         if local(f.tag) != "intent-filter":
@@ -1464,6 +1483,7 @@ def launcher(el):
     return False
 
 NAMESPACE = re.compile(r"namespace[ \t]*=?[ \t]*[" + chr(34) + chr(39) + r"]([A-Za-z0-9_.]+)")
+NAMESPACE_REF = re.compile(r"namespace[ \t]*=?[ \t]*rootProject[.]ext[.]([A-Za-z0-9_]+)")
 
 def package_of(root, path):
     pkg = root.get("package")
@@ -1471,12 +1491,28 @@ def package_of(root, path):
         return pkg.strip()
     for name in ("build.gradle", "build.gradle.kts"):
         try:
-            found = NAMESPACE.search(gradle_text(os.path.join(module(path), name)))
+            text = gradle_text(os.path.join(module(path), name))
+            found = NAMESPACE.search(text)
+            ref = NAMESPACE_REF.search(text)
+            if not found and ref:
+                found = root_value(module(path), ref.group(1))
         except OSError:
             continue
         if found:
             return found.group(1)
     return ""
+
+def root_value(mod, key):
+    # A string value set in the root ext block, such as appNamespace.
+    pattern = re.compile(re.escape(key) + r"[ \t]*=[ \t]*[" + chr(34) + chr(39) + r"]([A-Za-z0-9_.]+)")
+    for name in ("build.gradle", "build.gradle.kts"):
+        try:
+            found = pattern.search(gradle_text(os.path.join(os.path.dirname(mod), name)))
+        except OSError:
+            continue
+        if found:
+            return found
+    return None
 
 def full_name(name, pkg):
     # A short class name resolves against the package. Without one it stays short.
@@ -1527,6 +1563,7 @@ for path in sys.argv[1:]:
             continue
         default = attr(app, "resizeableActivity")
         pkg = package_of(root, path)
+        off = variant_off(path)
         # Activities that can root a task. a launcher, directly or through an enabled alias,
         # a document, or one that starts its own task. Names resolve against the package.
         roots = {full_name(attr(el, "name"), pkg) for el in app if local(el.tag) == "activity" and starts_task(el)}
@@ -1537,8 +1574,10 @@ for path in sys.argv[1:]:
             # An alias inherits from its target activity, so only the activity is judged.
             if local(el.tag) != "activity":
                 continue
-            # A disabled activity is never started.
+            # A disabled activity is never started, nor is one a variant disables or removes.
             if attr(el, "enabled") == "false":
+                continue
+            if any(full_name(o, pkg) == full_name(attr(el, "name"), pkg) for o in off):
                 continue
             if target >= 36 and not (target == 36 and (app_keeps or opts_out(el))):
                 if attr(el, "screenOrientation") == "locked":
@@ -1550,7 +1589,8 @@ for path in sys.argv[1:]:
             own = attr(el, "resizeableActivity")
             mine = full_name(attr(el, "name"), pkg)
             is_root = not roots or any(same_class(mine, r) for r in roots)
-            resize_lock = is_root and (own if own is not None else default) == "false"
+            sized = supports_size_changes(el) or supports_size_changes(app)
+            resize_lock = is_root and not sized and (own if own is not None else default) == "false"
             if resize_lock or attr(el, "screenOrientation") in LOCKED:
                 print(path)
                 sys.exit(0)
