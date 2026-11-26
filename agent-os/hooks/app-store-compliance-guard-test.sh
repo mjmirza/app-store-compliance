@@ -4273,6 +4273,17 @@ func make<T, /* renderer */ ImageCreator: P>(_: T) -> ImageCreator { ImageCreato
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a generic parameter after a block comment stays silent" || bad "a generic parameter after a block comment stays silent"
 rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func make<T, // renderer
+ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a line comment stays silent" || bad "a generic parameter after a line comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func make<T: Collection<() -> Void>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a function-type constraint stays silent" || bad "a generic parameter after a function-type constraint stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

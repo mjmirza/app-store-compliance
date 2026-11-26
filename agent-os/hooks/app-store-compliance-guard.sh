@@ -504,7 +504,11 @@ def use_at(text, i, end):
     global DECLARED
     b = i - 1
     while b >= 0:
-        if text[b].isspace():
+        if text[b] == chr(10):
+            ls = text.rfind(chr(10), 0, b) + 1
+            c = text.find("//", ls, b)
+            b = (c if c >= 0 else b) - 1
+        elif text[b].isspace():
             b -= 1
         elif text[b] == "/" and b and text[b - 1] == "*" and text.rfind("/*", 0, b - 1) >= 0:
             b = text.rfind("/*", 0, b - 1) - 1
@@ -516,7 +520,8 @@ def use_at(text, i, end):
     t2 = k
     while t2 < end and text[t2].isspace():
         t2 += 1
-    generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] in (":", ">", ",") and generic_param(text, i)
+    # A constrained type parameter, as in <ImageCreator: P>, <T, ImageCreator: P> or where ImageCreator: P.
+    generic = t2 < end and text[t2] == ":" and not text.startswith("::", t2) and b >= 0 and (text[b] in ("<", ",") or text[w + 1:b + 1] == "where")
     # A C typedef names its alias last, as in typedef Renderer ImageCreator;
     st = max(text.rfind(";", 0, i), text.rfind(chr(123), 0, i), text.rfind(chr(125), 0, i)) + 1
     typedef = t2 < end and text[t2] in (";", ",") and "typedef" in text[st:i].split()
@@ -549,43 +554,6 @@ CUR = ""
 DECLARED = False
 HITS = []
 SKIP = dict()
-
-def generic_param(text, i):
-    # True when the name sits in the generic clause of a func, type or init, as in func f<A, ImageCreator>.
-    j = i - 1
-    depth = 0
-    while j >= 0:
-        c = text[j]
-        if c == ">":
-            depth += 1
-        elif c == "<":
-            if depth == 0:
-                break
-            depth -= 1
-        elif c == "/" and j and text[j - 1] == "*":
-            k = text.rfind("/*", 0, j - 1)
-            if k < 0:
-                return False
-            j = k
-        elif not (c.isalnum() or c in "_,:&.?[]()" or c.isspace()):
-            return False
-        j -= 1
-    if j < 0:
-        return False
-    j -= 1
-    while j >= 0 and text[j].isspace():
-        j -= 1
-    e = j
-    while j >= 0 and (text[j].isalnum() or text[j] == "_"):
-        j -= 1
-    if text[j + 1:e + 1] == "init":
-        return True
-    while j >= 0 and text[j].isspace():
-        j -= 1
-    e = j
-    while j >= 0 and (text[j].isalnum() or text[j] == "_"):
-        j -= 1
-    return text[j + 1:e + 1] in ("func", "struct", "class", "enum", "actor", "typealias", "subscript")
 
 def cond_unknown(cond):
     # True unless the condition is only platform checks, which a Release build for that platform keeps.
