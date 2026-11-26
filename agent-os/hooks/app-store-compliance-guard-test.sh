@@ -4136,6 +4136,13 @@ let c = MyImagePlayground.ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a namespace ending in ImagePlayground is not the Image Playground module" || bad "a namespace ending in ImagePlayground is not the Image Playground module"
 rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it" || bad "ImageCreator() under #if DEBUG still fires, the 27 SDK will not compile it"
+rm -rf "$D"
 D="$(ic_app A.swift 'struct ImageCreator {}')"
 i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
 printf 'let renderer = ImageCreator()\n' > "$D/App/Z.swift"
