@@ -1,6 +1,6 @@
 # Rules. Performance and completeness
 
-34 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+35 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-2.1-CLOUD-NOT-IN-PRODUCTION
 
@@ -361,6 +361,23 @@ How to detect.
 
 ```bash
 grep -rn 'NSBundleResourceRequest\|OnDemandResources\|on-demand-resource' --include='*.swift' --include='*.m' --include='*.plist' --include='*.entitlements' --include='*.pbxproj' .
+```
+
+## APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED
+
+- Title. ImageCreator call will stop working on iOS 27
+- Platform. apple
+- Guideline or policy. ImageCreator discontinuation (Apple Developer news dz9wvq0r, 11 June 2026)
+- Severity. high
+- What triggers it. Apple is discontinuing the ImageCreator class. It will no longer work in iOS 27, iPadOS 27, macOS 27, and visionOS 27 or later (Apple Developer news, 11 June 2026, https://developer.apple.com/news/?id=dz9wvq0r). Apple included the class so an app could generate images programmatically with the on-device image generation model. On a beta OS the code still compiles and Xcode warns, TestFlight builds do not function, and the call causes a runtime error. On a public OS the code does not compile, and features that use ImageCreator do not work. The class page marks ImageCreator Deprecated on iOS 18.4-27.0, iPadOS 18.4-27.0, Mac Catalyst 18.4-27.0, macOS 15.4-27.0, and visionOS 2.4-27.0, and says to use ImagePlaygroundViewController or imagePlaygroundSheet (https://developer.apple.com/documentation/imageplayground/imagecreator). Apple also says to present the Image Playground sheet, or to integrate another image generation service. The guard reports ImageCreator( and ImageCreator. in Swift or Objective-C, and an Objective-C message send such as [[ImageCreator alloc] init]. import ImagePlayground is the framework import that goes with that use. A comment, a string, or only the sheet does not match.
+- How to fix it. Before the public release of iOS 27, iPadOS 27, macOS 27, and visionOS 27, stop calling ImageCreator. Present the Image Playground sheet with ImagePlaygroundViewController or imagePlaygroundSheet, or integrate another image generation service.
+- Detection signals. ImageCreator(, ImageCreator., import ImagePlayground
+- Present means handled. ImagePlaygroundViewController, imagePlaygroundSheet
+
+How to detect.
+
+```bash
+grep -rnE '(^|[^A-Za-z0-9_])ImageCreator[[:space:]]*[(.]|(^|[^A-Za-z0-9_])[[][[:space:]]*ImageCreator[[:space:]]+[A-Za-z_]' --include='*.swift' --include='*.m' --include='*.mm' --include='*.h' .   # a call, ImageCreator., or [[ImageCreator alloc] init]. import ImagePlayground alone is the sheet's import and is not a hit. The guard skips comments, strings, and test directories
 ```
 
 ## APPLE-MACOS-ROSETTA-SUNSET

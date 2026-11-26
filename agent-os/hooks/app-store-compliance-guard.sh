@@ -479,6 +479,158 @@ apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flu
   [ -n "$out" ]
 }
 
+# ImageCreator() and ImageCreator. in Swift or Objective-C, after comments and strings are skipped.
+# A mention in a comment or a string is not a call. The sheet APIs are a different type, so they never match.
+# Sets IMAGECREATOR_HIT to file:line. Test directories are already out of the file list.
+apple_imagecreator_hit() {
+  IMAGECREATOR_HIT=""
+  [ -s "$FILELIST" ] || return 1
+  command -v python3 >/dev/null 2>&1 || return 1
+  local out
+  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ICPY'
+import sys
+
+def use_at(text, i, end):
+    name = "ImageCreator"
+    if not text.startswith(name, i):
+        return False
+    if i and (text[i - 1].isalnum() or text[i - 1] == "_"):
+        return False
+    k = i + len(name)
+    if k < end and (text[k].isalnum() or text[k] == "_"):
+        return False
+    t = k
+    while t < end and text[t] in " \t":
+        t += 1
+    if t < end and text[t] in "?!":
+        t2 = t + 1
+        while t2 < end and text[t2] in " \t":
+            t2 += 1
+        if t2 < end and text[t2] in "(.":
+            return True
+    if t < end and text[t] in "(.":
+        return True
+    b = i - 1
+    while b >= 0 and text[b] in " \t":
+        b -= 1
+    if b >= 0 and text[b] == "[":
+        if t < end and (text[t].isalnum() or text[t] == "_"):
+            return True
+    return False
+
+def walk(text, i, end, line, stop_paren):
+    depth = 0
+    while i < end:
+        ch = text[i]
+        if ch == "\n":
+            line += 1
+            i += 1
+            continue
+        if stop_paren and ch == ")" and depth == 0:
+            return 0, i, line
+        if text.startswith("//", i):
+            nl = text.find("\n", i, end)
+            if nl < 0:
+                return 0, end, line
+            i = nl
+            continue
+        if text.startswith("/*", i):
+            close = text.find("*/", i + 2, end)
+            if close < 0:
+                line += text.count("\n", i, end)
+                return 0, end, line
+            line += text.count("\n", i, close + 2)
+            i = close + 2
+            continue
+        h = 0
+        j = i
+        while j < end and text[j] == "#":
+            h += 1
+            j += 1
+        if h and j < end and text[j] == '"':
+            got, i, line = skip_delim(text, j, end, line, h, text.startswith('"""', j))
+            if got:
+                return got, i, line
+            continue
+        if ch == "@" and i + 1 < end and text[i + 1] == '"':
+            got, i, line = skip_delim(text, i + 1, end, line, 0, False, True)
+            if got:
+                return got, i, line
+            continue
+        if text.startswith('"""', i):
+            got, i, line = skip_delim(text, i, end, line, 0, True)
+            if got:
+                return got, i, line
+            continue
+        if ch == '"':
+            got, i, line = skip_delim(text, i, end, line, 0, False)
+            if got:
+                return got, i, line
+            continue
+        if ch == "'":
+            i = skip_char(text, i, end)
+            continue
+        if use_at(text, i, end):
+            return line, i, line
+        if ch == "(":
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+        i += 1
+    return 0, i, line
+
+def skip_char(text, i, end):
+    j = i + 1
+    if j < end and text[j] == "\\":
+        j += 2
+    elif j < end and text[j] != "'":
+        j += 1
+    if j < end and text[j] == "'":
+        return j + 1
+    return i + 1
+
+def skip_delim(text, i, end, line, h, triple, objc=False):
+    closer = '"""' if triple else '"'
+    i += len(closer)
+    while i < end:
+        if text[i] == "\n":
+            line += 1
+            i += 1
+            continue
+        if text[i] == "\\" and text.startswith("#" * h, i + 1):
+            j = i + 1 + h
+            if not objc and j < end and text[j] == "(":
+                got, i, line = walk(text, j + 1, end, line, True)
+                if got:
+                    return got, i, line
+                if i < end and text[i] == ")":
+                    i += 1
+                continue
+            i = j + (1 if j < end else 0)
+            continue
+        if text.startswith(closer, i) and text.startswith("#" * h, i + len(closer)):
+            return 0, i + len(closer) + h, line
+        i += 1
+    return 0, i, line
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    got, _, _ = walk(text, 0, len(text), 1, False)
+    if got:
+        sys.stdout.write("%s:%s\n" % (path, got))
+        break
+ICPY
+)" 2>/dev/null)" || true
+  [ -n "$out" ] || return 1
+  IMAGECREATOR_HIT="${out%%$'\n'*}"
+  IMAGECREATOR_HIT="${IMAGECREATOR_HIT#"${DIR%/}"/}"
+  return 0
+}
+
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
 CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|\.ya?ml|/project\.json|/config\.xml|/Project\.swift|/Tuist/.*\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
@@ -1041,6 +1193,11 @@ SIWAPY
   # On-Demand Resources are deprecated from the 27 OS family (WWDC26).
   if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
+  fi
+  # ImageCreator is discontinued in iOS 27, iPadOS 27, macOS 27, and visionOS 27 (Apple news dz9wvq0r, 11 June 2026).
+  # A call or member use counts, including [[ImageCreator alloc] init]. The Image Playground sheet does not.
+  if apple_imagecreator_hit; then
+    finding high "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED" "ImageCreator will not work on iOS 27 or later" "Present the Image Playground sheet (ImagePlaygroundViewController or imagePlaygroundSheet), or use another image generation service, before the public release of iOS 27, iPadOS 27, macOS 27, and visionOS 27." at "$IMAGECREATOR_HIT"
   fi
   # A Podfile has no extension, so it is outside the source list. Read it directly.
   podfile_below_ios13() {

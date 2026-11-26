@@ -4003,6 +4003,104 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 printf '%s\n' "$OUT" | grep -A1 'BOTH-PLACEHOLDER' | grep -q '^      file\. src/copy\.ts:1$' && ok "ptr-4 the placeholder finding names the shipping file, not a test file" || bad "ptr-4 the placeholder finding names the shipping file, not a test file"
 rm -rf "$D"
 
+# ImageCreator is discontinued in the 27 OS family. A call fires. The sheet, a comment, and a string do not.
+ic_app() {  # $1 filename under App/, $2 source
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  printf '<plist/>' > "$d/App/Info.plist"
+  printf '%s\n' "$2" > "$d/App/$1"
+  echo "$d"
+}
+ic_has() { grep -q 'APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED' <<<"$OUT"; }
+ic_at() { grep -q "^      file\\. $1$" <<<"$OUT"; }
+
+D="$(ic_app A.swift 'import ImagePlayground
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() in Swift fires and names the line" || bad "ImageCreator() in Swift fires and names the line"
+rm -rf "$D"
+D="$(ic_app A.swift 'let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:1' && ok "ImageCreator() without an import still fires" || bad "ImageCreator() without an import still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'let styles = ImageCreator.availableStyles')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:1' && ok "ImageCreator. member use fires" || bad "ImageCreator. member use fires"
+rm -rf "$D"
+D="$(ic_app A.m '@import ImagePlayground;
+NSString *note = @"ImageCreator()";
+ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.m:3' && ok "Objective-C [[ImageCreator alloc] init] fires, the string does not" || bad "Objective-C [[ImageCreator alloc] init] fires, the string does not"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let creator = try ImageCreator()
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() still fires when the sheet is in the same file" || bad "ImageCreator() still fires when the sheet is in the same file"
+rm -rf "$D"
+D="$(ic_app A.swift 'let help = """
+/* Start a comment using this marker
+"""
+let creator = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a comment marker inside a multiline string does not hide ImageCreator()" || bad "a comment marker inside a multiline string does not hide ImageCreator()"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImagePlaygroundViewController alone stays silent" || bad "ImagePlaygroundViewController alone stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import SwiftUI
+struct G: View {
+    var body: some View { Text("Draw").imagePlaygroundSheet(isPresented: $open) }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "imagePlaygroundSheet alone stays silent" || bad "imagePlaygroundSheet alone stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+// let creator = try ImageCreator()
+let sheet = ImagePlaygroundViewController() // ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a line comment stays silent" || bad "ImageCreator() in a line comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+/*
+let creator = try ImageCreator()
+*/
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a block comment stays silent" || bad "ImageCreator() in a block comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let note = "say \"ImageCreator()\""
+let raw = #"ImageCreator()"#
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a string or a raw string stays silent" || bad "ImageCreator() in a string or a raw string stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'func MyImageCreator() {}
+let view = ImageCreatorView()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside a longer name stays silent" || bad "ImageCreator inside a longer name stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/app/src/main/java/t"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let x = 1\n' > "$D/App/A.swift"
+printf 'import ImagePlayground\nval c = ImageCreator()\n' > "$D/app/src/main/java/t/Src.kt"
+printf 'const c = ImageCreator()\n' > "$D/App/web.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in Kotlin or JavaScript stays silent" || bad "ImageCreator() in Kotlin or JavaScript stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/AppTests" "$D/Pods/ImagePlayground"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let x = 1\n' > "$D/App/A.swift"
+printf 'import ImagePlayground\nlet creator = try ImageCreator()\n' > "$D/AppTests/T.swift"
+printf 'let creator = ImageCreator()\n' > "$D/Pods/ImagePlayground/Gen.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a test directory or Pods stays silent" || bad "ImageCreator() in a test directory or Pods stays silent"
+rm -rf "$D"
+
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"
