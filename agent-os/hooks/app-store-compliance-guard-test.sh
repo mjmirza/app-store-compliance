@@ -4262,6 +4262,17 @@ inline auto makeRenderer() { return ImageCreator(); }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a C++ using alias named ImageCreator stays silent" || bad "a C++ using alias named ImageCreator stays silent"
 rm -rf "$D"
+D="$(ic_app Renderer.h 'struct Renderer {};
+typedef Renderer ImageCreator;
+inline auto makeRenderer() { return ImageCreator(); }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a C typedef named ImageCreator stays silent" || bad "a C typedef named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'protocol P { init() }
+func make<T, /* renderer */ ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a block comment stays silent" || bad "a generic parameter after a block comment stays silent"
+rm -rf "$D"
 D="$(ic_app A.swift 'let pool: Array<ImageCreator> = []
 let c = try ImageCreator()')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

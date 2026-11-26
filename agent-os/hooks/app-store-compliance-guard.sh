@@ -503,8 +503,13 @@ def use_at(text, i, end):
     # A type the app declares under this name is the app own type, not the Image Playground one.
     global DECLARED
     b = i - 1
-    while b >= 0 and text[b].isspace():
-        b -= 1
+    while b >= 0:
+        if text[b].isspace():
+            b -= 1
+        elif text[b] == "/" and b and text[b - 1] == "*" and text.rfind("/*", 0, b - 1) >= 0:
+            b = text.rfind("/*", 0, b - 1) - 1
+        else:
+            break
     w = b
     while w >= 0 and (text[w].isalnum() or text[w] == "_"):
         w -= 1
@@ -512,7 +517,10 @@ def use_at(text, i, end):
     while t2 < end and text[t2].isspace():
         t2 += 1
     generic = b >= 0 and text[b] in ("<", ",") and t2 < end and text[t2] in (":", ">", ",") and generic_param(text, i)
-    if generic or text[w + 1:b + 1] in DECL_WORDS:
+    # A C typedef names its alias last, as in typedef Renderer ImageCreator;
+    st = max(text.rfind(";", 0, i), text.rfind(chr(123), 0, i), text.rfind(chr(125), 0, i)) + 1
+    typedef = t2 < end and text[t2] in (";", ",") and "typedef" in text[st:i].split()
+    if generic or typedef or text[w + 1:b + 1] in DECL_WORDS:
         # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
         # app type of this name silences unqualified calls. Missing one is never worse than main.
         DECLARED = True
@@ -554,6 +562,11 @@ def generic_param(text, i):
             if depth == 0:
                 break
             depth -= 1
+        elif c == "/" and j and text[j - 1] == "*":
+            k = text.rfind("/*", 0, j - 1)
+            if k < 0:
+                return False
+            j = k
         elif not (c.isalnum() or c in "_,:&.?[]()" or c.isspace()):
             return False
         j -= 1
