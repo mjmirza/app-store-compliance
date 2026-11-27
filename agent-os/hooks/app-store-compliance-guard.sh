@@ -744,11 +744,14 @@ def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
     stack = []
+    open_at = []
     chain = False
+    chain_exits = False
     top = False
     for k in range(min(stop, len(code))):
         c = code[k]
         if c == chr(123):
+            open_at.append(k)
             h = outer(head_of(code, k))
             words = h.split()
             first = words[0] if words else ""
@@ -757,18 +760,23 @@ def gated_at(code, stop):
             unavail = gates_27(h)
             if first == "else" and "if" in words:
                 # An else if branch runs only when every earlier condition failed.
-                stack.append([chain or unavail, chain or avail, False, -1])
+                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif"])
             elif first == "else":
-                stack.append([chain or unavail, chain, False, -1])
+                stack.append([chain or unavail, chain, False, -1, "else"])
             elif "guard" in words:
-                stack.append([avail, False, unavail, -1])
+                stack.append([avail, False, unavail, -1, "guard"])
             else:
-                stack.append([unavail, avail, False, k if avail else -1])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if first == "if" else "other"])
         elif c == chr(125) and stack:
             done = stack.pop()
             chain = done[1]
-            # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it.
-            if done[3] >= 0 and last_stmt(code[done[3] + 1:k]).split(" ")[0] in ("return", "throw"):
+            exits = done[4] in ("if", "elif") and last_stmt(code[open_at[-1] + 1:k]).split(" ")[0] in ("return", "throw")
+            open_at.pop()
+            all_before = chain_exits
+            chain_exits = exits and (done[4] == "if" or chain_exits)
+            # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it,
+            # and so does an else if one, when every earlier branch of the chain exits too.
+            if done[3] >= 0 and exits and (done[4] == "if" or all_before):
                 if stack:
                     stack[-1][0] = True
                 else:

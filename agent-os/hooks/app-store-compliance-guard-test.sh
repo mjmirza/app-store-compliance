@@ -4673,6 +4673,16 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:7' && ok "a return that only sometimes runs does not gate the code after it" || bad "a return that only sometimes runs does not gate the code after it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws { if !enabled { return } else if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if early return gates the code after it when every branch exits" || bad "an else if early return gates the code after it when every branch exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(a: Bool) async throws { if a { print(1) } else if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an else if early return does not gate when an earlier branch falls through" || bad "an else if early return does not gate when an earlier branch falls through"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
