@@ -34,6 +34,7 @@ import sys
 import re
 import json
 import glob
+import unicodedata
 from urllib.parse import urlparse
 
 FIELD_LIMITS = {
@@ -158,6 +159,14 @@ def has_emoji(s):
 
 def lc(s):
     return (s or "").lower()
+
+
+NON_ASCII_COMMAS = ("\u060c", "\uff0c", "\u3001")
+_KEYWORD_MARKS_RE = re.compile(r"[\u0307\u0640\u064b-\u065f\u0670\u06d6-\u06ed]")
+
+
+def _norm_kw_text(s):
+    return _KEYWORD_MARKS_RE.sub("", unicodedata.normalize("NFC", (s or "").lower()))
 
 
 def _word_break(raw, i, j, side):
@@ -303,7 +312,17 @@ def audit_fields(fields, check_urls=False, platform="apple"):
 
     # keywords formatting (Apple only, Google Play has no keywords field)
     if keywords and apple:
-        if ", " in keywords:
+        bad_commas = [c for c in NON_ASCII_COMMAS if c in keywords]
+        if bad_commas:
+            add(
+                findings,
+                "medium",
+                "APPLE-2.3-KEYWORD-FORMAT",
+                "keywords",
+                f"keywords field uses a non-ASCII comma ({' '.join(bad_commas)}) instead of an ASCII comma (,)",
+                "Replace localized commas with ASCII commas (,) so App Store Connect splits keywords",
+            )
+        if re.search(r"[,\u060c\uff0c\u3001]\s", keywords):
             add(
                 findings,
                 "low",
@@ -312,8 +331,14 @@ def audit_fields(fields, check_urls=False, platform="apple"):
                 "keywords field has spaces after commas, which wastes the 100 char budget",
                 "Use commas with no spaces between keywords",
             )
-        kw = set(w for w in re.split(r"[,\s]+", lc(keywords)) if w)
-        dup = kw & set(re.findall(r"[a-z]{3,}", lc(name + " " + subtitle)))
+        kw = set(
+            w
+            for w in re.split(r"[,\u060c\uff0c\u3001\s]+", _norm_kw_text(keywords))
+            if w
+        )
+        dup = kw & set(
+            re.findall(r"[^\W\d_]{3,}", _norm_kw_text(name + " " + subtitle))
+        )
         if dup:
             add(
                 findings,

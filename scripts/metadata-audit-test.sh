@@ -303,5 +303,37 @@ else
 fi
 rm -rf "$MC"
 
+# Non-ASCII keyword commas and non-Latin duplicated keywords are caught on Apple listings.
+LOC_KW="$(mktemp -d)"
+mkdir -p "$LOC_KW/ar-SA" "$LOC_KW/tr" "$LOC_KW/ja"
+for loc in ar-SA tr ja; do
+  printf 'https://journal.test/privacy' > "$LOC_KW/$loc/privacy_url.txt"
+  printf 'https://journal.test/help' > "$LOC_KW/$loc/support_url.txt"
+  printf 'Clean localized description for the app.' > "$LOC_KW/$loc/description.txt"
+done
+printf 'مُفَكِّرَة يَوْمِيَّة' > "$LOC_KW/ar-SA/name.txt"
+printf 'تنظيم،مهام،أهداف' > "$LOC_KW/ar-SA/keywords.txt"
+OUT="$($AUDIT "$LOC_KW/ar-SA" 2>&1)"
+grep -q 'uses a non-ASCII comma' <<<"$OUT" && ok "Arabic comma in keywords is flagged" || bad "Arabic comma in keywords is flagged"
+
+printf 'مفكـرة,تنظيم,مهام' > "$LOC_KW/ar-SA/keywords.txt"
+OUT="$($AUDIT "$LOC_KW/ar-SA" 2>&1)"
+grep -q 'keywords repeat words already in name or subtitle (مفكرة)' <<<"$OUT" && ok "Arabic keyword repeating vocalized name is flagged" || bad "Arabic keyword repeating vocalized name is flagged"
+
+printf 'تنظيم,مهام,أهداف' > "$LOC_KW/ar-SA/keywords.txt"
+OUT="$($AUDIT "$LOC_KW/ar-SA" 2>&1)"
+grep -q 'APPLE-2.3-KEYWORD-FORMAT' <<<"$OUT" && bad "clean Arabic ASCII-comma keywords pass" || ok "clean Arabic ASCII-comma keywords pass"
+
+printf 'İstanbul Rehberi' > "$LOC_KW/tr/name.txt"
+printf 'istanbul,gezi,harita' > "$LOC_KW/tr/keywords.txt"
+OUT="$($AUDIT "$LOC_KW/tr" 2>&1)"
+grep -q 'keywords repeat words already in name or subtitle (istanbul)' <<<"$OUT" && ok "Turkish dotted capital I duplicate keyword is flagged" || bad "Turkish dotted capital I duplicate keyword is flagged"
+
+printf '日記帳' > "$LOC_KW/ja/name.txt"
+printf 'メモ，記録、ノート' > "$LOC_KW/ja/keywords.txt"
+OUT="$($AUDIT "$LOC_KW/ja" 2>&1)"
+grep -q 'uses a non-ASCII comma' <<<"$OUT" && ok "fullwidth and ideographic commas in keywords are flagged" || bad "fullwidth and ideographic commas in keywords are flagged"
+rm -rf "$LOC_KW"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
