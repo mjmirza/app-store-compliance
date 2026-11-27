@@ -4938,6 +4938,17 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a let inside a default closure is not the declaration" || bad "a let inside a default closure is not the declaration"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, obsoleted: 27)
+typealias LegacyCreatorError = ImageCreator.Error')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias marked obsoleted at 27 is not reported" || bad "a typealias marked obsoleted at 27 is not reported"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias CreatorError = ImageCreator.Error')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a typealias with no availability is still reported" || bad "a typealias with no availability is still reported"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

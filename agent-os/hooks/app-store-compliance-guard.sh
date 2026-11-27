@@ -1016,7 +1016,8 @@ def gated_at(code, stop):
                     stack[-1][0] = True
                 else:
                     top = True
-    return top or any(f[0] for f in stack)
+    # A declaration without a body, such as a typealias, carries its @available on the same statement.
+    return top or any(f[0] for f in stack) or obsoleted_27(code, min(stop, len(code)))
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
