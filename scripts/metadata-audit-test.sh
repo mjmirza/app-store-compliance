@@ -335,5 +335,15 @@ OUT="$($AUDIT "$LOC_KW/ja" 2>&1)"
 grep -q 'uses a non-ASCII comma' <<<"$OUT" && ok "fullwidth and ideographic commas in keywords are flagged" || bad "fullwidth and ideographic commas in keywords are flagged"
 rm -rf "$LOC_KW"
 
+# Mixed-script names split at script boundaries so Latin and CJK/kana/hangul tokens still match duplicated keywords.
+for mixed_name in "PDF阅读器" "PDFリーダー" "PDF리더" "阅读器PDF"; do
+  OUT="$($AUDIT --name "$mixed_name" --keywords "pdf,reader,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+  grep -q 'keywords repeat words already in name or subtitle (pdf)' <<<"$OUT" && ok "mixed-script name splits Latin token ($mixed_name)" || bad "mixed-script name splits Latin token ($mixed_name)"
+done
+OUT="$($AUDIT --name "PDF阅读器" --keywords "阅读器,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q 'keywords repeat words already in name or subtitle (阅读器)' <<<"$OUT" && ok "mixed-script name splits CJK token (PDF阅读器)" || bad "mixed-script name splits CJK token (PDF阅读器)"
+OUT="$($AUDIT --name "PDF阅读器" --keywords "reader,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q 'APPLE-2.3-KEYWORD-FORMAT' <<<"$OUT" && bad "mixed-script name with distinct keywords passes" || ok "mixed-script name with distinct keywords passes"
+
 echo "metadata-audit-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
