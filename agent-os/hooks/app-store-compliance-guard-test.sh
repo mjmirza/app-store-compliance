@@ -4906,6 +4906,27 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a case that ends with an if and no else still fires" || bad "a case that ends with an if and no else still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(onProgress: (Double) -> Void = { _ in }) async throws {
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default closure in the parameters keeps the @available above it" || bad "a default closure in the parameters keeps the @available above it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func generate(_ remote: Bool) async throws {
+ if #available(iOS 27, *) {
+ switch remote {
+ case true: do { return } catch { return }
+ case false: return
+ }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a case that ends with a do and catch that both exit" || bad "a case that ends with a do and catch that both exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

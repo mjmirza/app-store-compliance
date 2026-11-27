@@ -813,7 +813,18 @@ def is_case_label(code, k):
 def obsoleted_27(code, k):
     # True when the declaration that opens the brace at k is obsoleted at iOS 27 or earlier.
     seg = code[:k]
-    cut = max(seg.rfind(chr(123)), seg.rfind(chr(125)), seg.rfind(";"))
+    # The declaration starts after the last brace or semicolon outside parentheses,
+    # so a default closure in the parameter list does not cut it short.
+    cut, level = -1, 0
+    for i in range(len(seg) - 1, -1, -1):
+        c = seg[i]
+        if c == ")":
+            level += 1
+        elif c == "(":
+            level -= 1
+        elif level <= 0 and c in (chr(123), chr(125), ";"):
+            cut = i
+            break
     lines = seg[cut + 1:].split(chr(10))
     # Only the attributes of this declaration count: its own line and the attribute lines right above it.
     decl = len(lines) - 1
@@ -862,7 +873,7 @@ def stmt_exits(stmt):
     first = stmt.split(" ")[0] if stmt else ""
     if first in ("return", "throw", "continue"):
         return True
-    if first != "if":
+    if first not in ("if", "do"):
         return False
     blocks, gaps, level, start, prev = [], [], 0, -1, 0
     for i, c in enumerate(stmt):
@@ -877,7 +888,13 @@ def stmt_exits(stmt):
                 blocks.append(stmt[start + 1:i])
                 prev = i + 1
     tail = stmt[prev:].strip()
-    if not blocks or tail or not gaps[-1].strip().startswith("else") or gaps[-1].strip() != "else":
+    if not blocks or tail:
+        return False
+    if first == "do":
+        # A do and its catches, each of which must exit.
+        if gaps[0].strip() != "do" or not all(g.strip().startswith("catch") for g in gaps[1:]):
+            return False
+    elif gaps[-1].strip() != "else":
         return False
     return all(stmt_exits(last_stmt(b)) for b in blocks)
 
