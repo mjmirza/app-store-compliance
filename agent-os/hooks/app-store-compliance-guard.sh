@@ -703,6 +703,24 @@ def alone(h, key, joins):
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
+def last_stmt(body):
+    # The last top-level statement of a block, split on semicolons and line breaks outside brackets.
+    depth = 0
+    cur = ""
+    last = ""
+    for c in body:
+        if c in "([" + chr(123):
+            depth += 1
+        elif c in ")]" + chr(125):
+            depth -= 1
+        if depth == 0 and c in (";", chr(10)):
+            if cur.strip():
+                last = cur
+            cur = ""
+        else:
+            cur += c
+    return " ".join((cur if cur.strip() else last).split())
+
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
@@ -730,9 +748,8 @@ def gated_at(code, stop):
         elif c == chr(125) and stack:
             done = stack.pop()
             chain = done[1]
-            body = code[done[3] + 1:k].strip() if done[3] >= 0 else ""
-            # if #available(iOS 27) { return } leaves only versions below 27 for the code after it.
-            if body.split(" ")[0] in ("return", "throw") and not any(c in body for c in (";", chr(10), chr(123))):
+            # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it.
+            if done[3] >= 0 and last_stmt(code[done[3] + 1:k]).split(" ")[0] in ("return", "throw"):
                 if stack:
                     stack[-1][0] = True
                 else:

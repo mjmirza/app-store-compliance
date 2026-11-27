@@ -4638,6 +4638,28 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an early return under #available(iOS 27) stays silent" || bad "an early return under #available(iOS 27) stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        print(1)
+        return
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "other statements before the early return still gate the code after it" || bad "other statements before the early return still gate the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(e: Bool) async throws {
+    if #available(iOS 27, *) {
+        if e { return }
+        print(1)
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:7' && ok "a return that only sometimes runs does not gate the code after it" || bad "a return that only sometimes runs does not gate the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
