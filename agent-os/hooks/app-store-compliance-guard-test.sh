@@ -4002,6 +4002,10 @@ module.exports = p;"
   js_case "js-36 an import() path built with + stays silent" 0 loader.js "const c = await import('./staging.config.' + platform);"
   js_case "js-37 a require.resolve() path built with + stays silent" 0 loader.js "const p = require.resolve('./staging.config.' + platform);"
   js_case "js-38 a URL in the callback of an AMD require() still fires" src/loader.js:1 loader.js "require(['./staging.config'], function () { fetch('http://localhost:3000'); });"
+  js_case "js-39 a host inside an import() template that starts with https:// still fires" src/widget.js:1 widget.js 'export const widget = import(/* webpackIgnore: true */ `https://${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  js_case "js-40 a host after a built scheme in an import() template still fires" src/widget.js:1 widget.js 'export const widget = import(`${proto}://${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  js_case "js-41 a host in an import() concatenation that starts with // still fires" src/widget.js:1 widget.js 'export const widget = import("//" + (process.env.WIDGET_HOST || "staging.acme.io") + "/widget.js");'
+  js_case "js-42 a template module path without a URL stays silent" 0 loader.js 'const c = await import(`./staging.config.${platform}.js`);'
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -4009,7 +4013,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-38 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-42 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

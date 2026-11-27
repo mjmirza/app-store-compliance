@@ -603,6 +603,10 @@ const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", 
 const plainText = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "TemplateLiteral" && a.expressions.length === 0) ? (a.quasis[0].value.cooked ?? a.quasis[0].value.raw) : null;
 // A URL: a scheme (http:, ws:) or a leading //host.
 const URL_LIKE = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
+// The fixed text of a template literal or a + concatenation, pieces joined in order.
+const staticText = (a) => !a ? "" : a.type === "StringLiteral" ? a.value : a.type === "TemplateLiteral" ? a.quasis.map((q) => q.value.cooked ?? q.value.raw).join("") : (a.type === "BinaryExpression" && a.operator === "+") ? staticText(a.left) + staticText(a.right) : "";
+// A path built around a URL, like `https://${host}/w.js` or "//" + host: what sits inside it is a host, not a module path.
+const builtUrl = (n) => (n.type === "TemplateLiteral" || (n.type === "BinaryExpression" && n.operator === "+")) && (URL_LIKE.test(staticText(n)) || staticText(n).includes("://"));
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
 function firstHits(ast) {
   let best = null, dq = null;
@@ -630,7 +634,7 @@ function firstHits(ast) {
     for (const k of Object.keys(n)) {
       if (SKIP_KEYS.has(k) || k === "directives") continue;
       if (loadsModule && k === "arguments") { n.arguments.forEach((a, i) => push(a, i === 0)); continue; }
-      push(n[k], inPath.has(n) || (k === "source" && /^(Import|Export)/.test(n.type)));
+      push(n[k], (inPath.has(n) && !builtUrl(n)) || (k === "source" && /^(Import|Export)/.test(n.type)));
     }
   }
   return [best, dq];
