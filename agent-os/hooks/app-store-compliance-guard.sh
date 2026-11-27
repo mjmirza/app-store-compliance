@@ -671,7 +671,7 @@ def head_of(code, k):
             prev = code[code.rfind(chr(10), 0, j) + 1:j].rstrip()
             cur = code[j + 1:k].strip()
             # A blank line, including one that held a comment, does not end the condition.
-            if cur and prev.strip() and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")")):
+            if cur and prev.strip() and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")", "else")):
                 break
         j -= 1
     h = " ".join(code[j + 1:k].split())
@@ -703,43 +703,6 @@ def alone(h, key, joins):
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
-def checks_27(text):
-    # True when text holds #available(iOS 27) or #unavailable(iOS N) with N at 27.0 or lower.
-    t = text
-    for key in ("#available", "#unavailable"):
-        t = t.replace(key + " (", key + "(")
-    for key, ok in (("#available(", lambda v: v[0] == 27), ("#unavailable(", lambda v: v <= (27, 0))):
-        k = t.find(key)
-        while k >= 0:
-            e = t.find(")", k)
-            for part in t[k + len(key):e if e > 0 else len(t)].replace(",", " ").split():
-                nums = part.split(".")
-                if nums[0].isdigit():
-                    v = (int(nums[0]), int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0)
-                    if ok(v):
-                        return True
-            k = t.find(key, k + 1)
-    return False
-
-def scope_gated(code, stop):
-    # True when the function around offset stop holds a version 27 availability check.
-    # Control flow is not followed, so an unrelated check there also silences the call.
-    opens = []
-    pairs = []
-    for k, c in enumerate(code):
-        if c == chr(123):
-            opens.append(k)
-        elif c == chr(125) and opens:
-            o = opens.pop()
-            if o < stop < k:
-                pairs.append((o, k))
-    pairs += [(o, len(code)) for o in opens if o < stop]
-    for o, e in sorted(pairs, reverse=True):
-        words = outer(head_of(code, o)).replace("(", " ").split()
-        if any(w in ("func", "init", "deinit", "subscript", "get", "set") for w in words):
-            return checks_27(code[o:e])
-    return checks_27(code)
-
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
@@ -755,15 +718,25 @@ def gated_at(code, stop):
             # An else runs whenever any comma clause fails, so only a lone #available check counts.
             avail = gates_27(h, ("#available(",)) and alone(h, "#available(", (",",))
             unavail = gates_27(h)
-            if first == "else":
-                stack.append([chain or unavail, chain, False])
+            if first == "else" and "if" in words:
+                # An else if branch runs only when every earlier condition failed.
+                stack.append([chain or unavail, chain or avail, False, -1])
+            elif first == "else":
+                stack.append([chain or unavail, chain, False, -1])
             elif "guard" in words:
-                stack.append([avail, False, unavail])
+                stack.append([avail, False, unavail, -1])
             else:
-                stack.append([unavail, avail, False])
+                stack.append([unavail, avail, False, k if avail else -1])
         elif c == chr(125) and stack:
             done = stack.pop()
             chain = done[1]
+            body = code[done[3] + 1:k].strip() if done[3] >= 0 else ""
+            # if #available(iOS 27) { return } leaves only versions below 27 for the code after it.
+            if body.split(" ")[0] in ("return", "throw") and not any(c in body for c in (";", chr(10), chr(123))):
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
             if done[2]:
                 # Code after guard #unavailable(iOS 27) else { return } runs only below 27.
                 if stack:
@@ -983,7 +956,7 @@ for path in sys.stdin.read().split(chr(10)):
             EXPORTED.append(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
-pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_at(CODE.get(h[0], ""), h[3]) and not scope_gated(CODE.get(h[0], ""), h[3]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_at(CODE.get(h[0], ""), h[3]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY
