@@ -648,6 +648,24 @@ function alt_primary() { if (alt_on && depths_at_alt()) alt_done = 1 }
 function alt_op() { if (alt_on && depths_at_alt()) alt_done = 0 }
 function confuse() { no_skip = 1; skip_on = 0; tern_on = 0; alt_on = 0; arm_skip = 0; arm_else = 0 }
 function add_cond(s) { if (in_cond) cond_buf = cond_buf s }
+# A __DEV__ ternary is blanked only when __DEV__, with at most one !, is the whole condition. The token
+# before it must start an expression, so a || b, a nested ternary, or !!__DEV__ is left for the search.
+function starts_expr(i,    q, c, e, w) {
+  q = i - 1; BANGS = 0
+  while (q >= 1) { c = ch(q); if (ws(c)) { q--; continue } if (c == "!") { BANGS++; q--; continue } break }
+  if (q < 1) return 1
+  c = ch(q)
+  if (index("(,[{;", c) > 0) return 1
+  if (c == ">") return ch(q - 1) == "="
+  if (c == "=") return index("=!<>+-*/%&|^", ch(q - 1)) == 0
+  if (idch(c)) {
+    e = q
+    while (q >= 1 && idch(ch(q))) q--
+    w = substr(S, q + 1, e - q)
+    return w == "return" || w == "yield" || w == "await" || w == "throw" || w == "case"
+  }
+  return 0
+}
 
 {
   if (NR > 1) S = S "\n"
@@ -820,8 +838,8 @@ END {
       }
       if (!handled && ID == "__DEV__" && !no_skip && !skip_on && !tern_on && !alt_on) {
         k = skip_ws(j)
-        if (ch(k) == "?" && ch(k + 1) != "." && ch(k + 1) != "?") {
-          tern_on = 1; tern_not = bang ? 1 : 0; tern_nest = 1; tern_from = k + 1
+        if (ch(k) == "?" && ch(k + 1) != "." && ch(k + 1) != "?" && starts_expr(i) && BANGS <= 1) {
+          tern_on = 1; tern_not = BANGS; tern_nest = 1; tern_from = k + 1
           tern_paren = paren; tern_brace = brace; tern_brack = bracket
           i = k + 1; expr_end = 0; bang = 0; line_start = 0
           handled = 1
