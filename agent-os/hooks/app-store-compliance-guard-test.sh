@@ -4780,6 +4780,12 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "the commas of a grouped case label do not break the gate after it" || bad "the commas of a grouped case label do not break the gate after it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { return try await
+ modern() }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a return whose expression wraps after await still exits" || bad "a return whose expression wraps after await still exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

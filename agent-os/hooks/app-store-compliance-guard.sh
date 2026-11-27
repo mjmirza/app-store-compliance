@@ -754,7 +754,9 @@ def last_stmt(body):
             depth += 1
         elif c in ")]" + chr(125):
             depth -= 1
-        if depth == 0 and c == chr(10) and body[i + 1:].lstrip(" " + chr(9)).startswith(".") and not body[i + 1:].lstrip(" " + chr(9)).startswith(".."):
+        nxt = body[i + 1:].lstrip(" " + chr(9))
+        prev = cur.rstrip()
+        if depth == 0 and c == chr(10) and prev and ((nxt.startswith(".") and not nxt.startswith("..")) or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
             # A line that starts with a member access continues the statement above.
             cur += " "
         elif depth == 0 and c in (";", chr(10)):
