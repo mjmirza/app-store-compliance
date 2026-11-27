@@ -819,6 +819,11 @@ def obsoleted_27(code, k):
     decl = len(lines) - 1
     while decl > 0 and not lines[decl].strip():
         decl -= 1
+    # A signature can wrap, so start from the line that holds the declaration keyword.
+    for i in range(decl, -1, -1):
+        if re.search(r"(^|[^A-Za-z0-9_])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", lines[i]):
+            decl = i
+            break
     first = decl
     while first > 0 and lines[first - 1].strip().startswith("@"):
         first -= 1
@@ -851,7 +856,16 @@ def switch_exits(body):
         return False
     for n, a in enumerate(starts):
         part = body[a:starts[n + 1] if n + 1 < len(starts) else len(body)]
-        colon = part.find(":")
+        colon, lvl = -1, 0
+        for ci, ch in enumerate(part):
+            if ch in "([":
+                lvl += 1
+            elif ch in ")]":
+                lvl -= 1
+            elif ch == ":" and lvl == 0:
+                # The label ends at the first colon outside the parentheses of an associated value.
+                colon = ci
+                break
         last = last_stmt(part[colon + 1:]) if colon >= 0 else ""
         if last.split(" ")[0] not in ("return", "throw", "continue"):
             return False

@@ -4837,6 +4837,19 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:5' && ok "an @available on an earlier declaration does not cover the next one" || bad "an @available on an earlier declaration does not cover the next one"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func make(
+ prompt: String
+) async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available above a signature that wraps still counts" || bad "@available above a signature that wraps still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a(code: Int), b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a(code: _): return; case .b: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an associated value label is not the end of a case label" || bad "an associated value label is not the end of a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
