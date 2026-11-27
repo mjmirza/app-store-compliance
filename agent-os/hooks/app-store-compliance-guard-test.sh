@@ -4949,6 +4949,16 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a typealias with no availability is still reported" || bad "a typealias with no availability is still reported"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, macOS 27, *) { switch n { case 0: switch b { case true: return; case false: return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested switch whose every case returns exits" || bad "a nested switch whose every case returns exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, macOS 27, *) { switch n { case 0: switch b { case true: return; case false: break }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a nested switch with a case that breaks still fires" || bad "a nested switch with a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

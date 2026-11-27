@@ -878,6 +878,11 @@ def stmt_exits(stmt):
     first = stmt.split(" ")[0] if stmt else ""
     if first in ("return", "throw", "continue"):
         return True
+    if first == "switch":
+        # A nested switch exits when every one of its cases does.
+        o = stmt.find(chr(123))
+        c = stmt.rfind(chr(125))
+        return o > 0 and c > o and not stmt[c + 1:].strip() and switch_exits(stmt[o + 1:c])
     if first not in ("if", "do"):
         return False
     blocks, gaps, level, start, prev = [], [], 0, -1, 0
