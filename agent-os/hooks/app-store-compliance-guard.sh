@@ -628,6 +628,17 @@ def no_comments(text):
             for j in range(i, e):
                 out[j] = " "
             i = e
+        elif text[i] == "/" and text[i + 1:i + 2] not in ("", " ", "=", chr(10)) and (text[:i].rstrip()[-1:] in ("=", "(", ",", ":", "[", chr(123), "!", "&", "|", "?", ";") or text[:i].rstrip().endswith("return")):
+            # A bare regex literal /.../ can hold braces.
+            j = i + 1
+            while j < n and text[j] != "/" and text[j] != chr(10):
+                j += 2 if text[j] == chr(92) else 1
+            if j < n and text[j] == "/":
+                for m in range(i + 1, j):
+                    out[m] = " "
+                i = j + 1
+            else:
+                i += 1
         elif text[i] == "#" and text[i:].lstrip("#").startswith("/"):
             # A Swift regex literal #/.../# can hold braces and quotes.
             h = len(text[i:]) - len(text[i:].lstrip("#"))
@@ -758,6 +769,10 @@ def is_case_label(code, k):
     before = code[:k].rstrip()
     if before.endswith((".", ",")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
         return False
+    line = code[:k].rsplit(chr(10), 1)[-1]
+    if line.strip() and not before.endswith((chr(123), chr(125), ";")):
+        # A label starts a statement, so default: inside a call is an argument label.
+        return False
     if code.startswith("case ", k):
         return True
     rest = code[k + 7:]
@@ -794,7 +809,7 @@ def gated_at(code, stop):
                 stack.append([avail, False, unavail, -1, "guard", avail])
             else:
                 # A case label or a statement label can sit before the if.
-                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else "other", unavail])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else "other"), unavail])
         elif stack and c in "cd" and is_case_label(code, k):
             # A case label starts a new path, so an early exit in an earlier case does not gate it.
             stack[-1][0] = stack[-1][5]
@@ -810,6 +825,12 @@ def gated_at(code, stop):
             # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it,
             # and so does an else if one, when every earlier branch of the chain exits too.
             if done[3] >= 0 and exits and (done[4] == "if" or all_before):
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
+            if done[4] == "do" and done[0] and not done[5] and not code[k + 1:].lstrip().startswith("catch"):
+                # A do block whose body returned on 27 leaves only versions below 27 after it.
                 if stack:
                     stack[-1][0] = True
                 else:

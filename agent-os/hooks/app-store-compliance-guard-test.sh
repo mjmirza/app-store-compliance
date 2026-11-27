@@ -4730,6 +4730,26 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "if case is not a case label" || bad "if case is not a case label"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func fallback(default n: Int)->Int { n }; func f() async throws { guard #unavailable(iOS 27) else { return }; _ = fallback(default: 0); _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default: argument label is not a case label" || bad "a default: argument label is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27) { let r = /[^}]+/; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a brace in a bare regex literal does not close the block" || bad "a brace in a bare regex literal does not close the block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { do { if #available(iOS 27, *) { return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a do block that returns on 27 gates the code after it" || bad "a do block that returns on 27 gates the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { do { try g(); if #available(iOS 27, *) { return } } catch { }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a do block with a catch still fires" || bad "a do block with a catch still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
