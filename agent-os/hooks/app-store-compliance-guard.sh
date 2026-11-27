@@ -611,8 +611,31 @@ function expr_kw(id) {
 function stmt_kw(id) {
   return id == "const" || id == "let" || id == "var" || id == "function" || id == "class" || id == "import" || id == "export" || id == "return" || id == "if" || id == "for" || id == "while" || id == "do" || id == "switch" || id == "try" || id == "throw" || id == "break" || id == "continue" || id == "debugger"
 }
+# Indent of the line that starts at p, or -1 for a blank line.
+function indent_at(p,    n, c) {
+  n = 0
+  while (p <= N) { c = ch(p); if (c == " " || c == "\t") { n++; p++ } else break }
+  return (p > N || ch(p) == "\n" || ch(p) == "\r") ? -1 : n
+}
+# A misread quote or regex can carry a region past its real end, so a region is blanked only when its
+# lines sit inside the opening line and a multi-line block closes at that same indent.
+function region_ok(a, b,    ls, ind, k, multi, n, cs) {
+  ls = a
+  while (ls > 1 && ch(ls - 1) != "\n") ls--
+  ind = indent_at(ls)
+  if (ind < 0) ind = 0
+  multi = 0
+  for (k = a; k <= b; k++) if (ch(k) == "\n") { multi = 1; n = indent_at(k + 1); if (n >= 0 && n < ind) return 0 }
+  if (multi && ch(b + 1) == "}") {
+    cs = b + 1
+    while (cs > 1 && ch(cs - 1) != "\n") cs--
+    if (indent_at(cs) != ind || cs + ind != b + 1) return 0
+  }
+  return 1
+}
 function blank(a, b,    k, c) {
   if (no_skip || a > b) return
+  if (!region_ok(a, b)) return
   for (k = a; k <= b; k++) { c = ch(k); if (c != "\n" && c != "\r") drop[k] = 1 }
 }
 function continues(i,    j, c) {

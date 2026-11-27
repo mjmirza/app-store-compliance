@@ -4036,6 +4036,22 @@ awk 'BEGIN { for (i = 0; i < 16000; i++) print "{ id: 1, label: \"Generated data
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'src/big.js:1' && ok "dev-22 a file over 512 KB is searched without the __DEV__ blanking" || bad "dev-22 a file over 512 KB is searched without the __DEV__ blanking"
 rm -rf "$D"
+D="$(mk_rn_ship App.tsx 'function App() {
+ if (__DEV__) { return <Text>You'"'"'re in development</Text>; }
+ fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/App.tsx:3' && ok "dev-23 an apostrophe in JSX text does not hide a later URL" || bad "dev-23 an apostrophe in JSX text does not hide a later URL"
+rm -rf "$D"
+D="$(mk_rn_ship api.js 'function setup(payload) {
+ if (__DEV__) {
+  if (payload) /^\{/.test(payload) || console.warn("Expected JSON");
+ }
+ fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.js:5' && ok "dev-24 a brace inside a regex does not hide a later URL" || bad "dev-24 a brace inside a regex does not hide a later URL"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"
