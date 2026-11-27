@@ -4786,6 +4786,21 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a return whose expression wraps after await still exits" || bad "a return whose expression wraps after await still exits"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(items: [Int]) async throws { if #unavailable(iOS 27), items.contains { $0 > 0 } { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a trailing closure in the condition keeps the #unavailable gate" || bad "a trailing closure in the condition keeps the #unavailable gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(useCache: Bool) async throws { if #available(iOS 27, *) { if useCache { return } else { return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an if and else that both return gate the code after them" || bad "an if and else that both return gate the code after them"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(useCache: Bool) async throws { if #available(iOS 27, *) { if useCache { return } else { print(1) } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an if and else where only one returns still fires" || bad "an if and else where only one returns still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

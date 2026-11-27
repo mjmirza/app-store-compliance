@@ -694,6 +694,19 @@ def gates_27(code, keys=("#unavailable(",)):
             k = code.find(key, k + 1)
     return False
 
+def open_of(code, j):
+    # The offset of the brace that the closing brace at j matches, or -1.
+    level = 0
+    while j >= 0:
+        if code[j] == chr(125):
+            level += 1
+        elif code[j] == chr(123):
+            level -= 1
+            if level == 0:
+                return j
+        j -= 1
+    return -1
+
 def head_of(code, k):
     # The condition before the brace at k. Scans back past parentheses, which hold any closure,
     # and across a line break only when the condition continues on the next line.
@@ -705,6 +718,15 @@ def head_of(code, k):
             depth += 1
         elif c == "(":
             depth -= 1
+        elif depth <= 0 and c == chr(125) and not code[j + 1:k].strip():
+            # A trailing closure right before the brace can belong to the condition, as in
+            # if #unavailable(iOS 27), items.contains { $0 > 0 } { ... }.
+            m = open_of(code, j)
+            hm = head_of(code, m) if m > 0 and (code[:m].rstrip()[-1:].isalnum() or code[:m].rstrip()[-1:] in (")", "_")) else ""
+            if hm.split(" ")[0] in ("if", "guard", "while") or hm.startswith("else if"):
+                j = m - 1
+                continue
+            break
         elif depth <= 0 and c in (chr(123), chr(125), ";"):
             break
         elif depth <= 0 and c == chr(10):
@@ -814,14 +836,14 @@ def gated_at(code, stop):
             unavail = gates_27(h)
             if first == "else" and "if" in words:
                 # An else if branch runs only when every earlier condition failed.
-                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif", chain or unavail])
+                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif", chain or unavail, -1])
             elif first == "else":
-                stack.append([chain or unavail, chain, False, -1, "else", chain or unavail])
+                stack.append([chain or unavail, chain, False, -1, "else", chain or unavail, -1])
             elif "guard" in words:
-                stack.append([avail, False, unavail, -1, "guard", avail])
+                stack.append([avail, False, unavail, -1, "guard", avail, -1])
             else:
                 # A case label or a statement label can sit before the if.
-                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else "other"), unavail])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else "other"), unavail, -1])
         elif stack and c in "cd" and is_case_label(code, k):
             # A case label starts a new path, so an early exit in an earlier case does not gate it.
             stack[-1][0] = stack[-1][5]
@@ -830,7 +852,12 @@ def gated_at(code, stop):
             d = len(stack)
             chain_at[d] = done[1]
             chain_exits = exits_at.get(d, False)
-            exits = done[4] in ("if", "elif") and last_stmt(code[open_at[-1] + 1:k]).split(" ")[0] in ("return", "throw", "continue", "break")
+            body = code[open_at[-1] + 1:k]
+            # A block exits when its last statement does, or when it ends with an if and else that both exit.
+            ends_out = last_stmt(body).split(" ")[0] in ("return", "throw", "continue", "break") or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
+            exits = done[4] in ("if", "elif") and ends_out
+            if done[4] == "else" and ends_out and chain_exits and stack:
+                stack[-1][6] = k
             open_at.pop()
             all_before = chain_exits
             exits_at[d] = exits and (done[4] == "if" or chain_exits)
