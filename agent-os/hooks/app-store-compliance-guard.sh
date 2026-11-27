@@ -590,7 +590,9 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
 DEV_AWK='# Blank React Native __DEV__ regions. One output line per input line.
 # A region is blanked only when its braces or ternary colon match.
 # Anything ambiguous is left unchanged, so a later search still fires.
-function ch(i) { return substr(S, i, 1) }
+# Characters live in C, split once, because substr on the whole text is linear per call in BSD awk.
+function ch(i) { return (i >= 1 && i <= N) ? C[i] : "" }
+function span(a, b,    k, t) { t = ""; for (k = a; k <= b; k++) t = t C[k]; return t }
 function ws(c) { return c == " " || c == "\t" || c == "\n" || c == "\r" }
 function idch(c) { return c ~ /[A-Za-z0-9_$]/ }
 function skip_ws(i,    c) {
@@ -600,7 +602,7 @@ function skip_ws(i,    c) {
 function read_id(i,    j) {
   j = i
   while (j <= N && idch(ch(j))) j++
-  ID = substr(S, i, j - i)
+  ID = span(i, j - 1)
   return j
 }
 function expr_kw(id) {
@@ -655,13 +657,14 @@ function starts_expr(i,    q, c, e, w) {
   while (q >= 1) { c = ch(q); if (ws(c)) { q--; continue } if (c == "!") { BANGS++; q--; continue } break }
   if (q < 1) return 1
   c = ch(q)
-  if (index("(,[{;", c) > 0) return 1
+  # An object key, a label, or the else side of another ternary all start a fresh expression after the colon.
+  if (index("(,[{;:", c) > 0) return 1
   if (c == ">") return ch(q - 1) == "="
   if (c == "=") return index("=!<>+-*/%&|^", ch(q - 1)) == 0
   if (idch(c)) {
     e = q
     while (q >= 1 && idch(ch(q))) q--
-    w = substr(S, q + 1, e - q)
+    w = span(q + 1, e)
     return w == "return" || w == "yield" || w == "await" || w == "throw" || w == "case"
   }
   return 0
@@ -672,7 +675,7 @@ function starts_expr(i,    q, c, e, w) {
   S = S $0
 }
 END {
-  N = length(S)
+  N = split(S, C, "")
   mode = "code"; line_start = 1; expr_end = 0
   i = 1
   while (i <= N) {
@@ -915,12 +918,15 @@ release_string_has() {
       *.js|*.jsx|*.ts|*.tsx)
         # Blank __DEV__ regions before the quote search (issue #2425). Same line count, or the
         # original text is kept and the host still fires.
+        # A file over 512 KB is usually generated, so it is searched as it is, like main does.
         case "$src" in
           *__DEV__*)
-            devsrc="$(printf '%s\n' "$src" | strip_dev_regions 2>/dev/null)" || devsrc=""
-            in_n="$(printf '%s\n' "$src" | wc -l | tr -d '[:space:]')"
-            out_n="$(printf '%s\n' "$devsrc" | wc -l | tr -d '[:space:]')"
-            [ -n "$devsrc" ] && [ "$in_n" = "$out_n" ] && src="$devsrc"
+            if [ "${#src}" -le 524288 ]; then
+              devsrc="$(printf '%s\n' "$src" | strip_dev_regions 2>/dev/null)" || devsrc=""
+              in_n="$(printf '%s\n' "$src" | wc -l | tr -d '[:space:]')"
+              out_n="$(printf '%s\n' "$devsrc" | wc -l | tr -d '[:space:]')"
+              [ -n "$devsrc" ] && [ "$in_n" = "$out_n" ] && src="$devsrc"
+            fi
             ;;
         esac
         m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" <<< "$src" 2>/dev/null)" ;;
