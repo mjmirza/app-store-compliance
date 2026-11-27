@@ -4594,6 +4594,31 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:4' && ok "an availability check inside a closure is not an outer gate" || bad "an availability check inside a closure is not an outer gate"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws {
+    if #unavailable(iOS 27),
+       // Legacy fallback
+       enabled { _ = try await ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a comment between condition clauses keeps the #unavailable(iOS 27) check" || bad "a comment between condition clauses keeps the #unavailable(iOS 27) check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable (iOS 27) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a space before the parenthesis of #unavailable still counts" || bad "a space before the parenthesis of #unavailable still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws {
+    if #unavailable(iOS 27) { print(1) }
+    // next block
+    if enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a comment line before a new if does not join it to the earlier condition" || bad "a comment line before a new if does not join it to the earlier condition"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

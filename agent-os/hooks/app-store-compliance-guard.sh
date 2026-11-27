@@ -666,10 +666,14 @@ def head_of(code, k):
         elif depth <= 0 and c == chr(10):
             prev = code[code.rfind(chr(10), 0, j) + 1:j].rstrip()
             cur = code[j + 1:k].strip()
-            if cur and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")")):
+            # A blank line, including one that held a comment, does not end the condition.
+            if cur and prev.strip() and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")")):
                 break
         j -= 1
-    return " ".join(code[j + 1:k].split())
+    h = " ".join(code[j + 1:k].split())
+    for key in ("#available", "#unavailable"):
+        h = h.replace(key + " (", key + "(")
+    return h
 
 def outer(h):
     # The condition with every parenthesised group removed except the version list of an availability check.
