@@ -609,6 +609,17 @@ def no_comments(text):
             for j in range(i, e):
                 out[j] = " "
             i = e
+        elif text[i] == "#" and text[i:].lstrip("#").startswith(chr(34)):
+            h = len(text[i:]) - len(text[i:].lstrip("#"))
+            q = chr(34) * 3 if text.startswith(chr(34) * 3, i + h) else chr(34)
+            close = q + "#" * h
+            j = i + h + len(q)
+            e = text.find(close, j)
+            e = n if e < 0 else e
+            for m in range(j, e):
+                if text[m] != chr(10):
+                    out[m] = " "
+            i = e + len(close)
         elif text[i] == chr(34):
             q = chr(34) * 3 if text.startswith(chr(34) * 3, i) else chr(34)
             j = i + len(q)
@@ -640,40 +651,42 @@ def gates_27(code, keys=("#unavailable(",)):
     return False
 
 def head_of(code, k):
-    # The condition before the brace at k, joined across continuation lines.
-    ls = code.rfind(chr(10), 0, k) + 1
-    # On a line with several blocks, the condition starts after the last brace or semicolon.
-    cut = -1
+    # The condition before the brace at k. Scans back past parentheses, which hold any closure,
+    # and across a line break only when the condition continues on the next line.
     depth = 0
-    for j in range(k - 1, ls - 1, -1):
+    j = k - 1
+    while j >= 0:
         c = code[j]
         if c == ")":
             depth += 1
         elif c == "(":
             depth -= 1
         elif depth <= 0 and c in (chr(123), chr(125), ";"):
-            # A closure in a condition sits inside parentheses, so only an outer brace ends the condition.
-            cut = j
             break
-    if cut >= 0:
-        return code[cut + 1:k].strip()
-    h = code[ls:k]
-    if not h.strip() and ls > 0:
-        # A brace on its own line belongs to the condition on the line above.
-        ps = code.rfind(chr(10), 0, ls - 1) + 1
-        h = code[ps:ls - 1]
-        ls = ps
-    while ls > 0:
-        prev_end = ls - 1
-        ps = code.rfind(chr(10), 0, prev_end) + 1
-        prev = code[ps:prev_end].rstrip()
-        cur = h.lstrip()
-        if prev.endswith((",", "&&", "||", "(")) or cur.startswith((",", "&&", "||", ")")):
-            h = prev + " " + h
-            ls = ps
-        else:
-            break
-    return h.strip().lstrip(chr(125)).strip()
+        elif depth <= 0 and c == chr(10):
+            prev = code[code.rfind(chr(10), 0, j) + 1:j].rstrip()
+            cur = code[j + 1:k].strip()
+            if cur and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")")):
+                break
+        j -= 1
+    return " ".join(code[j + 1:k].split())
+
+def outer(h):
+    # The condition with every parenthesised group removed except the version list of an availability check.
+    out = []
+    i = 0
+    while i < len(h):
+        if h[i] == "(" and not "".join(out).rstrip().endswith(("#available", "#unavailable")):
+            depth = 0
+            while i < len(h):
+                depth += {"(": 1, ")": -1}.get(h[i], 0)
+                i += 1
+                if depth == 0:
+                    break
+            continue
+        out.append(h[i])
+        i += 1
+    return "".join(out)
 
 def alone(h, key, joins):
     # True when no other clause is joined to the availability check by joins.
@@ -691,7 +704,7 @@ def gated_at(code, stop):
     for k in range(min(stop, len(code))):
         c = code[k]
         if c == chr(123):
-            h = head_of(code, k)
+            h = outer(head_of(code, k))
             words = h.split()
             first = words[0] if words else ""
             # An else runs whenever any comma clause fails, so only a lone #available check counts.

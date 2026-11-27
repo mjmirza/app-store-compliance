@@ -4561,6 +4561,39 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a closure inside a #unavailable(iOS 27) condition keeps the check" || bad "a closure inside a #unavailable(iOS 27) condition keeps the check"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #unavailable(iOS 27),
+       [1].contains(where: {
+           $0 > 0
+       }) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a multi-line closure inside a #unavailable(iOS 27) condition keeps the check" || bad "a multi-line closure inside a #unavailable(iOS 27) condition keeps the check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #available(iOS 27, *) {
+        let payload = #"{"message": "}"}"#
+        print(payload)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "braces in a raw string do not break block reading" || bad "braces in a raw string do not break block reading"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if [1].contains(where: { n in if #unavailable(iOS 27) { return n > 0 }; return n > 0 }) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "an availability check inside a closure is not an outer gate" || bad "an availability check inside a closure is not an outer gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
