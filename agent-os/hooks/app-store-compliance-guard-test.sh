@@ -4526,6 +4526,36 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "#unavailable(iOS 27) with the brace on its own line stays silent" || bad "#unavailable(iOS 27) with the brace on its own line stays silent"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws { if #available(iOS 18.4, *) { _ = try await ImageCreator() } else { print(1) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "the first branch of a one-line #available(iOS 18.4) with an else fires" || bad "the first branch of a one-line #available(iOS 18.4) with an else fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws { if #available(iOS 27, *) { print(1) } else { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of a one-line #available(iOS 27) stays silent" || bad "the else of a one-line #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws {
+    if #available(iOS 27, *) { print("https://api.myapp.dev") }
+    else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a URL string before the else does not break block reading" || bad "a URL string before the else does not break block reading"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws {
+    if #unavailable(iOS 27) {
+        print("{")
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a brace inside a string does not open a block" || bad "a brace inside a string does not open a block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

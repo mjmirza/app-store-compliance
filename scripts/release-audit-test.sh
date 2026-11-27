@@ -177,6 +177,24 @@ OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" 
 
 rm -rf "$W"
 
+# A file that calls ImageCreator and also shows the sheet is still an affected file.
+IC="$(mktemp -d)"; mkdir -p "$IC/App"
+printf 'import ImagePlayground\nfunc a() async throws { _ = try await ImageCreator() }\nlet v = ImagePlaygroundViewController()\n' > "$IC/App/A.swift"
+printf 'import ImagePlayground\nlet v = ImagePlaygroundViewController()\n' > "$IC/App/Sheet.swift"
+R="$(IC="$IC" python3 - <<'PYT'
+import importlib.util, json, os
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+raw = json.load(open("data/rejection-patterns.json"))
+pats = raw["patterns"] if isinstance(raw, dict) else raw
+pid = "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED"
+one = {p["id"]: p for p in pats if p["id"] == pid}
+print(sorted(m.find_affected_files(os.environ["IC"], one).get(pid, [])))
+PYT
+)"
+[ "$R" = "['App/A.swift']" ] && ok "an ImageCreator call next to the sheet is listed, a sheet-only file is not" || bad "an ImageCreator call next to the sheet is listed, a sheet-only file is not (got $R)"
+rm -rf "$IC"
+
 python3 scripts/test-release-audit-area.py && ok "area status reflects coverage" || bad "area status reflects coverage"
 
 echo "release-audit-test: $PASS passed, $FAIL failed"

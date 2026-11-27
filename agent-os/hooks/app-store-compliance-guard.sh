@@ -587,22 +587,41 @@ def decl_generic(text, b):
     return len(head) >= 2 and head[-2] in ("func", "struct", "class", "enum", "actor", "typealias", "protocol")
 
 def no_comments(text):
-    # Drop line and nested block comments, keeping the line breaks.
-    out = []
+    # Blank out comments and string contents with spaces, keeping every offset and line break.
+    out = list(text)
     i, n, depth = 0, len(text), 0
     while i < n:
         if text.startswith("/*", i):
             depth += 1
+            out[i] = out[i + 1] = " "
             i += 2
         elif depth and text.startswith("*/", i):
             depth -= 1
+            out[i] = out[i + 1] = " "
             i += 2
-        elif not depth and text.startswith("//", i):
+        elif depth:
+            if text[i] != chr(10):
+                out[i] = " "
+            i += 1
+        elif text.startswith("//", i):
             e = text.find(chr(10), i)
-            i = n if e < 0 else e
+            e = n if e < 0 else e
+            for j in range(i, e):
+                out[j] = " "
+            i = e
+        elif text[i] == chr(34):
+            q = chr(34) * 3 if text.startswith(chr(34) * 3, i) else chr(34)
+            j = i + len(q)
+            while j < n and not text.startswith(q, j) and (len(q) == 3 or text[j] != chr(10)):
+                if text[j] == chr(92):
+                    if text[j] != chr(10):
+                        out[j] = " "
+                    j += 1
+                if j < n and text[j] != chr(10):
+                    out[j] = " "
+                j += 1
+            i = j + len(q)
         else:
-            if not depth or text[i] == chr(10):
-                out.append(text[i])
             i += 1
     return "".join(out)
 
@@ -623,8 +642,12 @@ def gates_27(code, keys=("#unavailable(",)):
 def head_of(code, k):
     # The condition before the brace at k, joined across continuation lines.
     ls = code.rfind(chr(10), 0, k) + 1
+    # On a line with several blocks, the condition starts after the last brace or semicolon.
+    cut = max(code.rfind(chr(123), ls, k), code.rfind(chr(125), ls, k), code.rfind(";", ls, k))
+    if cut >= 0:
+        return code[cut + 1:k].strip()
     h = code[ls:k]
-    if not h.strip().strip(chr(125)).strip() and ls > 0:
+    if not h.strip() and ls > 0:
         # A brace on its own line belongs to the condition on the line above.
         ps = code.rfind(chr(10), 0, ls - 1) + 1
         h = code[ps:ls - 1]
@@ -648,14 +671,8 @@ def alone(h, key, joins):
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
-def gated_line(code, line):
-    # True when the line, or a block around its start, only runs below version 27.
-    lines = code.split(chr(10))
-    if line <= len(lines):
-        own = lines[line - 1]
-        if gates_27(own) or (gates_27(own, ("#available(",)) and "else" in own.split()):
-            return True
-    stop = len(chr(10).join(lines[:line - 1]))
+def gated_at(code, stop):
+    # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
     stack = []
     chain = False
@@ -828,7 +845,7 @@ def walk(text, i, end, line, stop_paren):
                 qual = s0 >= 0 and text[s0:a + 1] == mod and not (s0 and (text[s0 - 1].isalnum() or text[s0 - 1] == "_"))
             # Under any other namespace, Foo.ImageCreator is the app own type.
             if qual or not (b >= 0 and text[b] == "."):
-                HITS.append((CUR, line, qual))
+                HITS.append((CUR, line, qual, i))
             i += len("ImageCreator")
             continue
         if ch == "(":
@@ -897,7 +914,7 @@ for path in sys.stdin.read().split(chr(10)):
             EXPORTED.append(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
-pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_line(CODE.get(h[0], ""), h[1]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_at(CODE.get(h[0], ""), h[3]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 if pick:
     sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
 ICPY
