@@ -4750,7 +4750,7 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a do block with a catch still fires" || bad "a do block with a catch still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
-func f(_ x: ProcessInfo.ThermalState) async throws { switch x { case .nominal, .fair, .serious, .critical: if #available(iOS 27, *) { return }
+func f(_ x: ProcessInfo.ThermalState) async throws { switch x { case .nominal: if #available(iOS 27, *) { return }
 @unknown default: _ = try await ImageCreator() } }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:3' && ok "@unknown default: starts a new case" || bad "@unknown default: starts a new case"
@@ -4760,6 +4760,24 @@ func f() async throws { if #available(iOS 27, *) { return try await presenter
 .present() }; _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a return split across lines still exits" || bad "a return split across lines still exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func fallback(default n: Int)->Int { n }
+func f() async throws {
+    guard #unavailable(iOS 27) else { return }
+    _ = fallback(
+        default: 0
+    )
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default: argument on its own line is not a case label" || bad "a default: argument on its own line is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Int) async throws { switch x { case 0, 1: if #available(iOS 27, *) { return }; _ = try await ImageCreator()
+default: break } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the commas of a grouped case label do not break the gate after it" || bad "the commas of a grouped case label do not break the gate after it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }

@@ -775,7 +775,7 @@ def is_case_label(code, k):
         # @unknown default: is a switch label too.
         before = before[:-8].rstrip()
         line = line.rstrip()[:-8]
-    if before.endswith((".", ",")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
+    if before.endswith((".", ",", "(", "[")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
         return False
     if line.strip() and not before.endswith((chr(123), chr(125), ";")):
         # A label starts a statement, so default: inside a call is an argument label.
@@ -802,6 +802,9 @@ def gated_at(code, stop):
             chain_exits = exits_at.get(d, False)
             open_at.append(k)
             h = outer(head_of(code, k))
+            if h.split(" ")[0] in ("case", "default", "@unknown") and ":" in h:
+                # The commas of a case label are not clauses of the if that follows it.
+                h = h.split(":", 1)[1].strip()
             words = h.split()
             first = words[0] if words else ""
             # An else runs whenever any comma clause fails, so only a lone #available check counts.
