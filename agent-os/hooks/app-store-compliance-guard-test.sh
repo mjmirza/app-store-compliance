@@ -4683,6 +4683,26 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "an else if early return does not gate when an earlier branch falls through" || bad "an else if early return does not gate when an earlier branch falls through"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ guard
+ #unavailable(iOS 27)
+ else { return }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a guard with #unavailable(iOS 27) on the next line stays silent" || bad "a guard with #unavailable(iOS 27) on the next line stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool, notice: Bool) async throws { if !enabled { return } else if #available(iOS 27, *) { if notice { print(1) }; return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a block nested in an else if branch keeps the chain exit" || bad "a block nested in an else if branch keeps the chain exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ legacy: Bool) async throws { switch legacy { case true: if #available(iOS 27, *) { return }; _ = try await ImageCreator(); case false: return } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an if after a case label still gates" || bad "an if after a case label still gates"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

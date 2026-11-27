@@ -690,7 +690,8 @@ def head_of(code, k):
             prev = code[code.rfind(chr(10), 0, j) + 1:j].rstrip()
             cur = code[j + 1:k].strip()
             # A blank line, including one that held a comment, does not end the condition.
-            if cur and prev.strip() and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")", "else")):
+            ends_kw = prev.split()[-1:] in (["guard"], ["if"], ["while"])
+            if cur and prev.strip() and not ends_kw and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")", "else")):
                 break
         j -= 1
     h = " ".join(code[j + 1:k].split())
@@ -745,12 +746,16 @@ def gated_at(code, stop):
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
     stack = []
     open_at = []
-    chain = False
-    chain_exits = False
+    # Chain state is kept per nesting depth, so a block nested in a branch cannot reset its chain.
+    chain_at = dict()
+    exits_at = dict()
     top = False
     for k in range(min(stop, len(code))):
         c = code[k]
         if c == chr(123):
+            d = len(stack)
+            chain = chain_at.get(d, False)
+            chain_exits = exits_at.get(d, False)
             open_at.append(k)
             h = outer(head_of(code, k))
             words = h.split()
@@ -766,14 +771,17 @@ def gated_at(code, stop):
             elif "guard" in words:
                 stack.append([avail, False, unavail, -1, "guard"])
             else:
-                stack.append([unavail, avail, False, k if avail else -1, "if" if first == "if" else "other"])
+                # A case label or a statement label can sit before the if.
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else "other"])
         elif c == chr(125) and stack:
             done = stack.pop()
-            chain = done[1]
+            d = len(stack)
+            chain_at[d] = done[1]
+            chain_exits = exits_at.get(d, False)
             exits = done[4] in ("if", "elif") and last_stmt(code[open_at[-1] + 1:k]).split(" ")[0] in ("return", "throw")
             open_at.pop()
             all_before = chain_exits
-            chain_exits = exits and (done[4] == "if" or chain_exits)
+            exits_at[d] = exits and (done[4] == "if" or chain_exits)
             # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it,
             # and so does an else if one, when every earlier branch of the chain exits too.
             if done[3] >= 0 and exits and (done[4] == "if" or all_before):
