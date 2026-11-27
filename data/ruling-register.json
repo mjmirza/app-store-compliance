@@ -85,6 +85,158 @@
       ]
     },
     {
+      "id": "RR-PLAY-CRYPTO-HK",
+      "revision": 1,
+      "title": "Crypto exchanges in Hong Kong need an SFC type 1 and type 7 licence, a formal VATP licence, or both, and may offer only tokens permitted by the licence, or a documented Additional Options exemption. Software wallets are not required to hold a licence",
+      "jurisdiction": "HK",
+      "store": "google",
+      "instrument": "Google Play cryptocurrency exchange and software wallet requirements",
+      "authority": "Google Play, Securities and Futures Commission of Hong Kong",
+      "standing": "store_policy",
+      "takes_effect": null,
+      "features": [
+        "crypto"
+      ],
+      "proof": "owner_attested",
+      "proof_items": [
+        {
+          "what": "For an exchange, the SFC type 1 and type 7 licence, a formal VATP licence, or both, limited to tokens permitted by the licence, or the Additional Options exemption and its supporting documentation, and the completed Play Console declaration. For a software wallet, the Hong Kong row says Not required",
+          "how": "owner_attested",
+          "id": "owner-1"
+        }
+      ],
+      "check": "For a cryptocurrency exchange enabled in Hong Kong, record the SFC type 1 (dealing in securities) licence and type 7 licence, a formal Virtual Asset Trading Platform (VATP) licence, or both, and confirm the app offers only tokens permitted by the licence. A software wallet records that the Hong Kong row says Not required. An Additional Options exemption needs the supporting documentation the page describes. If the registration or licensing information is missing and none of the additional options apply, remove Hong Kong from distribution.",
+      "sources": [
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "The developer must be licensed by the Securities and Futures Commission (SFC) of Hong Kong and obtain one or both of the following, subject to the token classifications on the exchange:",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "(1) a type 1 (dealing in securities) licence and type 7 licence (providing automated trading services),",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "(2) a formal Virtual Asset Trading Platform (VATP) licence.",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "The developer must only offer tokens permitted by the license(s).",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "Not required",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "Updated Hong Kong requirements to accept the Virtual Asset Trading Platform (VATP) license.",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "I confirm that the availability of my app in this country/region does not require a local license or registration, or is permitted under a valid statutory exemption under applicable local law.",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "If you don’t have the required registration or licensing information for certain locations and none of the additional options apply to you, remove the relevant locations from your app’s distribution countries/regions.",
+          "supports": [
+            "obligation"
+          ]
+        }
+      ],
+      "open_questions": [
+        "Which of the two SFC licences is required depends on the token classifications on the exchange."
+      ]
+    },
+    {
+      "id": "RR-PLAY-CRYPTO-AE",
+      "revision": 1,
+      "title": "Crypto exchange and wallet apps in the United Arab Emirates need a licence from the FSRA, VARA, the DFSA, or the CMA, or a documented Additional Options exemption",
+      "jurisdiction": "AE",
+      "store": "google",
+      "instrument": "Google Play cryptocurrency exchange and software wallet requirements",
+      "authority": "Google Play, Financial Services Regulatory Authority, Virtual Asset Regulatory Authority, Dubai Financial Services Authority, Capital Market Authority",
+      "standing": "store_policy",
+      "takes_effect": null,
+      "features": [
+        "crypto"
+      ],
+      "proof": "owner_attested",
+      "proof_items": [
+        {
+          "what": "The licence named on the United Arab Emirates row, or the Additional Options exemption and its supporting documentation, and the completed Play Console declaration",
+          "how": "owner_attested",
+          "id": "owner-1"
+        }
+      ],
+      "check": "For a cryptocurrency exchange or software wallet enabled in the United Arab Emirates, record a licence from the Financial Services Regulatory Authority (FSRA), the Virtual Asset Regulatory Authority (VARA), the Dubai Financial Services Authority (DFSA), or the Capital Market Authority (CMA), or the Additional Options exemption and its supporting documentation, and the completed Play Console declaration. If the registration or licensing information is missing and none of the additional options apply, remove the United Arab Emirates from distribution.",
+      "sources": [
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "The developer must be licensed by (a) the Financial Services Regulatory Authority (FSRA), (b) the Virtual Asset Regulatory Authority (VARA) or (c) the Dubai Financial Services Authority (DFSA), (d) Capital Market Authority (CMA).",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "Updated United Arab Emirates requirements to accept license from the Capital Market Authority (CMA).",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "I confirm that the availability of my app in this country/region does not require a local license or registration, or is permitted under a valid statutory exemption under applicable local law.",
+          "supports": [
+            "obligation"
+          ]
+        },
+        {
+          "url": "https://support.google.com/googleplay/android-developer/answer/16329703?hl=en",
+          "checked_on": "2026-11-27",
+          "quote": "If you don’t have the required registration or licensing information for certain locations and none of the additional options apply to you, remove the relevant locations from your app’s distribution countries/regions.",
+          "supports": [
+            "obligation"
+          ]
+        }
+      ],
+      "open_questions": [
+        "Which authority named on the United Arab Emirates row applies is a question for local advice."
+      ]
+    },
+    {
       "id": "RR-US-FDA-DEVICE-SOFTWARE",
       "revision": 1,
       "title": "Health software that diagnoses or treats may be a regulated medical device in the US",
