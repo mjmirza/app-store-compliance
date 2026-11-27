@@ -643,7 +643,18 @@ def head_of(code, k):
     # The condition before the brace at k, joined across continuation lines.
     ls = code.rfind(chr(10), 0, k) + 1
     # On a line with several blocks, the condition starts after the last brace or semicolon.
-    cut = max(code.rfind(chr(123), ls, k), code.rfind(chr(125), ls, k), code.rfind(";", ls, k))
+    cut = -1
+    depth = 0
+    for j in range(k - 1, ls - 1, -1):
+        c = code[j]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            depth -= 1
+        elif depth <= 0 and c in (chr(123), chr(125), ";"):
+            # A closure in a condition sits inside parentheses, so only an outer brace ends the condition.
+            cut = j
+            break
     if cut >= 0:
         return code[cut + 1:k].strip()
     h = code[ls:k]

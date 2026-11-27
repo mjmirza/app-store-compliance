@@ -4556,6 +4556,11 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:6' && ok "a brace inside a string does not open a block" || bad "a brace inside a string does not open a block"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27), [1].contains(where: { $0 > 0 }) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a closure inside a #unavailable(iOS 27) condition keeps the check" || bad "a closure inside a #unavailable(iOS 27) condition keeps the check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
