@@ -4717,6 +4717,18 @@ func f() async throws { if #unavailable(iOS 27) { let r = #/[^}]+/#; _ = try awa
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a brace in a Swift regex literal does not close the block" || bad "a brace in a Swift regex literal does not close the block"
 rm -rf "$D"
+D="$(ic_app A.swift 'import Foundation
+import ImagePlayground
+func make() async throws { guard #unavailable(iOS 27) else { return }; _ = NotificationCenter.default; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok ".default is not a case label" || bad ".default is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum E { case a, b }
+func make(_ e: E) async throws { guard #unavailable(iOS 27) else { return }; if case .a = e { print(1) }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "if case is not a case label" || bad "if case is not a case label"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"

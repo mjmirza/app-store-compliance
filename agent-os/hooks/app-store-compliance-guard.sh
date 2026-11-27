@@ -751,6 +751,18 @@ def last_stmt(body):
             cur += c
     return " ".join((cur if cur.strip() else last).split())
 
+def is_case_label(code, k):
+    # A switch label, not .default, an enum case, or the pattern in if case and guard case.
+    if k > 0 and (code[k - 1].isalnum() or code[k - 1] == "_"):
+        return False
+    before = code[:k].rstrip()
+    if before.endswith((".", ",")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
+        return False
+    if code.startswith("case ", k):
+        return True
+    rest = code[k + 7:]
+    return code.startswith("default", k) and rest.lstrip().startswith(":") and not (rest[:1].isalnum() or rest[:1] == "_")
+
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
@@ -783,7 +795,7 @@ def gated_at(code, stop):
             else:
                 # A case label or a statement label can sit before the if.
                 stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else "other", unavail])
-        elif stack and c in "cd" and (k == 0 or not (code[k - 1].isalnum() or code[k - 1] == "_")) and (code.startswith("case ", k) or (code.startswith("default", k) and not (code[k + 7:k + 8].isalnum() or code[k + 7:k + 8] == "_"))):
+        elif stack and c in "cd" and is_case_label(code, k):
             # A case label starts a new path, so an early exit in an earlier case does not gate it.
             stack[-1][0] = stack[-1][5]
         elif c == chr(125) and stack:
