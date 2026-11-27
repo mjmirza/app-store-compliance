@@ -3412,6 +3412,19 @@ printf 'val info = AdvertisingIdClient.getAdvertisingIdInfo(context)\n' > "$D/an
 rr_run "$D"
 printf '%s\n' "$OUT" | grep -A1 'ANDROID-ADVERTISING-ID' | grep -q '^      file\. android/app/src/main/java/Ads\.kt:1$' && ok "gs adid-6 a removed permission never hides a getAdvertisingIdInfo call, and the finding names the call" || bad "gs adid-6 a removed permission never hides a getAdvertisingIdInfo call, and the finding names the call"
 rm -rf "$D"
+# The other Play permission checks read a removed permission the same way.
+D="$(mk_android_perm '<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove"/>')"
+gs_check "perm-1 a removed background location permission stays silent" "$D" 'GOOGLE-PERM-BACKGROUND-LOCATION' 0
+D="$(mk_android_perm '<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>')"
+gs_check "perm-2 a declared background location permission is flagged" "$D" 'GOOGLE-PERM-BACKGROUND-LOCATION' 1
+D="$(mk_android_perm '<uses-permission android:name="android.permission.READ_CALL_LOG" tools:node="remove"/>')"
+gs_check "perm-3 a removed call log permission stays silent" "$D" 'GOOGLE-PERM-SMS-CALLLOG' 0
+D="$(mk_android_perm '<uses-permission android:name="android.permission.READ_CALL_LOG" tools:node="remove"/>')"
+gs_check "perm-4 a removed call log permission needs no disclosure" "$D" 'ANDROID-USER-DATA-DISCLOSURE' 0
+D="$(mk_android_perm '<uses-permission android:name="android.permission.READ_CALL_LOG"/>')"
+gs_check "perm-5 a declared call log permission is flagged" "$D" 'GOOGLE-PERM-SMS-CALLLOG' 1
+D="$(mk_android_perm '<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:node="remove"/>')"
+gs_check "perm-6 a removed all files permission stays silent" "$D" 'GOOGLE-PERM-ALL-FILES' 0
 # X feedback, November 2026. a pre-permission button titled Allow, per Apple HIG Privacy.
 # Clean fixtures, so a pass means exit 0, CLEAR, and the finding at MEDIUM or absent.
 PP_KEYS='<key>NSLocationWhenInUseUsageDescription</key><string>Shows the nearest mosque on the map.</string><key>NSCameraUsageDescription</key><string>Scans a QR code to join a group.</string>'
