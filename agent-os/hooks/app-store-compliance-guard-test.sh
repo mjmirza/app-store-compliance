@@ -4006,6 +4006,12 @@ module.exports = p;"
   js_case "js-40 a host after a built scheme in an import() template still fires" src/widget.js:1 widget.js 'export const widget = import(`${proto}://${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
   js_case "js-41 a host in an import() concatenation that starts with // still fires" src/widget.js:1 widget.js 'export const widget = import("//" + (process.env.WIDGET_HOST || "staging.acme.io") + "/widget.js");'
   js_case "js-42 a template module path without a URL stays silent" 0 loader.js 'const c = await import(`./staging.config.${platform}.js`);'
+  js_case "js-43 a host passed to a call inside import() still fires" src/loader.js:1 loader.js 'const url = host => `https://${host}/widget.js`; export const widget = import(/* webpackIgnore: true */ url("staging.acme.io"));'
+  js_case "js-44 a host in an object inside require() still fires" src/loader.js:1 loader.js "const w = require(widgetPath({ host: 'staging.acme.io' }));"
+  js_case "js-45 a host passed to a call in an AMD require() array still fires" src/loader.js:1 loader.js "require([widgetPath('staging.acme.io')], callback);"
+  js_case "js-46 a host in an array inside import() still fires" src/loader.js:1 loader.js "export const w = import(pick(['staging.acme.io', 'api.acme.io']));"
+  js_case "js-47 the branches of a conditional require() path stay silent" 0 loader.js "const c = require(dev ? './staging.config' : './prod.config');"
+  js_case "js-48 a fallback in a require() path stays silent" 0 loader.js "const c = require(process.env.CFG_PATH || './staging.config');"
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -4013,7 +4019,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-42 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-48 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

@@ -607,13 +607,18 @@ const URL_LIKE = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 const staticText = (a) => !a ? "" : a.type === "StringLiteral" ? a.value : a.type === "TemplateLiteral" ? a.quasis.map((q) => q.value.cooked ?? q.value.raw).join("") : (a.type === "BinaryExpression" && a.operator === "+") ? staticText(a.left) + staticText(a.right) : "";
 // A path built around a URL, like `https://${host}/w.js` or "//" + host: what sits inside it is a host, not a module path.
 const builtUrl = (n) => (n.type === "TemplateLiteral" || (n.type === "BinaryExpression" && n.operator === "+")) && (URL_LIKE.test(staticText(n)) || staticText(n).includes("://"));
+// The keys of a module path node whose values are still that path: the pieces of a template or a + concatenation,
+// the branches of a ?: or a fallback, and the items of an AMD require([...]) list. A string inside anything else,
+// a nested call, object or array, is read as before (#2423 review).
+const PATH_KEYS = { TemplateLiteral: ["quasis", "expressions"], ConditionalExpression: ["consequent", "alternate"], LogicalExpression: ["left", "right"] };
+const pathKeys = (n, amd) => n.type === "BinaryExpression" ? (n.operator === "+" ? ["left", "right"] : []) : n.type === "ArrayExpression" ? (amd.has(n) ? ["elements"] : []) : (PATH_KEYS[n.type] || []);
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
 function firstHits(ast) {
   let best = null, dq = null;
   const stack = [ast.program];
   // Nodes inside a module path: the first argument of require(), import() or require.resolve(), and the source
   // of a static import or export. A string there is a piece of a module path unless it is a URL (#2423 review).
-  const inPath = new WeakSet();
+  const inPath = new WeakSet(), amd = new WeakSet();
   const push = (v, path) => { if (path && v && typeof v === "object") inPath.add(v); stack.push(v); };
   while (stack.length) {
     const n = stack.pop();
@@ -633,8 +638,13 @@ function firstHits(ast) {
     const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath);
     for (const k of Object.keys(n)) {
       if (SKIP_KEYS.has(k) || k === "directives") continue;
-      if (loadsModule && k === "arguments") { n.arguments.forEach((a, i) => push(a, i === 0)); continue; }
-      push(n[k], (inPath.has(n) && !builtUrl(n)) || (k === "source" && /^(Import|Export)/.test(n.type)));
+      if (loadsModule && k === "arguments") {
+        const a0 = n.arguments[0];
+        if (a0 && a0.type === "ArrayExpression" && c.type === "Identifier") amd.add(a0);
+        n.arguments.forEach((a, i) => push(a, i === 0));
+        continue;
+      }
+      push(n[k], (inPath.has(n) && !builtUrl(n) && pathKeys(n, amd).includes(k)) || (k === "source" && /^(Import|Export)/.test(n.type)));
     }
   }
   return [best, dq];
