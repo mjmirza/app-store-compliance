@@ -601,36 +601,36 @@ const FLOW_TYPE = new Set(["TypeAlias", "OpaqueType", "InterfaceDeclaration", "T
 const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", "leadingComments", "trailingComments", "innerComments", "tokens"]);
 // The text of a string literal or of a template literal with no ${...}, else null.
 const plainText = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "TemplateLiteral" && a.expressions.length === 0) ? (a.quasis[0].value.cooked ?? a.quasis[0].value.raw) : null;
-// A relative or bare module specifier. A URL (any scheme, or //host) is not one, and neither is any other expression.
-const isSpecifier = (a) => { const t = plainText(a); return t !== null && !/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(t); };
+// A URL: a scheme (http:, ws:) or a leading //host.
+const URL_LIKE = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
 function firstHits(ast) {
   let best = null, dq = null;
   const stack = [ast.program];
+  // Nodes inside a module path: the first argument of require(), import() or require.resolve(), and the source
+  // of a static import or export. A string there is a piece of a module path unless it is a URL (#2423 review).
+  const inPath = new WeakSet();
+  const push = (v, path) => { if (path && v && typeof v === "object") inPath.add(v); stack.push(v); };
   while (stack.length) {
     const n = stack.pop();
-    if (Array.isArray(n)) { for (const c of n) stack.push(c); continue; }
+    if (Array.isArray(n)) { for (const c of n) push(c, inPath.has(n)); continue; }
     if (!n || typeof n.type !== "string" || typeOnly(n)) continue;
     let text = null;
     if (n.type === "StringLiteral") text = n.value;
     else if (n.type === "TemplateElement") text = n.value.cooked == null ? n.value.raw : n.value.cooked;
-    if (text !== null && re.test(text)) {
+    if (text !== null && re.test(text) && (!inPath.has(n) || URL_LIKE.test(text))) {
       if (best === null || n.start < best.start) best = n;
       if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
     }
-    // A module path is never a backend URL: a relative or bare specifier given to require(), import(),
-    // require.resolve() (also require["resolve"]) or a static import or export. A URL or any other expression
-    // there is still read (#2423 review). No other require member: RequireJS require.config() takes an options object that can
-    // hold a real backend URL.
+    // Module paths: require(), import(), require.resolve() and require["resolve"]. No other require member:
+    // RequireJS require.config() takes an options object that can hold a real backend URL.
     const c = n.type === "CallExpression" ? n.callee : null;
     const resolvesPath = !!c && c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "require" && (c.computed ? plainText(c.property) === "resolve" : c.property.type === "Identifier" && c.property.name === "resolve");
-    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath) && isSpecifier(n.arguments[0]);
+    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath);
     for (const k of Object.keys(n)) {
-      if (SKIP_KEYS.has(k)) continue;
-      if ((k === "source" && /^(Import|Export)/.test(n.type) && isSpecifier(n.source)) || (k === "directives")) continue;
-      if (loadsModule && k === "arguments") { for (const a of n.arguments.slice(1)) stack.push(a); continue; }
-      const v = n[k];
-      if (v && typeof v === "object") stack.push(v);
+      if (SKIP_KEYS.has(k) || k === "directives") continue;
+      if (loadsModule && k === "arguments") { n.arguments.forEach((a, i) => push(a, i === 0)); continue; }
+      push(n[k], inPath.has(n) || (k === "source" && /^(Import|Export)/.test(n.type)));
     }
   }
   return [best, dq];
