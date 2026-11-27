@@ -4619,6 +4619,40 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:6' && ok "a comment line before a new if does not join it to the earlier condition" || bad "a comment line before a new if does not join it to the earlier condition"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws { if enabled { return } else if #available(iOS 27, *) { return } else { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if after an #available(iOS 27) branch stays silent" || bad "an else if after an #available(iOS 27) branch stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    guard #unavailable(iOS 27)
+    else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a guard #unavailable(iOS 27) with else on the next line stays silent" || bad "a guard #unavailable(iOS 27) with else on the next line stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an early return under #available(iOS 27) stays silent" || bad "an early return under #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func a() { if #available(iOS 27, *) { print(1) } }
+func b() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "an availability check in another function does not silence the call" || bad "an availability check in another function does not silence the call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #unavailable(iOS 27.1) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 27.1) still lets iOS 27.0 through" || bad "#unavailable(iOS 27.1) still lets iOS 27.0 through"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 import struct Graphics.ImageCreator
 func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
