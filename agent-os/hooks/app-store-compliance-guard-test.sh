@@ -4703,6 +4703,21 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an if after a case label still gates" || bad "an if after a case label still gates"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async throws { switch x { case false: if #available(iOS 27, *) { return }; print(1); case true: _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an early exit in one case does not gate the next case" || bad "an early exit in one case does not gate the next case"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { for _ in [1] { if #available(iOS 27, *) { continue }; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "continue under #available(iOS 27) gates the rest of the loop body" || bad "continue under #available(iOS 27) gates the rest of the loop body"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27) { let r = #/[^}]+/#; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a brace in a Swift regex literal does not close the block" || bad "a brace in a Swift regex literal does not close the block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

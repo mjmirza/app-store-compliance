@@ -628,6 +628,16 @@ def no_comments(text):
             for j in range(i, e):
                 out[j] = " "
             i = e
+        elif text[i] == "#" and text[i:].lstrip("#").startswith("/"):
+            # A Swift regex literal #/.../# can hold braces and quotes.
+            h = len(text[i:]) - len(text[i:].lstrip("#"))
+            close = "/" + "#" * h
+            e = text.find(close, i + h + 1)
+            e = n if e < 0 else e
+            for m in range(i + h + 1, e):
+                if text[m] != chr(10):
+                    out[m] = " "
+            i = e + len(close)
         elif text[i] == "#" and text[i:].lstrip("#").startswith(chr(34)):
             h = len(text[i:]) - len(text[i:].lstrip("#"))
             q = chr(34) * 3 if text.startswith(chr(34) * 3, i + h) else chr(34)
@@ -765,20 +775,23 @@ def gated_at(code, stop):
             unavail = gates_27(h)
             if first == "else" and "if" in words:
                 # An else if branch runs only when every earlier condition failed.
-                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif"])
+                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif", chain or unavail])
             elif first == "else":
-                stack.append([chain or unavail, chain, False, -1, "else"])
+                stack.append([chain or unavail, chain, False, -1, "else", chain or unavail])
             elif "guard" in words:
-                stack.append([avail, False, unavail, -1, "guard"])
+                stack.append([avail, False, unavail, -1, "guard", avail])
             else:
                 # A case label or a statement label can sit before the if.
-                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else "other"])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else "other", unavail])
+        elif stack and c in "cd" and (k == 0 or not (code[k - 1].isalnum() or code[k - 1] == "_")) and (code.startswith("case ", k) or (code.startswith("default", k) and not (code[k + 7:k + 8].isalnum() or code[k + 7:k + 8] == "_"))):
+            # A case label starts a new path, so an early exit in an earlier case does not gate it.
+            stack[-1][0] = stack[-1][5]
         elif c == chr(125) and stack:
             done = stack.pop()
             d = len(stack)
             chain_at[d] = done[1]
             chain_exits = exits_at.get(d, False)
-            exits = done[4] in ("if", "elif") and last_stmt(code[open_at[-1] + 1:k]).split(" ")[0] in ("return", "throw")
+            exits = done[4] in ("if", "elif") and last_stmt(code[open_at[-1] + 1:k]).split(" ")[0] in ("return", "throw", "continue", "break")
             open_at.pop()
             all_before = chain_exits
             exits_at[d] = exits and (done[4] == "if" or chain_exits)
