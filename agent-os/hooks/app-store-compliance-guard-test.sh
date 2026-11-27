@@ -3988,6 +3988,15 @@ module.exports = cfg;'
   js_case "js-26 a single-quoted URL in require.config() fires" src/api.js:1 api.js "require.config({baseUrl: 'http://localhost:3000/scripts'});"
   js_case "js-27 a single-quoted require.resolve() path stays silent" 0 api.js "const p = require.resolve('./staging.config');
 module.exports = p;"
+  # #2423 review. Only a relative or bare module specifier is a module path. A URL, or any other expression, is read.
+  js_case "js-28 a template-literal require.resolve() path stays silent" 0 loader.js "const p = require.resolve(\`./staging.config\`);
+module.exports = p;"
+  js_case "js-29 a require['resolve']() path stays silent" 0 loader.js "const p = require['resolve']('./staging.config');
+module.exports = p;"
+  js_case "js-30 a URL passed to import() still fires" src/loader.js:1 loader.js 'export const widget = import(/* webpackIgnore: true */ "http://localhost:3000/widget.js");'
+  js_case "js-31 a URL inside an expression passed to import() still fires" src/loader.js:1 loader.js 'export const mod = import(fetch("http://localhost:3000/module-name").then(r => r.text()));'
+  js_case "js-32 a URL passed to require() still fires" src/loader.js:1 loader.js 'const w = require("http://localhost:3000/widget.js");'
+  js_case "js-33 a URL in a static import still fires" src/loader.js:1 loader.js 'import "http://localhost:3000/polyfill.js";'
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -3995,7 +4004,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-27 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-33 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

@@ -599,6 +599,10 @@ const re = new RegExp(pattern);
 const TS_CODE = /^TS(AsExpression|SatisfiesExpression|NonNullExpression|TypeAssertion|InstantiationExpression|ParameterProperty|EnumDeclaration|EnumBody|EnumMember|ExportAssignment|ModuleDeclaration|ModuleBlock)$/;
 const FLOW_TYPE = new Set(["TypeAlias", "OpaqueType", "InterfaceDeclaration", "TypeAnnotation", "TypeParameterDeclaration", "TypeParameterInstantiation", "DeclareModule", "DeclareModuleExports", "DeclareVariable", "DeclareFunction", "DeclareClass", "DeclareTypeAlias", "DeclareOpaqueType", "DeclareInterface", "DeclareExportDeclaration", "DeclareExportAllDeclaration"]);
 const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", "leadingComments", "trailingComments", "innerComments", "tokens"]);
+// The text of a string literal or of a template literal with no ${...}, else null.
+const plainText = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "TemplateLiteral" && a.expressions.length === 0) ? (a.quasis[0].value.cooked ?? a.quasis[0].value.raw) : null;
+// A relative or bare module specifier. A URL (any scheme, or //host) is not one, and neither is any other expression.
+const isSpecifier = (a) => { const t = plainText(a); return t !== null && !/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(t); };
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
 function firstHits(ast) {
   let best = null, dq = null;
@@ -614,15 +618,16 @@ function firstHits(ast) {
       if (best === null || n.start < best.start) best = n;
       if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
     }
-    // A module path is never a backend URL: the first argument of require(), import() and a string-literal
-    // require.resolve(). No other require member: RequireJS require.config() takes an options object that can
+    // A module path is never a backend URL: a relative or bare specifier given to require(), import(),
+    // require.resolve() (also require["resolve"]) or a static import or export. A URL or any other expression
+    // there is still read (#2423 review). No other require member: RequireJS require.config() takes an options object that can
     // hold a real backend URL.
     const c = n.type === "CallExpression" ? n.callee : null;
-    const resolvesPath = !!c && c.type === "MemberExpression" && !c.computed && c.object.type === "Identifier" && c.object.name === "require" && c.property.type === "Identifier" && c.property.name === "resolve" && !!n.arguments[0] && n.arguments[0].type === "StringLiteral";
-    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath);
+    const resolvesPath = !!c && c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "require" && (c.computed ? plainText(c.property) === "resolve" : c.property.type === "Identifier" && c.property.name === "resolve");
+    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath) && isSpecifier(n.arguments[0]);
     for (const k of Object.keys(n)) {
       if (SKIP_KEYS.has(k)) continue;
-      if ((k === "source" && /^(Import|Export)/.test(n.type)) || (k === "directives")) continue;
+      if ((k === "source" && /^(Import|Export)/.test(n.type) && isSpecifier(n.source)) || (k === "directives")) continue;
       if (loadsModule && k === "arguments") { for (const a of n.arguments.slice(1)) stack.push(a); continue; }
       const v = n[k];
       if (v && typeof v === "object") stack.push(v);
