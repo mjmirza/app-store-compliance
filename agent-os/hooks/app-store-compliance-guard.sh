@@ -767,7 +767,7 @@ def alone(h, key, joins):
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
-def last_stmt(body):
+def last_stmt(body, raw=False):
     # The last top-level statement of a block, split on semicolons and line breaks outside brackets.
     depth = 0
     cur = ""
@@ -788,7 +788,9 @@ def last_stmt(body):
             cur = ""
         else:
             cur += c
-    return " ".join((cur if cur.strip() else last).split())
+    out = cur if cur.strip() else last
+    # raw keeps the line breaks, which a nested switch needs to find its case labels.
+    return out.strip() if raw else " ".join(out.split())
 
 def is_case_label(code, k):
     # A switch label, not .default, an enum case, or the pattern in if case and guard case.
@@ -875,7 +877,7 @@ def obsoleted_27(code, k):
 def stmt_exits(stmt):
     # True when a statement always leaves the function: return, throw, continue,
     # or an if chain that ends in else and whose every branch does.
-    first = stmt.split(" ")[0] if stmt else ""
+    first = stmt.split()[0] if stmt.split() else ""
     if first in ("return", "throw", "continue"):
         return True
     if first == "switch":
@@ -906,7 +908,7 @@ def stmt_exits(stmt):
             return False
     elif gaps[-1].strip() != "else":
         return False
-    return all(stmt_exits(last_stmt(b)) for b in blocks)
+    return all(stmt_exits(last_stmt(b, True)) for b in blocks)
 
 def switch_exits(body):
     # True when every case of a switch body ends with return, throw, continue or break out.
@@ -933,7 +935,7 @@ def switch_exits(body):
                 # The label ends at the first colon outside the parentheses of an associated value.
                 colon = ci
                 break
-        last = last_stmt(part[colon + 1:]) if colon >= 0 else ""
+        last = last_stmt(part[colon + 1:], True) if colon >= 0 else ""
         if not stmt_exits(last):
             return False
     return True
