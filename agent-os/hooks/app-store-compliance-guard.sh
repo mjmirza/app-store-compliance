@@ -749,12 +749,15 @@ def last_stmt(body):
     depth = 0
     cur = ""
     last = ""
-    for c in body:
+    for i, c in enumerate(body):
         if c in "([" + chr(123):
             depth += 1
         elif c in ")]" + chr(125):
             depth -= 1
-        if depth == 0 and c in (";", chr(10)):
+        if depth == 0 and c == chr(10) and body[i + 1:].lstrip(" " + chr(9)).startswith(".") and not body[i + 1:].lstrip(" " + chr(9)).startswith(".."):
+            # A line that starts with a member access continues the statement above.
+            cur += " "
+        elif depth == 0 and c in (";", chr(10)):
             if cur.strip():
                 last = cur
             cur = ""
@@ -767,9 +770,13 @@ def is_case_label(code, k):
     if k > 0 and (code[k - 1].isalnum() or code[k - 1] == "_"):
         return False
     before = code[:k].rstrip()
+    line = code[:k].rsplit(chr(10), 1)[-1]
+    if before.endswith("@unknown"):
+        # @unknown default: is a switch label too.
+        before = before[:-8].rstrip()
+        line = line.rstrip()[:-8]
     if before.endswith((".", ",")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
         return False
-    line = code[:k].rsplit(chr(10), 1)[-1]
     if line.strip() and not before.endswith((chr(123), chr(125), ";")):
         # A label starts a statement, so default: inside a call is an argument label.
         return False
