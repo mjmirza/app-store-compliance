@@ -161,7 +161,6 @@ def lc(s):
     return (s or "").lower()
 
 
-NON_ASCII_COMMAS = ("\u060c", "\uff0c", "\u3001")
 _KEYWORD_MARKS_RE = re.compile(r"[\u0307\u0640\u064b-\u065f\u0670\u06d6-\u06ed]")
 
 
@@ -370,18 +369,9 @@ def audit_fields(fields, check_urls=False, platform="apple"):
                 )
 
     # keywords formatting (Apple only, Google Play has no keywords field)
+    # App Store Connect accepts ASCII (,) and Chinese/fullwidth (，) commas as separators.
     if keywords and apple:
-        bad_commas = [c for c in NON_ASCII_COMMAS if c in keywords]
-        if bad_commas:
-            add(
-                findings,
-                "medium",
-                "APPLE-2.3-KEYWORD-FORMAT",
-                "keywords",
-                f"keywords field uses a non-ASCII comma ({' '.join(bad_commas)}) instead of an ASCII comma (,)",
-                "Replace localized commas with ASCII commas (,) so App Store Connect splits keywords",
-            )
-        if re.search(r"[,\u060c\uff0c\u3001]\s", keywords):
+        if re.search(r"[,\uff0c]\s", keywords):
             add(
                 findings,
                 "low",
@@ -392,7 +382,7 @@ def audit_fields(fields, check_urls=False, platform="apple"):
             )
         kw = set(
             w
-            for w in re.split(r"[,\u060c\uff0c\u3001\s]+", _norm_kw_text(keywords))
+            for w in re.split(r"[,\uff0c\s]+", _norm_kw_text(keywords))
             if w
         )
         dup = kw & _name_words(name + " " + subtitle)

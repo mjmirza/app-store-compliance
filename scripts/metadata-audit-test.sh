@@ -303,19 +303,15 @@ else
 fi
 rm -rf "$MC"
 
-# Non-ASCII keyword commas and non-Latin duplicated keywords are caught on Apple listings.
+# Non-Latin duplicated keywords and fullwidth Chinese comma separators on Apple listings.
 LOC_KW="$(mktemp -d)"
-mkdir -p "$LOC_KW/ar-SA" "$LOC_KW/tr" "$LOC_KW/ja"
-for loc in ar-SA tr ja; do
+mkdir -p "$LOC_KW/ar-SA" "$LOC_KW/tr"
+for loc in ar-SA tr; do
   printf 'https://journal.test/privacy' > "$LOC_KW/$loc/privacy_url.txt"
   printf 'https://journal.test/help' > "$LOC_KW/$loc/support_url.txt"
   printf 'Clean localized description for the app.' > "$LOC_KW/$loc/description.txt"
 done
 printf 'مُفَكِّرَة يَوْمِيَّة' > "$LOC_KW/ar-SA/name.txt"
-printf 'تنظيم،مهام،أهداف' > "$LOC_KW/ar-SA/keywords.txt"
-OUT="$($AUDIT "$LOC_KW/ar-SA" 2>&1)"
-grep -q 'uses a non-ASCII comma' <<<"$OUT" && ok "Arabic comma in keywords is flagged" || bad "Arabic comma in keywords is flagged"
-
 printf 'مفكـرة,تنظيم,مهام' > "$LOC_KW/ar-SA/keywords.txt"
 OUT="$($AUDIT "$LOC_KW/ar-SA" 2>&1)"
 grep -q 'keywords repeat words already in name or subtitle (مفكرة)' <<<"$OUT" && ok "Arabic keyword repeating vocalized name is flagged" || bad "Arabic keyword repeating vocalized name is flagged"
@@ -328,18 +324,27 @@ printf 'İstanbul Rehberi' > "$LOC_KW/tr/name.txt"
 printf 'istanbul,gezi,harita' > "$LOC_KW/tr/keywords.txt"
 OUT="$($AUDIT "$LOC_KW/tr" 2>&1)"
 grep -q 'keywords repeat words already in name or subtitle (istanbul)' <<<"$OUT" && ok "Turkish dotted capital I duplicate keyword is flagged" || bad "Turkish dotted capital I duplicate keyword is flagged"
-
-printf '日記帳' > "$LOC_KW/ja/name.txt"
-printf 'メモ，記録、ノート' > "$LOC_KW/ja/keywords.txt"
-OUT="$($AUDIT "$LOC_KW/ja" 2>&1)"
-grep -q 'uses a non-ASCII comma' <<<"$OUT" && ok "fullwidth and ideographic commas in keywords are flagged" || bad "fullwidth and ideographic commas in keywords are flagged"
 rm -rf "$LOC_KW"
+
+# App Store Connect accepts the fullwidth Chinese comma (，) alongside ASCII comma; unconfirmed commas stay unflagged.
+OUT="$($AUDIT --name 日記帳 --keywords 'メモ，記録，ノート' --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q '^Clean\.' <<<"$OUT" && ok "fullwidth Chinese comma keywords stay clean (日記帳)" || bad "fullwidth Chinese comma keywords stay clean (日記帳)"
+OUT="$($AUDIT --name 日記帳 --keywords '日記帳，記録，ノート' --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q 'keywords repeat words already in name or subtitle (日記帳)' <<<"$OUT" && ok "fullwidth comma splits keywords for duplicate check" || bad "fullwidth comma splits keywords for duplicate check"
+OUT="$($AUDIT --name 日記帳 --keywords 'メモ， 記録，ノート' --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q 'spaces after commas' <<<"$OUT" && ok "space after fullwidth comma is flagged" || bad "space after fullwidth comma is flagged"
+for unconfirmed_kw in 'メモ、記録、ノート' 'メモ﹐記録﹐ノート' 'تنظيم،مهام،أهداف'; do
+  OUT="$($AUDIT --name 日記帳 --keywords "$unconfirmed_kw" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+  grep -q '\[MEDIUM\]' <<<"$OUT" && bad "unconfirmed comma stays unflagged ($unconfirmed_kw)" || ok "unconfirmed comma stays unflagged ($unconfirmed_kw)"
+done
 
 # Mixed-script names split at script boundaries so Latin and CJK/kana/hangul tokens still match duplicated keywords.
 for mixed_name in "PDF阅读器" "PDFリーダー" "PDF리더" "阅读器PDF"; do
   OUT="$($AUDIT --name "$mixed_name" --keywords "pdf,reader,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
   grep -q 'keywords repeat words already in name or subtitle (pdf)' <<<"$OUT" && ok "mixed-script name splits Latin token ($mixed_name)" || bad "mixed-script name splits Latin token ($mixed_name)"
 done
+OUT="$($AUDIT --name "Photo编辑" --keywords "photo,editor" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
+grep -q 'keywords repeat words already in name or subtitle (photo)' <<<"$OUT" && ok "mixed-script name splits Latin token (Photo编辑)" || bad "mixed-script name splits Latin token (Photo编辑)"
 OUT="$($AUDIT --name "PDF阅读器" --keywords "阅读器,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
 grep -q 'keywords repeat words already in name or subtitle (阅读器)' <<<"$OUT" && ok "mixed-script name splits CJK token (PDF阅读器)" || bad "mixed-script name splits CJK token (PDF阅读器)"
 OUT="$($AUDIT --name "PDF阅读器" --keywords "reader,scanner" --privacy_url https://journal.test/privacy --support_url https://journal.test/help 2>&1)"
