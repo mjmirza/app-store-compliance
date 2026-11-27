@@ -4801,6 +4801,28 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "an if and else where only one returns still fires" || bad "an if and else where only one returns still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available obsoleted at iOS 27 keeps the body off iOS 27" || bad "@available obsoleted at iOS 27 keeps the body off iOS 27"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 28.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available obsoleted at iOS 28 still fires" || bad "@available obsoleted at iOS 28 still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a, b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a: return; case .b: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a switch where every case returns gates the code after it" || bad "a switch where every case returns gates the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a, b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a: return; case .b: break } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a switch with a case that breaks still fires" || bad "a switch with a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

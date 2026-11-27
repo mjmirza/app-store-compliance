@@ -508,6 +508,7 @@ apple_imagecreator_hit() {
   local out
   # The list goes in on stdin, so one process sees every file and a declaration in any of them counts.
   out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | python3 -c "$(cat <<'ICPY'
+import re
 import sys
 
 def use_at(text, i, end):
@@ -809,6 +810,45 @@ def is_case_label(code, k):
     rest = code[k + 7:]
     return code.startswith("default", k) and rest.lstrip().startswith(":") and not (rest[:1].isalnum() or rest[:1] == "_")
 
+def obsoleted_27(code, k):
+    # True when the declaration that opens the brace at k is obsoleted at iOS 27 or earlier.
+    seg = code[:k]
+    cut = max(seg.rfind(chr(123)), seg.rfind(chr(125)), seg.rfind(";"))
+    seg = seg[cut + 1:]
+    for m in re.finditer(r"@available[ ]*[(]([^)]*)[)]", seg):
+        args = [a.strip() for a in m.group(1).split(",")]
+        if not args or args[0] not in ("iOS", "iPadOS", "*"):
+            continue
+        for a in args[1:]:
+            if a == "unavailable":
+                return True
+            if a.startswith("obsoleted"):
+                v = a.split(":", 1)[-1].strip().split(".")
+                if v[0].isdigit() and (int(v[0]), int(v[1]) if len(v) > 1 and v[1].isdigit() else 0) <= (27, 0):
+                    return True
+    return False
+
+def switch_exits(body):
+    # True when every case of a switch body ends with return, throw, continue or break out.
+    starts = []
+    level = 0
+    for i, c in enumerate(body):
+        if c in "([" + chr(123):
+            level += 1
+        elif c in ")]" + chr(125):
+            level -= 1
+        elif level == 0 and c in "cd" and is_case_label(" " + body, i + 1):
+            starts.append(i)
+    if not starts:
+        return False
+    for n, a in enumerate(starts):
+        part = body[a:starts[n + 1] if n + 1 < len(starts) else len(body)]
+        colon = part.find(":")
+        last = last_stmt(part[colon + 1:]) if colon >= 0 else ""
+        if last.split(" ")[0] not in ("return", "throw", "continue"):
+            return False
+    return True
+
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
@@ -841,9 +881,12 @@ def gated_at(code, stop):
                 stack.append([chain or unavail, chain, False, -1, "else", chain or unavail, -1])
             elif "guard" in words:
                 stack.append([avail, False, unavail, -1, "guard", avail, -1])
+            elif obsoleted_27(code, k):
+                # @available(iOS, obsoleted: 27) on the declaration keeps its body off iOS 27.
+                stack.append([True, False, False, -1, "other", True, -1])
             else:
                 # A case label or a statement label can sit before the if.
-                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else "other"), unavail, -1])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else ("switch" if first == "switch" else "other")), unavail, -1])
         elif stack and c in "cd" and is_case_label(code, k):
             # A case label starts a new path, so an early exit in an earlier case does not gate it.
             stack[-1][0] = stack[-1][5]
@@ -857,6 +900,9 @@ def gated_at(code, stop):
             ends_out = last_stmt(body).split(" ")[0] in ("return", "throw", "continue", "break") or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
             exits = done[4] in ("if", "elif") and ends_out
             if done[4] == "else" and ends_out and chain_exits and stack:
+                stack[-1][6] = k
+            if done[4] == "switch" and stack and switch_exits(body):
+                # A switch must be exhaustive, so when every case exits the switch does too.
                 stack[-1][6] = k
             open_at.pop()
             all_before = chain_exits
