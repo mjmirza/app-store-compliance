@@ -814,10 +814,18 @@ def obsoleted_27(code, k):
     # True when the declaration that opens the brace at k is obsoleted at iOS 27 or earlier.
     seg = code[:k]
     cut = max(seg.rfind(chr(123)), seg.rfind(chr(125)), seg.rfind(";"))
-    seg = seg[cut + 1:]
+    lines = seg[cut + 1:].split(chr(10))
+    # Only the attributes of this declaration count: its own line and the attribute lines right above it.
+    decl = len(lines) - 1
+    while decl > 0 and not lines[decl].strip():
+        decl -= 1
+    first = decl
+    while first > 0 and lines[first - 1].strip().startswith("@"):
+        first -= 1
+    seg = chr(10).join(lines[first:])
     for m in re.finditer(r"@available[ ]*[(]([^)]*)[)]", seg):
         args = [a.strip() for a in m.group(1).split(",")]
-        if not args or args[0] not in ("iOS", "iPadOS", "*"):
+        if not args or args[0] not in ("iOS", "iPadOS", "macOS", "macCatalyst", "visionOS", "*"):
             continue
         for a in args[1:]:
             if a == "unavailable":

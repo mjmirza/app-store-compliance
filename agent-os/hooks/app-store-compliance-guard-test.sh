@@ -4823,6 +4823,20 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a switch with a case that breaks still fires" || bad "a switch with a case that breaks still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(macOS, introduced: 15.4, obsoleted: 27.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available(macOS, obsoleted: 27.0) keeps the body off 27" || bad "@available(macOS, obsoleted: 27.0) keeps the body off 27"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+struct Renderer {}
+@available(*, unavailable, renamed: "Renderer")
+typealias LegacyRenderer = Renderer
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "an @available on an earlier declaration does not cover the next one" || bad "an @available on an earlier declaration does not cover the next one"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
