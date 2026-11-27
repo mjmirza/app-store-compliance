@@ -4879,6 +4879,32 @@ func make() async throws {
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:7' && ok "a catch that falls through still fires" || bad "a catch that falls through still fires"
 rm -rf "$D"
+D="$(ic_app A.swift 'import SwiftUI
+import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+@SwiftUI.ViewBuilder
+func legacyView() -> some View { Text("Generate").task { _ = try? await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a qualified attribute such as @SwiftUI.ViewBuilder keeps the @available above it" || bad "a qualified attribute such as @SwiftUI.ViewBuilder keeps the @available above it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(
+ mode: Int = .init()
+) async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok ".init() in a default argument is not a declaration" || bad ".init() in a default argument is not a declaration"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ mode: Int, _ cached: Bool) async throws { if #available(iOS 27, *) { switch mode { case 1: if cached { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a case that ends with an if and else that both return exits" || bad "a case that ends with an if and else that both return exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ mode: Int, _ cached: Bool) async throws { if #available(iOS 27, *) { switch mode { case 1: if cached { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a case that ends with an if and no else still fires" || bad "a case that ends with an if and no else still fires"
+rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"

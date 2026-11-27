@@ -821,7 +821,7 @@ def obsoleted_27(code, k):
         decl -= 1
     # A signature can wrap, so start from the line that holds the declaration keyword.
     for i in range(decl, -1, -1):
-        if re.search(r"(^|[^A-Za-z0-9_])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", lines[i]):
+        if re.search(r"(^|[^A-Za-z0-9_.])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", lines[i]):
             decl = i
             break
     # Walk back over the attributes stacked on this declaration, each @name or @name(...), even across lines.
@@ -836,9 +836,9 @@ def obsoleted_27(code, k):
                 level += {")": 1, "(": -1}.get(t[o], 0)
                 if level == 0:
                     break
-            m = re.search(r"@[A-Za-z_][A-Za-z0-9_]*[ ]*$", t[:o])
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_.]*[ ]*$", t[:o])
         else:
-            m = re.search(r"@[A-Za-z_][A-Za-z0-9_]*$", t)
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_.]*$", t)
         if not m:
             break
         keep = m.start()
@@ -855,6 +855,31 @@ def obsoleted_27(code, k):
                 if v[0].isdigit() and (int(v[0]), int(v[1]) if len(v) > 1 and v[1].isdigit() else 0) <= (27, 0):
                     return True
     return False
+
+def stmt_exits(stmt):
+    # True when a statement always leaves the function: return, throw, continue,
+    # or an if chain that ends in else and whose every branch does.
+    first = stmt.split(" ")[0] if stmt else ""
+    if first in ("return", "throw", "continue"):
+        return True
+    if first != "if":
+        return False
+    blocks, gaps, level, start, prev = [], [], 0, -1, 0
+    for i, c in enumerate(stmt):
+        if c == chr(123):
+            if level == 0:
+                gaps.append(stmt[prev:i])
+                start = i
+            level += 1
+        elif c == chr(125):
+            level -= 1
+            if level == 0:
+                blocks.append(stmt[start + 1:i])
+                prev = i + 1
+    tail = stmt[prev:].strip()
+    if not blocks or tail or not gaps[-1].strip().startswith("else") or gaps[-1].strip() != "else":
+        return False
+    return all(stmt_exits(last_stmt(b)) for b in blocks)
 
 def switch_exits(body):
     # True when every case of a switch body ends with return, throw, continue or break out.
@@ -882,7 +907,7 @@ def switch_exits(body):
                 colon = ci
                 break
         last = last_stmt(part[colon + 1:]) if colon >= 0 else ""
-        if last.split(" ")[0] not in ("return", "throw", "continue"):
+        if not stmt_exits(last):
             return False
     return True
 
