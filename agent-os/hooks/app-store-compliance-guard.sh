@@ -619,17 +619,18 @@ function indent_at(p,    n, c) {
 }
 # A misread quote or regex can carry a region past its real end, so a region is blanked only when its
 # lines sit inside the opening line and a multi-line block closes at that same indent.
-function region_ok(a, b,    ls, ind, k, multi, n, cs) {
-  ls = a
-  while (ls > 1 && ch(ls - 1) != "\n") ls--
-  ind = indent_at(ls)
+function region_ok(a, b,    ind, k, n, close_ls) {
+  # A ternary region is measured from the line where its __DEV__ condition starts.
+  ind = indent_at(LS[BASE > 0 ? BASE : a])
   if (ind < 0) ind = 0
-  multi = 0
-  for (k = a; k <= b; k++) if (ch(k) == "\n") { multi = 1; n = indent_at(k + 1); if (n >= 0 && n < ind) return 0 }
-  if (multi && ch(b + 1) == "}") {
-    cs = b + 1
-    while (cs > 1 && ch(cs - 1) != "\n") cs--
-    if (indent_at(cs) != ind || cs + ind != b + 1) return 0
+  close_ls = (ch(b + 1) == "}") ? LS[b + 1] : 0
+  for (k = a; k <= b; k++) {
+    if (ch(k) != "\n") continue
+    n = indent_at(k + 1)
+    if (n < 0) continue
+    # The closing brace sits at the opening indent and starts its line. Every other line is deeper.
+    if (k + 1 == close_ls) { if (n != ind || close_ls + ind != b + 1) return 0 }
+    else if (n <= ind) return 0
   }
   return 1
 }
@@ -668,7 +669,7 @@ function try_regex(i,    j, c, cls) {
   return 0
 }
 function depths_at_alt() { return paren == alt_paren && brace == alt_brace && bracket == alt_brack }
-function stop_alt(before) { blank(alt_from, before); alt_on = 0 }
+function stop_alt(before) { BASE = alt_base; blank(alt_from, before); BASE = 0; alt_on = 0 }
 function alt_primary() { if (alt_on && depths_at_alt()) alt_done = 1 }
 function alt_op() { if (alt_on && depths_at_alt()) alt_done = 0 }
 function confuse() { no_skip = 1; skip_on = 0; tern_on = 0; alt_on = 0; arm_skip = 0; arm_else = 0 }
@@ -699,6 +700,10 @@ function starts_expr(i,    q, c, e, w) {
 }
 END {
   N = split(S, C, "")
+  # Start of the line each character sits on, so a region check never rescans a long line.
+  ls_cur = 1
+  for (k = 1; k <= N; k++) { LS[k] = ls_cur; if (C[k] == "\n") ls_cur = k + 1 }
+  LS[N + 1] = ls_cur
   mode = "code"; line_start = 1; expr_end = 0
   i = 1
   while (i <= N) {
@@ -746,8 +751,8 @@ END {
     if (tern_on && c == ":" && paren == tern_paren && brace == tern_brace && bracket == tern_brack) {
       tern_nest--
       if (tern_nest == 0) {
-        if (!tern_not) blank(tern_from, i - 1)
-        else { alt_on = 1; alt_done = 0; alt_from = i + 1; alt_paren = tern_paren; alt_brace = tern_brace; alt_brack = tern_brack }
+        if (!tern_not) { BASE = tern_at; blank(tern_from, i - 1); BASE = 0 }
+        else { alt_on = 1; alt_base = tern_at; alt_done = 0; alt_from = i + 1; alt_paren = tern_paren; alt_brace = tern_brace; alt_brack = tern_brack }
         tern_on = 0
       }
       expr_end = 0; bang = 0; line_start = 0
@@ -865,7 +870,7 @@ END {
       if (!handled && ID == "__DEV__" && !no_skip && !skip_on && !tern_on && !alt_on) {
         k = skip_ws(j)
         if (ch(k) == "?" && ch(k + 1) != "." && ch(k + 1) != "?" && starts_expr(i) && BANGS <= 1) {
-          tern_on = 1; tern_not = BANGS; tern_nest = 1; tern_from = k + 1
+          tern_on = 1; tern_not = BANGS; tern_nest = 1; tern_from = k + 1; tern_at = i
           tern_paren = paren; tern_brace = brace; tern_brack = bracket
           i = k + 1; expr_end = 0; bang = 0; line_start = 0
           handled = 1
@@ -904,7 +909,7 @@ END {
     expr_end = 0; bang = 0; line_start = 0
     i++
   }
-  if (alt_on && depths_at_alt()) blank(alt_from, N)
+  if (alt_on && depths_at_alt()) { BASE = alt_base; blank(alt_from, N); BASE = 0 }
   line = ""
   for (k = 1; k <= N; k++) {
     c = ch(k)

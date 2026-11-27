@@ -4052,6 +4052,20 @@ D="$(mk_rn_ship api.js 'function setup(payload) {
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'src/api.js:5' && ok "dev-24 a brace inside a regex does not hide a later URL" || bad "dev-24 a brace inside a regex does not hide a later URL"
 rm -rf "$D"
+D="$(mk_rn_ship App.tsx 'function App() {
+  const banner = !__DEV__ ? null : <Text>Dev'"'"'s on</Text>;
+  fetch("http://localhost:3000");
+  return banner;
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/App.tsx:3' && ok "dev-25 an apostrophe in JSX on the dev side of a ternary does not hide the next statement" || bad "dev-25 an apostrophe in JSX on the dev side of a ternary does not hide the next statement"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const u = __DEV__
+  ? "http://localhost:3000"
+  : "https://api.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-26 a __DEV__ ternary split over three lines stays silent" || bad "dev-26 a __DEV__ ternary split over three lines stays silent"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"
