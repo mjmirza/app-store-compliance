@@ -581,11 +581,302 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
+# React Native inlines __DEV__ and strips the blocks it guards from the minified build.
+# Blank those regions, and the dev side of a __DEV__ ternary, before the quote search.
+# The whole region is blanked, so the skip does not depend on which quotes the host uses.
+# A region is blanked only when its braces or its colon match. A condition that is not
+# exactly __DEV__ or !__DEV__, a body with no braces, or a block that does not close,
+# is left as it was, and the host still fires (issue #2425).
+DEV_AWK='# Blank React Native __DEV__ regions. One output line per input line.
+# A region is blanked only when its braces or ternary colon match.
+# Anything ambiguous is left unchanged, so a later search still fires.
+function ch(i) { return substr(S, i, 1) }
+function ws(c) { return c == " " || c == "\t" || c == "\n" || c == "\r" }
+function idch(c) { return c ~ /[A-Za-z0-9_$]/ }
+function skip_ws(i,    c) {
+  while (i <= N) { c = ch(i); if (!ws(c)) break; i++ }
+  return i
+}
+function read_id(i,    j) {
+  j = i
+  while (j <= N && idch(ch(j))) j++
+  ID = substr(S, i, j - i)
+  return j
+}
+function expr_kw(id) {
+  return id == "return" || id == "throw" || id == "case" || id == "delete" || id == "void" || id == "typeof" || id == "in" || id == "of" || id == "instanceof" || id == "new" || id == "yield" || id == "await" || id == "else" || id == "do"
+}
+function stmt_kw(id) {
+  return id == "const" || id == "let" || id == "var" || id == "function" || id == "class" || id == "import" || id == "export" || id == "return" || id == "if" || id == "for" || id == "while" || id == "do" || id == "switch" || id == "try" || id == "throw" || id == "break" || id == "continue" || id == "debugger"
+}
+function blank(a, b,    k, c) {
+  if (no_skip || a > b) return
+  for (k = a; k <= b; k++) { c = ch(k); if (c != "\n" && c != "\r") drop[k] = 1 }
+}
+function continues(i,    j, c) {
+  j = i
+  while (j <= N && ws(ch(j))) j++
+  if (j > N) return 0
+  c = ch(j)
+  if (c ~ /[.+\/*%&|?:<>=([]/) return 1
+  if (c == "-") return 1
+  return 0
+}
+function try_regex(i,    j, c, cls) {
+  regex_brace = 0
+  j = i + 1
+  cls = 0
+  while (j <= N) {
+    c = ch(j)
+    if (c == "\n") return 0
+    if (c == "\\") { j += 2; continue }
+    if (!cls && c == "[") { cls = 1; j++; continue }
+    if (cls && c == "]") { cls = 0; j++; continue }
+    if (!cls && (c == "{" || c == "}")) regex_brace = 1
+    if (!cls && c == "/") {
+      j++
+      while (j <= N && ch(j) ~ /[A-Za-z]/) j++
+      return j
+    }
+    j++
+  }
+  return 0
+}
+function depths_at_alt() { return paren == alt_paren && brace == alt_brace && bracket == alt_brack }
+function stop_alt(before) { blank(alt_from, before); alt_on = 0 }
+function alt_primary() { if (alt_on && depths_at_alt()) alt_done = 1 }
+function alt_op() { if (alt_on && depths_at_alt()) alt_done = 0 }
+function confuse() { no_skip = 1; skip_on = 0; tern_on = 0; alt_on = 0; arm_skip = 0; arm_else = 0 }
+function add_cond(s) { if (in_cond) cond_buf = cond_buf s }
+
+{
+  if (NR > 1) S = S "\n"
+  S = S $0
+}
+END {
+  N = length(S)
+  mode = "code"; line_start = 1; expr_end = 0
+  i = 1
+  while (i <= N) {
+    c = ch(i)
+    if (mode == "dq" || mode == "sq") {
+      if (c == "\\") { i += 2; continue }
+      if (c == "\n") { mode = "code"; i++; continue }
+      if ((mode == "dq" && c == "\"") || (mode == "sq" && c == sq)) { mode = "code"; expr_end = 1; bang = 0; alt_primary(); i++; continue }
+      i++
+      continue
+    }
+    if (mode == "tm") {
+      if (c == "\\") { i += 2; continue }
+      if (c == "`") { mode = "code"; expr_end = 1; bang = 0; alt_primary(); i++; continue }
+      if (c == "$" && ch(i + 1) == "{") { tm_n++; tm_at[tm_n] = brace; brace++; mode = "code"; expr_end = 0; bang = 0; i += 2; continue }
+      i++
+      continue
+    }
+    if (ws(c)) {
+      if (alt_on && c == "\n" && depths_at_alt() && alt_done && !continues(i + 1)) stop_alt(i - 1)
+      if (c == "\n") line_start = 1
+      i++
+      continue
+    }
+    if (want_else) {
+      want_else = 0
+      if (idch(c) && (i == 1 || !idch(ch(i - 1)))) {
+        j = read_id(i)
+        if (ID == "else") {
+          k = skip_ws(j)
+          if (ch(k) == "{") { arm_skip = 1; i = k; line_start = 0; continue }
+          i = j
+          line_start = 0
+          continue
+        }
+      }
+    }
+    if ((arm_skip || arm_else) && c != "{") { arm_skip = 0; arm_else = 0 }
+    if (tern_on && c == "?" && paren == tern_paren && brace == tern_brace && bracket == tern_brack && ch(i + 1) != "." && ch(i + 1) != "?") {
+      tern_nest++
+      expr_end = 0; bang = 0; line_start = 0
+      i++
+      continue
+    }
+    if (tern_on && c == ":" && paren == tern_paren && brace == tern_brace && bracket == tern_brack) {
+      tern_nest--
+      if (tern_nest == 0) {
+        if (!tern_not) blank(tern_from, i - 1)
+        else { alt_on = 1; alt_done = 0; alt_from = i + 1; alt_paren = tern_paren; alt_brace = tern_brace; alt_brack = tern_brack }
+        tern_on = 0
+      }
+      expr_end = 0; bang = 0; line_start = 0
+      i++
+      continue
+    }
+    if (alt_on && depths_at_alt() && (c == ";" || c == ",")) { stop_alt(i - 1) }
+    if (c == "\"") { mode = "dq"; line_start = 0; i++; continue }
+    if (c == sq) { mode = "sq"; line_start = 0; i++; continue }
+    if (c == "`") { mode = "tm"; line_start = 0; i++; continue }
+    if (c == "/") {
+      if (expr_end && ch(i + 1) == "=") { add_cond("/="); expr_end = 0; bang = 0; line_start = 0; i += 2; continue }
+      if (!expr_end && ch(i + 1) != "=") {
+        j = try_regex(i)
+        if (j > 0) { expr_end = 1; bang = 0; line_start = 0; alt_primary(); i = j; continue }
+        if (regex_brace) confuse()
+      }
+      add_cond("/")
+      alt_op()
+      expr_end = 0; bang = 0; line_start = 0
+      i++
+      continue
+    }
+    if (c == "{") {
+      if (arm_skip && !no_skip && !skip_on && !tern_on && !alt_on) {
+        arm_skip = 0
+        skip_on = 1; skip_from = i + 1; skip_base = brace
+      } else if (arm_else && !no_skip && !skip_on) {
+        arm_else = 0
+        else_n++; else_at[else_n] = brace
+      } else { arm_skip = 0; arm_else = 0 }
+      brace++; expr_end = 0; bang = 0; line_start = 0
+      i++
+      continue
+    }
+    if (c == "}") {
+      if (tm_n > 0 && brace - 1 == tm_at[tm_n]) { tm_n--; brace--; mode = "tm"; line_start = 0; i++; continue }
+      if (skip_on && brace - 1 == skip_base) {
+        if (!no_skip) blank(skip_from, i - 1)
+        skip_on = 0
+        brace--; expr_end = 1; bang = 0; line_start = 0
+        i++
+        continue
+      }
+      if (else_n > 0 && brace - 1 == else_at[else_n]) {
+        else_n--; brace--; want_else = 1; expr_end = 1; bang = 0; line_start = 0
+        i++
+        continue
+      }
+      if (alt_on && brace == alt_brace) stop_alt(i - 1)
+      brace--
+      if (brace < 0) { brace = 0; confuse() }
+      expr_end = 1; bang = 0; line_start = 0
+      alt_primary()
+      i++
+      continue
+    }
+    if (c == "(") {
+      add_cond("")
+      alt_op()
+      paren++; expr_end = 0; bang = 0; line_start = 0
+      i++
+      continue
+    }
+    if (c == ")") {
+      if (alt_on && paren == alt_paren) stop_alt(i - 1)
+      if (in_cond && paren - 1 == cond_paren && tm_n == 0) {
+        in_cond = 0
+        paren--
+        if (!no_skip && !skip_on && !tern_on && !alt_on) {
+          if (cond_buf == "__DEV__") arm_skip = 1
+          else if (cond_buf == "!__DEV__") arm_else = 1
+        }
+        expr_end = 0; bang = 0; line_start = 0
+        i++
+        continue
+      }
+      paren--
+      if (paren < 0) { paren = 0; confuse() }
+      expr_end = 1; bang = 0; line_start = 0
+      if (alt_on && paren == alt_paren && brace == alt_brace && bracket == alt_brack) alt_done = 1
+      i++
+      continue
+    }
+    if (c == "[") { add_cond("["); bracket++; expr_end = 0; bang = 0; line_start = 0; i++; continue }
+    if (c == "]") {
+      if (alt_on && bracket == alt_brack && paren == alt_paren && brace == alt_brace) stop_alt(i - 1)
+      add_cond("]")
+      bracket--; expr_end = 1; bang = 0; line_start = 0
+      alt_primary()
+      i++
+      continue
+    }
+    if (c == "!") { add_cond("!"); alt_op(); bang = 1; expr_end = 0; line_start = 0; i++; continue }
+    if (idch(c) && (i == 1 || !idch(ch(i - 1)))) {
+      j = read_id(i)
+      if (line_start && alt_on && !depths_at_alt() && stmt_kw(ID)) { alt_on = 0 }
+      if (after_dot) {
+        after_dot = 0
+        add_cond(ID)
+        i = j; expr_end = 1; bang = 0; line_start = 0
+        alt_primary()
+        continue
+      }
+      if (in_cond) { add_cond(ID); i = j; bang = 0; line_start = 0; continue }
+      handled = 0
+      if (ID == "if" && !no_skip && !skip_on && !tern_on && !alt_on && !in_cond) {
+        k = skip_ws(j)
+        if (ch(k) == "(") {
+          in_cond = 1; cond_buf = ""; cond_paren = paren
+          paren++; i = k + 1; expr_end = 0; bang = 0; line_start = 0
+          handled = 1
+        }
+      }
+      if (!handled && ID == "__DEV__" && !no_skip && !skip_on && !tern_on && !alt_on) {
+        k = skip_ws(j)
+        if (ch(k) == "?" && ch(k + 1) != "." && ch(k + 1) != "?") {
+          tern_on = 1; tern_not = bang ? 1 : 0; tern_nest = 1; tern_from = k + 1
+          tern_paren = paren; tern_brace = brace; tern_brack = bracket
+          i = k + 1; expr_end = 0; bang = 0; line_start = 0
+          handled = 1
+        }
+      }
+      if (!handled) {
+        i = j
+        expr_end = expr_kw(ID) ? 0 : 1
+        bang = 0; line_start = 0
+        if (!expr_kw(ID)) alt_primary()
+      }
+      continue
+    }
+    if (c == ".") {
+      add_cond(".")
+      alt_op()
+      if (ch(i + 1) ~ /[0-9]/) {
+        i++
+        while (i <= N && ch(i) ~ /[0-9A-Fa-fxXoObB._]/) i++
+        expr_end = 1
+        alt_primary()
+      } else { after_dot = 1; expr_end = 0; i++ }
+      bang = 0; line_start = 0
+      continue
+    }
+    if (c ~ /[0-9]/) {
+      while (i <= N && ch(i) ~ /[0-9A-Fa-fxXoObB._]/) i++
+      if (i <= N && (ch(i) == "+" || ch(i) == "-") && ch(i - 1) ~ /[eE]/) { i++; while (i <= N && ch(i) ~ /[0-9]/) i++ }
+      add_cond("0")
+      expr_end = 1; bang = 0; line_start = 0
+      alt_primary()
+      continue
+    }
+    add_cond(c)
+    alt_op()
+    expr_end = 0; bang = 0; line_start = 0
+    i++
+  }
+  if (alt_on && depths_at_alt()) blank(alt_from, N)
+  line = ""
+  for (k = 1; k <= N; k++) {
+    c = ch(k)
+    if (c == "\n") { print line; line = "" }
+    else if (drop[k]) line = line " "
+    else line = line c
+  }
+  if (N > 0) print line
+}
+BEGIN { sq = sprintf("%c", 39) }'
+strip_dev_regions() { LC_ALL=C awk "$DEV_AWK"; }
 # RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
   RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f m src
+  local f m src devsrc in_n out_n
   while IFS= read -r f; do
     # Source comments go first (issue #2413). STRIP_AWK keeps one line per line and, with gate=1, only blanks
     # a line that itself looks like a comment, so a /* in a string or regex never hides later lines (#2421).
@@ -603,6 +894,18 @@ release_string_has() {
           skip { print ""; next }
           { print }
         ' 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+      *.js|*.jsx|*.ts|*.tsx)
+        # Blank __DEV__ regions before the quote search (issue #2425). Same line count, or the
+        # original text is kept and the host still fires.
+        case "$src" in
+          *__DEV__*)
+            devsrc="$(printf '%s\n' "$src" | strip_dev_regions 2>/dev/null)" || devsrc=""
+            in_n="$(printf '%s\n' "$src" | wc -l | tr -d '[:space:]')"
+            out_n="$(printf '%s\n' "$devsrc" | wc -l | tr -d '[:space:]')"
+            [ -n "$devsrc" ] && [ "$in_n" = "$out_n" ] && src="$devsrc"
+            ;;
+        esac
+        m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" <<< "$src" 2>/dev/null)" ;;
       *)
         if [[ "$f" =~ $SRC_EXT_RE ]]; then
           m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" <<< "$src" 2>/dev/null)"
@@ -1000,7 +1303,7 @@ fi
 # Gated like the framework checks, so an Android-only command never meets an Apple finding.
 if [ "$IOS_TARGET_ACTIVE" -eq 1 ]; then
   if release_string_has 'localhost|127\.0\.0\.1|staging\.[a-z]|ngrok\.io'; then
-    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG or a comment is fine. this only flags strings the release build actually compiles." at "$RELEASE_HIT"
+    finding critical "APPLE-2.1-STAGING-BACKEND" "A release-build string points at localhost or a staging host" "Point the release build at the live production backend. A localhost/staging URL inside #if DEBUG, an if (__DEV__) block, or a comment is fine. this only flags strings the release build actually compiles." at "$RELEASE_HIT"
   fi
   if grep_has 'signIn|logIn|LoginView|OAuth|FirebaseAuth|createAccount|signUp'; then
     if ! impl_has 'deleteAccount|delete_account|account deletion|deleteUser'; then
