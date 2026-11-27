@@ -4850,6 +4850,36 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "an associated value label is not the end of a case label" || bad "an associated value label is not the end of a case label"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(
+ iOS, introduced: 18.4, obsoleted: 27.0
+)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an @available attribute that wraps across lines still counts" || bad "an @available attribute that wraps across lines still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+ if #available(iOS 27, *) {
+  do { return try await modern() }
+  catch { throw error }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a do and catch that both exit gate the code after them" || bad "a do and catch that both exit gate the code after them"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+ if #available(iOS 27, *) {
+  do { return try await modern() }
+  catch { print(error) }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:7' && ok "a catch that falls through still fires" || bad "a catch that falls through still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

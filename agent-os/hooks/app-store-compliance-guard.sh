@@ -824,10 +824,25 @@ def obsoleted_27(code, k):
         if re.search(r"(^|[^A-Za-z0-9_])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", lines[i]):
             decl = i
             break
-    first = decl
-    while first > 0 and lines[first - 1].strip().startswith("@"):
-        first -= 1
-    seg = chr(10).join(lines[first:])
+    # Walk back over the attributes stacked on this declaration, each @name or @name(...), even across lines.
+    head = chr(10).join(lines[:decl])
+    keep = len(head)
+    while True:
+        t = head[:keep].rstrip()
+        if t.endswith(")"):
+            o = t.rfind("(")
+            level = 0
+            for o in range(len(t) - 1, -1, -1):
+                level += {")": 1, "(": -1}.get(t[o], 0)
+                if level == 0:
+                    break
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_]*[ ]*$", t[:o])
+        else:
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_]*$", t)
+        if not m:
+            break
+        keep = m.start()
+    seg = head[keep:] + chr(10) + chr(10).join(lines[decl:])
     for m in re.finditer(r"@available[ ]*[(]([^)]*)[)]", seg):
         args = [a.strip() for a in m.group(1).split(",")]
         if not args or args[0] not in ("iOS", "iPadOS", "macOS", "macCatalyst", "visionOS", "*"):
@@ -879,6 +894,7 @@ def gated_at(code, stop):
     # Chain state is kept per nesting depth, so a block nested in a branch cannot reset its chain.
     chain_at = dict()
     exits_at = dict()
+    tries_out = dict()
     top = False
     for k in range(min(stop, len(code))):
         c = code[k]
@@ -908,7 +924,7 @@ def gated_at(code, stop):
                 stack.append([True, False, False, -1, "other", True, -1])
             else:
                 # A case label or a statement label can sit before the if.
-                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else ("switch" if first == "switch" else "other")), unavail, -1])
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else ("switch" if first == "switch" else ("catch" if first == "catch" else "other"))), unavail, -1])
         elif stack and c in "cd" and is_case_label(code, k):
             # A case label starts a new path, so an early exit in an earlier case does not gate it.
             stack[-1][0] = stack[-1][5]
@@ -923,6 +939,11 @@ def gated_at(code, stop):
             exits = done[4] in ("if", "elif") and ends_out
             if done[4] == "else" and ends_out and chain_exits and stack:
                 stack[-1][6] = k
+            if done[4] in ("do", "catch"):
+                # A do and its catches exit when every one of them ends with an exit.
+                tries_out[d] = ends_out and (done[4] == "do" or tries_out.get(d, False))
+                if tries_out[d] and stack and not code[k + 1:].lstrip().startswith("catch"):
+                    stack[-1][6] = k
             if done[4] == "switch" and stack and switch_exits(body):
                 # A switch must be exhaustive, so when every case exits the switch does too.
                 stack[-1][6] = k
