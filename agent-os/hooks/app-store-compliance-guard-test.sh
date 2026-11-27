@@ -4927,6 +4927,17 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a case that ends with a do and catch that both exit" || bad "a case that ends with a do and catch that both exit"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(onProgress: (Double) -> Void = { value in
+ let percentage = Int(value * 100)
+ print(percentage)
+}) async throws {
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a let inside a default closure is not the declaration" || bad "a let inside a default closure is not the declaration"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

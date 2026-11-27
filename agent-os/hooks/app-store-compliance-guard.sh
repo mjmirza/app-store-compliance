@@ -831,10 +831,15 @@ def obsoleted_27(code, k):
     while decl > 0 and not lines[decl].strip():
         decl -= 1
     # A signature can wrap, so start from the line that holds the declaration keyword.
-    for i in range(decl, -1, -1):
-        if re.search(r"(^|[^A-Za-z0-9_.])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", lines[i]):
-            decl = i
-            break
+    # Only a keyword outside parentheses counts, so a let inside a default closure is skipped.
+    text = chr(10).join(lines)
+    level, depth = 0, []
+    for c in text:
+        depth.append(level)
+        level += {"(": 1, ")": -1}.get(c, 0)
+    hits = [m.start(2) for m in re.finditer(r"(^|[^A-Za-z0-9_.])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", text) if depth[m.start(2)] == 0]
+    if hits:
+        decl = text.count(chr(10), 0, hits[-1])
     # Walk back over the attributes stacked on this declaration, each @name or @name(...), even across lines.
     head = chr(10).join(lines[:decl])
     keep = len(head)
