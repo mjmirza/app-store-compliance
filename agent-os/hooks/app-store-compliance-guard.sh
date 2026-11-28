@@ -1214,12 +1214,16 @@ PBXPY
     # A scheme plist is cleared only by applinks in the Release entitlements of the iOS app target that owns it.
     universal_links_cover() {
       command -v python3 >/dev/null 2>&1 || return 1
-      local schemes; schemes="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -lIs -e 'CFBundleURLSchemes' 2>/dev/null)"
-      [ -n "$schemes" ] || return 1
-      grep '[.]pbxproj$' "$FILELIST" | tr '\n' '\0' | DL_SCHEMES="$schemes" xargs -0 python3 -c "$(cat <<'ENTPY'
+      # A scheme is declared in a plist, in Expo app.json or app.config, or in build settings. Source code never declares one.
+      local schemes in_settings=0
+      schemes="$(grep -E '[.]plist$|/app[.]json$|/app[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -lIs -e 'CFBundleURLSchemes' 2>/dev/null)"
+      [ -n "$(grep -E '[.](pbxproj|xcconfig)$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -lIs -e 'INFOPLIST_KEY_CFBundleURLTypes' 2>/dev/null)" ] && in_settings=1
+      [ -n "$schemes" ] || [ "$in_settings" -eq 1 ] || return 1
+      grep '[.]pbxproj$' "$FILELIST" | tr '\n' '\0' | DL_SCHEMES="$schemes" DL_IN_SETTINGS="$in_settings" xargs -0 python3 -c "$(cat <<'ENTPY'
 import fnmatch
 import os
 import plistlib
+import re
 import sys
 
 LB, RB, LP, RP, LS, RS = chr(123), chr(125), chr(40), chr(41), chr(91), chr(93)
@@ -1409,12 +1413,37 @@ def setting(levels, name, cfg_name):
     return None
 
 
+REF_RE = re.compile(re.escape(DOL) + LP + "?:" + re.escape(LP) + "([A-Za-z0-9_]+)((?::[A-Za-z0-9_]+)*)" + re.escape(RP)
+                    + "|" + re.escape(LB) + "([A-Za-z0-9_]+)((?::[A-Za-z0-9_]+)*)" + re.escape(RB) + RP)
+
+
+def modify(value, mods):
+    for mod in mods.split(":")[1:]:
+        if mod in ("identifier", "c99extidentifier"):
+            value = re.sub("[^A-Za-z0-9_]", "_", value)
+            if value[:1].isdigit():
+                value = "_" + value
+        elif mod == "rfc1034identifier":
+            value = re.sub("[^A-Za-z0-9.-]", "-", value)
+        elif mod == "lower":
+            value = value.lower()
+        elif mod == "upper":
+            value = value.upper()
+        else:
+            return None
+    return value
+
+
 def expand(value, names):
+    def sub(m):
+        var, mods = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        if var not in names:
+            return m.group(0)
+        real = modify(names[var], mods)
+        return m.group(0) if real is None else real
     for _ in range(6):
         before = value
-        for var, real in names.items():
-            for form in (DOL + LP + var + RP, DOL + LB + var + RB):
-                value = value.replace(form, real)
+        value = REF_RE.sub(sub, value)
         if value == before:
             break
     return UNSURE if DOL in value else value
@@ -1480,8 +1509,10 @@ def release_only(cfgs):
 def is_ios(sdk, plats, dep):
     if isinstance(plats, str) and "iphoneos" in plats.split():
         return True
-    if isinstance(sdk, str):
+    if isinstance(sdk, str) and sdk.strip().lower() not in ("", "auto"):
         return sdk.strip().lower().startswith("iphoneos")
+    if isinstance(plats, str) and plats.strip():
+        return False
     return isinstance(dep, str) and bool(dep.strip())
 
 
@@ -1497,12 +1528,13 @@ def applinks(path):
     for entry in doms:
         if isinstance(entry, str):
             entry = entry.strip()
-            if entry.startswith("applinks:") and len(entry) > 9 and "mode=developer" not in entry:
+            mode = entry.partition("?")[2].partition("mode=")[2]
+            if entry.startswith("applinks:") and len(entry.partition("?")[0]) > 9 and "developer" not in mode and "managed" not in mode:
                 return True
     return False
 
 
-pairs = []
+pairs, in_settings, unshipped, blind = [], [], set(), []
 for pbx in sys.argv[1:]:
     try:
         with open(pbx, encoding="utf-8", errors="replace") as fh:
@@ -1528,21 +1560,26 @@ for pbx in sys.argv[1:]:
     work = []
     for t in targets:
         if t.get("productType") == "com.apple.product-type.application":
-            work.append((str(t.get("name", "")), release_only(configs(objects, t.get("buildConfigurationList")))))
+            work.append((str(t.get("name", "")), configs(objects, t.get("buildConfigurationList"))))
     if not targets:
         loose = [o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "XCBuildConfiguration"
                  and o not in project_cfgs and "PRODUCT_BUNDLE_IDENTIFIER" in (o.get("buildSettings") or dict())]
-        work.append(("", release_only(loose)))
+        work.append(("", loose))
     for target_name, cfgs in work:
+        shipped = release_only(cfgs)
         for cfg in cfgs:
             cname = str(cfg.get("name", ""))
+            ships = any(cfg is c for c in shipped)
             levels = [cfg.get("buildSettings") or dict(), base_settings(objects, parents, cfg, proj_dir)]
             if cname in by_name:
                 proj_cfg = by_name[cname]
                 levels += [proj_cfg.get("buildSettings") or dict(), base_settings(objects, parents, proj_cfg, proj_dir)]
             sdk = setting(levels, "SDKROOT", cname)
             plats = setting(levels, "SUPPORTED_PLATFORMS", cname)
-            if not is_ios(sdk, plats, setting(levels, "IPHONEOS_DEPLOYMENT_TARGET", cname)):
+            dep = setting(levels, "IPHONEOS_DEPLOYMENT_TARGET", cname)
+            if not is_ios(sdk, plats, dep):
+                if UNSURE in (sdk, plats, dep):
+                    blind.append(ships)
                 continue
             names = dict(PROJECT_DIR=proj_dir, SRCROOT=proj_dir, SOURCE_ROOT=proj_dir, PROJECT_NAME=proj_name, CONFIGURATION=cname)
             if target_name:
@@ -1554,21 +1591,32 @@ for pbx in sys.argv[1:]:
                 product = expand(product, names)
                 if isinstance(product, str) and product:
                     names["PRODUCT_NAME"] = product
-            plist = setting(levels, "INFOPLIST_FILE", cname)
-            if not isinstance(plist, str):
-                continue
-            plist = resolve(plist, proj_dir, names)
-            if not isinstance(plist, str):
-                continue
             ent = setting(levels, "CODE_SIGN_ENTITLEMENTS", cname)
             if isinstance(ent, str):
                 ent = resolve(ent, proj_dir, names)
-            pairs.append((plist, isinstance(ent, str) and applinks(ent)))
+            signed = isinstance(ent, str) and applinks(ent)
+            if ships and setting(levels, "INFOPLIST_KEY_CFBundleURLTypes", cname) is not None:
+                in_settings.append(signed)
+            plist = setting(levels, "INFOPLIST_FILE", cname)
+            if isinstance(plist, str):
+                plist = resolve(plist, proj_dir, names)
+            if not isinstance(plist, str):
+                blind.append(ships)
+                continue
+            if ships:
+                pairs.append((plist, signed))
+            else:
+                unshipped.add(plist)
 
 schemes = [os.path.realpath(os.path.abspath(p)) for p in os.environ.get("DL_SCHEMES", "").split(NL) if p.strip()]
-covered = bool(schemes)
+by_settings = os.environ.get("DL_IN_SETTINGS") == "1"
+covered = bool(schemes) or by_settings
+if by_settings and (not in_settings or not all(in_settings)):
+    covered = False
 for scheme in schemes:
     owners = [ok for plist, ok in pairs if plist == scheme]
+    if not owners and scheme in unshipped and not any(blind):
+        continue
     if not owners or not all(owners):
         covered = False
 if covered:

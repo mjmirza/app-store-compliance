@@ -1307,7 +1307,7 @@ dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
 dl_check "dl-dev a developer-mode applinks entry does not count" "$D" 1
 D="$(dl_app)"; mkdir -p "$D/App.xcodeproj"
 printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Development.entitlements"
-printf '{\n R1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n CODE_SIGN_ENTITLEMENTS = App/Release.entitlements;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+printf '{\n R1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n CODE_SIGN_ENTITLEMENTS = App/Release.entitlements;\n INFOPLIST_FILE = App/Info.plist;\n IPHONEOS_DEPLOYMENT_TARGET = 16.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
 dl_check "dl-signing an entitlements file no release configuration signs with does not count" "$D" 1
 D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '<plist><dict/></plist>' > "$D/App/Development.entitlements"
 dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = App/Development.entitlements;' '"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "$(PROJECT_DIR)/App/App.entitlements";'
@@ -1455,6 +1455,45 @@ D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlem
 printf 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements\nCODE_SIGN_ENTITLEMENTS[config=Debug] = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
 dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
 dl_check "dl-config-debug a config condition naming Debug never applies to the Release build" "$D" 1
+# Only a plist, Expo app.json or app.config, or a build setting declares a scheme. A source comment does not.
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '// Read CFBundleURLSchemes from the bundle\nlet ready = true\n' > "$D/App/Links.swift"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-swift-comment a Swift comment naming CFBundleURLSchemes never blocks the clearing" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '{"expo":{"ios":{"infoPlist":{"CFBundleURLTypes":[{"CFBundleURLSchemes":["acme"]}]}}}}' > "$D/app.json"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-expo a scheme in Expo app.json that no target owns keeps the finding" "$D" 1
+D="$(mk_ios_clean)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_KEY_CFBundleURLTypes = CFBundleURLSchemes; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-settings a scheme in build settings clears with Release applinks" "$D" 0
+D="$(mk_ios_clean)"; printf '%s' "$DL_NONE" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_KEY_CFBundleURLTypes = CFBundleURLSchemes; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-settings-none a scheme in build settings without Release applinks is flagged" "$D" 1
+# INFOPLIST_FILE resolves per configuration. A plist only a Debug configuration owns never blocks.
+D="$(mk_ios_clean)"; printf '%s' "$DL_SCHEME" > "$D/App/Info-Debug.plist"; printf '%s' "$DL_SCHEME" > "$D/App/Info-Release.plist"
+printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Debug^INFOPLIST_FILE = \"App/Info-\$(CONFIGURATION).plist\";@Release^INFOPLIST_FILE = \"App/Info-\$(CONFIGURATION).plist\"; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-plist-debug a scheme plist only Debug owns never blocks the clearing" "$D" 0
+# Build-setting modifiers resolve when the base value is known.
+for m in identifier rfc1034identifier c99extidentifier lower upper; do
+  case "$m" in identifier|c99extidentifier) f="My_App" ;; rfc1034identifier) f="My-App" ;; lower) f="my app" ;; upper) f="MY APP" ;; esac
+  D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/$f.entitlements"
+  dl_pbx "$D" '' "PRODUCT_NAME = \"My App\"; CODE_SIGN_ENTITLEMENTS = \"App/\$(PRODUCT_NAME:$m).entitlements\";"
+  dl_check "dl-mod-$m PRODUCT_NAME:$m resolves" "$D" 0
+done
+# SDKROOT auto is iOS when an iOS deployment target is set.
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^SDKROOT = auto; IPHONEOS_DEPLOYMENT_TARGET = 16.0; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-sdk-auto-ios SDKROOT auto with an iOS deployment target is iOS" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;" \
+  "T2|AppMac|$DL_APPTYPE|Release^SDKROOT = auto; SUPPORTED_PLATFORMS = macosx; IPHONEOS_DEPLOYMENT_TARGET = 16.0; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;"
+dl_check "dl-sdk-auto-mac SDKROOT auto with only macOS platforms is not iOS" "$D" 0
+# Apple documents mode=managed as reaching only devices under an MDM profile.
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=managed</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-managed a managed-mode applinks entry does not count" "$D" 1
 
 # ===== Issue #612. Review findings, pinned =====
 # The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.
