@@ -874,6 +874,32 @@ def obsoleted_27(code, k):
                     return True
     return False
 
+def body_exits(body):
+    # True when a block always leaves the function. A trailing #if ... #endif exits
+    # when it has an #else and every compiled branch exits.
+    lines = [l for l in body.split(chr(10)) if l.strip()]
+    if lines and lines[-1].strip().startswith("#endif"):
+        depth, branches, cur, i = 0, [], [], len(lines) - 2
+        has_else = False
+        while i >= 0:
+            t = lines[i].strip()
+            if t.startswith("#endif"):
+                depth += 1
+            elif t.startswith("#if") and depth > 0:
+                depth -= 1
+            elif depth == 0 and (t.startswith("#else") or t.startswith("#elseif") or t.startswith("#if")):
+                has_else = has_else or t.startswith("#else") and not t.startswith("#elseif")
+                branches.append(chr(10).join(reversed(cur)))
+                cur = []
+                if t.startswith("#if"):
+                    break
+                i -= 1
+                continue
+            cur.append(lines[i])
+            i -= 1
+        return has_else and bool(branches) and all(body_exits(b) for b in branches)
+    return stmt_exits(last_stmt(body, True))
+
 def stmt_exits(stmt):
     # True when a statement always leaves the function: return, throw, continue,
     # or an if chain that ends in else and whose every branch does.
@@ -887,9 +913,16 @@ def stmt_exits(stmt):
         return o > 0 and c > o and not stmt[c + 1:].strip() and switch_exits(stmt[o + 1:c])
     if first not in ("if", "do"):
         return False
-    blocks, gaps, level, start, prev = [], [], 0, -1, 0
+    blocks, gaps, level, start, prev, paren = [], [], 0, -1, 0, 0
     for i, c in enumerate(stmt):
-        if c == chr(123):
+        if level == 0 and c in "([":
+            paren += 1
+        elif level == 0 and c in ")]":
+            paren -= 1
+        elif paren > 0:
+            # A closure inside the condition, as in if xs.contains(where: { $0 > 0 }) { ... }.
+            continue
+        elif c == chr(123):
             if level == 0:
                 gaps.append(stmt[prev:i])
                 start = i
@@ -908,7 +941,7 @@ def stmt_exits(stmt):
             return False
     elif gaps[-1].strip() != "else":
         return False
-    return all(stmt_exits(last_stmt(b, True)) for b in blocks)
+    return all(body_exits(b) for b in blocks)
 
 def switch_exits(body):
     # True when every case of a switch body ends with return, throw, continue or break out.
@@ -923,7 +956,9 @@ def switch_exits(body):
             starts.append(i)
     if not starts:
         return False
-    for n, a in enumerate(starts):
+    nxt = True
+    for n in range(len(starts) - 1, -1, -1):
+        a = starts[n]
         part = body[a:starts[n + 1] if n + 1 < len(starts) else len(body)]
         colon, lvl = -1, 0
         for ci, ch in enumerate(part):
@@ -935,9 +970,13 @@ def switch_exits(body):
                 # The label ends at the first colon outside the parentheses of an associated value.
                 colon = ci
                 break
-        last = last_stmt(part[colon + 1:], True) if colon >= 0 else ""
-        if not stmt_exits(last):
+        rest = part[colon + 1:] if colon >= 0 else ""
+        last = last_stmt(rest, True)
+        # fallthrough runs the next case, so it exits when that case does.
+        here = body_exits(rest) or (last.split()[:1] == ["fallthrough"] and n + 1 < len(starts) and nxt)
+        if not here:
             return False
+        nxt = here
     return True
 
 def gated_at(code, stop):
@@ -989,7 +1028,7 @@ def gated_at(code, stop):
             chain_exits = exits_at.get(d, False)
             body = code[open_at[-1] + 1:k]
             # A block exits when its last statement does, or when it ends with an if and else that both exit.
-            ends_out = last_stmt(body).split(" ")[0] in ("return", "throw", "continue", "break") or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
+            ends_out = last_stmt(body).split(" ")[0] in ("return", "throw", "continue", "break") or body_exits(body) or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
             exits = done[4] in ("if", "elif") and ends_out
             if done[4] == "else" and ends_out and chain_exits and stack:
                 stack[-1][6] = k

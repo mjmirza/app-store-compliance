@@ -4982,6 +4982,47 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a nested switch on separate lines whose every case returns exits" || bad "a nested switch on separate lines whose every case returns exits"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws { if #available(iOS 27, *) { switch n { case 0: print(n); fallthrough; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "fallthrough into a returning case exits" || bad "fallthrough into a returning case exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws { if #available(iOS 27, *) { switch n { case 0: print(n); fallthrough; default: break } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "fallthrough into a case that breaks still fires" || bad "fallthrough into a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ xs: [Int]) async throws { if #available(iOS 27, *) { switch n { case 0: if xs.contains(where: { $0 > 0 }) { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a closure in an if condition is not a branch" || bad "a closure in an if condition is not a branch"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ if #available(iOS 27, macOS 27, *) {
+#if os(iOS)
+ return try await mobile()
+#else
+ return try await desktop()
+#endif
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#if and #else that both return exit" || bad "#if and #else that both return exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ if #available(iOS 27, macOS 27, *) {
+#if os(iOS)
+ return try await mobile()
+#endif
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:7' && ok "#if with no #else still fires" || bad "#if with no #else still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
