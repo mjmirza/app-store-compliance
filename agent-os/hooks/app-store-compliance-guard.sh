@@ -581,10 +581,9 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
-# JS and TS strings in every quote style (#2402). @babel/parser comes from the scanned app: Metro compiles
-# React Native code with Babel, so every React Native and Expo app has it. It reads single quotes, template
-# literals, JSX, TypeScript and Flow as a compiler does, so comments, JSX text, regex literals, import paths
-# and type-only code are never read as strings. Prints "file<TAB>line<TAB>dq" for each file with a matching
+# JS and TS strings in every quote style (#2402), read by a trusted @babel/parser (see js_parser). It reads single
+# quotes, template literals, JSX, TypeScript and Flow as a compiler does, so comments, JSX text, regex literals,
+# import paths and type-only code are never read as strings. Prints "file<TAB>line<TAB>dq" for each file with a matching
 # string, where line is the first match in any quote style and dq the first double-quoted one ("-" if none),
 # and "file<TAB>?" for a file it could not parse, which then falls back to the double-quoted grep.
 JS_STR_EXT_RE='\.(js|jsx|ts|tsx|mjs|cjs)$'
@@ -610,19 +609,28 @@ const builtUrl = (n) => (n.type === "TemplateLiteral" || (n.type === "BinaryExpr
 // The keys of a module path node whose values are still that path: the pieces of a template or a + concatenation,
 // the branches of a ?: or a fallback, and the items of an AMD require([...]) list. A string inside anything else,
 // a nested call, object or array, is read as before (#2423 review).
-const PATH_KEYS = { TemplateLiteral: ["quasis", "expressions"], ConditionalExpression: ["consequent", "alternate"], LogicalExpression: ["left", "right"] };
-const pathKeys = (n, amd) => n.type === "BinaryExpression" ? (n.operator === "+" ? ["left", "right"] : []) : n.type === "ArrayExpression" ? (amd.has(n) ? ["elements"] : []) : (PATH_KEYS[n.type] || []);
+const PATH_KEYS = { ConditionalExpression: ["consequent", "alternate"], LogicalExpression: ["left", "right"] };
+// The leading piece of a template or a + concatenation, __dirname read as /. Only . or / there is visibly a file path.
+const DIR_VARS = new Set(["__dirname", "__filename"]);
+const lead = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "Identifier" && DIR_VARS.has(a.name)) ? "/" : a.type === "TemplateLiteral" ? (((a.quasis[0].value.cooked ?? a.quasis[0].value.raw) === "" && a.expressions.length) ? lead(a.expressions[0]) : (a.quasis[0].value.cooked ?? a.quasis[0].value.raw)) : (a.type === "BinaryExpression" && a.operator === "+") ? lead(a.left) : null;
+const fileLike = (n, cont) => cont.has(n) || (n.type === "TemplateLiteral" && n.expressions.length === 0) || /^[.\/]/.test(lead(n) ?? "");
+// path.join(), path.resolve() and their posix and win32 forms take file path pieces (#2423 review).
+const PATH_FNS = new Set(["join", "resolve"]);
+const joinsPath = (n) => n.type === "CallExpression" && n.callee.type === "MemberExpression" && !n.callee.computed && PATH_FNS.has(n.callee.property.name) && (n.callee.object.type === "Identifier" ? n.callee.object.name === "path" : n.callee.object.type === "MemberExpression" && !n.callee.object.computed && /^(posix|win32)$/.test(n.callee.object.property.name) && n.callee.object.object.type === "Identifier" && n.callee.object.object.name === "path");
+const pathKeys = (n, amd, cont) => n.type === "BinaryExpression" ? (n.operator === "+" && fileLike(n, cont) ? ["left", "right"] : []) : n.type === "TemplateLiteral" ? (fileLike(n, cont) ? ["quasis", "expressions"] : []) : n.type === "ArrayExpression" ? (amd.has(n) ? ["elements"] : []) : joinsPath(n) ? ["arguments"] : (PATH_KEYS[n.type] || []);
+// Keys whose values continue a file path already seen, so their own first piece need not start with . or /.
+const contKey = (n, k) => k === "arguments" || ((n.type === "TemplateLiteral" || n.type === "BinaryExpression") && k !== "quasis");
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
 function firstHits(ast) {
   let best = null, dq = null;
   const stack = [ast.program];
   // Nodes inside a module path: the first argument of require(), import() or require.resolve(), and the source
   // of a static import or export. A string there is a piece of a module path unless it is a URL (#2423 review).
-  const inPath = new WeakSet(), amd = new WeakSet();
-  const push = (v, path) => { if (path && v && typeof v === "object") inPath.add(v); stack.push(v); };
+  const inPath = new WeakSet(), amd = new WeakSet(), cont = new WeakSet();
+  const push = (v, path, more) => { if (path && v && typeof v === "object") { inPath.add(v); if (more) cont.add(v); } stack.push(v); };
   while (stack.length) {
     const n = stack.pop();
-    if (Array.isArray(n)) { for (const c of n) push(c, inPath.has(n)); continue; }
+    if (Array.isArray(n)) { for (const c of n) push(c, inPath.has(n), cont.has(n)); continue; }
     if (!n || typeof n.type !== "string" || typeOnly(n)) continue;
     let text = null;
     if (n.type === "StringLiteral") text = n.value;
@@ -644,7 +652,8 @@ function firstHits(ast) {
         n.arguments.forEach((a, i) => push(a, i === 0));
         continue;
       }
-      push(n[k], (inPath.has(n) && !builtUrl(n) && pathKeys(n, amd).includes(k)) || (k === "source" && /^(Import|Export)/.test(n.type)));
+      const along = inPath.has(n) && !builtUrl(n) && pathKeys(n, amd, cont).includes(k);
+      push(n[k], along || (k === "source" && /^(Import|Export)/.test(n.type)), along && contKey(n, k));
     }
   }
   return [best, dq];
@@ -663,11 +672,37 @@ for (const f of fs.readFileSync(0, "utf8").split("\n")) {
   if (hit) out.push(f + "\t" + hit.loc.start.line + "\t" + (dq ? dq.loc.start.line : "-"));
 }
 process.stdout.write(out.join("\n") + (out.length ? "\n" : ""));'
+# The scanned app never supplies the parser, since loading it would run its code. BABEL_PARSER_DIR or the global
+# npm root is used, and APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 opts in to the copy inside the scanned app.
+JS_PARSER_JS='const fs = require("fs"), path = require("path");
+const [mode, where, dir] = process.argv.slice(1);
+let p = "";
+try {
+  if (mode === "project") p = require.resolve("@babel/parser", { paths: [where] });
+  else if (JSON.parse(fs.readFileSync(path.join(where, "package.json"), "utf8")).name === "@babel/parser") p = require.resolve(path.resolve(where));
+  if (p && mode !== "project") { const real = fs.realpathSync(p), root = fs.realpathSync(dir) + path.sep; if (real.startsWith(root)) p = ""; }
+} catch (e) { p = ""; }
+process.stdout.write(p);'
+js_parser() {  # prints the path of a trusted @babel/parser, or nothing
+  local p="" g d
+  d="$(cd "$DIR" 2>/dev/null && pwd -P)" || return 0
+  if [ "${APP_STORE_GUARD_TRUST_PROJECT_BABEL:-0}" = 1 ]; then
+    p="$(cd / && node -e "$JS_PARSER_JS" project "$d" "$d" 2>/dev/null)"
+  fi
+  if [ -z "$p" ] && [ -n "${BABEL_PARSER_DIR:-}" ] && [ -d "$BABEL_PARSER_DIR" ]; then
+    g="$(cd "$BABEL_PARSER_DIR" && pwd -P)" && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g" "$d" 2>/dev/null)"
+  fi
+  if [ -z "$p" ] && command -v npm >/dev/null 2>&1; then
+    g="$(cd / && npm root -g 2>/dev/null)"
+    [ -n "$g" ] && [ -d "$g/@babel/parser" ] && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g/@babel/parser" "$d" 2>/dev/null)"
+  fi
+  printf '%s' "$p"
+}
 js_strings() {  # $1 regex. Writes $FILELIST.js and returns 0 when Node and @babel/parser read the shipped JS and TS files
   : > "$FILELIST.js" 2>/dev/null || return 1
   command -v node >/dev/null 2>&1 || return 1
   local parser
-  parser="$(node -e 'try { process.stdout.write(require.resolve("@babel/parser", { paths: [process.argv[1]] })) } catch (e) {}' "$DIR" 2>/dev/null)"
+  parser="$(js_parser)"
   [ -n "$parser" ] || return 1
   grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}" | node -e "$JS_STRINGS_JS" "$parser" "$1" > "$FILELIST.js" 2>/dev/null
 }

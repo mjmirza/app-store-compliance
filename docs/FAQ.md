@@ -12,6 +12,7 @@ Fair question, and stars prove nothing. Check it yourself in a few minutes.
 - `scripts/install.sh` writes into `~/.claude` (or `$CLAUDE_CONFIG_DIR`). the hook, the skill folder, one command file, and a hook entry in `settings.json`. It backs up `settings.json` first as `settings.json.bak-<timestamp>`.
 - `bash scripts/install.sh install --dry-run` prints every change and writes nothing. `doctor` checks the install, `uninstall` removes it.
 - Neither the installer nor the guard calls curl or wget. `scripts/monitor.py` fetches Apple's public developer feed by default; pass `--mock`, `--simulate` or `--news-file` to stay offline. The Android, AI policy and privacy monitors fetch only with `--live`.
+- The guard never runs code from the project it scans. To read JS and TS strings it loads `@babel/parser` from `BABEL_PARSER_DIR` or the global npm root, and refuses a copy inside the scanned folder. Without one it reads double-quoted strings only. Set `APP_STORE_GUARD_TRUST_PROJECT_BABEL=1` to use the copy in your own app's `node_modules`, only for a project you trust.
 - Want more isolation? Run it in a container or a VM.
 
 Section 8 of `docs/WHAT-THE-SCAN-PROVES.md` lists what each script touches.

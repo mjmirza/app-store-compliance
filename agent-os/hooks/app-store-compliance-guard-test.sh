@@ -3912,12 +3912,14 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'App/Net.swift:6' && ok "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it" || bad "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it"
 rm -rf "$D"
 # Issue #2402. JS and TS strings in every quote style, read by @babel/parser from the scanned app.
-# CI installs @babel/parser globally. Elsewhere set BABEL_PARSER_DIR, or these print SKIP.
-BABEL_PARSER_DIR="${BABEL_PARSER_DIR:-$(npm root -g 2>/dev/null)/@babel/parser}"
-mk_js() {  # a React Native app whose src/$1 holds $2, with @babel/parser in node_modules as Metro brings it
-  local d; d="$(mk_rn_ship "$1" "$2")"
-  mkdir -p "$d/node_modules/@babel" && ln -s "$BABEL_PARSER_DIR" "$d/node_modules/@babel/parser"
-  echo "$d"
+# CI installs @babel/parser globally. Elsewhere set BABEL_PARSER_DIR, or these print SKIP. The guard reads it
+# from BABEL_PARSER_DIR or the global npm root, never from the scanned app.
+BABEL_PARSER_DIR="${BABEL_PARSER_DIR:-$(npm root -g 2>/dev/null)/@babel/parser}"; export BABEL_PARSER_DIR
+mk_js() { mk_rn_ship "$@"; }  # a React Native app whose src/$1 holds $2
+plant_parser() {  # $1 app. A fake @babel/parser in its node_modules that leaves a MARKER file when loaded
+  mkdir -p "$1/node_modules/@babel/parser"
+  printf '{"name":"@babel/parser","main":"index.js"}\n' > "$1/node_modules/@babel/parser/package.json"
+  printf 'require("fs").writeFileSync(require("path").join(__dirname, "MARKER"), "ran");\nmodule.exports = {};\n' > "$1/node_modules/@babel/parser/index.js"
 }
 js_case() {  # name, expect (file:line that fires, or 0 for silent), file name, file content
   local d; d="$(mk_js "$3" "$4")"
@@ -4012,6 +4014,25 @@ module.exports = p;"
   js_case "js-46 a host in an array inside import() still fires" src/loader.js:1 loader.js "export const w = import(pick(['staging.acme.io', 'api.acme.io']));"
   js_case "js-47 the branches of a conditional require() path stay silent" 0 loader.js "const c = require(dev ? './staging.config' : './prod.config');"
   js_case "js-48 a fallback in a require() path stays silent" 0 loader.js "const c = require(process.env.CFG_PATH || './staging.config');"
+  js_case "js-49 a host after a scheme held in a variable in an import() template still fires" src/loader.js:1 loader.js 'const scheme = "https://"; export const widget = import(/* webpackIgnore: true */ `${scheme}${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  printf "const path = require('path'); module.exports = require(path.join(__dirname, './staging.config.js'));\n" > "$D/app.config.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-50 a path.join() file path inside require() stays silent" || bad "js-50 a path.join() file path inside require() stays silent"
+  rm -rf "$D"
+  # #2423 review. A parser planted in the scanned app is never loaded unless APP_STORE_GUARD_TRUST_PROJECT_BABEL=1.
+  NOGLOBAL="$(mktemp -d)"; printf '#!/bin/sh\necho /nonexistent\n' > "$NOGLOBAL/npm"; chmod +x "$NOGLOBAL/npm"
+  D="$(mk_js api.js "const a = 'https://staging.acme.io';
+const b = \"http://localhost:3000\";")"; plant_parser "$D"
+  OUT="$(BABEL_PARSER_DIR= PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:2' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-51 a parser planted in the app is not loaded, the double-quoted grep runs" || bad "js-51 a parser planted in the app is not loaded, the double-quoted grep runs"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:1' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-52 with a trusted parser the planted one is still not loaded" || bad "js-52 with a trusted parser the planted one is still not loaded"
+  OUT="$(BABEL_PARSER_DIR="$D/node_modules/@babel/parser" PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:2' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-53 a BABEL_PARSER_DIR inside the scanned app is refused" || bad "js-53 a BABEL_PARSER_DIR inside the scanned app is refused"
+  OUT="$(APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 bash "$GUARD" "$D" 2>&1)"
+  [ -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-54 APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 uses the copy in the app" || bad "js-54 APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 uses the copy in the app"
+  rm -rf "$D" "$NOGLOBAL"
   D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
 export const b = \"http://localhost:3000\";")"
   NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
@@ -4019,7 +4040,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-48 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-54 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

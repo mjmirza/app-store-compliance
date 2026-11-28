@@ -24,7 +24,7 @@ jobs:
         run: python3 scripts/deadline-checker.py
 
       - name: Babel parser for the guard's JS and TS string tests
-        # The guard reads it from the scanned app's node_modules. The js-* tests link this copy into their fixtures.
+        # The guard loads it from BABEL_PARSER_DIR or the global npm root, never from the scanned app.
         run: npm install --global @babel/parser@7.29.15
 
       - name: Guard test suite
