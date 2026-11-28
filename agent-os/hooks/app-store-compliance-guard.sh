@@ -697,30 +697,300 @@ fi
 SCAN_ERROR=""
 
 # Terms of Use evidence for an auto-renewable subscription (Schedule 2 section 3.8(b)).
-# Literals are read from comment-stripped source, so a comment, license header or identifier never counts.
-TERMS_LIT_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96) }
-  { l=$0; n=length(l); i=1
-    while (i <= n) { c=substr(l, i, 1)
-      if (c == "\"" || c == sq || c == bt) { j=i+1; s=""
-        while (j <= n && substr(l, j, 1) != c) { if (substr(l, j, 1) == "\\") j++; else s=s substr(l, j, 1); j++ }
-        print s; i=j+1; continue }
-      i++ }
-    while (match(l, />[^<>{}]+</)) { print substr(l, RSTART+1, RLENGTH-2); l=substr(l, RSTART+RLENGTH-1) } }'
-TERMS_PHRASE_RE='terms[[:space:]]+(of[[:space:]]+(use|service)|(&|&amp;|and)[[:space:]]+conditions)|(^|[^a-z])eula([^a-z]|$)|stdeula|end[- ]user[[:space:]]+licen[cs]e|nutzungsbedingungen|gesch.{1,2}ftsbedingungen|t.{1,2}rminos[[:space:]]+(de[[:space:]]+(uso|servicio)|y[[:space:]]+condiciones)|termos[[:space:]]+(de[[:space:]]+(uso|servi)|e[[:space:]]+condi)|termini[[:space:]]+(di[[:space:]]+(utilizzo|uso|servizio)|e[[:space:]]+condizioni)|condizioni[[:space:]]+d.{1,3}uso|conditions[[:space:]]+(d.{1,3}utilisation|g.{1,2}n.{1,2}rales)|(^|[^a-z])(cgu|cgv)([^a-z]|$)|gebruiksvoorwaarden|algemene[[:space:]]+voorwaarden|kullan.{1,2}m[[:space:]]+ko.{1,2}ullar|利用規約|使用条款|服务条款|服務條款|用户协议|이용약관|(У|у)словия[[:space:]]+(использования|пользования|обслуживания)|(П|п)ользовательское[[:space:]]+соглашение'
-TERMS_URL_RE='/(tos|terms[a-z_-]*|user-agreement|eula|agb|cgu|cgv)([/?#.]|$)'
-TERMS_LABEL_RE='^[[:space:]]*(Terms|Legal|Rechtliches|AGB)[[:space:]]*$'
+# Files are read whole, so a literal or JSX text that spans lines counts. Comments never count.
+IFS= read -r -d '' TERMS_PY <<'TERMSPY' || :
+import sys, re, json
+
+NL, Q2, Q1, BT, BS = chr(10), chr(34), chr(39), chr(96), chr(92)
+SQ_EXT = (
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".dart",
+    ".kt",
+    ".kts",
+    ".java",
+    ".cs",
+)
+JSX_EXT = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
+PHRASE = (
+    r"terms\s+(of\s+(use|service)|(&|&amp;|and)\s+conditions)|(?<![a-z])eula(?![a-z])|stdeula|end[- ]user\s+licen[cs]e"
+    r"|nutzungsbedingungen|gesch.{1,2}ftsbedingungen|t.{1,2}rminos\s+(de\s+(uso|servicio)|y\s+condiciones)"
+    r"|termos\s+(de\s+(uso|servi)|e\s+condi)|termini\s+(di\s+(utilizzo|uso|servizio)|e\s+condizioni)|condizioni\s+d.{1,3}uso"
+    r"|conditions\s+(d.{1,3}utilisation|g.{1,2}n.{1,2}rales)|(?<![a-z])(cgu|cgv)(?![a-z])|gebruiksvoorwaarden|algemene\s+voorwaarden"
+    r"|kullan.{1,2}m\s+ko.{1,2}ullar|利用規約|使用条款|服务条款|服務條款|用户协议|이용약관"
+    r"|условия\s+(использования|пользования|обслуживания)|пользовательское\s+соглашение"
+)
+PHRASE_RE = re.compile(PHRASE, re.I)
+ITEM = (
+    PHRASE
+    + r"|subscription\s+terms|usage\s+terms|licen[cs]e\s+agreement|legal\s+(info|information|notice|notices)"
+    r"|legal|terms|tos|agb|rechtliches"
+)
+PRIV = r"privacy(\s+(policy|notice))?|datenschutz\S*|cookie\s+policy"
+SEP = r"(\s*(&amp;|&|·|•|\||/|,|\+|(?<![a-z])(and|und|et|y)(?![a-z]))\s*|\s+)"
+ANY = "(" + ITEM + "|" + PRIV + ")"
+WHOLE_RE = re.compile(r"^\W*" + ANY + "(" + SEP + ANY + r")*\W*$", re.I)
+ITEM_RE = re.compile(r"(?<![a-z])(" + ITEM + r")(?![a-z])", re.I)
+URLPATH_RE = re.compile(
+    r"/(terms([-_](of[-_](use|service)|and[-_]conditions|conditions))?|termsofuse|termsofservice|tos|eula"
+    r"|stdeula|legal|agb|cgu|cgv|user[-_]agreement)(\.(html?|php|aspx?|jsp))?(?=[/?#]|$)",
+    re.I,
+)
+UI_RE = re.compile(
+    r"((?<![A-Za-z0-9_])(Link|Button|Text|Label|NavigationLink|TextButton|Tab)\s*\(\s*([A-Za-z_]+\s*[:=]\s*)?"
+    r"|(?<![A-Za-z0-9_])href\s*[=:]\s*\{?\s*)$"
+)
+TRIGGER_RE = re.compile(
+    r"subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\("
+)
+KEY_TOKENS = ("terms", "tos", "eula", "legal", "agb")
+NEXT_RE = re.compile("[/" + Q2 + Q1 + BT + "]")
+
+
+def norm(s):
+    return " ".join(s.split())
+
+
+def is_url_terms(s):
+    s = s.strip()
+    if not re.match(r"^(https?://\S+|/\S*)$", s):
+        return False
+    return bool(URLPATH_RE.search(re.sub(r"^https?://[^/]+", "", s)))
+
+
+def is_label(s):
+    s = norm(s)
+    return bool(s) and bool(WHOLE_RE.match(s)) and bool(ITEM_RE.search(s))
+
+
+def scan(text, ext):
+    out, lits, i, n, pos = [], [], 0, len(text), 0
+    sq, bt = ext in SQ_EXT, ext in JSX_EXT
+    while i < n:
+        c = text[i]
+        if c == "/" and text[i + 1 : i + 2] == "/" and (i == 0 or text[i - 1] != ":"):
+            j = text.find(NL, i)
+            i = n if j < 0 else j
+            continue
+        if c == "/" and text[i + 1 : i + 2] == "*":
+            j = text.find("*/", i + 2)
+            end = n if j < 0 else j + 2
+            k = NL * text.count(NL, i, end)
+            out.append(k)
+            pos += len(k)
+            i = end
+            continue
+        if c == Q2 or (c == Q1 and sq) or (c == BT and bt):
+            tri = c != BT and text[i : i + 3] == c * 3
+            close = c * 3 if tri else c
+            multi = tri or c == BT
+            j, buf = i + len(close), []
+            while j < n and not text.startswith(close, j):
+                if text[j] == NL and not multi:
+                    break
+                if text[j] == BS:
+                    buf.append(text[j + 1 : j + 2])
+                    j += 2
+                    continue
+                buf.append(text[j])
+                j += 1
+            if j >= n or not text.startswith(close, j):
+                out.append(c)
+                pos += 1
+                i += 1
+                continue
+            body = "".join(buf)
+            lits.append((body, pos))
+            mark = chr(1) + str(len(lits) - 1) + chr(2) + NL * body.count(NL)
+            out.append(mark)
+            pos += len(mark)
+            i = j + len(close)
+            continue
+        m = NEXT_RE.search(text, i + 1)
+        j = n if m is None else m.start()
+        out.append(text[i:j])
+        pos += j - i
+        i = j
+    return "".join(out), lits
+
+
+def jsx_texts(code, lits):
+    def sub(m):
+        return lits[int(m.group(1))][0]
+
+    code = re.sub(r"\{\s*" + chr(1) + r"(\d+)" + chr(2) + r"\s*\}", sub, code)
+    code = re.sub(chr(1) + r"\d+" + chr(2), " ", code)
+    return [norm(t) for t in re.findall(r">([^<>{}]+)<", code)]
+
+
+def read(path):
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return ""
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", "replace")
+    return data.decode("utf-8", "replace")
+
+
+def source_hit(path):
+    low = path.lower()
+    text = read(path)
+    if low.endswith(".html") or low.endswith(".htm"):
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+        for t in re.findall(r">([^<>]+)<", text):
+            if PHRASE_RE.search(t) or is_label(t):
+                return True
+        for u in re.findall(
+            r"href\s*=\s*[" + Q2 + Q1 + r"]([^" + Q2 + Q1 + r"]+)", text, re.I
+        ):
+            if is_url_terms(u):
+                return True
+        return False
+    ext = "." + low.rsplit(".", 1)[-1]
+    code, lits = scan(text, ext)
+    for body, pos in lits:
+        if is_label(body) or is_url_terms(body):
+            return True
+        if UI_RE.search(code[max(0, pos - 80) : pos]) and PHRASE_RE.search(body):
+            return True
+    if ext in JSX_EXT:
+        for t in jsx_texts(code, lits):
+            if PHRASE_RE.search(t) or is_label(t):
+                return True
+    return False
+
+
+def key_tokens(key):
+    return [t.lower() for t in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", key)]
+
+
+def value_counts(key, val):
+    val = norm(val)
+    if not val:
+        return False
+    if is_label(val) or is_url_terms(val):
+        return True
+    if len(val.split()) <= 6 and PHRASE_RE.search(val):
+        return True
+    if any(t in KEY_TOKENS for t in key_tokens(key)) and (
+        PHRASE_RE.search(val) or ITEM_RE.search(val)
+    ):
+        return True
+    return False
+
+
+def flatten(obj, pre, acc):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(k, str) and not k.startswith("@"):
+                flatten(v, pre + "." + k if pre else k, acc)
+    elif isinstance(obj, list):
+        for v in obj:
+            flatten(v, pre, acc)
+    elif isinstance(obj, str):
+        acc.append((pre, obj))
+
+
+def strings_pairs(path):
+    text = read(path)
+    low = path.lower()
+    pairs = []
+    if low.endswith(".strings"):
+        text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+        lit = Q2 + r"((?:[^" + Q2 + BS + BS + r"]|" + BS + BS + r".)*)" + Q2
+        for k, v in re.findall(lit + r"\s*=\s*" + lit + r"\s*;", text):
+            pairs.append((k, v))
+    elif low.endswith(".xml"):
+        pat = (
+            r"<string\s+name\s*=\s*"
+            + Q2
+            + r"([^"
+            + Q2
+            + r"]*)"
+            + Q2
+            + r"[^>]*>(.*?)</string>"
+        )
+        for k, v in re.findall(pat, text, re.S):
+            pairs.append((k, re.sub(r"<[^>]*>|<!\[CDATA\[|\]\]>", " ", v)))
+    else:
+        try:
+            data = json.loads(text)
+        except ValueError:
+            return pairs
+        if (
+            low.endswith(".xcstrings")
+            and isinstance(data, dict)
+            and isinstance(data.get("strings"), dict)
+        ):
+            for k, entry in data["strings"].items():
+                pairs.append((k, k))
+                acc = []
+                flatten(entry, "", acc)
+                pairs.extend((k, v) for p, v in acc if p.endswith("value"))
+        else:
+            flatten(data, "", pairs)
+    return pairs
+
+
+def main():
+    mode = sys.argv[1]
+    src, strs = [], []
+    cur = src
+    for line in sys.stdin.read().split(NL):
+        if line == "--strings--":
+            cur = strs
+            continue
+        if line:
+            cur.append(line)
+    if mode == "trigger":
+        for p in src:
+            ext = "." + p.lower().rsplit(".", 1)[-1]
+            if ext in (".html", ".htm"):
+                continue
+            code, _ = scan(read(p), ext)
+            m = TRIGGER_RE.search(code)
+            if m:
+                print(p + ":" + str(code.count(NL, 0, m.start()) + 1))
+                return 0
+        return 1
+    for p in src:
+        if source_hit(p):
+            return 0
+    for p in strs:
+        for k, v in strings_pairs(p):
+            if value_counts(k, v):
+                return 0
+    return 1
+
+
+sys.exit(main())
+TERMSPY
+terms_inputs() {  # source files, then a marker, then the strings files the app ships
+  grep -E "$SRC_EXT_RE|[.]html?$" "$FILELIST"
+  printf '%s\n' '--strings--'
+  find_app 12 \( -name '*.strings' -o -name '*.xcstrings' -o -name '*.arb' -o -name 'strings.xml' -o -name '*.json' \) -type f \
+    | grep -E '[.](strings|xcstrings|arb)$|/res/values[^/]*/strings[.]xml$|/(locales?|i18n|l10n|lang|langs|languages|translations|messages)/([^/]+/)?[^/]+[.]json$|/[a-z][a-z]([-_][A-Za-z]+)?[.]json$'
+  return 0  # no strings file is not a failure under pipefail
+}
+# Prints the file and line of a subscription call in code, never in a comment or a string. Silent without python3.
+subscription_hit() {
+  [ -s "$FILELIST" ] && command -v python3 >/dev/null 2>&1 || return 1
+  local h
+  h="$(grep -E "$SRC_EXT_RE" "$FILELIST" | python3 -c "$TERMS_PY" trigger 2>/dev/null | head -n 1)"
+  [ -n "$h" ] || return 1
+  printf '%s' "${h#"${DIR%/}"/}"
+}
 terms_link_present() {
-  local lits
   # SubscriptionStoreView shows the policy links Apple configures, unless storeButton hides them.
   if impl_has 'SubscriptionStoreView' && ! impl_has 'storeButton\([[:space:]]*\.hidden[[:space:]]*,[[:space:]]*for:[^)]*\.policies'; then return 0; fi
-  lits="$({ if [ "${CODE_OK:-0}" -eq 1 ]; then awk "$TERMS_LIT_AWK" "$FILELIST.impl"
-      else grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk "$TERMS_LIT_AWK"; fi
-    find_app 12 \( -name '*.strings' -o -name '*.xcstrings' -o -name '*.arb' -o -name 'strings.xml' -o -name '*.json' \) -type f \
-      | grep -E '[.](strings|xcstrings|arb)$|/res/values[^/]*/strings[.]xml$|/(locales?|i18n|l10n|lang|langs|languages|translations|messages)/[^/]*[.]json$|/[a-z][a-z]([-_][A-Za-z]+)?[.]json$' \
-      | tr '\n' '\0' | xargs -0 awk "$TERMS_LIT_AWK"; } 2>/dev/null)"
-  [ -n "$lits" ] || return 1
-  printf '%s\n' "$lits" | grep -Ei -e "$TERMS_PHRASE_RE" -e "$TERMS_URL_RE" >/dev/null && return 0
-  printf '%s\n' "$lits" | grep -E -e "$TERMS_LABEL_RE" >/dev/null
+  command -v python3 >/dev/null 2>&1 || return 0
+  terms_inputs 2>/dev/null | python3 -c "$TERMS_PY" terms 2>/dev/null
 }
 
 # ----- the scan of one tree (issue #612). Runs once per app root, or once on the project root -----
@@ -1226,9 +1496,9 @@ PBXPY
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
   # Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
-  # A terms phrase, URL path or Legal label counts only in a string literal, JSX text or a strings file.
-  if grep_has 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('; then
-    terms_link_present || finding medium "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
+  # A terms label counts as a whole literal, in UI text, as a terms URL or as a short strings value.
+  if SUB_HIT="$(subscription_hit)"; then
+    terms_link_present || finding medium "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." at "$SUB_HIT"
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'

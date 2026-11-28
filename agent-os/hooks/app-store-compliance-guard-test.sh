@@ -3368,6 +3368,57 @@ gs_check "subt-40 a Flutter subscription with no terms link is flagged" "$(subt_
 gs_check "subt-41 a Flutter Text with Terms of Use stays silent" "$(subt_flutter "Text('Terms of Use')")" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
 gs_check "subt-42 a React Native subscription with no terms link is flagged" "$(subt_rn 'const termsAccepted = false;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
 gs_check "subt-43 React Native JSX text Terms of Use stays silent" "$(subt_rn 'return <Text onPress={open}>Terms of Use</Text>;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# Text that spans lines is read whole. Prettier JSX, a Swift multi-line literal, a JS template literal.
+gs_check "subt-44 multi-line JSX text Terms of Use stays silent" "$(subt_rn 'return (
+  <Text onPress={open}>
+    Terms of Use
+  </Text>
+);')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+let footer = """
+    Terms of Use
+    """')"
+gs_check "subt-45 a Swift multi-line literal with Terms of Use stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+TICK="$(printf '\140')"
+gs_check "subt-46 a multi-line JS template literal with Terms of Use stays silent" "$(subt_rn "const label = ${TICK}
+  Terms of Use
+${TICK};")" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# Nested i18next locale files are strings files.
+D="$(subt_rn 'const footer = t("paywall.footer");')"; mkdir -p "$D/public/locales/en"
+printf '{"paywall":{"footer":"Terms of Use"}}' > "$D/public/locales/en/translation.json"
+gs_check "subt-47 a terms label in public/locales/en/translation.json stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(subt_rn 'const footer = t("legal.link");')"; mkdir -p "$D/locales/de"
+printf '{"legal":{"link":"Nutzungsbedingungen"}}' > "$D/locales/de/common.json"
+gs_check "subt-48 a terms label in locales/de/common.json stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# Common real labels, as a whole literal, JSX text with an escaped ampersand, or a WebView URL.
+n=48
+for c in 'let l = "Terms and Privacy"' 'let l = "Terms & Privacy"' 'let l = "Terms · Privacy"' 'let l = "Subscription Terms"' 'let l = "Usage Terms"' 'let l = "License Agreement"' 'let l = "Legal Info"' 'let l = "Legal Notice"' 'let l = "ToS"' 'WebView(url: URL(string: "https://realbackend.io/legal")!)'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n a terms label stays silent. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+done
+gs_check "subt-59 JSX Terms {&} Conditions stays silent" "$(subt_rn 'return <Text onPress={open}>Terms {"&"} Conditions</Text>;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# The trigger is code. A comment or a string that names the API is not a subscription.
+D="$(gs_ios Paywall.swift '// TODO subscriptionPeriod')"
+gs_check "subt-60 a subscriptionPeriod comment is not a subscription" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let note = "we never use .autoRenewable"')"
+gs_check "subt-61 a .autoRenewable string is not a subscription" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# A terms phrase inside a log, analytics or search string is not a link.
+n=61
+for c in 'print("Terms of Service loaded")' 'Analytics.log("terms of use viewed")' 'let q = "terms of service search"' 'let u = "https://realbackend.io/terms-of-sale"' 'let img = "https://realbackend.io/img/terms.png"' 'let f = "https://realbackend.io/fonts/eula.woff2"'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n not a terms link. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+done
+# A strings value counts when it is short, or its key names the terms.
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Text("footer")')"
+printf '"footer" = "By subscribing you accept the Terms of Use and the renewal rules shown here";\n' > "$D/App/Localizable.strings"
+gs_check "subt-68 a long strings value with a terms phrase is not a link" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Text("terms_link")')"
+printf '"terms_link" = "Read the legal details before you subscribe to the premium plan";\n' > "$D/App/Localizable.strings"
+gs_check "subt-69 a strings value under a terms key stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
 
 D="$(mk_android_perm '<application android:debuggable="true"/>')"
 gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1

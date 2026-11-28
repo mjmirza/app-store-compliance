@@ -171,10 +171,10 @@ grep -rqn 'ExternalPurchaseLink\|external-purchase-link\|openExternalPurchaseLin
 - Platform. apple
 - Guideline or policy. 3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)
 - Severity. medium
-- What triggers it. The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its string literals, JSX text or localized strings files. Comments and identifiers do not count. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
+- What triggers it. The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its code. A terms label counts as a whole string literal, as UI text (a Link, Button or Text argument, or JSX text, also across lines), as a URL with a terms path, or as a short localized strings value. A terms phrase inside a longer log or analytics string, a comment or an identifier does not count, and a subscription API named only in a comment or a string does not trigger the check. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
 - How to fix it. Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.
 - Detection signals. subscriptionPeriod, .autoRenewable, getSubscriptions(, requestSubscription(
-- Present means handled. SubscriptionStoreView, unless storeButton(.hidden, for: .policies), Terms of Use, Terms of Service, Terms and Conditions, EULA, End User License, stdeula, Nutzungsbedingungen, a /terms, /tos, /user-agreement, /eula, /agb, /cgu or /cgv URL, a string literal Terms, Legal, Rechtliches or AGB
+- Present means handled. SubscriptionStoreView, unless storeButton(.hidden, for: .policies), Terms of Use, Terms of Service, Terms and Conditions, EULA, End User License, stdeula, Nutzungsbedingungen, a /terms, /terms-of-use, /terms-of-service, /tos, /user-agreement, /eula, /legal, /agb, /cgu or /cgv URL, a whole string literal such as Terms, Terms and Privacy, Subscription Terms, License Agreement, Legal Info, ToS or AGB
 
 How to detect.
 
