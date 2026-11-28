@@ -779,8 +779,8 @@ def last_stmt(body, raw=False):
             depth -= 1
         nxt = body[i + 1:].lstrip(" " + chr(9))
         prev = cur.rstrip()
-        if depth == 0 and c == chr(10) and prev and ((nxt.startswith(".") and not nxt.startswith("..")) or nxt.split(chr(123))[0].split("(")[0].strip().split(" ")[0] in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
-            # A line that starts with a member access continues the statement above.
+        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.split(chr(123))[0].split("(")[0].strip().split(" ")[0] in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
+            # A line that starts with a member access, or sits inside a multiline string, continues the statement above.
             cur += " "
         elif depth == 0 and c in (";", chr(10)):
             if cur.strip():
@@ -987,6 +987,22 @@ def switch_exits(body):
         nxt = here
     return True
 
+def cond_gated(code, k):
+    # True when k sits in a condition after a clause such as #unavailable(iOS 27), which
+    # short-circuits, so the rest of the condition never runs on 27.
+    h = outer(head_of(code, k))
+    if not (h.split(" ")[0] in ("if", "guard", "while") or h.startswith("else if")):
+        return False
+    parts, cur, depth = [], "", 0
+    for c in h:
+        depth += {"(": 1, ")": -1}.get(c, 0)
+        if c == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += c
+    return any(gates_27(p) for p in parts)
+
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
@@ -1071,7 +1087,7 @@ def gated_at(code, stop):
                 else:
                     top = True
     # A declaration without a body, such as a typealias, carries its @available on the same statement.
-    return top or any(f[0] for f in stack) or obsoleted_27(code, min(stop, len(code)))
+    return top or any(f[0] for f in stack) or obsoleted_27(code, min(stop, len(code))) or cond_gated(code, min(stop, len(code)))
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.

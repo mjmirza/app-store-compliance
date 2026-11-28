@@ -5055,6 +5055,34 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a trailing closure in the condition is not a branch" || bad "a trailing closure in the condition is not a branch"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #unavailable(iOS 27), let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a call after #unavailable in the same condition is gated" || bad "a call after #unavailable in the same condition is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #available(iOS 27, *), let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a call after #available in the same condition still fires" || bad "a call after #available in the same condition still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if let c = try? await ImageCreator(), #unavailable(iOS 27) { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a call before #unavailable in the condition still fires" || bad "a call before #unavailable in the condition still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws -> String {
+if #available(iOS 27, *) {
+return """
+Use the sheet.
+"""
+}
+let c = try await ImageCreator()
+return String(describing: c)
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "returning a multiline string is an early return" || bad "returning a multiline string is an early return"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
