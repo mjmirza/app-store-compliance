@@ -4020,6 +4020,48 @@ module.exports = p;"
   OUT="$(bash "$GUARD" "$D" 2>&1)"
   ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-50 a path.join() file path inside require() stays silent" || bad "js-50 a path.join() file path inside require() stays silent"
   rm -rf "$D"
+  js_at() {  # name, expect, path from the app root, content. Like js_case, for a file outside src/
+    local d; d="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+    mkdir -p "$(dirname "$d/$3")"; printf '%s\n' "$4" > "$d/$3"
+    OUT="$(bash "$GUARD" "$d" 2>&1)"
+    if [ "$2" = 0 ]; then ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "$1" || bad "$1"
+    else sh_at "$2" && ok "$1" || bad "$1"; fi
+    rm -rf "$d"
+  }
+  # #2423 review. A backslash in a file name, and the dev-only configs, stories and test setup files.
+  js_case "js-55 a double-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' 'export const a = "http://localhost:3000";'
+  js_case "js-56 a single-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' "export const a = 'http://localhost:3000';"
+  js_at "js-57 a single-quoted host in next.config.js stays silent" 0 next.config.js "module.exports = { env: { API: 'http://localhost:3000' } };"
+  js_at "js-58 a double-quoted host in next.config.js still fires, as on main" next.config.js:1 next.config.js 'module.exports = { env: { API: "http://localhost:3000" } };'
+  js_at "js-59 a single-quoted host in vue.config.js stays silent" 0 vue.config.js "module.exports = { devServer: { proxy: 'http://localhost:8080' } };"
+  js_at "js-60 a single-quoted host in nuxt.config.ts stays silent" 0 nuxt.config.ts "export default { devServer: { url: 'http://localhost:3000' } };"
+  js_at "js-61 a single-quoted host in svelte.config.js stays silent" 0 svelte.config.js "export default { kit: { dev: 'http://localhost:5173' } };"
+  js_at "js-62 a single-quoted host in .storybook/main.js stays silent" 0 .storybook/main.js "module.exports = { url: 'http://localhost:6006' };"
+  js_at "js-63 a single-quoted host in a stories file stays silent" 0 src/Button.stories.tsx "export const u = 'http://localhost:6006';"
+  js_at "js-64 a single-quoted host in setupTests.ts stays silent" 0 src/setupTests.ts "global.API = 'http://localhost:3000';"
+  js_at "js-65 a single-quoted host in jest.setup.js stays silent" 0 jest.setup.js "global.API = 'http://localhost:3000';"
+  js_at "js-66 a single-quoted host in vitest.setup.ts stays silent" 0 vitest.setup.ts "global.API = 'http://localhost:3000';"
+  js_at "js-67 a single-quoted host in an Expo app.config.js still fires" app.config.js:1 app.config.js "export default { extra: { api: 'http://localhost:3000' } };"
+  js_at "js-68 a single-quoted host in capacitor.config.ts still fires" capacitor.config.ts:1 capacitor.config.ts "export default { server: { url: 'http://localhost:3000' } };"
+  js_at "js-69 a single-quoted host in bundled Capacitor web assets still fires, as double quotes do on main" ios/App/App/public/assets/vendor.js:1 ios/App/App/public/assets/vendor.js "var u = 'http://localhost:3000';"
+  # Module paths in new URL(), import.meta, require.context and the jest and vi mocks, only in the first argument.
+  js_case "js-70 a worker path in new URL() with import.meta.url stays silent" 0 a.js "const w = new URL('./staging.worker.js', import.meta.url);"
+  js_case "js-71 a host URL in new URL() with import.meta.url still fires" src/a.js:1 a.js "const w = new URL('https://staging.acme.io/x', import.meta.url);"
+  js_case "js-72 a path in import.meta.glob() stays silent" 0 a.js "const m = import.meta.glob('./staging.config.js');"
+  js_case "js-73 a path in import.meta.resolve() stays silent" 0 a.js "const m = import.meta.resolve('./staging.config.js');"
+  js_case "js-74 a path in require.context() stays silent" 0 a.js "const ctx = require.context('./staging.config.js');"
+  js_case "js-75 a path in jest.mock() stays silent" 0 a.js "jest.mock('./staging.api');"
+  js_case "js-76 a path in jest.requireActual() stays silent" 0 a.js "const a = jest.requireActual('./staging.api');"
+  js_case "js-77 a path in vi.mock() stays silent" 0 a.js "vi.mock('./staging.api');"
+  js_case "js-78 a path in vi.importActual() stays silent" 0 a.js "const a = vi.importActual('./staging.api');"
+  js_case "js-79 a host in a jest.mock() factory still fires" src/a.js:1 a.js "jest.mock('./api', () => ({ base: 'https://staging.acme.io' }));"
+  js_case "js-80 a host as the first argument of jest.mock() still fires" src/a.js:1 a.js "jest.mock('staging.acme.io');"
+  # A template or + path that starts with a variable and ends in a source file name.
+  js_case "js-81 a template require() path after a dir variable stays silent" 0 a.js 'const c = require(`${dir}/staging.config.js`);'
+  js_case "js-82 a concatenated require() path after a dir variable stays silent" 0 a.js "const c = require(base + '/staging.config.js');"
+  js_case "js-83 a host glued to a variable in a require() path still fires" src/a.js:1 a.js "const w = require(base + 'staging.acme.io/w.js');"
+  js_case "js-84 a host folder after a dir variable in a require() path still fires" src/a.js:1 a.js 'const c = require(`${dir}/staging.acme.io/w.js`);'
+  js_case "js-85 a host after a scheme variable and // in an import() template still fires" src/a.js:1 a.js 'const w = import(`${scheme}//staging.acme.io/widget.js`);'
   # #2423 review. A parser planted in the scanned app is never loaded unless APP_STORE_GUARD_TRUST_PROJECT_BABEL=1.
   NOGLOBAL="$(mktemp -d)"; printf '#!/bin/sh\necho /nonexistent\n' > "$NOGLOBAL/npm"; chmod +x "$NOGLOBAL/npm"
   D="$(mk_js api.js "const a = 'https://staging.acme.io';
@@ -4040,7 +4082,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-54 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-85 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
