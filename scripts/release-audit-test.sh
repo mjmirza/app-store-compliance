@@ -26,7 +26,7 @@ if [ -f "$REPORT" ]; then ok "report is written into the audited project"; else
 [ "$BEFORE" = "$AFTER" ] && ok "the playbook repository is left untouched" || bad "the audit changed files in this repository"
 
 SUMMARY="$(printf '%s\n' "$OUT" | grep -E '^Summary: ' | tail -1)"
-echo "$SUMMARY" | grep -q 'critical=0 ' && ok "no critical findings on a harmless app ($SUMMARY)" || bad "unexpected criticals ($SUMMARY)"
+grep -q 'critical=0 ' <<<"$SUMMARY" && ok "no critical findings on a harmless app ($SUMMARY)" || bad "unexpected criticals ($SUMMARY)"
 
 grep -q 'BOTH-PLACEHOLDER' "$REPORT" 2>/dev/null && ok "the real placeholder finding is still reported" || bad "placeholder finding lost"
 
@@ -36,11 +36,11 @@ IDS="$(grep -oE '\b[A-Z]+(-[A-Z0-9.]+)+\b' "$REPORT" 2>/dev/null | sort -u | wc 
 
 # A target path that does not exist is an error, never a silent audit of this playbook.
 OUT="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1)"; RC=$?
-[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing target path is rejected before any scan" || bad "a missing target path is rejected before any scan (rc=$RC)"
+[ "$RC" -eq 1 ] && grep -q "not a directory" <<<"$OUT" && ! grep -q "Starting Release Readiness" <<<"$OUT" && ok "a missing target path is rejected before any scan" || bad "a missing target path is rejected before any scan (rc=$RC)"
 
 # The audit runs the playbook's own tests first, which is slow. The reader is told how long before the wait.
 FIRST="$(python3 scripts/release-audit.py "$FX/no-such-app" 2>&1; sed -n '/Starting Release Readiness/,/Scanning your app/p' scripts/release-audit.py)"
-echo "$FIRST" | grep -q "about two minutes" && ok "the slow self-check step says how long it takes" || bad "the slow self-check step says how long it takes"
+grep -q "about two minutes" <<<"$FIRST" && ok "the slow self-check step says how long it takes" || bad "the slow self-check step says how long it takes"
 
 # A finding whose title contains "(mandatory " is a finding. Only deadline lines, which carry a date there, are skipped.
 python3 - <<'PYT' && ok "only deadline lines are dropped from the finding list" || bad "only deadline lines are dropped from the finding list"
@@ -60,7 +60,7 @@ sys.exit(0 if fn and not fn(keep) and not fn(keep2) and all(fn(d) for d in drop)
 PYT
 
 # The harmless app above has a high placeholder finding and no listing, so it is never cleared.
-[ "$RUN_RC" -ne 0 ] && ! echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "an app with a high finding is not cleared to submit" || bad "an app with a high finding is not cleared to submit (rc=$RUN_RC)"
+[ "$RUN_RC" -ne 0 ] && ! grep -q "CLEAR TO SUBMIT" <<<"$OUT" && ok "an app with a high finding is not cleared to submit" || bad "an app with a high finding is not cleared to submit (rc=$RUN_RC)"
 
 # The installed layout. scripts sit in skills/app-store-compliance and the guard sits in hooks, with no agent-os folder.
 W="$(mktemp -d)"
@@ -79,32 +79,32 @@ STUB_HIGH="$W/high.sh"; printf '#!/usr/bin/env bash\necho "  [HIGH]     BOTH-PLA
 STUB_ERR="$W/err.sh"; printf '#!/usr/bin/env bash\necho "guard crashed" >&2\nexit 2\n' > "$STUB_ERR"
 
 OUT="$(python3 "$SK/scripts/release-audit.py" "$CL" 2>&1)"
-echo "$OUT" | grep -qF "Guard. $W/c/hooks/app-store-compliance-guard.sh" && echo "$OUT" | grep -q "Scanning your app" && ! echo "$OUT" | grep -q "guard tests failed" && ok "the installed layout finds the installed guard and never needs its test file" || bad "the installed layout finds the installed guard and never needs its test file"
+grep -qF "Guard. $W/c/hooks/app-store-compliance-guard.sh" <<<"$OUT" && grep -q "Scanning your app" <<<"$OUT" && ! grep -q "guard tests failed" <<<"$OUT" && ok "the installed layout finds the installed guard and never needs its test file" || bad "the installed layout finds the installed guard and never needs its test file"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$CL" 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "Overall Status: PASSED" && ok "a clean app with complete scans passes the gate" || bad "a clean app with complete scans passes the gate (rc=$RC)"
+[ "$RC" -eq 0 ] && grep -q "Overall Status: PASSED" <<<"$OUT" && ok "a clean app with complete scans passes the gate" || bad "a clean app with complete scans passes the gate (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_HIGH" python3 "$SK/scripts/release-audit.py" "$CL" 2>&1)"; RC=$?
-[ "$RC" -eq 2 ] && echo "$OUT" | grep -q "Overall Status: BLOCKED" && ! echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "a single high finding blocks the release" || bad "a single high finding blocks the release (rc=$RC)"
+[ "$RC" -eq 2 ] && grep -q "Overall Status: BLOCKED" <<<"$OUT" && ! grep -q "CLEAR TO SUBMIT" <<<"$OUT" && ok "a single high finding blocks the release" || bad "a single high finding blocks the release (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_NC" python3 "$SK/scripts/release-audit.py" "$CL" 2>&1)"; RC=$?
-[ "$RC" -ne 0 ] && ! echo "$OUT" | grep -q "Overall Status: PASSED" && ! echo "$OUT" | grep -q "CLEAR TO SUBMIT" && echo "$OUT" | grep -q "NOT CHECKED" && ok "a guard that did not check the app fails the gate" || bad "a guard that did not check the app fails the gate (rc=$RC)"
+[ "$RC" -ne 0 ] && ! grep -q "Overall Status: PASSED" <<<"$OUT" && ! grep -q "CLEAR TO SUBMIT" <<<"$OUT" && grep -q "NOT CHECKED" <<<"$OUT" && ok "a guard that did not check the app fails the gate" || bad "a guard that did not check the app fails the gate (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_ERR" python3 "$SK/scripts/release-audit.py" "$CL" 2>&1)"; RC=$?
-[ "$RC" -ne 0 ] && ! echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "guard crashed" && ok "a guard error fails the gate and keeps its diagnostics" || bad "a guard error fails the gate and keeps its diagnostics (rc=$RC)"
+[ "$RC" -ne 0 ] && ! grep -q "Overall Status: PASSED" <<<"$OUT" && grep -q "guard crashed" <<<"$OUT" && ok "a guard error fails the gate and keeps its diagnostics" || bad "a guard error fails the gate and keeps its diagnostics (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
-[ "$RC" -ne 0 ] && ! echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "Nothing was audited" && ok "a listing that was not audited fails the gate" || bad "a listing that was not audited fails the gate (rc=$RC)"
+[ "$RC" -ne 0 ] && ! grep -q "Overall Status: PASSED" <<<"$OUT" && grep -q "Nothing was audited" <<<"$OUT" && ok "a listing that was not audited fails the gate" || bad "a listing that was not audited fails the gate (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$W/no-such-guard.sh" python3 scripts/release-audit.py "$CL" 2>&1)"; RC=$?
-[ "$RC" -ne 0 ] && echo "$OUT" | grep -q "guard not found" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing guard is reported before any scan" || bad "a missing guard is reported before any scan (rc=$RC)"
+[ "$RC" -ne 0 ] && grep -q "guard not found" <<<"$OUT" && ! grep -q "Starting Release Readiness" <<<"$OUT" && ok "a missing guard is reported before any scan" || bad "a missing guard is reported before any scan (rc=$RC)"
 # --metadata points the listing audit at a pulled metadata folder instead of the app folder.
 MD="$W/pulled"; mkdir -p "$MD/en-US"
 printf 'Lumina Studio' > "$MD/en-US/name.txt"
 printf 'A focused editor with layers and presets.' > "$MD/en-US/description.txt"
 printf '{"privacy_policy_url":"https://lumina.app/privacy","support_url":"https://lumina.app/support"}' > "$MD/m.json"
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" --metadata "$MD" 2>&1)"; RC=$?
-[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "Overall Status: PASSED" && echo "$OUT" | grep -q "CLEAR TO SUBMIT" && ok "a clean pulled listing passed with --metadata reaches CLEAR" || bad "a clean pulled listing passed with --metadata reaches CLEAR (rc=$RC)"
+[ "$RC" -eq 0 ] && grep -q "Overall Status: PASSED" <<<"$OUT" && grep -q "CLEAR TO SUBMIT" <<<"$OUT" && ok "a clean pulled listing passed with --metadata reaches CLEAR" || bad "a clean pulled listing passed with --metadata reaches CLEAR (rc=$RC)"
 
 # The audit starts its Python children on the interpreter running it, never on the name python3.
 APP_STORE_GUARD_PATH="$STUB_PASS" python3 - "$NOMETA" <<'PYT' && ok "the audit starts validate.py on sys.executable" || bad "the audit starts validate.py on sys.executable"
@@ -170,10 +170,10 @@ PYT
 rm -rf "$DECOY"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" 2>&1)"; RC=$?
-[ "$RC" -eq 3 ] && echo "$OUT" | grep -q "Overall Status: INCOMPLETE" && echo "$OUT" | grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
+[ "$RC" -eq 3 ] && grep -q "Overall Status: INCOMPLETE" <<<"$OUT" && grep -q "Store listing not audited. Pull it with scripts/pull-metadata.sh, then pass --metadata <dir>." <<<"$OUT" && ok "no listing and no --metadata is INCOMPLETE with the command to run" || bad "no listing and no --metadata is INCOMPLETE with the command to run (rc=$RC)"
 
 OUT="$(APP_STORE_GUARD_PATH="$STUB_PASS" python3 "$SK/scripts/release-audit.py" "$NOMETA" --metadata "$W/no-such-dir" 2>&1)"; RC=$?
-[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "not a directory" && ! echo "$OUT" | grep -q "Starting Release Readiness" && ok "a missing --metadata folder is rejected before any scan" || bad "a missing --metadata folder is rejected before any scan (rc=$RC)"
+[ "$RC" -eq 1 ] && grep -q "not a directory" <<<"$OUT" && ! grep -q "Starting Release Readiness" <<<"$OUT" && ok "a missing --metadata folder is rejected before any scan" || bad "a missing --metadata folder is rejected before any scan (rc=$RC)"
 
 rm -rf "$W"
 
