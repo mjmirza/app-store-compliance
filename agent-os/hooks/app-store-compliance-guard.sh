@@ -1358,12 +1358,31 @@ TAIL = rx("~s*~+")
 HEXID = rx(LS + "0-9a-fA-F-" + RS + LB + "8," + RB)
 QCUT = rx(LS + "?#" + RS)
 SEP = rx(LS + "-_" + RS)
-SLOT = LB + "x" + RB
+NAMEREF = rx("~s*~+~s*" + LP + "[A-Za-z_][A-Za-z0-9_.?!]*" + RP)
+NONAME = rx("[^A-Za-z0-9_.]")
+PREFIX = rx("v~d+<?~.~d+>>?|api|rest")
+# Ids that name the signed in user, and the bare id a path parameter usually carries.
+SELF_IDS = set("me self current currentuser user.id auth.uid".split())
+SELF_LAST = set("userid uid currentuserid".split())
+GENERIC_IDS = set("id x".split())
+SELFREF = rx("~b<?userId|uid|currentUser|currentUserId>>~b|~buser~s*[?!]?~s*~.~s*id~b|~bauth~s*~.~s*uid~b")
 ACCT_LAST = set("me account user profile".split())
 ACCT_COLL = set("users accounts user account".split())
 ID_ALIAS = set("me current self".split())
 DEL_WORDS = set("deleteaccount deleteuser deleteme deleteprofile accountdelete userdelete".split())
 NEST_EXT = (".swift", ".kt", ".kts", ".rs", ".scala")
+GETTER = rx("^~s*get~s*<?~" + LP + "~s*~" + RP + ">>?~s*" + LS + "=~" + LB + RS)
+ELSE = rx("~s*else~b")
+BRANCH = rx("~b<?if|else>>~b")
+ARM = rx("->~s*$")
+TERNARY = rx("~s~?~s|~belse~b")
+ENUMCASE = rx("~bcase~s+<?[A-Za-z_][A-Za-z0-9_]*~s*,~s*>>*$")
+IMPORTISH = rx("^~s*<?import~b|export~s*~" + LB + "|from~b>>|~b<?const|let|var|val>>~s*" + LS + "~" + LB + "~" + LS + LP + RS)
+OBJC_DEF = rx("^~s*[-+]~s*~" + LP)
+WORDS_ONLY = rx("~s*<?[A-Za-z_@][A-Za-z0-9_]*~s+>>*")
+SIG_TAIL = rx("<?:|->|throws~b|rethrows~b|async~b>>")
+NOT_TYPE = set("await return try throw yield defer go new delete".split())
+TESTPATH = rx("<?^|/>><?Tests?|tests?|__tests__|specs?|UITests|androidTest>>/|[._-]<?test|spec>>~.[A-Za-z]+$|Tests?~.<?swift|kt|java|m>>$")
 LABEL = rx(LS + LP + "," + RS + "~s*" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP + ":" + LP + "?!:" + RP)
 
 
@@ -1427,43 +1446,80 @@ def uncomment(text, nest):
     return "".join(out)
 
 
-def is_id(s):
+def id_kind(s):
+    # What an id segment names. self is the signed in account, generic an unnamed id, other someone else.
     t = s.strip()
     if not t:
-        return False
-    if t.lower() in ID_ALIAS or t.isdigit() or HEXID.fullmatch(t):
+        return ""
+    if t.lower() in ID_ALIAS:
+        return "self"
+    if t.isdigit() or HEXID.fullmatch(t):
+        return "other"
+    if not (t[0] in LB + ":$<" or t.startswith(BS + LP)):
+        return ""
+    name = NONAME.sub("", t).lower()
+    if name in SELF_IDS or name.split(".")[-1] in SELF_LAST:
+        return "self"
+    return "generic" if name in GENERIC_IDS else "other"
+
+
+def prefix_like(s, k):
+    # A scheme, host, version or api segment, or a base url placeholder in first place.
+    if PREFIX.fullmatch(s.lower()) or "." in s or s.endswith(":"):
         return True
-    return t[0] in LB + ":$<" or t.startswith(BS + LP)
+    return k == 0 and s[0] in LB + "$<"
 
 
 def segs(path):
     return [s for s in QCUT.split(path, 1)[0].split("/") if s]
 
 
-def acct_segs(ss):
-    # The path ends on the account or user itself, never on a resource under it.
-    if not ss:
-        return False
-    if ss[-1].lower() in ACCT_LAST:
-        return True
-    return len(ss) >= 2 and ss[-2].lower() in ACCT_COLL and is_id(ss[-1])
+def acct_kind(ss):
+    # The path is the account or user itself, under nothing but a host, version or api prefix.
+    k = 0
+    while k < len(ss) - 1 and prefix_like(ss[k], k):
+        k += 1
+    raw = ss[k:]
+    rest = [s.lower() for s in raw]
+    if len(rest) == 1 and rest[0] in ACCT_LAST:
+        return "strong"
+    if len(rest) != 2:
+        return ""
+    if rest[0] == "me" and rest[1] in ACCT_LAST:
+        return "strong"
+    if rest[0] in ACCT_COLL or rest[0] == "profile":
+        if rest[1] == "me":
+            return "strong"
+        kind = id_kind(raw[1])
+        if kind == "self":
+            return "strong"
+        if kind == "generic" and rest[0] in ACCT_COLL:
+            return "generic"
+    return ""
 
 
-def del_segs(ss):
+def del_kind(ss):
     # A delete path whose delete word applies to the account or user.
     low = [SEP.sub("", s.lower()) for s in ss]
     if not low:
-        return False
+        return ""
     if low[-1] in DEL_WORDS:
-        return True
-    if len(low) >= 2 and low[-2] in DEL_WORDS and is_id(ss[-1]):
-        return True
-    if low[-1] == "delete" and acct_segs(ss[:-1]):
-        return True
+        return "strong"
+    if len(low) >= 2 and low[-2] in DEL_WORDS:
+        kind = id_kind(ss[-1])
+        if kind:
+            return {"self": "strong", "generic": "generic"}.get(kind, "")
+    if low[-1] == "delete":
+        return acct_kind(ss[:-1])
     if "delete" in low[:-1]:
         k = len(low) - 1 - low[::-1].index("delete")
-        return acct_segs(ss[k + 1 :]) and len(ss) - k - 1 <= 2
-    return False
+        return acct_kind(ss[k + 1 :]) if len(ss) - k - 1 <= 2 else ""
+    return ""
+
+
+def slot(gap):
+    m = NAMEREF.match(gap)
+    return LB + (m.group(1) if m else "x") + RB
 
 
 def paths(text):
@@ -1475,7 +1531,7 @@ def paths(text):
         if cur is not None and JOIN.fullmatch(gap):
             cur += body
         elif cur is not None and JOIN_NAME.fullmatch(gap):
-            cur += SLOT + body
+            cur += slot(gap) + body
         else:
             if cur is not None:
                 out.append(cur)
@@ -1483,7 +1539,7 @@ def paths(text):
         nxt = ms[n + 1].start() if n + 1 < len(ms) else len(text)
         rest = text[m.end() : nxt]
         if TAIL.match(rest) and not JOIN.fullmatch(rest) and not JOIN_NAME.fullmatch(rest):
-            cur += SLOT
+            cur += slot(rest)
     if cur is not None:
         out.append(cur)
     return out
@@ -1502,42 +1558,48 @@ def args(t, k):
     return t[k:]
 
 
+def better(a, b):
+    return "strong" if "strong" in (a, b) else (a or b)
+
+
 def hit(text, post, slash):
+    best = ""
     for p in paths(text):
         if slash and "/" not in p:
             continue
         ss = segs(p)
-        if del_segs(ss) if post else acct_segs(ss):
-            return True
-    return False
+        best = better(best, del_kind(ss) if post else acct_kind(ss))
+    return best
 
 
 def real_delete(line, before=()):
+    # strong is the account itself, generic a users id path that still needs the id to be the signed in user.
     t = code(line)
     if any(r.search(t) for r in SDK):
-        return True
+        return "strong"
+    best = ""
     for m in ARGCALL.finditer(t):
         verb = m.group(1)
         post = verb.lower().endswith("post")
-        if hit(args(t, m.end()), post, not verb.startswith("@")):
-            return True
+        best = better(best, hit(args(t, m.end()), post, not verb.startswith("@")))
     for pat, post in ((METHOD_DEL, False), (METHOD_POST, True)):
-        if pat.search(t) and any(hit(x, post, True) for x in (t,) + tuple(before)):
-            return True
-    return False
+        if pat.search(t):
+            for x in (t,) + tuple(before):
+                best = better(best, hit(x, post, True))
+    return best
 
 
 def real_in(lines, region):
     # A method option may name the verb a few lines after the path, with no other call between.
+    best = ""
     for n, j in enumerate(region):
         before = []
         for k in reversed(region[max(0, n - 3) : n]):
             if VERB.search(code(lines[k])):
                 break
             before.append(code(lines[k]))
-        if real_delete(lines[j], before):
-            return True
-    return False
+        best = better(best, real_delete(lines[j], before))
+    return best
 
 
 def pdepth(c, k):
@@ -1686,7 +1748,13 @@ def val_defs(n):
         rx("~b<?let|var|val>>~s+" + n + "~s*:[^=]*~" + LB),
         rx("~b<?self|this>>~s*~.~s*" + n + "~s*=" + LP + "?!=" + RP),
         rx("^~s*" + n + "~s*[:=]" + LP + "?!=" + RP + "~s*~S"),
+        rx("^~s*" + n + "~s*[:=]~s*$"),
     ]
+
+
+def typed_decl(n):
+    # A typed declaration with no value on its line, such as a Kotlin val read through a getter.
+    return rx("~b<?let|var|val|const>>~s+" + n + "~s*:" + LS + "^=~" + LB + RS + "*$")
 
 
 def skip_back(c, j):
@@ -1764,6 +1832,165 @@ def allowed(name, root, lit, apptypes):
     return (name in HTTP and lit) or name in STD_MEMBERS
 
 
+def next_code(cl, j):
+    for q in range(j + 1, min(len(cl), j + 6)):
+        if cl[q].strip():
+            return q
+    return None
+
+
+def cont(cl, j):
+    # Line j and the lines it runs on to until its brackets close. None when it never ends.
+    out, depth = [], 0
+    for q in range(j, min(len(cl), j + 30)):
+        t = cl[q]
+        out.append(q)
+        depth += sum(t.count(ch) for ch in LP + LS + LB) - sum(t.count(ch) for ch in RP + RS + RB)
+        s = t.rstrip()
+        if s.strip() and depth <= 0 and not s.endswith(("=", "+", ",", LP, "?", ":")):
+            return out
+    return None
+
+
+def value_lines(cl, i, col):
+    # The lines that hold the value a declaration names. None when no value can be found.
+    if not cl[i][col:].rstrip().endswith("="):
+        return []
+    q = next_code(cl, i)
+    if q is None:
+        return None
+    return cont(cl, q)
+
+
+def getter_lines(cl, i):
+    q = next_code(cl, i)
+    if q is None or not GETTER.match(cl[q]):
+        return []
+    s = cl[q].rstrip()
+    if s.endswith("="):
+        r = next_code(cl, q)
+        rest = cont(cl, r) if r is not None else None
+        return None if rest is None else [q] + rest
+    return cont(cl, q)
+
+
+def opener(cc, i, col):
+    # The brace that encloses column col of line i.
+    depth = 0
+    for j in range(i, max(-1, i - 400), -1):
+        t = cc[j][:col] if j == i else cc[j]
+        for x in range(len(t) - 1, -1, -1):
+            if t[x] == RB:
+                depth += 1
+            elif t[x] == LB:
+                if depth == 0:
+                    return j, x
+                depth -= 1
+    return None
+
+
+def closer(cc, i, col):
+    # The brace that closes the one opened at column col of line i.
+    depth = 0
+    for j in range(i, min(len(cc), i + 600)):
+        t = cc[j]
+        for x in range(col if j == i else 0, len(t)):
+            if t[x] == LB:
+                depth += 1
+            elif t[x] == RB:
+                depth -= 1
+                if depth == 0:
+                    return j, x
+    return None
+
+
+def head_of(cc, j, x):
+    # The text before a brace, or the line above when the brace opens its own line.
+    h = cc[j][:x]
+    if not h.strip() and j > 0:
+        h = cc[j - 1]
+    return h
+
+
+def chain(cc, j, x):
+    # Every line of the if and else chain whose branch opens at column x of line j. None when unclosed.
+    while True:
+        h = cc[j][:x].rstrip()
+        k = h.rfind(RB)
+        if k < 0 and not h.strip() and j > 0 and cc[j - 1].strip().startswith(RB + " else"):
+            j, h = j - 1, cc[j - 1].rstrip()
+            k = h.find(RB)
+        if k < 0 or not ELSE.match(h[k + 1 :] + " "):
+            break
+        o = opener(cc, j, k)
+        if not o:
+            return None
+        j, x = o
+    start, lines = j, []
+    while True:
+        e = closer(cc, j, x)
+        if not e:
+            return None
+        lines = list(range(start, e[0] + 1))
+        tail, q, col = cc[e[0]][e[1] + 1 :], e[0], e[1] + 1
+        if not tail.strip():
+            q = next_code(cc, e[0])
+            if q is None:
+                break
+            tail, col = cc[q], 0
+        if not ELSE.match(tail.strip() + " "):
+            break
+        nb = cc[q].find(LB, col)
+        if nb < 0:
+            q2 = next_code(cc, q)
+            if q2 is None or not cc[q2].strip().startswith(LB):
+                return None
+            q, nb = q2, cc[q2].find(LB)
+        j, x = q, nb
+    return lines
+
+
+def branch_lines(cc, i, col):
+    # The if, else and when chains around column col of line i, so a weak sibling branch is followed too.
+    out, cur = set(), (i, col)
+    for _ in range(8):
+        o = opener(cc, *cur)
+        if not o:
+            break
+        h = head_of(cc, *o)
+        if ARM.search(h):
+            p = opener(cc, *o)
+            e = closer(cc, *p) if p else None
+            if not e:
+                return None
+            out.update(range(p[0], e[0] + 1))
+            cur = p
+            continue
+        if BRANCH.search(h):
+            lines = chain(cc, *o)
+            if lines is None:
+                return None
+            out.update(lines)
+        cur = o
+    return out
+
+
+def decl_ref(c, m, before):
+    # An occurrence that declares the entry point rather than using it.
+    if ENUMCASE.search(before) or is_label(c) or IMPORTISH.search(c):
+        return True
+    if OBJC_DEF.match(before):
+        return True
+    rest = c[m.end() :].lstrip()
+    if not rest.startswith(LP) or not WORDS_ONLY.fullmatch(before):
+        return False
+    after = c[m.end() :].lstrip()[len(args(rest, 1)) + 2 :].lstrip()
+    if SIG_TAIL.match(after):
+        return True
+    words = set(before.split())
+    return after.startswith(";") and bool(words) and not (words & NOT_TYPE)
+
+
 def main():
     try:
         with open(sys.argv[1], encoding="utf-8", errors="replace") as fh:
@@ -1795,8 +2022,15 @@ def main():
                 where.setdefault(t, []).append((p, i))
             for m in TYPEDEF.finditer(c):
                 apptypes.add(m.group(1))
-    state = {"unsure": skipped, "real": False}
+    state = {"unsure": skipped, "real": False, "generic": False, "selfref": False}
     frontier, called, defined = set(), [], set()
+
+    def evidence(p, region):
+        kind = real_in(nocom[p], region)
+        state["real"] = state["real"] or kind == "strong"
+        state["generic"] = state["generic"] or kind == "generic"
+        if any(SELFREF.search(scrub(nocom[p][j])) for j in region):
+            state["selfref"] = True
 
     def harvest(p, region, scoped):
         # Names a region uses. A local declared before its first use, or an argument label, is never chased elsewhere.
@@ -1827,7 +2061,7 @@ def main():
                 if name in STOP and not name[0].isupper() and not platform:
                     frontier.add(name)
 
-    anchored, seen = False, set()
+    anchored, seen, entry, own = False, set(), set(), {}
     for p, lines in src.items():
         js = p.endswith(JS_EXT)
         for i, line in enumerate(lines):
@@ -1835,17 +2069,50 @@ def main():
                 continue
             # A deleting function, or a switch arm labelled with the deletion, is where the path starts.
             fn = is_label(clean[p][i]) and "deleteAccount" in clean[p][i]
+            if fn:
+                entry.update(t for t in IDENT.findall(clean[p][i]) if "deleteAccount" in t)
             anchored = anchored or fn
             for t in IDENT.findall(clean[p][i]):
                 if "deleteAccount" in t and def_at(lines, clean[p], i, fn_pats(re.escape(t)), js):
                     anchored = fn = True
+                    entry.add(t)
             region, ok = block(lines, i, 0)
+            if fn:
+                own.setdefault(p, set()).update(region)
             state["unsure"] = state["unsure"] or not ok
-            state["real"] = state["real"] or real_in(nocom[p], region)
+            evidence(p, region)
             harvest(p, region, fn)
     if not anchored:
         print("UNSURE")
         return
+    # The entry point must be used somewhere, as a call or an action handed to a control. A dead one proves nothing.
+    used, early = False, []
+    for name in sorted(entry):
+        pat = rx("~b" + re.escape(name) + "~b")
+        for p, i in where.get(name, []):
+            if i in own.get(p, ()) or TESTPATH.search(p):
+                continue
+            cc = scrub(nocom[p][i])
+            for m in pat.finditer(cc):
+                if decl_ref(cc, m, cc[: m.start()]):
+                    continue
+                if def_at(src[p], clean[p], i, fn_pats(re.escape(name)), p.endswith(JS_EXT)):
+                    continue
+                used = True
+                # A use inside an if, else or when branch, or a ternary, follows the sibling branches too.
+                lines = {i} if TERNARY.search(cc) else set()
+                br = branch_lines([scrub(x) for x in nocom[p]], i, m.start())
+                if br is None:
+                    state["unsure"] = True
+                else:
+                    lines.update(br)
+                if lines:
+                    region = sorted(lines)
+                    early.extend((p, j) for j in region)
+                    harvest(p, region, False)
+                break
+    # Nothing weak reached is still reported, but a deletion nothing uses is never called clean.
+    state["unsure"] = state["unsure"] or not used
     for hop in range(MAX_HOPS):
         names = sorted(t for t in frontier if t not in seen)
         seen.update(names)
@@ -1853,7 +2120,7 @@ def main():
             print("UNSURE")
             return
         frontier.clear()
-        reached = []
+        reached, early = early, []
         for name in names:
             n = re.escape(name)
             vpats, fpats = val_defs(n), fn_pats(n)
@@ -1878,16 +2145,29 @@ def main():
                     reached.append((p, i))
                 d = def_at(src[p], clean[p], i, fpats, p.endswith(JS_EXT))
                 scoped = d is not None
+                extra = []
                 if not d:
                     for pat in vpats:
                         m = pat.search(c)
                         if m:
                             d = (i, m.start())
+                            extra = value_lines(clean[p], i, m.start())
                             break
+                if not d:
+                    m = typed_decl(n).search(c)
+                    if m:
+                        extra = getter_lines(clean[p], i)
+                        if extra != []:
+                            d = (i, m.start())
+                if extra is None:
+                    # A value that cannot be found is never vouched for.
+                    state["unsure"] = True
+                    extra = []
                 if not d:
                     continue
                 defined.add(name)
                 region, ok = block(src[p], d[0], d[1])
+                region = region + [q for q in extra if q not in region]
                 if d[0] != i:
                     region = list(range(i, d[0])) + region
                 k = region[0]
@@ -1896,7 +2176,7 @@ def main():
                 region = list(range(k, region[0])) + region
                 state["unsure"] = state["unsure"] or not ok
                 reached.extend((p, j) for j in region)
-                state["real"] = state["real"] or real_in(nocom[p], region)
+                evidence(p, region)
                 harvest(p, region, scoped)
         for p, j in reached:
             if WEAK.search(LAYOUT.sub(" ", src[p][j])):
@@ -1909,7 +2189,9 @@ def main():
             ):
                 state["unsure"] = True
             # CLEAN needs a real deletion call in what the deletion reaches, not just nothing weak found.
-            print("CLEAN" if state["real"] and not state["unsure"] else "UNSURE")
+            # A users id path counts only when the deletion also names the signed in user.
+            real = state["real"] or (state["generic"] and state["selfref"])
+            print("CLEAN" if real and not state["unsure"] else "UNSURE")
             return
     print("UNSURE")
 
