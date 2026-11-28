@@ -229,7 +229,7 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 How to detect.
 
 ```bash
-grep -rn 'deleteAccount\|delete account' --include='*.swift' . && grep -rn 'mailto:\|deactivate' --include='*.swift' .   # deletion must truly delete, not mailto or deactivate
+grep -rl --null 'deleteAccount\|delete account' --include='*.swift' . | xargs -0 grep -n 'mailto:\|deactivate' ; grep -rlq 'deleteAccount\|delete account' --include='*.swift' . && grep -rnE '/deactivate|deactivate(Account|User)|([Dd]elet|[Rr]emov|[Aa]ccount).*mailto:|mailto:[^"]*([Dd]elet|[Rr]emov|[Aa]ccount)' --include='*.swift' . | grep -vE '[Dd]evices?/deactivate'   # deletion must truly delete. The guard also follows the deleting function into the code it calls across files. It narrows the finding only when the deleting function is used outside its own definition and tests, that code makes a real account deletion call, such as an HTTP DELETE on the signed in account itself (/me, /users/me, /account, users/{id} only when the id is the signed in user, never /devices/me or /users/{friendId}), a Firebase user delete, or a POST to an account delete path, and nothing weak is reachable, including a sibling if, else or when branch where the deletion is used. A constant whose value cannot be found is never vouched for. A keychain, cache, file, photo, device or token delete, a POST that deletes a sub resource of the user, and a call inside a comment are not evidence. Otherwise any mailto: or deactivate in the app counts
 ```
 
 ## APPLE-PRIVACY-NUTRITION-LABELS

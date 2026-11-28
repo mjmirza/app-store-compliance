@@ -575,6 +575,389 @@ printf '// the outgoing page must finish sliding after it is deactivated\n' > "$
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "Words in a lowercase test/ folder are not app source" || ok "Words in a lowercase test/ folder are not app source"
 rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { accountService.remove() }\n' > "$D/App/Settings.swift"
+printf 'func remove() { api.post("/users/me/deactivate") }\n' > "$D/App/AccountService.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "acct-split an account deactivation endpoint in another file still counts" || bad "acct-split an account deactivation endpoint in another file still counts"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { UIApplication.shared.open(Links.accountRemoval) }\n' > "$D/App/Settings.swift"
+printf 'enum Links { static let accountRemoval = URL(string: "mailto:help@acme.example.io?subject=Delete")! }\n' > "$D/App/Links.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "acct-mailto a deletion mailto kept in another file still counts" || bad "acct-mailto a deletion mailto kept in another file still counts"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.delete("/me") }\n' > "$D/App/Settings.swift"
+printf 'func disconnectDevice() { api.post("/devices/deactivate") }\n' > "$D/App/Device.swift"
+printf 'let deleteButton = Button("Delete") { deleteAccount() }\n' > "$D/App/DeleteButton.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "acct-device a device deactivation endpoint is not account removal" || ok "acct-device a device deactivation endpoint is not account removal"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { accountService.remove() }\n' > "$D/App/Settings.swift"
+printf 'func remove() { api.post("/accounts/deactivate") }\n' > "$D/App/AccountService.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "acct-accounts an /accounts/deactivate endpoint in another file still counts" || bad "acct-accounts an /accounts/deactivate endpoint in another file still counts"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { UIApplication.shared.open(Links.accountRemoval) }\n' > "$D/App/Settings.swift"
+printf 'enum Links { static let accountRemoval = URL(string: "mailto:help@acme.example.io")! }\n' > "$D/App/Links.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "acct-const a mailto on an account removal line still counts" || bad "acct-const a mailto on an account removal line still counts"
+rm -rf "$D"
+# A support mailto: link or a deactivate call in another file is not the way the account is removed.
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.delete("/users/me") }\n' > "$D/App/A.swift"
+printf 'let support = URL(string: "mailto:help@acme.example.io")\n' > "$D/App/Support.swift"
+printf 'let deleteButton = Button("Delete") { deleteAccount() }\n' > "$D/App/DeleteButton.swift"
+printf 'func pageDidHide() { player.deactivate() }\n' > "$D/App/Pager.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && bad "dw-1 a mailto: or deactivate in another file is not the deletion path" || ok "dw-1 a mailto: or deactivate in another file is not the deletion path"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let support = URL(string: "mailto:help@acme.example.io")\n' > "$D/App/Support.swift"
+printf 'func deleteAccount() {\n  open(URL(string: "mailto:help@acme.example.io?subject=Delete")!)\n}\n' > "$D/App/Settings.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -A1 'APPLE-ACCOUNT-DELETION-WEAK' | grep -q 'file\. App/Settings\.swift:2' && ok "dw-2 a deletion that only opens a mailto: link is flagged at that link" || bad "dw-2 a deletion that only opens a mailto: link is flagged at that link"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'func deleteAccount() { api.post("/users/me/deactivate") }\n' > "$D/App/Account.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "dw-3 a deletion that only deactivates is flagged" || bad "dw-3 a deletion that only deactivates is flagged"
+rm -rf "$D"
+# The deletion is followed into the functions and constants it calls in other files.
+dw_case() {  # name expect(fire|quiet) file content [file content ...]
+  local name="$1" want="$2" D; shift 2; D="$(mktemp -d)"; mkdir -p "$D/App"
+  printf '<plist/>' > "$D/App/Info.plist"
+  while [ "$#" -ge 2 ]; do mkdir -p "$(dirname "$D/$1")"; printf '%b' "$2" > "$D/$1"; shift 2; done
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  if echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK '; then got=fire; else got=quiet; fi
+  [ "$got" = "$want" ] && ok "$name" || bad "$name"
+  rm -rf "$D"
+}
+dw_case "df-1 a deactivate in a service the deletion calls is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { accountService.remove() }\n' \
+  App/AccountService.swift 'func remove() { currentUser.deactivate() }\n'
+dw_case "df-2 a support mailto constant the deletion opens is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { UIApplication.shared.open(Links.supportEmail) }\n' \
+  App/Links.swift 'enum Links {\n  static let supportEmail = URL(string: "mailto:help@acme.example.io")!\n}\n'
+dw_case "df-3 a deactivate two calls away is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { accountService.remove() }\n' \
+  App/AccountService.swift 'func remove() { session.end() }\n' \
+  App/Session.swift 'class Session {\n  func end() {\n    currentUser.deactivate()\n  }\n}\n'
+dw_case "df-4 a deletion through a closure that cannot be followed still reports" fire \
+  App/V.swift 'struct V {\n  var onDelete: (() -> Void)?\n  func deleteAccount() { onDelete?() }\n}\n' \
+  App/Support.swift 'let support = URL(string: "mailto:help@acme.example.io")\n'
+dw_case "df-5 a deletion switch arm that opens a mailto constant is flagged" fire \
+  App/Router.swift 'enum Route { case deleteAccount, faq }\nfunc go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    UIApplication.shared.open(Links.support)\n  case .faq:\n    break\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@acme.example.io")!\n}\n'
+dw_case "df-6 a real deletion through an API client ignores an unrelated support link" quiet \
+  App/AccountViewModel.swift 'final class AccountViewModel {\n  private let api: APIClient\n  var user: User?\n  func deleteAccount() async {\n    do {\n      try await api.deleteUser(id: user?.id ?? "")\n    } catch {\n      showError = true\n    }\n  }\n}\n' \
+  App/APIClient.swift 'final class APIClient {\n  func deleteUser(id: String) async throws {\n    try await send(path: "/users/" + id, method: "DELETE")\n  }\n  func send(path: String, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: base))\n  }\n}\n' \
+  App/SupportView.swift 'let contact = Link("Contact us", destination: URL(string: "mailto:help@acme.example.io")!)\n' \
+  App/Layout.swift 'func relayout(_ old: [NSLayoutConstraint]) { NSLayoutConstraint.deactivate(old) }\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { Task { await vm.deleteAccount() } }\n'
+dw_case "df-7 a Kotlin deletion through a repository ignores a sensor deactivate" quiet \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
+  App/Sensor.kt 'fun onPause() { sensor.deactivate() }\n' \
+  App/DeleteButton.kt 'val deleteButton = Button(onClick = { deleteAccount() })\n'
+dw_case "df-8 a TypeScript deletion that opens a mailto constant is flagged" fire \
+  App/account.ts 'export async function deleteAccount() {\n  await accountApi.remove();\n}\n' \
+  App/api.ts 'export const accountApi = {\n  remove: () => Linking.openURL(SUPPORT_MAIL),\n};\n' \
+  App/links.ts 'export const SUPPORT_MAIL = "mailto:help@acme.example.io";\n'
+dw_case "df-9 a plain real deletion stays quiet" quiet \
+  App/Account.swift 'func deleteAccount() async throws {\n  try await api.delete("/users/me")\n  try await session.signOut()\n}\n'
+# The follower itself, not the fallback. Its verdict is WEAK, CLEAN, or UNSURE, which sends the check back to any match.
+fl_case() {  # name expected-verdict file content [file content ...]
+  local name="$1" want="$2" D got; shift 2; D="$(mktemp -d)"; mkdir -p "$D/App"
+  while [ "$#" -ge 2 ]; do mkdir -p "$(dirname "$D/$1")"; printf '%b' "$2" > "$D/$1"; shift 2; done
+  find "$D" -type f > "$D.list"
+  got="$(python3 -c "$(sed -n "/<<'DELPY'/,/^DELPY/p" "$HERE/app-store-compliance-guard.sh" | sed '1d;$d')" "$D.list" 2>&1 | head -1 | sed "s|$D/||" | tr '\t' ' ')"
+  [ "$got" = "$want" ] && ok "$name" || bad "$name (got: $got)"
+  rm -rf "$D" "$D.list"
+}
+fl_case "fl-1 a one line Java method body is followed" "WEAK App/S.java 2" \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc {\n  void remove() { currentUser.deactivate(); }\n}\n'
+dw_case "fl-1 a one line Java method body is flagged" fire \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc {\n  void remove() { currentUser.deactivate(); }\n}\n'
+fl_case "fl-1b a one line TypeScript class method is followed" "WEAK App/s.ts 2" \
+  App/a.ts 'class A {\n  async deleteAccount() {\n    await svc.remove();\n  }\n}\n' \
+  App/s.ts 'class Svc {\n  async remove() { await currentUser.deactivate(); }\n}\n'
+fl_case "fl-2 an Allman brace method is followed" "WEAK App/S.java 5" \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+dw_case "fl-2 an Allman brace method is flagged" fire \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+fl_case "fl-2b an Allman C# deletion is anchored and followed" "WEAK App/S.cs 5" \
+  App/Acct.cs 'class A\n{\n  public void deleteAccount()\n  {\n    svc.remove();\n  }\n}\n' \
+  App/S.cs 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+fl_case "fl-3 a Kotlin extension function is followed" "WEAK App/R.kt 1" \
+  App/Vm.kt 'class Vm {\n  suspend fun deleteAccount() {\n    repo.close()\n  }\n}\n' \
+  App/R.kt 'suspend fun UserRepo.close() { api.deactivate(uid) }\n'
+dw_case "fl-3 a Kotlin extension function is flagged" fire \
+  App/Vm.kt 'class Vm {\n  suspend fun deleteAccount() {\n    repo.close()\n  }\n}\n' \
+  App/R.kt 'suspend fun UserRepo.close() { api.deactivate(uid) }\n'
+fl_case "fl-4 a member call named open is followed" "WEAK App/Sup.swift 2" \
+  App/S.swift 'func deleteAccount() { Support.open() }\n' \
+  App/Sup.swift 'enum Support {\n  static func open() { UIApplication.shared.open(URL(string: "mailto:help@acme.io")!) }\n}\n'
+dw_case "fl-4 a member call named open is flagged" fire \
+  App/S.swift 'func deleteAccount() { Support.open() }\n' \
+  App/Sup.swift 'enum Support {\n  static func open() { UIApplication.shared.open(URL(string: "mailto:help@acme.io")!) }\n}\n'
+fl_case "fl-a a called name with no definition is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/Sup.swift 'let support = URL(string: "mailto:help@acme.io")\n'
+dw_case "fl-a a called name with no definition falls back and reports" fire \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/Sup.swift 'let support = URL(string: "mailto:help@acme.io")\n'
+fl_case "fl-a2 an API client method with no definition is unsure" "UNSURE" \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n'
+fl_case "fl-a3 constructing an app type is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { present(DeleteAccountView()) }\n' \
+  App/D.swift 'struct DeleteAccountView {\n  let mail = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "fl-d a local let is not resolved to a same named property elsewhere" "CLEAN" \
+  App/Acct.swift 'func deleteAccount() async throws {\n  let url = URL(string: base + "/users/me")!\n  try await api.send(url, method: "DELETE")\n}\n' \
+  App/Api.swift 'final class Api {\n  func send(_ u: URL, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: u))\n  }\n}\n' \
+  App/SupportView.swift 'struct SupportView {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+dw_case "fl-d a local let is not resolved to a same named property elsewhere" quiet \
+  App/Acct.swift 'func deleteAccount() async throws {\n  let url = URL(string: base + "/users/me")!\n  try await api.send(url, method: "DELETE")\n}\n' \
+  App/Api.swift 'final class Api {\n  func send(_ u: URL, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: u))\n  }\n}\n' \
+  App/SupportView.swift 'struct SupportView {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+fl_case "fl-d2 a name used before a later local is still followed" "WEAK App/L.swift 2" \
+  App/Acct.swift 'final class A {\n  func deleteAccount() {\n    UIApplication.shared.open(url)\n    let url = 1\n  }\n}\n' \
+  App/L.swift 'struct L {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "fl-df4 the follower reports the closure it cannot follow" "UNSURE" \
+  App/V.swift 'struct V {\n  var onDelete: (() -> Void)?\n  func deleteAccount() { onDelete?() }\n}\n' \
+  App/Support.swift 'let support = URL(string: "mailto:help@acme.example.io")\n'
+fl_case "fl-df5 the follower reaches the mailto from the deletion switch arm" "WEAK App/Links.swift 2" \
+  App/Router.swift 'enum Route { case deleteAccount, faq }\nfunc go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    UIApplication.shared.open(Links.support)\n  case .faq:\n    break\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@acme.example.io")!\n}\n'
+
+# Evidence. A deletion is called clean only when the code it reaches makes a real deletion call and nothing weak.
+dw_case "ev-1 a Swift local that reads a mailto member in another file is flagged" fire \
+  App/Settings.swift 'func deleteAccount() {\n  guard let support = Links.support else { return }\n  UIApplication.shared.open(support)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@x.io")\n}\n'
+fl_case "ev-1b the follower chases the member a same named local reads" "WEAK App/Links.swift 2" \
+  App/Settings.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  guard let support = Links.support else { return }\n  UIApplication.shared.open(support)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@x.io")\n}\n'
+dw_case "ev-2 a TypeScript constructor parameter closure is not a definition" fire \
+  App/controller.ts 'export class Controller {\n  constructor(private onDelete: () => void) {}\n  async deleteAccount() {\n    this.onDelete();\n  }\n}\n' \
+  App/app.ts 'const c = new Controller(() => Linking.openURL("mailto:help@x.io"));\n'
+fl_case "ev-2b a constructor parameter closure is unsure even with a real deletion" "UNSURE" \
+  App/controller.ts 'export class Controller {\n  constructor(private onDelete: () => void) {}\n  async deleteAccount() {\n    await api.delete("/users/me");\n    this.onDelete();\n  }\n}\n' \
+  App/app.ts 'const c = new Controller(() => Linking.openURL("mailto:help@x.io"));\n'
+dw_case "ev-3 a SwiftUI flag that opens a contact sheet is flagged" fire \
+  App/Account.swift 'struct AccountView: View {\n  @State private var showContact = false\n  var body: some View {\n    Button("Delete") { deleteAccount() }\n      .sheet(isPresented: $showContact) { ContactSheet() }\n  }\n  func deleteAccount() {\n    showContact = true\n  }\n}\n' \
+  App/ContactSheet.swift 'struct ContactSheet: View {\n  var body: some View {\n    Link("Email us", destination: URL(string: "mailto:help@x.io")!)\n  }\n}\n'
+dw_case "ev-4 a Kotlin navigation to a support screen is flagged" fire \
+  App/Account.kt 'fun deleteAccount() {\n  nav.navigate(Screen.Support)\n}\n' \
+  App/Router.kt 'fun route(s: Screen) {\n  when (s) {\n    Screen.Support -> startMail("mailto:help@x.io")\n  }\n}\n'
+dw_case "ev-5 a React Native navigation to a contact screen is flagged" fire \
+  App/Account.tsx 'export const deleteAccount = () => navigation.navigate(\047Contact\047);\n' \
+  App/Contact.tsx 'export default function Contact() {\n  return <Button onPress={() => Linking.openURL("mailto:help@x.io")} title="Mail" />;\n}\n'
+fl_case "ev-6 a deletion with no real deletion call is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  session.signOut()\n  showContact = true\n}\nfunc signOut() {}\n'
+fl_case "ev-7 a Firebase user delete is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() async throws {\n  try await currentUser.delete()\n}\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+fl_case "ev-8 a closure property declaration is unsure" "UNSURE" \
+  App/a.ts 'let onDelete: () => void;\nexport async function deleteAccount() {\n  await api.delete("/users/me");\n  onDelete();\n}\n'
+fl_case "ev-9 a mailto bound on an assignment the deletion reads is weak" "WEAK App/Config.swift 1" \
+  App/Settings.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  UIApplication.shared.open(contact)\n}\n' \
+  App/Config.swift 'func setup() { Config.shared.contact = URL(string: "mailto:help@acme.io") }\n'
+fl_case "ev-10 a deletion string with no deleting function is unsure" "UNSURE" \
+  App/S.swift 'Button("delete account") { api.delete("/users/me") }\n'
+fl_case "ev-11 a layout constraint deactivate the deletion reaches is not weak" "CLEAN" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  relayout()\n}\n' \
+  App/L.swift 'func relayout() { NSLayoutConstraint.deactivate(old) }\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+fl_case "ev-12 constructing an app class with a primary constructor is unsure" "UNSURE" \
+  App/Account.kt 'fun deleteAccount() {\n  Helper(ctx).run()\n}\n' \
+  App/Helper.kt 'class Helper(private val c: Ctx) {\n  fun run() { api.delete("/users/me") }\n}\n'
+fl_case "ev-13 an unclosed deleting function is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n'
+fl_case "ev-14 an unclosed callee is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/W.swift 'func wipe() {\n  api.delete("/users/me")\n'
+fl_case "ev-15 a React hook call needs no definition" "CLEAN" \
+  App/a.ts 'export const deleteAccount = async () => {\n  const nav = useNavigation();\n  await api.delete("/users/me");\n  nav.goBack();\n};\n' \
+  App/DeleteButton.tsx 'export const DeleteButton = () => <button onClick={deleteAccount}>Delete</button>;\n'
+fl_case "ev-16 constructing an app view after a real deletion is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  let s = ContactSheet()\n}\n' \
+  App/C.swift 'struct ContactSheet {\n  let mail = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "ev-17 a Retrofit annotation above the called method is a real deletion" "CLEAN" \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
+  App/DeleteButton.kt 'val deleteButton = Button(onClick = { deleteAccount() })\n'
+fl_case "ev-18 a POST to an account delete path is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/account/delete")\n}\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+fl_case "ev-19 a commented out deletion call is not evidence" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  // api.delete("/users/me")\n  log()\n}\nfunc log() {}\n'
+fl_case "ev-20 an unclosed deletion switch arm is unsure" "UNSURE" \
+  App/R.swift 'func go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    api.delete("/users/me")\n'
+EV21="$(python3 -c 'print("var a=1;" * 3000 + "function wipe(){api.delete(" + chr(34) + "/users/me" + chr(34) + ")}")')"
+fl_case "ev-21 a callee in a minified file is not followed" "UNSURE" \
+  App/a.ts 'export async function deleteAccount() {\n  await svc.wipe();\n}\n' \
+  App/bundle.js "$EV21"
+# A 2 MB minified single line file costs the follower no more than a few seconds over the check without it.
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+python3 -c 'print("function deleteAccount(){svc.wipe()};" + "x(1);a.b(c)(d);" * 150000)' > "$D/App/bundle.js"
+now() { python3 -c 'import time; print(time.time())'; }
+t0="$(now)"; bash "$GUARD" "$D" >/dev/null 2>&1; t1="$(now)"
+sed 's/deleteAccount/keepAccount/' "$D/App/bundle.js" > "$D/b" && mv "$D/b" "$D/App/bundle.js"
+t2="$(now)"; bash "$GUARD" "$D" >/dev/null 2>&1; t3="$(now)"
+python3 -c "import sys; sys.exit(0 if ($t1 - $t0) - ($t3 - $t2) < 5 else 1)" && ok "ev-22 a 2 MB single line file does not slow the deletion follower" || bad "ev-22 a 2 MB single line file does not slow the deletion follower"
+rm -rf "$D"
+
+# Evidence must delete the account itself. A keychain, cache, photo, device or token delete is not account removal.
+dw_case "ad-1 a keychain delete before a support sheet is flagged" fire \
+  App/Account.swift 'struct AccountView: View {\n  @State private var showSupport = false\n  var body: some View {\n    Button("Delete") { deleteAccount() }\n      .sheet(isPresented: $showSupport) { SupportSheet() }\n  }\n  func deleteAccount() {\n    keychain.delete("authToken")\n    showSupport = true\n  }\n}\n' \
+  App/SupportSheet.swift 'struct SupportSheet: View {\n  var body: some View {\n    Link("Email us", destination: URL(string: "mailto:help@x.io")!)\n  }\n}\n'
+dw_case "ad-2 a cache path delete is not account removal" fire \
+  App/S.swift 'func deleteAccount() {\n  cache.delete("/tmp/cache")\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-3 a Retrofit photo delete before a support screen is flagged" fire \
+  App/Account.kt 'fun deleteAccount() {\n  api.removePhoto(id)\n  nav.navigate(Screen.Support)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("photos/{id}")\n  suspend fun removePhoto(@Path("id") id: String)\n}\n' \
+  App/Router.kt 'fun route(s: Screen) {\n  when (s) {\n    Screen.Support -> startMail("mailto:help@x.io")\n  }\n}\n'
+dw_case "ad-4 a React Native device delete before a contact screen is flagged" fire \
+  App/Account.tsx 'export const deleteAccount = async () => {\n  await api.delete("/devices/123");\n  navigation.navigate(\047Contact\047);\n};\n' \
+  App/Contact.tsx 'export default function Contact() {\n  return <Button onPress={() => Linking.openURL("mailto:help@x.io")} title="Mail" />;\n}\n'
+dw_case "ad-5 a POST that deletes a sub resource of the user is flagged" fire \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/user/notifications/delete")\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-6 a push token delete plus an inactive status patch is flagged" fire \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.delete("/tokens/push")\n  try await api.patch("/users/me", status: inactive)\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-7 a block commented deletion call is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* api.delete("/users/me") */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-8 a multi line block comment stub is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* TODO wire this up\n  api.delete("/users/me")\n  */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-9 a nested Swift block comment is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* outer /* inner */\n  api.delete("/users/me")\n  */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-10 a DELETE on the current user clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.delete("/users/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+dw_case "ad-11 a Retrofit DELETE on users by id clears an unrelated support link" quiet \
+  App/Account.kt 'suspend fun deleteAccount() = api.deleteUser(userId)\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
+  App/C.kt 'val contact = "mailto:help@x.io"\n' \
+  App/DeleteButton.kt 'val deleteButton = Button(onClick = { deleteAccount() })\n'
+dw_case "ad-12 a POST to the account delete path clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/account/delete")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+dw_case "ad-13 a Firebase current user delete clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await currentUser.delete()\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+dw_case "ad-14 a string holding a comment opener does not hide the deletion" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  let note = "a /* b"\n  try await api.delete("/users/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+dw_case "ad-15 a fetch with method DELETE on the current user clears a support link" quiet \
+  App/a.ts 'export async function deleteAccount() {\n  await fetch(`${API}/users/me`, { method: "DELETE" });\n}\n' \
+  App/c.ts 'export const C = "mailto:help@x.io";\n' \
+  App/DeleteButton.tsx 'export const DeleteButton = () => <button onClick={deleteAccount}>Delete</button>;\n'
+fl_case "ad-16 a keychain delete is not a real deletion" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  keychain.delete("authToken")\n}\n'
+fl_case "ad-17 a block commented deletion is not a real deletion" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  /* api.delete("/users/me") */\n  log()\n}\nfunc log() {}\n'
+fl_case "ad-18 a DELETE on the current user is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n}\n' \
+  App/DeleteButton.swift 'let deleteButton = Button("Delete") { deleteAccount() }\n'
+
+# Round 5. CLEAN needs a used entry point, a resolved value for every constant it reads, and a path that is the signed in account.
+BTN="App/DeleteButton.swift"; BTNC='let deleteButton = Button("Delete") { deleteAccount() }\n'
+fl_case "en-1 a deletion nothing calls is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n}\n'
+dw_case "en-1 a deletion nothing calls does not clear a support link" fire \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+fl_case "en-2 a deletion called only from a test is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n}\n' \
+  AppTests/AccountTests.swift 'func testDelete() { deleteAccount() }\n'
+fl_case "en-3 an interface signature, an import and an export are not uses" "UNSURE" \
+  App/a.ts 'interface Account {\n  deleteAccount(): Promise<void>;\n}\nexport async function deleteAccount() {\n  await api.delete("/users/me");\n}\n' \
+  App/b.ts 'import { deleteAccount } from "./a";\nexport { deleteAccount };\n'
+fl_case "en-4 a deletion button whose else branch opens a mailto is weak" "WEAK App/Links.swift 2" \
+  App/V.swift 'struct V: View {\n  var body: some View {\n    if config.selfServe {\n      Button("Delete") { deleteAccount() }\n    } else {\n      Button("Delete") { UIApplication.shared.open(Links.privacyMail) }\n    }\n  }\n  func deleteAccount() {\n    api.delete("/users/me")\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail = URL(string: "mailto:privacy@x.io")!\n}\n'
+dw_case "en-4 a deletion button whose else branch opens a mailto is flagged" fire \
+  App/V.swift 'struct V: View {\n  var body: some View {\n    if config.selfServe {\n      Button("Delete") { deleteAccount() }\n    } else {\n      Button("Delete") { UIApplication.shared.open(Links.privacyMail) }\n    }\n  }\n  func deleteAccount() {\n    api.delete("/users/me")\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail = URL(string: "mailto:privacy@x.io")!\n}\n'
+fl_case "en-5 a Kotlin when arm next to the deletion arm is followed" "WEAK App/L.kt 2" \
+  App/A.kt 'fun onRow(r: Row) {\n  when (r) {\n    Row.Delete -> {\n      vm.deleteAccount()\n    }\n    else -> {\n      openMail(Links.privacy)\n    }\n  }\n}\nfun openMail(u: String) {}\n' \
+  App/VM.kt 'class VM {\n  fun deleteAccount() {\n    api.delete("/users/me")\n  }\n}\n' \
+  App/L.kt 'object Links {\n  const val privacy = "mailto:privacy@x.io"\n}\n'
+fl_case "en-6 an else branch inside the deletion that opens a mailto is weak" "WEAK App/Links.swift 2" \
+  App/S.swift 'func deleteAccount() {\n  if config.selfServe {\n    api.delete("/users/me")\n  } else {\n    UIApplication.shared.open(Links.privacyMail)\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail = URL(string: "mailto:privacy@x.io")!\n}\n' \
+  "$BTN" "$BTNC"
+fl_case "mc-1 a constant whose value sits on the next line is read" "WEAK App/Links.swift 3" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  UIApplication.shared.open(Links.privacyMail)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail =\n    URL(string: "mailto:privacy@x.io")!\n}\n' \
+  "$BTN" "$BTNC"
+dw_case "mc-1 a constant whose value sits on the next line is flagged" fire \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  UIApplication.shared.open(Links.privacyMail)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail =\n    URL(string: "mailto:privacy@x.io")!\n}\n' \
+  "$BTN" "$BTNC"
+fl_case "mc-2 a Kotlin val read through a getter is read" "WEAK App/L.kt 3" \
+  App/A.kt 'fun deleteAccount() {\n  api.delete("/users/me")\n  openMail(Links.privacy)\n}\nfun openMail(u: String) {}\n' \
+  App/L.kt 'object Links {\n  val privacy: String\n    get() = "mailto:privacy@x.io"\n}\n' \
+  App/DeleteButton.kt 'val deleteButton = Button(onClick = { deleteAccount() })\n'
+fl_case "mc-3 a TypeScript constant whose value sits on the next line is read" "WEAK App/l.ts 2" \
+  App/a.ts 'export async function deleteAccount() {\n  await api.delete("/users/me");\n  await Linking.openURL(PRIVACY_MAIL);\n}\n' \
+  App/l.ts 'export const PRIVACY_MAIL =\n  "mailto:privacy@x.io";\n' \
+  App/DeleteButton.tsx 'export const DeleteButton = () => <button onClick={deleteAccount}>Delete</button>;\n'
+fl_case "mc-4 a constant with no value to read is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  UIApplication.shared.open(Links.privacyMail)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let privacyMail =' \
+  "$BTN" "$BTNC"
+fl_case "rs-1 a delete on a device, session or push token under me is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/devices/me")\n  api.delete("/sessions/me")\n  api.delete("/push-tokens/me")\n}\n' \
+  "$BTN" "$BTNC"
+dw_case "rs-1 a delete on a device under me does not clear a support link" fire \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/devices/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  "$BTN" "$BTNC"
+fl_case "rs-2 a delete on another user by id is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/" + friendId)\n}\n' \
+  "$BTN" "$BTNC"
+dw_case "rs-2 a delete on another user by id does not clear a support link" fire \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/" + friendId)\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n' \
+  "$BTN" "$BTNC"
+fl_case "rs-3 a users id path reached only with a friend id is unsure" "UNSURE" \
+  App/Account.kt 'suspend fun deleteAccount() = api.deleteUser(friend.id)\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
+  App/DeleteButton.kt 'val deleteButton = Button(onClick = { deleteAccount() })\n'
+fl_case "rs-4 a delete on the signed in user under an api version prefix is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("https://x.io/api/v1/users/me")\n  api.delete("/users/" + userId)\n}\n' \
+  "$BTN" "$BTNC"
 
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.
