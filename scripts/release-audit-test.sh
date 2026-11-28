@@ -195,6 +195,28 @@ PYT
 [ "$R" = "['App/A.swift']" ] && ok "an ImageCreator call next to the sheet is listed, a sheet-only file is not" || bad "an ImageCreator call next to the sheet is listed, a sheet-only file is not (got $R)"
 rm -rf "$IC"
 
+# A longer name, a doc mention, a comment or a string is not a call. Objective-C++ source is scanned.
+IC="$(mktemp -d)"; mkdir -p "$IC/App"
+printf 'import ImagePlayground\nlet r = LegacyImageCreator()\n' > "$IC/App/Legacy.swift"
+printf 'Replace ImageCreator() with the sheet.\n' > "$IC/App/NOTES.md"
+printf 'import ImagePlayground\n// let c = ImageCreator()\nlet s = "ImageCreator()"\n/* ImageCreator.x */\n' > "$IC/App/Commented.swift"
+printf 'import ImagePlayground\nlet c = ImagePlayground.ImageCreator()\n' > "$IC/App/Qual.swift"
+printf 'auto c = ImageCreator();\n' > "$IC/App/Bridge.mm"
+R="$(IC="$IC" python3 - <<'PYT'
+import importlib.util, json, os
+spec = importlib.util.spec_from_file_location("ra", "scripts/release-audit.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+with open("data/rejection-patterns.json") as fh:
+    raw = json.load(fh)
+pats = raw["patterns"] if isinstance(raw, dict) else raw
+pid = "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED"
+one = {p["id"]: p for p in pats if p["id"] == pid}
+print(sorted(m.find_affected_files(os.environ["IC"], one).get(pid, [])))
+PYT
+)"
+[ "$R" = "['App/Bridge.mm', 'App/Qual.swift']" ] && ok "LegacyImageCreator(, a .md mention, a comment and a string are not listed" || bad "LegacyImageCreator(, a .md mention, a comment and a string are not listed (got $R)"
+rm -rf "$IC"
+
 python3 scripts/test-release-audit-area.py && ok "area status reflects coverage" || bad "area status reflects coverage"
 
 echo "release-audit-test: $PASS passed, $FAIL failed"

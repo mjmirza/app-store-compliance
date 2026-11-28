@@ -881,11 +881,14 @@ def obsoleted_27(code, k):
     seg = head[keep:] + chr(10) + chr(10).join(lines[decl:])
     for m in re.finditer(r"@available[ ]*[(]([^)]*)[)]", seg):
         args = [a.strip() for a in m.group(1).split(",")]
-        if not args or args[0] not in ("iOS", "iPadOS", "macOS", "macCatalyst", "visionOS", "*"):
+        if not args or args[0] not in ("iOS", "iPadOS", "iOSApplicationExtension", "macOS", "macCatalyst", "visionOS", "*"):
             continue
         for a in args[1:]:
             if a == "unavailable":
-                return True
+                # Unavailable on macOS, macCatalyst or visionOS still compiles the body for iOS.
+                if args[0] in ("iOS", "iPadOS", "iOSApplicationExtension", "*"):
+                    return True
+                continue
             if a.startswith("obsoleted"):
                 v = a.split(":", 1)[-1].strip().split(".")
                 if v[0].isdigit() and (int(v[0]), int(v[1]) if len(v) > 1 and v[1].isdigit() else 0) <= (27, 0):
@@ -1077,7 +1080,6 @@ def gated_many(code, stops):
     # Chain state is kept per nesting depth, so a block nested in a branch cannot reset its chain.
     chain_at = dict()
     exits_at = dict()
-    tries_out = dict()
     top = False
     want = sorted(set(min(x, len(code)) for x in stops))
     res = dict()
@@ -1130,14 +1132,6 @@ def gated_many(code, stops):
             exits = done[4] in ("if", "elif") and ends_out
             if done[4] == "else" and ends_out and chain_exits and stack:
                 stack[-1][6] = k
-            if done[4] in ("do", "catch"):
-                # A do and its catches exit when every one of them ends with an exit.
-                tries_out[d] = ends_out and (done[4] == "do" or tries_out.get(d, False))
-                if tries_out[d] and stack and not code[k + 1:].lstrip().startswith("catch"):
-                    stack[-1][6] = k
-            if done[4] == "switch" and stack and switch_exits(body):
-                # A switch must be exhaustive, so when every case exits the switch does too.
-                stack[-1][6] = k
             open_at.pop()
             all_before = chain_exits
             exits_at[d] = exits and (done[4] == "if" or chain_exits)
@@ -1166,7 +1160,8 @@ def gated_many(code, stops):
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
     how = ""
-    for line in text.split(chr(10)):
+    # One line can hold several imports, as in import SwiftUI; import ImagePlayground.
+    for line in (seg for row in text.split(chr(10)) for seg in row.split(";")):
         words = [w for w in line.split() if not w.startswith("@") and w not in ("public", "internal", "package", "private", "fileprivate")]
         if len(words) < 2 or words[0] != "import":
             continue
@@ -1279,8 +1274,8 @@ def cond_value(cond):
     return v if pos[0] == len(toks) else "U"
 
 def cond_lines(text):
-    # Lines a Release build does not compile. A chain holding a flag that
-    # cannot be evaluated is skipped whole, never guessed.
+    # Lines a Release build does not compile. A branch whose flag cannot be
+    # evaluated, such as a custom PRO flag, counts as compiled and is reported.
     out = set()
     stack = []
     for n, raw in enumerate(text.split(chr(10)), 1):
@@ -1297,9 +1292,6 @@ def cond_lines(text):
             if stack:
                 chain = stack.pop()
                 br = chain["branches"]
-                if any(v == "U" for _, v in br):
-                    out.update(range(chain["start"], n + 1))
-                    continue
                 live = True
                 for idx, (bn, v) in enumerate(br):
                     end_n = br[idx + 1][0] if idx + 1 < len(br) else n
@@ -1477,10 +1469,22 @@ for path in sys.stdin.read().split(chr(10)):
             IMPORTS.add(path)
         if how == "exported":
             EXPORTED.append(path)
+# A typealias to the Apple type, as in typealias Gen = ImageCreator, makes Gen another name for it.
+ALIAS_HIT = set()
+for src, scode in list(CODE.items()):
+    for am in re.finditer(r"(?<![A-Za-z0-9_.])typealias\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(ImagePlayground\s*\.\s*)?ImageCreator(?![A-Za-z0-9_.<])", scode):
+        name, aq = am.group(1), bool(am.group(2))
+        if name == "ImageCreator" or not (src in IMPORTS or EXPORTED) or (not aq and src in QUIET):
+            continue
+        use = re.compile(r"(?<![A-Za-z0-9_.])" + re.escape(name) + r"\s*[?!]?[ \t]*[" + chr(40) + ".]")
+        for p, pcode in CODE.items():
+            for um in use.finditer(pcode):
+                HITS.append((p, pcode.count(chr(10), 0, um.start()) + 1, aq, um.start()))
+                ALIAS_HIT.add((p, um.start()))
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
 # Only the first ungated hit is printed, so stop there, and run the costly gated_at check last.
-live = [h for h in HITS if (h[2] or h[0] not in QUIET) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+live = [h for h in HITS if ((h[0], h[3]) in ALIAS_HIT or (h[2] or h[0] not in QUIET) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift")))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
 GATED = dict()
 for h in live:
     if h[0] not in GATED:

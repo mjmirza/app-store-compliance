@@ -298,6 +298,20 @@ def get_areas_for_pattern(pid, patterns_dict):
     return list(set(areas))
 
 
+IMAGECREATOR_ID = "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED"
+IMAGECREATOR_EXTS = {".swift", ".m", ".mm"}
+# Comments and string literals, matched leftmost first so a // inside a string stays in the string.
+NOISE_RE = re.compile(r'"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"|/\*[\s\S]*?\*/|//[^\n]*')
+# A whole-word ImageCreator call or member use, or one qualified as ImagePlayground.ImageCreator.
+IMAGECREATOR_RE = re.compile(
+    r"(?:(?<![A-Za-z0-9_.])|(?<=ImagePlayground\.))ImageCreator\s*[(.]"
+)
+
+
+def calls_imagecreator(content):
+    return bool(IMAGECREATOR_RE.search(NOISE_RE.sub(" ", content)))
+
+
 def find_affected_files(target_dir, patterns_dict):
     affected = {}
     exclude_dirs = {
@@ -315,6 +329,7 @@ def find_affected_files(target_dir, patterns_dict):
     allowed_exts = {
         ".swift",
         ".m",
+        ".mm",
         ".h",
         ".kt",
         ".java",
@@ -368,6 +383,11 @@ def find_affected_files(target_dir, patterns_dict):
                     ph_regex = r'lorem ipsum|example\.(com|org)|YOUR_[A-Z_]+_(KEY|HERE)|INSERT_[A-Z_]+_HERE|dummy (text|content|data)|(john|jane)@example|"Acme( Inc| Corp)?"'
                     if re.search(ph_regex, content, re.IGNORECASE):
                         has_signal = True
+                elif pid == IMAGECREATOR_ID:
+                    # A plain substring also matches LegacyImageCreator( and a mention in docs or a comment.
+                    has_signal = ext in IMAGECREATOR_EXTS and calls_imagecreator(
+                        content
+                    )
                 else:
                     for sig in signals:
                         if sig in content:

@@ -4321,7 +4321,7 @@ D="$(ic_app A.swift 'import ImagePlayground
 let creatorType = ImageCreator.self
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "ImageCreator under a custom build flag stays silent" || bad "ImageCreator under a custom build flag stays silent"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator under a custom build flag fires, a Release build may set it" || bad "ImageCreator under a custom build flag fires, a Release build may set it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if !(DEBUG)
@@ -5290,7 +5290,115 @@ let usesSheet = true
 func legacy() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "an old-SDK fallback under #if compiler stays silent" || bad "an old-SDK fallback under #if compiler stays silent"
+ic_has && ic_at 'App/A.swift:5' && ok "the #else of #if compiler(>=6.3) fires, the toolchain may be older" || bad "the #else of #if compiler(>=6.3) fires, the toolchain may be older"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=6.3) fires" || bad "ImageCreator() under #if compiler(>=6.3) fires"
+rm -rf "$D"
+for v in 6.1 6.2 9.0; do
+D="$(ic_app A.swift "import ImagePlayground
+#if compiler(>=$v)
+func make() async throws { _ = try await ImageCreator() }
+#endif")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=$v) fires" || bad "ImageCreator() under #if compiler(>=$v) fires"
+rm -rf "$D"
+done
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(<6.0)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if compiler(<6.0) stays silent, a 6.1 toolchain drops it" || bad "ImageCreator() under #if compiler(<6.0) stays silent, a 6.1 toolchain drops it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if PRO
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if PRO fires" || bad "ImageCreator() under #if PRO fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if APPSTORE
+let usesSheet = true
+#else
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of a custom flag fires" || bad "ImageCreator() in the #else of a custom flag fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
+let usesSheet = true
+#elseif ENABLE_IMAGE_GEN
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() under #elseif of a custom flag fires" || bad "ImageCreator() under #elseif of a custom flag fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
+let usesSheet = true
+#elseif PRO
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in an #elseif PRO after a true branch stays silent" || bad "ImageCreator() in an #elseif PRO after a true branch stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(macOS, unavailable)
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macOS, unavailable) still compiles for iOS, so the call fires" || bad "@available(macOS, unavailable) still compiles for iOS, so the call fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(macCatalyst, unavailable)
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macCatalyst, unavailable) fires" || bad "@available(macCatalyst, unavailable) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(visionOS, unavailable, message: "not on visionOS")
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(visionOS, unavailable, message:) fires" || bad "@available(visionOS, unavailable, message:) fires"
+rm -rf "$D"
+for plat in iOS iOSApplicationExtension '*'; do
+D="$(ic_app A.swift "import ImagePlayground
+@available($plat, unavailable)
+func make() async throws { _ = try await ImageCreator() }")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available($plat, unavailable) keeps the body off iOS and stays silent" || bad "@available($plat, unavailable) keeps the body off iOS and stays silent"
+rm -rf "$D"
+done
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImageCreator
+func make() async throws { _ = try await Gen() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a call through typealias Gen = ImageCreator fires" || bad "a call through typealias Gen = ImageCreator fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImagePlayground.ImageCreator')"
+printf 'func make() async throws { _ = try await Gen.init() }\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/Use.swift:1' && ok "a call through a qualified typealias declared in another file fires" || bad "a call through a qualified typealias declared in another file fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImageCreator
+// let c = Gen()
+let note = "Gen()"
+let gen = MyGen()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias with no call, a comment or a longer name stays silent" || bad "a typealias with no call, a comment or a longer name stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import SwiftUI; import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "import ImagePlayground after another import on the same line counts" || bad "import ImagePlayground after another import on the same line counts"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if compiler(>=6.3)
