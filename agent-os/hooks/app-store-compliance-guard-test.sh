@@ -4241,6 +4241,1434 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 printf '%s\n' "$OUT" | grep -A1 'BOTH-PLACEHOLDER' | grep -q '^      file\. src/copy\.ts:1$' && ok "ptr-4 the placeholder finding names the shipping file, not a test file" || bad "ptr-4 the placeholder finding names the shipping file, not a test file"
 rm -rf "$D"
 
+# ImageCreator is discontinued in the 27 OS family. A call fires. The sheet, a comment, and a string do not.
+ic_app() {  # $1 filename under App/, $2 source
+  local d; d="$(mktemp -d)"; mkdir -p "$d/App"
+  printf '<plist/>' > "$d/App/Info.plist"
+  printf '%s\n' "$2" > "$d/App/$1"
+  echo "$d"
+}
+ic_has() { grep -q 'APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED' <<<"$OUT"; }
+ic_at() { grep -q "^      file\\. $1$" <<<"$OUT"; }
+
+D="$(ic_app A.swift 'import ImagePlayground
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() in Swift fires and names the line" || bad "ImageCreator() in Swift fires and names the line"
+rm -rf "$D"
+D="$(ic_app A.swift 'let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a Swift file without an ImagePlayground import stays silent" || bad "ImageCreator() in a Swift file without an ImagePlayground import stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let styles = ImageCreator.availableStyles')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator. member use fires" || bad "ImageCreator. member use fires"
+rm -rf "$D"
+D="$(ic_app A.m '@import ImagePlayground;
+NSString *note = @"ImageCreator()";
+ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "Objective-C never fires, ImageCreator is a Swift-only API" || bad "Objective-C never fires, ImageCreator is a Swift-only API"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let creator = try ImageCreator()
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "ImageCreator() still fires when the sheet is in the same file" || bad "ImageCreator() still fires when the sheet is in the same file"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let help = """
+/* Start a comment using this marker
+"""
+let creator = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "a comment marker inside a multiline string does not hide ImageCreator()" || bad "a comment marker inside a multiline string does not hide ImageCreator()"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImagePlaygroundViewController alone stays silent" || bad "ImagePlaygroundViewController alone stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import SwiftUI
+struct G: View {
+    var body: some View { Text("Draw").imagePlaygroundSheet(isPresented: $open) }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "imagePlaygroundSheet alone stays silent" || bad "imagePlaygroundSheet alone stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+// let creator = try ImageCreator()
+let sheet = ImagePlaygroundViewController() // ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a line comment stays silent" || bad "ImageCreator() in a line comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+/*
+let creator = try ImageCreator()
+*/
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a block comment stays silent" || bad "ImageCreator() in a block comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+/* outer
+/* inner */
+let creator = try ImageCreator()
+*/
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a nested Swift block comment stays silent" || bad "ImageCreator() in a nested Swift block comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+/* outer /* inner */ still a comment */
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() after a closed nested Swift comment fires" || bad "ImageCreator() after a closed nested Swift comment fires"
+rm -rf "$D"
+D="$(ic_app A.m '/* a /* b */ ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an Objective-C file stays silent even with nested block comments" || bad "an Objective-C file stays silent even with nested block comments"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+struct ImageCreator {}
+let renderer = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type named ImageCreator stays silent" || bad "an app type named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let renderer = ImageCreator()')"
+printf 'final class ImageCreator {\n}\n' > "$D/App/Renderer.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type named ImageCreator in another file stays silent" || bad "an app type named ImageCreator in another file stays silent"
+rm -rf "$D"
+D="$(ic_app A.m '@interface ImageCreator : NSObject
+@end
+ImageCreator *c = [[ImageCreator alloc] init];')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an Objective-C class named ImageCreator stays silent" || bad "an Objective-C class named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+// class ImageCreator wraps the system type
+let creator = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a declaration in a comment does not hide ImageCreator()" || bad "a declaration in a comment does not hide ImageCreator()"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+final class ImageCreator {
+  func make() async throws { let c = try await ImagePlayground.ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImagePlayground.ImageCreator() fires next to an app type of that name" || bad "ImagePlayground.ImageCreator() fires next to an app type of that name"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+/*
+class ImageCreator wraps the system type
+*/
+let creator = try await ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "a declaration in a block comment does not hide ImageCreator()" || bad "a declaration in a block comment does not hide ImageCreator()"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS 15.0, *) final class ImageCreator {}
+let renderer = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type behind @available(...) stays silent" || bad "an app type behind @available(...) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum MyImagePlayground {
+  struct ImageCreator {}
+}
+let c = MyImagePlayground.ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a namespace ending in ImagePlayground is not the Image Playground module" || bad "a namespace ending in ImagePlayground is not the Image Playground module"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if DEBUG stays silent, a Release build never compiles it" || bad "ImageCreator() under #if DEBUG stays silent, a Release build never compiles it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering { struct ImageCreator {} }
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup" || bad "a nested app type named ImageCreator silences unqualified calls, the scan cannot follow Swift lookup"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering {
+  struct ImageCreator {}
+  static func make() -> ImageCreator { ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a call inside the type that nests ImageCreator stays silent" || bad "a call inside the type that nests ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let c = Rendering.ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator under another namespace stays silent" || bad "ImageCreator under another namespace stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Rendering { struct ImageCreator {} }
+extension Rendering { static func make() -> ImageCreator { ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested app type used from an extension stays silent" || bad "a nested app type used from an extension stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { static func make() }
+protocol Renderer { associatedtype ImageCreator: ImageCreating }
+extension Renderer { func render() { ImageCreator.make() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an associatedtype named ImageCreator stays silent" || bad "an associatedtype named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { init() }
+func create<ImageCreator: ImageCreating>(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter named ImageCreator stays silent" || bad "a generic parameter named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol ImageCreating { init() }
+func create<ImageCreator>() -> ImageCreator where ImageCreator: ImageCreating { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter constrained in a where clause stays silent" || bad "a generic parameter constrained in a where clause stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func create<
+  ImageCreator: P
+>(_: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter list split across lines stays silent" || bad "a generic parameter list split across lines stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
+let mode = 1
+#else
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of #if DEBUG fires, Release compiles it" || bad "ImageCreator() in the #else of #if DEBUG fires, Release compiles it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if !DEBUG fires, Release compiles it" || bad "ImageCreator() under #if !DEBUG fires, Release compiles it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+#if DEBUG
+    _ = try await ImageCreator()
+#endif
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if DEBUG alone stays silent, Release drops it" || bad "ImageCreator() under #if DEBUG alone stays silent, Release drops it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.1)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=6.1) fires, every SDK that has it passes" || bad "ImageCreator() under #if compiler(>=6.1) fires, every SDK that has it passes"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(<6.0)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if compiler(<6.0) stays silent" || bad "ImageCreator() under #if compiler(<6.0) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(macOS)
+let probe = true
+#else
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of #if os(macOS) fires" || bad "ImageCreator() in the #else of #if os(macOS) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias ImageCreator = ImagePlayground.ImageCreator
+func make() async throws {
+    let creator = try await ImageCreator()
+    _ = creator
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a typealias back to ImagePlayground.ImageCreator does not silence calls" || bad "a typealias back to ImagePlayground.ImageCreator does not silence calls"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias ImageCreator = MyRenderer
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias to an app type named ImageCreator still silences calls" || bad "a typealias to an app type named ImageCreator still silences calls"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<T: Collection<String>, ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a nested generic constraint stays silent" || bad "a generic parameter after a nested generic constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(iOS)
+let probe = true
+#elseif DEBUG
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #elseif DEBUG stays silent" || bad "ImageCreator() under #elseif DEBUG stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<T: Collection<(String, Int)>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a tuple constraint stays silent" || bad "a generic parameter after a tuple constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if canImport(ImagePlayground)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if canImport fires, Release keeps it" || bad "ImageCreator() under #if canImport fires, Release keeps it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(iOS) && !targetEnvironment(macCatalyst)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under a platform-only #if fires" || bad "ImageCreator() under a platform-only #if fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if INTERNAL_BUILD
+let creatorType = ImageCreator.self
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator under a custom build flag fires, a Release build may set it" || bad "ImageCreator under a custom build flag fires, a Release build may set it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if !(DEBUG)
+func release() {}
+#else
+let creator = ImageCreator()
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if !(DEBUG) stays silent" || bad "ImageCreator() under #if !(DEBUG) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
+func release() {}
+#elseif os(macOS)
+let creator = ImageCreator()
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in an #elseif after #if !DEBUG stays silent" || bad "ImageCreator() in an #elseif after #if !DEBUG stays silent"
+rm -rf "$D"
+D="$(ic_app Renderer.h 'struct Renderer {};
+using ImageCreator = Renderer;
+inline auto makeRenderer() { return ImageCreator(); }')"
+printf 'import ImagePlayground\nlet r = ImageCreator()\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a C++ using alias named ImageCreator silences a Swift call" || bad "a C++ using alias named ImageCreator silences a Swift call"
+rm -rf "$D"
+D="$(ic_app Renderer.h 'struct Renderer {};
+typedef Renderer ImageCreator;
+inline auto makeRenderer() { return ImageCreator(); }')"
+printf 'import ImagePlayground\nlet r = ImageCreator()\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a C typedef named ImageCreator silences a Swift call" || bad "a C typedef named ImageCreator silences a Swift call"
+rm -rf "$D"
+D="$(ic_app Renderer.h 'typedef struct { int width; } ImageCreator;')"
+printf 'import ImagePlayground\nlet c = ImageCreator(width: 1)\n' > "$D/App/Editor.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an anonymous C typedef named ImageCreator silences a Swift call" || bad "an anonymous C typedef named ImageCreator silences a Swift call"
+rm -rf "$D"
+D="$(ic_app Renderer.h 'struct { int width; } ImageCreator;')"
+printf 'import ImagePlayground\nlet c = ImageCreator(width: 1)\n' > "$D/App/Editor.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ok "a C variable named ImageCreator is not a type and still fires" || bad "a C variable named ImageCreator is not a type and still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<T, /* renderer */ ImageCreator: P>(_: T) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a block comment stays silent" || bad "a generic parameter after a block comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<T, // renderer
+ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a line comment stays silent" || bad "a generic parameter after a line comment stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<T: Collection<() -> Void>, ImageCreator: P>(_: T, creator: ImageCreator.Type) -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter after a function-type constraint stays silent" || bad "a generic parameter after a function-type constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func creatorType<ImageCreator>(_: ImageCreator.Type) -> Any.Type { ImageCreator.self }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an unconstrained generic parameter named ImageCreator stays silent" || bad "an unconstrained generic parameter named ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+protocol P { init() }
+func make<ImageCreator /* implementation */: P>() -> ImageCreator { ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a generic parameter with a comment before its constraint stays silent" || bad "a generic parameter with a comment before its constraint stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import RenderingKit
+let renderer = RenderingKit::ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "another module selector, RenderingKit::ImageCreator, stays silent" || bad "another module selector, RenderingKit::ImageCreator, stays silent"
+rm -rf "$D"
+D="$(ic_app Model.swift 'struct ImageCreator {}')"
+printf 'import ImagePlayground\nlet renderer = ImageCreator()\n' > "$D/App/Editor.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type in a file without the import still silences an importing file" || bad "an app type in a file without the import still silences an importing file"
+rm -rf "$D"
+D="$(ic_app A.swift '@preconcurrency import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an attributed import counts as an ImagePlayground import" || bad "an attributed import counts as an ImagePlayground import"
+rm -rf "$D"
+D="$(ic_app A.swift '// import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a commented-out import does not count" || bad "a commented-out import does not count"
+rm -rf "$D"
+D="$(ic_app A.swift 'import RenderingKit
+/*
+import ImagePlayground
+*/
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an import inside a block comment does not count" || bad "an import inside a block comment does not count"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS 18.4, *) func make() async throws { if #unavailable(iOS 27.0) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() kept for systems before 27 stays silent" || bad "ImageCreator() kept for systems before 27 stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        print(27)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in the else of #available(iOS 27) stays silent" || bad "ImageCreator() in the else of #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }
+func refresh() { if #available(iOS 27, *) { print(27) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a version 27 check elsewhere in the file does not hide a call" || bad "a version 27 check elsewhere in the file does not hide a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone" || bad "ImageCreator() inside #available(iOS 27) fires, it runs where the API is gone"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #unavailable(iOS 27) else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "code after guard #unavailable(iOS 27) stays silent" || bad "code after guard #unavailable(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func a() {
+    guard #unavailable(iOS 27) else { return }
+}
+func make() async throws {
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a guard #unavailable in another function does not hide a call" || bad "a guard #unavailable in another function does not hide a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #available(iOS 27, *) else {
+        _ = try await ImageCreator()
+        return
+    }
+    print(27)
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of guard #available(iOS 27) stays silent" || bad "the else of guard #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    guard #available(iOS 27, *) else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "code after guard #available(iOS 27) fires" || bad "code after guard #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(f: Bool) async throws {
+    if #available(iOS 27, *) {
+        print(27)
+    } else if f {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if after #available(iOS 27) stays silent" || bad "an else if after #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 18, *) {
+        print(18)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else after #available(iOS 18) stays silent, it only runs below 18" || bad "an else after #available(iOS 18) stays silent, it only runs below 18"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #unavailable(iOS 27),
+       enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a multi-line #unavailable(iOS 27) condition stays silent" || bad "a multi-line #unavailable(iOS 27) condition stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    guard #available(iOS 27, *), enabled else {
+        _ = try await ImageCreator()
+        return
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "the else of a compound guard #available(iOS 27) fires" || bad "the else of a compound guard #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws {
+    if #available(iOS 27, *), enabled {
+        print(27)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "the else of a compound if #available(iOS 27) fires" || bad "the else of a compound if #available(iOS 27) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool, fallback: Bool) async throws {
+    if #unavailable(iOS 27), enabled || fallback {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#unavailable(iOS 27) with a comma clause holding || stays silent" || bad "#unavailable(iOS 27) with a comma clause holding || stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #unavailable(iOS 30) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 30) fires, it runs on 27 to 29" || bad "#unavailable(iOS 30) fires, it runs on 27 to 29"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 30, *) {
+        print(30)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "the else of #available(iOS 30) fires, it runs on 27 to 29" || bad "the else of #available(iOS 30) fires, it runs on 27 to 29"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 26, *) {
+        print(26)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of #available(iOS 26) stays silent" || bad "the else of #available(iOS 26) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #unavailable(iOS 27)
+    {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#unavailable(iOS 27) with the brace on its own line stays silent" || bad "#unavailable(iOS 27) with the brace on its own line stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws { if #available(iOS 18.4, *) { _ = try await ImageCreator() } else { print(1) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "the first branch of a one-line #available(iOS 18.4) with an else fires" || bad "the first branch of a one-line #available(iOS 18.4) with an else fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws { if #available(iOS 27, *) { print(1) } else { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the else of a one-line #available(iOS 27) stays silent" || bad "the else of a one-line #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws {
+    if #available(iOS 27, *) { print("https://api.myapp.dev") }
+    else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a URL string before the else does not break block reading" || bad "a URL string before the else does not break block reading"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func m() async throws {
+    if #unavailable(iOS 27) {
+        print("{")
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a brace inside a string does not open a block" || bad "a brace inside a string does not open a block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27), [1].contains(where: { $0 > 0 }) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a closure inside a #unavailable(iOS 27) condition keeps the check" || bad "a closure inside a #unavailable(iOS 27) condition keeps the check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #unavailable(iOS 27),
+       [1].contains(where: {
+           $0 > 0
+       }) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a multi-line closure inside a #unavailable(iOS 27) condition keeps the check" || bad "a multi-line closure inside a #unavailable(iOS 27) condition keeps the check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #available(iOS 27, *) {
+        let payload = #"{"message": "}"}"#
+        print(payload)
+    } else {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "braces in a raw string do not break block reading" || bad "braces in a raw string do not break block reading"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if [1].contains(where: { n in if #unavailable(iOS 27) { return n > 0 }; return n > 0 }) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "an availability check inside a closure is not an outer gate" || bad "an availability check inside a closure is not an outer gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws {
+    if #unavailable(iOS 27),
+       // Legacy fallback
+       enabled { _ = try await ImageCreator() }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a comment between condition clauses keeps the #unavailable(iOS 27) check" || bad "a comment between condition clauses keeps the #unavailable(iOS 27) check"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable (iOS 27) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a space before the parenthesis of #unavailable still counts" || bad "a space before the parenthesis of #unavailable still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws {
+    if #unavailable(iOS 27) { print(1) }
+    // next block
+    if enabled {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:6' && ok "a comment line before a new if does not join it to the earlier condition" || bad "a comment line before a new if does not join it to the earlier condition"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool) async throws { if enabled { return } else if #available(iOS 27, *) { return } else { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if after an #available(iOS 27) branch stays silent" || bad "an else if after an #available(iOS 27) branch stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    guard #unavailable(iOS 27)
+    else { return }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a guard #unavailable(iOS 27) with else on the next line stays silent" || bad "a guard #unavailable(iOS 27) with else on the next line stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an early return under #available(iOS 27) stays silent" || bad "an early return under #available(iOS 27) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+    if #available(iOS 27, *) {
+        print(1)
+        return
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "other statements before the early return still gate the code after it" || bad "other statements before the early return still gate the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(e: Bool) async throws {
+    if #available(iOS 27, *) {
+        if e { return }
+        print(1)
+    }
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:7' && ok "a return that only sometimes runs does not gate the code after it" || bad "a return that only sometimes runs does not gate the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(enabled: Bool) async throws { if !enabled { return } else if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if early return gates the code after it when every branch exits" || bad "an else if early return gates the code after it when every branch exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make(a: Bool) async throws { if a { print(1) } else if #available(iOS 27, *) { return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an else if early return does not gate when an earlier branch falls through" || bad "an else if early return does not gate when an earlier branch falls through"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ guard
+ #unavailable(iOS 27)
+ else { return }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a guard with #unavailable(iOS 27) on the next line stays silent" || bad "a guard with #unavailable(iOS 27) on the next line stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(enabled: Bool, notice: Bool) async throws { if !enabled { return } else if #available(iOS 27, *) { if notice { print(1) }; return }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a block nested in an else if branch keeps the chain exit" || bad "a block nested in an else if branch keeps the chain exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ legacy: Bool) async throws { switch legacy { case true: if #available(iOS 27, *) { return }; _ = try await ImageCreator(); case false: return } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an if after a case label still gates" || bad "an if after a case label still gates"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async throws { switch x { case false: if #available(iOS 27, *) { return }; print(1); case true: _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an early exit in one case does not gate the next case" || bad "an early exit in one case does not gate the next case"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { for _ in [1] { if #available(iOS 27, *) { continue }; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "continue under #available(iOS 27) gates the rest of the loop body" || bad "continue under #available(iOS 27) gates the rest of the loop body"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27) { let r = #/[^}]+/#; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a brace in a Swift regex literal does not close the block" || bad "a brace in a Swift regex literal does not close the block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import Foundation
+import ImagePlayground
+func make() async throws { guard #unavailable(iOS 27) else { return }; _ = NotificationCenter.default; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok ".default is not a case label" || bad ".default is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum E { case a, b }
+func make(_ e: E) async throws { guard #unavailable(iOS 27) else { return }; if case .a = e { print(1) }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "if case is not a case label" || bad "if case is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func fallback(default n: Int)->Int { n }; func f() async throws { guard #unavailable(iOS 27) else { return }; _ = fallback(default: 0); _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default: argument label is not a case label" || bad "a default: argument label is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #unavailable(iOS 27) { let r = /[^}]+/; _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a brace in a bare regex literal does not close the block" || bad "a brace in a bare regex literal does not close the block"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { do { if #available(iOS 27, *) { return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a do block that returns on 27 gates the code after it" || bad "a do block that returns on 27 gates the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { do { try g(); if #available(iOS 27, *) { return } } catch { }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a do block with a catch still fires" || bad "a do block with a catch still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: ProcessInfo.ThermalState) async throws { switch x { case .nominal: if #available(iOS 27, *) { return }
+@unknown default: _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@unknown default: starts a new case" || bad "@unknown default: starts a new case"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { return try await presenter
+.present() }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a return split across lines still exits" || bad "a return split across lines still exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func fallback(default n: Int)->Int { n }
+func f() async throws {
+    guard #unavailable(iOS 27) else { return }
+    _ = fallback(
+        default: 0
+    )
+    _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default: argument on its own line is not a case label" || bad "a default: argument on its own line is not a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Int) async throws { switch x { case 0, 1: if #available(iOS 27, *) { return }; _ = try await ImageCreator()
+default: break } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "the commas of a grouped case label do not break the gate after it" || bad "the commas of a grouped case label do not break the gate after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { return try await
+ modern() }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a return whose expression wraps after await still exits" || bad "a return whose expression wraps after await still exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(items: [Int]) async throws { if #unavailable(iOS 27), items.contains { $0 > 0 } { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a trailing closure in the condition keeps the #unavailable gate" || bad "a trailing closure in the condition keeps the #unavailable gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(useCache: Bool) async throws { if #available(iOS 27, *) { if useCache { return } else { return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an if and else that both return gate the code after them" || bad "an if and else that both return gate the code after them"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(useCache: Bool) async throws { if #available(iOS 27, *) { if useCache { return } else { print(1) } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an if and else where only one returns still fires" || bad "an if and else where only one returns still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available obsoleted at iOS 27 keeps the body off iOS 27" || bad "@available obsoleted at iOS 27 keeps the body off iOS 27"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 28.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available obsoleted at iOS 28 still fires" || bad "@available obsoleted at iOS 28 still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a, b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a: return; case .b: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a switch where every case returns gates the code after it" || bad "a switch where every case returns gates the code after it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a, b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a: return; case .b: break } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a switch with a case that breaks still fires" || bad "a switch with a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(macOS, introduced: 15.4, obsoleted: 27.0)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macOS, obsoleted: 27.0) still compiles the body for iOS" || bad "@available(macOS, obsoleted: 27.0) still compiles the body for iOS"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+struct Renderer {}
+@available(*, unavailable, renamed: "Renderer")
+typealias LegacyRenderer = Renderer
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "an @available on an earlier declaration does not cover the next one" || bad "an @available on an earlier declaration does not cover the next one"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func make(
+ prompt: String
+) async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available above a signature that wraps still counts" || bad "@available above a signature that wraps still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+enum Mode { case a(code: Int), b }; func f(_ mode: Mode) async throws { if #available(iOS 27, *) { switch mode { case .a(code: _): return; case .b: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an associated value label is not the end of a case label" || bad "an associated value label is not the end of a case label"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(
+ iOS, introduced: 18.4, obsoleted: 27.0
+)
+func legacy() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an @available attribute that wraps across lines still counts" || bad "an @available attribute that wraps across lines still counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+ if #available(iOS 27, *) {
+  do { return try await modern() }
+  catch { throw error }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a do and catch that both exit gate the code after them" || bad "a do and catch that both exit gate the code after them"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+ if #available(iOS 27, *) {
+  do { return try await modern() }
+  catch { print(error) }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:7' && ok "a catch that falls through still fires" || bad "a catch that falls through still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import SwiftUI
+import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+@SwiftUI.ViewBuilder
+func legacyView() -> some View { Text("Generate").task { _ = try? await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a qualified attribute such as @SwiftUI.ViewBuilder keeps the @available above it" || bad "a qualified attribute such as @SwiftUI.ViewBuilder keeps the @available above it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(
+ mode: Int = .init()
+) async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok ".init() in a default argument is not a declaration" || bad ".init() in a default argument is not a declaration"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ mode: Int, _ cached: Bool) async throws { if #available(iOS 27, *) { switch mode { case 1: if cached { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a case that ends with an if and else that both return exits" || bad "a case that ends with an if and else that both return exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ mode: Int, _ cached: Bool) async throws { if #available(iOS 27, *) { switch mode { case 1: if cached { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a case that ends with an if and no else still fires" || bad "a case that ends with an if and no else still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(onProgress: (Double) -> Void = { _ in }) async throws {
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a default closure in the parameters keeps the @available above it" || bad "a default closure in the parameters keeps the @available above it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func generate(_ remote: Bool) async throws {
+ if #available(iOS 27, *) {
+ switch remote {
+ case true: do { return } catch { return }
+ case false: return
+ }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a case that ends with a do and catch that both exit" || bad "a case that ends with a do and catch that both exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, introduced: 18.4, obsoleted: 27)
+func legacy(onProgress: (Double) -> Void = { value in
+ let percentage = Int(value * 100)
+ print(percentage)
+}) async throws {
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a let inside a default closure is not the declaration" || bad "a let inside a default closure is not the declaration"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(iOS, obsoleted: 27)
+typealias LegacyCreatorError = ImageCreator.Error')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias marked obsoleted at 27 is not reported" || bad "a typealias marked obsoleted at 27 is not reported"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias CreatorError = ImageCreator.Error')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a typealias with no availability is still reported" || bad "a typealias with no availability is still reported"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, macOS 27, *) { switch n { case 0: switch b { case true: return; case false: return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested switch whose every case returns exits" || bad "a nested switch whose every case returns exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, macOS 27, *) { switch n { case 0: switch b { case true: return; case false: break }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a nested switch with a case that breaks still fires" || bad "a nested switch with a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, macOS 27, *) { switch n { case 0: switch b { case true: return
+case false: break }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a nested switch whose cases sit on separate lines and one breaks still fires" || bad "a nested switch whose cases sit on separate lines and one breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws {
+ if #available(iOS 27, *) {
+  switch n {
+  case 0:
+   switch b {
+   case true: return
+   case false: return
+   }
+  default: return
+  }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a nested switch on separate lines whose every case returns exits" || bad "a nested switch on separate lines whose every case returns exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws { if #available(iOS 27, *) { switch n { case 0: print(n); fallthrough; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "fallthrough into a returning case exits" || bad "fallthrough into a returning case exits"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws { if #available(iOS 27, *) { switch n { case 0: print(n); fallthrough; default: break } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "fallthrough into a case that breaks still fires" || bad "fallthrough into a case that breaks still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ xs: [Int]) async throws { if #available(iOS 27, *) { switch n { case 0: if xs.contains(where: { $0 > 0 }) { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a closure in an if condition is not a branch" || bad "a closure in an if condition is not a branch"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ if #available(iOS 27, macOS 27, *) {
+#if os(iOS)
+ return try await mobile()
+#else
+ return try await desktop()
+#endif
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "#if and #else that both return exit" || bad "#if and #else that both return exit"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+ if #available(iOS 27, macOS 27, *) {
+#if os(iOS)
+ return try await mobile()
+#endif
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:8' && ok "#if with no #else still fires" || bad "#if with no #else still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, *) { switch n { case 0: if b { return }
+else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else on its own line continues the if" || bad "an else on its own line continues the if"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, *) { switch n { case 0: if b { return }
+else { print(1) }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "an else on its own line that falls through still fires" || bad "an else on its own line that falls through still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws {
+ if #available(iOS 27, *) {
+  switch n {
+  case 0:
+   do { return }
+   catch { return }
+  default: return
+  }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a catch on its own line continues the do" || bad "a catch on its own line continues the do"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ xs: [Int]) async throws { if #available(iOS 27, *) { switch n { case 0: if xs.contains { $0 > 0 } { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a trailing closure in the condition is not a branch" || bad "a trailing closure in the condition is not a branch"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #unavailable(iOS 27), let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a call after #unavailable in the same condition is gated" || bad "a call after #unavailable in the same condition is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #available(iOS 27, *), let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a call after #available in the same condition still fires" || bad "a call after #available in the same condition still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if let c = try? await ImageCreator(), #unavailable(iOS 27) { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a call before #unavailable in the condition still fires" || bad "a call before #unavailable in the condition still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws -> String {
+if #available(iOS 27, *) {
+return """
+Use the sheet.
+"""
+}
+let c = try await ImageCreator()
+return String(describing: c)
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "returning a multiline string is an early return" || bad "returning a multiline string is an early return"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #available(iOS 27, *) { print(27) } else if let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if condition after if #available(iOS 27) is gated" || bad "an else if condition after if #available(iOS 27) is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async { if #available(iOS 27, *), x { print(27) } else if let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an else if after #available with another clause still fires" || bad "an else if after #available with another clause still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #unavailable(iOS 27), let c =
+ try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a condition that wraps after = keeps its #unavailable gate" || bad "a condition that wraps after = keeps its #unavailable gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ disabled: Bool, _ flags: [Flag]) async { if disabled {} else if flags.contains(where: { flag in
+if #available(iOS 27, *) { return flag.enabled } else { return flag.legacyEnabled } }), let creator = try? await ImageCreator() { print(creator) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "an else inside a closure in an else if condition does not gate it" || bad "an else inside a closure in an else if condition does not gate it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, *) { switch n { case 0: if b
+{ return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a brace on the line after if b still forms the if" || bad "a brace on the line after if b still forms the if"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws -> ImageCreator? { if #available(iOS 27, *) { return(nil) }; return try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "return(nil) with no space is an early return" || bad "return(nil) with no space is an early return"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws { if #available(iOS 27, *) { returnValue(nil) }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a call named returnValue is not a return and still fires" || bad "a call named returnValue is not a return and still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let diagnosticPattern = /ImageCreator(.+)/')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside a regex literal is not a call" || bad "ImageCreator inside a regex literal is not a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let p = #/
+  ImageCreator(.+)
+/#')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside an extended regex literal is not a call" || bad "ImageCreator inside an extended regex literal is not a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let p = #/
+  x
+/#
+func f() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "a call after a multiline regex is still reported on its own line" || bad "a call after a multiline regex is still reported on its own line"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ b: Bool) async throws -> String { if #available(iOS 27, *) { return b
+ ? "sheet"
+ : "service" }; _ = try await ImageCreator(); return "legacy" }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a ternary wrapped over lines after return is still a return" || bad "a ternary wrapped over lines after return is still a return"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ b: Bool) async throws -> String { if #available(iOS 27, *) { let s = b
+ ? "sheet"
+ : "service"; print(s) }; _ = try await ImageCreator(); return "legacy" }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a wrapped ternary that is not returned still fires" || bad "a wrapped ternary that is not returned still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async {
+ if #available(iOS 27, *) {
+  print(27)
+ } else if x {
+  print(1)
+ } else if let c = try? await ImageCreator() {
+  print(c)
+ }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if chain on separate lines after if #available(iOS 27) is gated" || bad "an else if chain on separate lines after if #available(iOS 27) is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func a() { if #available(iOS 27, *) { print(1) } }
+func b() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "an availability check in another function does not silence the call" || bad "an availability check in another function does not silence the call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async throws {
+    if #unavailable(iOS 27.1) {
+        _ = try await ImageCreator()
+    }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "#unavailable(iOS 27.1) still lets iOS 27.0 through" || bad "#unavailable(iOS 27.1) still lets iOS 27.0 through"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import struct Graphics.ImageCreator
+func make() async throws { _ = try await ImagePlayground.ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a qualified call fires next to a selective import of another module" || bad "a qualified call fires next to a selective import of another module"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { if #available(iOS 26, *) { _ = try await ImageCreator() } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an #available check below 27 still fires" || bad "an #available check below 27 still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+printf 'import struct Graphics.ImageCreator\n' > "$D/App/Render.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a selective import in another file does not silence this file" || bad "a selective import in another file does not silence this file"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+import struct Graphics.ImageCreator
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a selective import of another module ImageCreator stays silent" || bad "a selective import of another module ImageCreator stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import class ImagePlayground.ImageCreator
+let c = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "a selective import of the ImagePlayground ImageCreator fires" || bad "a selective import of the ImagePlayground ImageCreator fires"
+rm -rf "$D"
+D="$(ic_app Exports.swift '@_exported import ImagePlayground')"
+printf 'func make() async throws { _ = try await ImageCreator() }\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/Use.swift:1' && ok "an @_exported import in another file counts for every Swift file" || bad "an @_exported import in another file counts for every Swift file"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground;
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an import with a trailing semicolon counts" || bad "an import with a trailing semicolon counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let pool: Array<ImageCreator> = []
+let c = try ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "Array<ImageCreator> is a use, so the call still fires" || bad "Array<ImageCreator> is a use, so the call still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
+let usesSheet = true
+#else
+func legacy() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "the #else of #if compiler(>=6.3) fires, the toolchain may be older" || bad "the #else of #if compiler(>=6.3) fires, the toolchain may be older"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=6.3) fires" || bad "ImageCreator() under #if compiler(>=6.3) fires"
+rm -rf "$D"
+for v in 6.1 6.2 9.0; do
+D="$(ic_app A.swift "import ImagePlayground
+#if compiler(>=$v)
+func make() async throws { _ = try await ImageCreator() }
+#endif")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=$v) fires" || bad "ImageCreator() under #if compiler(>=$v) fires"
+rm -rf "$D"
+done
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(<6.0)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if compiler(<6.0) stays silent, a 6.1 toolchain drops it" || bad "ImageCreator() under #if compiler(<6.0) stays silent, a 6.1 toolchain drops it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if PRO
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if PRO fires" || bad "ImageCreator() under #if PRO fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if APPSTORE
+let usesSheet = true
+#else
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of a custom flag fires" || bad "ImageCreator() in the #else of a custom flag fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if DEBUG
+let usesSheet = true
+#elseif ENABLE_IMAGE_GEN
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() under #elseif of a custom flag fires" || bad "ImageCreator() under #elseif of a custom flag fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if !DEBUG
+let usesSheet = true
+#elseif PRO
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in an #elseif PRO after a true branch stays silent" || bad "ImageCreator() in an #elseif PRO after a true branch stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(macOS, unavailable)
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macOS, unavailable) still compiles for iOS, so the call fires" || bad "@available(macOS, unavailable) still compiles for iOS, so the call fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(macCatalyst, unavailable)
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macCatalyst, unavailable) fires" || bad "@available(macCatalyst, unavailable) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+@available(visionOS, unavailable, message: "not on visionOS")
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(visionOS, unavailable, message:) fires" || bad "@available(visionOS, unavailable, message:) fires"
+rm -rf "$D"
+for plat in iOS iOSApplicationExtension '*'; do
+D="$(ic_app A.swift "import ImagePlayground
+@available($plat, unavailable)
+func make() async throws { _ = try await ImageCreator() }")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "@available($plat, unavailable) keeps the body off iOS and stays silent" || bad "@available($plat, unavailable) keeps the body off iOS and stays silent"
+rm -rf "$D"
+done
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImageCreator
+func make() async throws { _ = try await Gen() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "a call through typealias Gen = ImageCreator fires" || bad "a call through typealias Gen = ImageCreator fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImagePlayground.ImageCreator')"
+printf 'func make() async throws { _ = try await Gen.init() }\n' > "$D/App/Use.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/Use.swift:1' && ok "a call through a qualified typealias declared in another file fires" || bad "a call through a qualified typealias declared in another file fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias Gen = ImageCreator
+// let c = Gen()
+let note = "Gen()"
+let gen = MyGen()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias with no call, a comment or a longer name stays silent" || bad "a typealias with no call, a comment or a longer name stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import SwiftUI; import ImagePlayground
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "import ImagePlayground after another import on the same line counts" || bad "import ImagePlayground after another import on the same line counts"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.3)
+let usesSheet = true
+#endif
+func make() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() after a closed #if compiler block still fires" || bad "ImageCreator() after a closed #if compiler block still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'struct ImageCreator {}')"
+i=0; while [ "$i" -lt 5100 ]; do printf 'let v%s = 1\n' "$i" > "$D/App/F$i.swift"; i=$((i + 1)); done
+printf 'import ImagePlayground\nlet renderer = ImageCreator()\n' > "$D/App/Z.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an app type still counts when the project has more than 5000 source files" || bad "an app type still counts when the project has more than 5000 source files"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let note = "say \"ImageCreator()\""
+let raw = #"ImageCreator()"#
+let sheet = ImagePlaygroundViewController()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a string or a raw string stays silent" || bad "ImageCreator() in a string or a raw string stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func MyImageCreator() {}
+let view = ImageCreatorView()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside a longer name stays silent" || bad "ImageCreator inside a longer name stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/app/src/main/java/t"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let x = 1\n' > "$D/App/A.swift"
+printf 'import ImagePlayground\nval c = ImageCreator()\n' > "$D/app/src/main/java/t/Src.kt"
+printf 'const c = ImageCreator()\n' > "$D/App/web.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in Kotlin or JavaScript stays silent" || bad "ImageCreator() in Kotlin or JavaScript stays silent"
+rm -rf "$D"
+D="$(mktemp -d)"; mkdir -p "$D/App" "$D/AppTests" "$D/Pods/ImagePlayground"
+printf '<plist/>' > "$D/App/Info.plist"
+printf 'let x = 1\n' > "$D/App/A.swift"
+printf 'import ImagePlayground\nlet creator = try ImageCreator()\n' > "$D/AppTests/T.swift"
+printf 'let creator = ImageCreator()\n' > "$D/Pods/ImagePlayground/Gen.swift"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() in a test directory or Pods stays silent" || bad "ImageCreator() in a test directory or Pods stays silent"
+rm -rf "$D"
+
 # macOS ships bash 3.2 as /bin/bash. CI runs a newer bash, so only a Mac run catches a 3.2 parse error.
 if [ -x /bin/bash ] && /bin/bash -c '[ "${BASH_VERSINFO[0]}" -lt 4 ]'; then
   /bin/bash -n "$GUARD" 2>/dev/null && ok "bash32 the guard parses under macOS /bin/bash 3.2" || bad "bash32 the guard parses under macOS /bin/bash 3.2"

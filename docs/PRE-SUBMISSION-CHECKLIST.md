@@ -75,6 +75,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 - [ ] App Tracking Transparency prompt is implemented before any cross app tracking.
 - [ ] Third party social login is paired with an equal privacy preserving alternative such as Sign in with Apple.
 - [ ] No private APIs, no deprecated frameworks, current OS support.
+- [ ] Image Playground. No call to ImageCreator. Apple is discontinuing that class, and it will no longer work in iOS 27, iPadOS 27, macOS 27, and visionOS 27 or later. Present the Image Playground sheet (ImagePlaygroundViewController or imagePlaygroundSheet), or use another image generation service ([Apple, 11 June 2026](https://developer.apple.com/news/?id=dz9wvq0r), [ImageCreator](https://developer.apple.com/documentation/imageplayground/imagecreator)).
 - [ ] No downloaded code that changes app features. Server side changes are data, not code.
 - [ ] Background modes declared match what the app actually does.
 - [ ] The new age rating questionnaire (13 plus, 16 plus, 18 plus) is answered for every app.

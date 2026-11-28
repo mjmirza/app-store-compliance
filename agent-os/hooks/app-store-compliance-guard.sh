@@ -498,6 +498,1009 @@ apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flu
   [ -n "$out" ]
 }
 
+# ImageCreator() and ImageCreator. in Swift or Objective-C, after comments and strings are skipped.
+# A mention in a comment or a string is not a call. The sheet APIs are a different type, so they never match.
+# Sets IMAGECREATOR_HIT to file:line. Test directories are already out of the file list.
+apple_imagecreator_hit() {
+  IMAGECREATOR_HIT=""
+  [ -s "$FILELIST" ] || return 1
+  command -v python3 >/dev/null 2>&1 || return 1
+  local out
+  # The list goes in on stdin, so one process sees every file and a declaration in any of them counts.
+  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | python3 -c "$(cat <<'ICPY'
+import re
+import sys
+
+def use_at(text, i, end):
+    name = "ImageCreator"
+    if not text.startswith(name, i):
+        return False
+    if i and (text[i - 1].isalnum() or text[i - 1] == "_"):
+        return False
+    k = i + len(name)
+    if k < end and (text[k].isalnum() or text[k] == "_"):
+        return False
+    # A type the app declares under this name is the app own type, not the Image Playground one.
+    global DECLARED
+    b = i - 1
+    while b >= 0:
+        if text[b] == chr(10):
+            ls = text.rfind(chr(10), 0, b) + 1
+            c = text.find("//", ls, b)
+            b = (c if c >= 0 else b) - 1
+        elif text[b].isspace():
+            b -= 1
+        elif text[b] == "/" and b and text[b - 1] == "*" and text.rfind("/*", 0, b - 1) >= 0:
+            b = text.rfind("/*", 0, b - 1) - 1
+        else:
+            break
+    w = b
+    while w >= 0 and (text[w].isalnum() or text[w] == "_"):
+        w -= 1
+    t2 = k
+    while t2 < end and text[t2].isspace():
+        t2 += 1
+    # A type from another module, as in RenderingKit::ImageCreator.
+    if i >= 2 and text[i - 2:i] == "::" and not text[:i - 2].endswith("ImagePlayground"):
+        return False
+    # A constrained type parameter, as in <ImageCreator: P>, <T, ImageCreator: P> or where ImageCreator: P.
+    generic = decl_generic(text, b) or t2 < end and text[t2] == ":" and not text.startswith("::", t2) and b >= 0 and (text[b] in ("<", ",") or text[w + 1:b + 1] == "where")
+    # A C typedef names its alias last, as in typedef Renderer ImageCreator;
+    st = max(text.rfind(";", 0, i), text.rfind(chr(123), 0, i), text.rfind(chr(125), 0, i)) + 1
+    typedef = t2 < end and text[t2] in (";", ",") and "typedef" in text[st:i].split()
+    if not typedef and t2 < end and text[t2] in (";", ",") and b >= 0 and text[b] == chr(125):
+        # An anonymous body, as in typedef struct { int width; } ImageCreator;
+        m = open_of(text, b)
+        st = max(text.rfind(";", 0, m), text.rfind(chr(123), 0, m), text.rfind(chr(125), 0, m)) + 1 if m > 0 else m
+        typedef = m > 0 and "typedef" in text[st:m].split()
+    if text[w + 1:b + 1] == "typealias" and t2 < end and text[t2] == "=":
+        rhs = text[t2 + 1:end].lstrip()
+        q = len("ImagePlayground.ImageCreator")
+        if rhs.startswith("ImagePlayground.ImageCreator") and not (rhs[q:q + 1].isalnum() or rhs[q:q + 1] == "_"):
+            # An alias back to the Image Playground type is not an app type of the same name.
+            return False
+    if generic or typedef or text[w + 1:b + 1] in DECL_WORDS:
+        # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
+        # app type of this name silences unqualified calls. Missing one is never worse than main.
+        DECLARED = True
+        return False
+    t = k
+    while t < end and text[t] in " \t":
+        t += 1
+    if t < end and text[t] in "?!":
+        t2 = t + 1
+        while t2 < end and text[t2] in " \t":
+            t2 += 1
+        if t2 < end and text[t2] in "(.":
+            return True
+    if t < end and text[t] in "(.":
+        return True
+    b = i - 1
+    while b >= 0 and text[b] in " \t":
+        b -= 1
+    if b >= 0 and text[b] == "[":
+        if t < end and (text[t].isalnum() or text[t] == "_"):
+            return True
+    return False
+
+NEST = False
+CUR = ""
+DECLARED = False
+HITS = []
+SKIP = dict()
+IMPORTS = set()
+EXPORTED = []
+QUIET = set()
+CODE = dict()
+
+def decl_generic(text, b):
+    # True when the name opens or follows a comma in a generic parameter list, as in func f<T, ImageCreator>.
+    if b < 0 or text[b] not in ("<", ","):
+        return False
+    depth = 0
+    j = b if text[b] == "<" else b - 1
+    while j >= 0:
+        c = text[j]
+        if c in "{};":
+            return False
+        if c == ">" and not (j and text[j - 1] == "-"):
+            depth += 1
+        elif c == "<":
+            if depth == 0:
+                break
+            depth -= 1
+        j -= 1
+    if j < 0:
+        return False
+    head = text[max(0, j - 200):j].split()
+    if head and head[-1] in ("init", "subscript"):
+        return True
+    return len(head) >= 2 and head[-2] in ("func", "struct", "class", "enum", "actor", "typealias", "protocol")
+
+def no_comments(text):
+    # Blank out comments and string contents with spaces, keeping every offset and line break.
+    out = list(text)
+    i, n, depth = 0, len(text), 0
+    while i < n:
+        if text.startswith("/*", i):
+            depth += 1
+            out[i] = out[i + 1] = " "
+            i += 2
+        elif depth and text.startswith("*/", i):
+            depth -= 1
+            out[i] = out[i + 1] = " "
+            i += 2
+        elif depth:
+            if text[i] != chr(10):
+                out[i] = " "
+            i += 1
+        elif text.startswith("//", i):
+            e = text.find(chr(10), i)
+            e = n if e < 0 else e
+            for j in range(i, e):
+                out[j] = " "
+            i = e
+        elif text[i] == "/" and text[i + 1:i + 2] not in ("", " ", "=", chr(10)) and (text[:i].rstrip()[-1:] in ("=", "(", ",", ":", "[", chr(123), "!", "&", "|", "?", ";") or text[:i].rstrip().endswith("return")):
+            # A bare regex literal /.../ can hold braces.
+            j = i + 1
+            while j < n and text[j] != "/" and text[j] != chr(10):
+                j += 2 if text[j] == chr(92) else 1
+            if j < n and text[j] == "/":
+                for m in range(i + 1, j):
+                    out[m] = " "
+                i = j + 1
+            else:
+                i += 1
+        elif text[i] == "#" and text[i:].lstrip("#").startswith("/"):
+            # A Swift regex literal #/.../# can hold braces and quotes.
+            h = len(text[i:]) - len(text[i:].lstrip("#"))
+            close = "/" + "#" * h
+            e = text.find(close, i + h + 1)
+            e = n if e < 0 else e
+            for m in range(i + h + 1, e):
+                if text[m] != chr(10):
+                    out[m] = " "
+            i = e + len(close)
+        elif text[i] == "#" and text[i:].lstrip("#").startswith(chr(34)):
+            h = len(text[i:]) - len(text[i:].lstrip("#"))
+            q = chr(34) * 3 if text.startswith(chr(34) * 3, i + h) else chr(34)
+            close = q + "#" * h
+            j = i + h + len(q)
+            e = text.find(close, j)
+            e = n if e < 0 else e
+            for m in range(j, e):
+                if text[m] != chr(10):
+                    out[m] = " "
+            i = e + len(close)
+        elif text[i] == chr(34):
+            q = chr(34) * 3 if text.startswith(chr(34) * 3, i) else chr(34)
+            j = i + len(q)
+            while j < n and not text.startswith(q, j) and (len(q) == 3 or text[j] != chr(10)):
+                if text[j] == chr(92):
+                    if text[j] != chr(10):
+                        out[j] = " "
+                    j += 1
+                if j < n and text[j] != chr(10):
+                    out[j] = " "
+                j += 1
+            i = j + len(q)
+        else:
+            i += 1
+    return "".join(out)
+
+def gates_27(code, keys=("#unavailable(",)):
+    # Code under #unavailable(iOS N), or in the else of #available(iOS N), runs only below N.
+    # It never reaches 27 when every listed version N is 27.0 or lower.
+    for key in keys:
+        k = code.find(key)
+        while k >= 0:
+            e = code.find(")", k)
+            vers = []
+            for part in code[k + len(key):e if e > 0 else len(code)].replace(",", " ").split():
+                nums = part.split(".")
+                if nums[0].isdigit():
+                    vers.append((int(nums[0]), int(nums[1]) if len(nums) > 1 and nums[1].isdigit() else 0))
+            # 27.1 still lets 27.0 through, so the whole version must be 27.0 or lower.
+            if vers and max(vers) <= (27, 0):
+                return True
+            k = code.find(key, k + 1)
+    return False
+
+def open_of(code, j):
+    # The offset of the brace that the closing brace at j matches, or -1.
+    level = 0
+    while j >= 0:
+        if code[j] == chr(125):
+            level += 1
+        elif code[j] == chr(123):
+            level -= 1
+            if level == 0:
+                return j
+        j -= 1
+    return -1
+
+def head_of(code, k, pos=False):
+    # The condition before the brace at k. Scans back past parentheses, which hold any closure,
+    # and across a line break only when the condition continues on the next line.
+    depth = 0
+    j = k - 1
+    while j >= 0:
+        c = code[j]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            depth -= 1
+        elif depth <= 0 and c == chr(125) and not code[j + 1:k].strip():
+            # A trailing closure right before the brace can belong to the condition, as in
+            # if #unavailable(iOS 27), items.contains { $0 > 0 } { ... }.
+            m = open_of(code, j)
+            hm = head_of(code, m) if m > 0 and (code[:m].rstrip()[-1:].isalnum() or code[:m].rstrip()[-1:] in (")", "_")) else ""
+            if hm.split(" ")[0] in ("if", "guard", "while") or hm.startswith("else if"):
+                j = m - 1
+                continue
+            break
+        elif depth <= 0 and c in (chr(123), chr(125), ";"):
+            break
+        elif depth <= 0 and c == chr(10):
+            prev = code[code.rfind(chr(10), 0, j) + 1:j].rstrip()
+            cur = code[j + 1:k].strip()
+            # A blank line, including one that held a comment, does not end the condition.
+            ends_kw = prev.split()[-1:] in (["guard"], ["if"], ["while"])
+            if cur and prev.strip() and not ends_kw and not prev.endswith((",", "&&", "||", "(", "=")) and not cur.startswith((",", "&&", "||", ")", "else")):
+                break
+        j -= 1
+    if pos:
+        return j + 1
+    h = " ".join(code[j + 1:k].split())
+    for key in ("#available", "#unavailable"):
+        h = h.replace(key + " (", key + "(")
+    return h
+
+def outer(h):
+    # The condition with every parenthesised group removed except the version list of an availability check.
+    out = []
+    i = 0
+    while i < len(h):
+        if h[i] == "(" and not "".join(out).rstrip().endswith(("#available", "#unavailable")):
+            depth = 0
+            while i < len(h):
+                depth += {"(": 1, ")": -1}.get(h[i], 0)
+                i += 1
+                if depth == 0:
+                    break
+            continue
+        out.append(h[i])
+        i += 1
+    return "".join(out)
+
+def alone(h, key, joins):
+    # True when no other clause is joined to the availability check by joins.
+    k = h.find(key)
+    e = h.find(")", k)
+    rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
+    return not any(j in rest for j in joins)
+
+def first_word(s):
+    # The leading keyword of a statement, so return(nil) and if(x) read as return and if.
+    m = re.match(r"\s*([A-Za-z_]+)", s)
+    return m.group(1) if m else ""
+
+def last_stmt(body, raw=False):
+    # The last top-level statement of a block, split on semicolons and line breaks outside brackets.
+    depth = 0
+    cur = ""
+    last = ""
+    for i, c in enumerate(body):
+        if c in "([" + chr(123):
+            depth += 1
+        elif c in ")]" + chr(125):
+            depth -= 1
+        nxt = body[i + 1:].lstrip(" " + chr(9))
+        prev = cur.rstrip()
+        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.startswith(chr(123)) or nxt.startswith(("? ", ": ", "?? ", "&& ", "|| ", "+ ", "- ", "* ", "/ ", "== ", "!= ", "< ", "> ", "<= ", ">= ")) or first_word(nxt) in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
+            # A line that starts with a member access, or sits inside a multiline string, continues the statement above.
+            cur += " "
+        elif depth == 0 and c in (";", chr(10)):
+            if cur.strip():
+                last = cur
+            cur = ""
+        else:
+            cur += c
+    out = cur if cur.strip() else last
+    # raw keeps the line breaks, which a nested switch needs to find its case labels.
+    return out.strip() if raw else " ".join(out.split())
+
+def is_case_label(code, k):
+    # A switch label, not .default, an enum case, or the pattern in if case and guard case.
+    if k > 0 and (code[k - 1].isalnum() or code[k - 1] == "_"):
+        return False
+    before = code[:k].rstrip()
+    line = code[:k].rsplit(chr(10), 1)[-1]
+    if before.endswith("@unknown"):
+        # @unknown default: is a switch label too.
+        before = before[:-8].rstrip()
+        line = line.rstrip()[:-8]
+    if before.endswith((".", ",", "(", "[")) or (before.split() or [""])[-1] in ("if", "guard", "while", "for", "else", "enum", "indirect"):
+        return False
+    if line.strip() and not before.endswith((chr(123), chr(125), ";")):
+        # A label starts a statement, so default: inside a call is an argument label.
+        return False
+    if code.startswith("case ", k):
+        return True
+    rest = code[k + 7:]
+    return code.startswith("default", k) and rest.lstrip().startswith(":") and not (rest[:1].isalnum() or rest[:1] == "_")
+
+def obsoleted_27(code, k):
+    # True when the declaration that opens the brace at k is obsoleted at iOS 27 or earlier.
+    seg = code[:k]
+    # The declaration starts after the last brace or semicolon outside parentheses,
+    # so a default closure in the parameter list does not cut it short.
+    cut, level = -1, 0
+    for i in range(len(seg) - 1, -1, -1):
+        c = seg[i]
+        if c == ")":
+            level += 1
+        elif c == "(":
+            level -= 1
+        elif level <= 0 and c in (chr(123), chr(125), ";"):
+            cut = i
+            break
+    lines = seg[cut + 1:].split(chr(10))
+    # Only the attributes of this declaration count: its own line and the attribute lines right above it.
+    decl = len(lines) - 1
+    while decl > 0 and not lines[decl].strip():
+        decl -= 1
+    # A signature can wrap, so start from the line that holds the declaration keyword.
+    # Only a keyword outside parentheses counts, so a let inside a default closure is skipped.
+    text = chr(10).join(lines)
+    level, depth = 0, []
+    for c in text:
+        depth.append(level)
+        level += {"(": 1, ")": -1}.get(c, 0)
+    hits = [m.start(2) for m in re.finditer(r"(^|[^A-Za-z0-9_.])(func|init|subscript|var|let|struct|class|enum|actor|extension|protocol|typealias)([^A-Za-z0-9_]|$)", text) if depth[m.start(2)] == 0]
+    if hits:
+        decl = text.count(chr(10), 0, hits[-1])
+    # Walk back over the attributes stacked on this declaration, each @name or @name(...), even across lines.
+    head = chr(10).join(lines[:decl])
+    keep = len(head)
+    while True:
+        t = head[:keep].rstrip()
+        if t.endswith(")"):
+            o = t.rfind("(")
+            level = 0
+            for o in range(len(t) - 1, -1, -1):
+                level += {")": 1, "(": -1}.get(t[o], 0)
+                if level == 0:
+                    break
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_.]*[ ]*$", t[:o])
+        else:
+            m = re.search(r"@[A-Za-z_][A-Za-z0-9_.]*$", t)
+        if not m:
+            break
+        keep = m.start()
+    seg = head[keep:] + chr(10) + chr(10).join(lines[decl:])
+    for m in re.finditer(r"@available[ ]*[(]([^)]*)[)]", seg):
+        args = [a.strip() for a in m.group(1).split(",")]
+        if not args or args[0] not in ("iOS", "iPadOS", "iOSApplicationExtension", "macOS", "macCatalyst", "visionOS", "*"):
+            continue
+        for a in args[1:]:
+            if a == "unavailable":
+                # Unavailable on macOS, macCatalyst or visionOS still compiles the body for iOS.
+                if args[0] in ("iOS", "iPadOS", "iOSApplicationExtension", "*"):
+                    return True
+                continue
+            if a.startswith("obsoleted") and args[0] in ("iOS", "iPadOS", "iOSApplicationExtension"):
+                v = a.split(":", 1)[-1].strip().split(".")
+                if v[0].isdigit() and (int(v[0]), int(v[1]) if len(v) > 1 and v[1].isdigit() else 0) <= (27, 0):
+                    return True
+    return False
+
+def body_exits(body):
+    # True when a block always leaves the function. A trailing #if ... #endif exits
+    # when it has an #else and every compiled branch exits.
+    lines = [l for l in body.split(chr(10)) if l.strip()]
+    if lines and lines[-1].strip().startswith("#endif"):
+        depth, branches, cur, i = 0, [], [], len(lines) - 2
+        has_else = False
+        while i >= 0:
+            t = lines[i].strip()
+            if t.startswith("#endif"):
+                depth += 1
+            elif t.startswith("#if") and depth > 0:
+                depth -= 1
+            elif depth == 0 and (t.startswith("#else") or t.startswith("#elseif") or t.startswith("#if")):
+                has_else = has_else or t.startswith("#else") and not t.startswith("#elseif")
+                branches.append(chr(10).join(reversed(cur)))
+                cur = []
+                if t.startswith("#if"):
+                    break
+                i -= 1
+                continue
+            cur.append(lines[i])
+            i -= 1
+        return has_else and bool(branches) and all(body_exits(b) for b in branches)
+    return stmt_exits(last_stmt(body, True))
+
+def stmt_exits(stmt):
+    # True when a statement always leaves the function: return, throw, continue,
+    # or an if chain that ends in else and whose every branch does.
+    first = first_word(stmt)
+    if first in ("return", "throw", "continue"):
+        return True
+    if first == "switch":
+        # A nested switch exits when every one of its cases does.
+        o = stmt.find(chr(123))
+        c = stmt.rfind(chr(125))
+        return o > 0 and c > o and not stmt[c + 1:].strip() and switch_exits(stmt[o + 1:c])
+    if first not in ("if", "do"):
+        return False
+    blocks, gaps, level, start, prev, paren = [], [], 0, -1, 0, 0
+    for i, c in enumerate(stmt):
+        if level == 0 and c in "([":
+            paren += 1
+        elif level == 0 and c in ")]":
+            paren -= 1
+        elif paren > 0:
+            # A closure inside the condition, as in if xs.contains(where: { $0 > 0 }) { ... }.
+            continue
+        elif c == chr(123):
+            if level == 0:
+                gaps.append(stmt[prev:i])
+                start = i
+            level += 1
+        elif c == chr(125):
+            level -= 1
+            if level == 0:
+                blocks.append(stmt[start + 1:i])
+                prev = i + 1
+    tail = stmt[prev:].strip()
+    if not blocks or tail:
+        return False
+    # Two blocks with nothing between them mean the first was a trailing closure in the condition.
+    i = 1
+    while i < len(blocks):
+        if not gaps[i].strip():
+            del blocks[i - 1]
+            del gaps[i]
+        else:
+            i += 1
+    if first == "do":
+        # A do and its catches, each of which must exit.
+        if gaps[0].strip() != "do" or not all(g.strip().startswith("catch") for g in gaps[1:]):
+            return False
+    elif gaps[-1].strip() != "else":
+        return False
+    return all(body_exits(b) for b in blocks)
+
+def switch_exits(body):
+    # True when every case of a switch body ends with return, throw, continue or break out.
+    starts = []
+    level = 0
+    for i, c in enumerate(body):
+        if c in "([" + chr(123):
+            level += 1
+        elif c in ")]" + chr(125):
+            level -= 1
+        elif level == 0 and c in "cd" and is_case_label(" " + body, i + 1):
+            starts.append(i)
+    if not starts:
+        return False
+    nxt = True
+    for n in range(len(starts) - 1, -1, -1):
+        a = starts[n]
+        part = body[a:starts[n + 1] if n + 1 < len(starts) else len(body)]
+        colon, lvl = -1, 0
+        for ci, ch in enumerate(part):
+            if ch in "([":
+                lvl += 1
+            elif ch in ")]":
+                lvl -= 1
+            elif ch == ":" and lvl == 0:
+                # The label ends at the first colon outside the parentheses of an associated value.
+                colon = ci
+                break
+        rest = part[colon + 1:] if colon >= 0 else ""
+        last = last_stmt(rest, True)
+        # fallthrough runs the next case, so it exits when that case does.
+        here = body_exits(rest) or (first_word(last) == "fallthrough" and n + 1 < len(starts) and nxt)
+        if not here:
+            return False
+        nxt = here
+    return True
+
+def split_top(h):
+    # The comma-separated clauses of a condition, ignoring commas inside parentheses.
+    parts, cur, depth = [], "", 0
+    for c in h:
+        depth += {"(": 1, ")": -1}.get(c, 0)
+        if c == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += c
+    return parts + [cur]
+
+def else_below_27(code, k):
+    # True when the else if holding k follows a branch whose whole condition is #available(iOS 27),
+    # so its condition is only evaluated below 27.
+    def start(at):
+        q = head_of(code, at, True)
+        while q < at and code[q].isspace():
+            q += 1
+        return q if code.startswith("else", q) else -1
+    # The else that begins this condition, never one inside a closure in it.
+    p = start(k)
+    while p > 0:
+        b = code.rfind(chr(125), 0, p)
+        if b < 0 or code[b + 1:p].strip():
+            return False
+        m = open_of(code, b)
+        if m <= 0:
+            return False
+        ph = outer(head_of(code, m))
+        cond = ph[len("else if"):] if ph.startswith("else if") else ph[len("if"):] if ph.split(" ")[0] == "if" else None
+        if cond is None:
+            return False
+        parts = split_top(cond)
+        if len(parts) == 1 and gates_27(parts[0], ("#available(",)):
+            return True
+        if not ph.startswith("else if"):
+            return False
+        p = start(m)
+    return False
+
+def cond_gated(code, k):
+    # True when k sits in a condition after a clause such as #unavailable(iOS 27), which
+    # short-circuits, so the rest of the condition never runs on 27.
+    h = outer(head_of(code, k))
+    if not (h.split(" ")[0] in ("if", "guard", "while") or h.startswith("else if")):
+        return False
+    if h.startswith("else if") and else_below_27(code, k):
+        return True
+    parts, cur, depth = [], "", 0
+    for c in h:
+        depth += {"(": 1, ")": -1}.get(c, 0)
+        if c == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += c
+    return any(gates_27(p) for p in parts)
+
+def gated_at(code, stop):
+    # True when the block holding offset stop only runs below version 27.
+    k = min(stop, len(code))
+    return gated_many(code, [k])[k]
+
+def gated_many(code, stops):
+    # gated_at for every offset in stops, in one pass over the file.
+    # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
+    stack = []
+    open_at = []
+    # Chain state is kept per nesting depth, so a block nested in a branch cannot reset its chain.
+    chain_at = dict()
+    exits_at = dict()
+    top = False
+    want = sorted(set(min(x, len(code)) for x in stops))
+    res = dict()
+    wi = 0
+    for k in range((want[-1] if want else 0) + 1):
+        while wi < len(want) and want[wi] == k:
+            res[k] = top or any(f[0] for f in stack) or obsoleted_27(code, k) or cond_gated(code, k)
+            wi += 1
+        if k >= len(code) or wi >= len(want):
+            break
+        c = code[k]
+        if c == chr(123):
+            d = len(stack)
+            chain = chain_at.get(d, False)
+            chain_exits = exits_at.get(d, False)
+            open_at.append(k)
+            h = outer(head_of(code, k))
+            if h.split(" ")[0] in ("case", "default", "@unknown") and ":" in h:
+                # The commas of a case label are not clauses of the if that follows it.
+                h = h.split(":", 1)[1].strip()
+            words = h.split()
+            first = words[0] if words else ""
+            # An else runs whenever any comma clause fails, so only a lone #available check counts.
+            avail = gates_27(h, ("#available(",)) and alone(h, "#available(", (",",))
+            unavail = gates_27(h)
+            if first == "else" and "if" in words:
+                # An else if branch runs only when every earlier condition failed.
+                stack.append([chain or unavail, chain or avail, False, k if avail else -1, "elif", chain or unavail, -1])
+            elif first == "else":
+                stack.append([chain or unavail, chain, False, -1, "else", chain or unavail, -1])
+            elif "guard" in words:
+                stack.append([avail, False, unavail, -1, "guard", avail, -1])
+            elif obsoleted_27(code, k):
+                # @available(iOS, obsoleted: 27) on the declaration keeps its body off iOS 27.
+                stack.append([True, False, False, -1, "other", True, -1])
+            else:
+                # A case label or a statement label can sit before the if.
+                stack.append([unavail, avail, False, k if avail else -1, "if" if "if" in words else ("do" if first == "do" else ("switch" if first == "switch" else ("catch" if first == "catch" else "other"))), unavail, -1])
+        elif stack and c in "cd" and is_case_label(code, k):
+            # A case label starts a new path, so an early exit in an earlier case does not gate it.
+            stack[-1][0] = stack[-1][5]
+        elif c == chr(125) and stack:
+            done = stack.pop()
+            d = len(stack)
+            chain_at[d] = done[1]
+            chain_exits = exits_at.get(d, False)
+            body = code[open_at[-1] + 1:k]
+            # A block exits when its last statement does, or when it ends with an if and else that both exit.
+            ends_out = first_word(last_stmt(body)) in ("return", "throw", "continue", "break") or body_exits(body) or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
+            exits = done[4] in ("if", "elif") and ends_out
+            if done[4] == "else" and ends_out and chain_exits and stack:
+                stack[-1][6] = k
+            open_at.pop()
+            all_before = chain_exits
+            exits_at[d] = exits and (done[4] == "if" or chain_exits)
+            # if #available(iOS 27) { ...; return } leaves only versions below 27 for the code after it,
+            # and so does an else if one, when every earlier branch of the chain exits too.
+            if done[3] >= 0 and exits and (done[4] == "if" or all_before):
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
+            if done[4] == "do" and done[0] and not done[5] and not code[k + 1:].lstrip().startswith("catch"):
+                # A do block whose body returned on 27 leaves only versions below 27 after it.
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
+            if done[2]:
+                # Code after guard #unavailable(iOS 27) else { return } runs only below 27.
+                if stack:
+                    stack[-1][0] = True
+                else:
+                    top = True
+    # A declaration without a body, such as a typealias, carries its @available on the same statement.
+    return res
+
+def imports_ip(text):
+    # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
+    how = ""
+    # One line can hold several imports, as in import SwiftUI; import ImagePlayground.
+    for line in (seg for row in text.split(chr(10)) for seg in row.split(";")):
+        words = [w for w in line.split() if not w.startswith("@") and w not in ("public", "internal", "package", "private", "fileprivate")]
+        if len(words) < 2 or words[0] != "import":
+            continue
+        m = words[2] if words[1] in ("typealias", "struct", "class", "enum", "protocol", "let", "var", "func") and len(words) > 2 else words[1]
+        m = m.rstrip(";")
+        if m.endswith(".ImageCreator") and not m.startswith("ImagePlayground."):
+            # import struct Graphics.ImageCreator brings in a type of that name for this file only.
+            return "other"
+        if m == "ImagePlayground" or m.startswith("ImagePlayground."):
+            # @_exported makes the module visible in every file of the app.
+            if "@_exported" in line.split():
+                how = "exported"
+            elif not how:
+                how = "file"
+    return how
+
+def cond_value(cond):
+    # The value of an #if condition in a Release build for an Apple platform.
+    # T true, F false, P platform check (kept, later branches still possible), U unknown.
+    toks = []
+    c = cond.split("//")[0].strip()
+    i = 0
+    while i < len(c):
+        ch = c[i]
+        if ch.isspace():
+            i += 1
+        elif c.startswith("&&", i) or c.startswith("||", i):
+            toks.append(c[i:i + 2])
+            i += 2
+        elif ch in "!()":
+            toks.append(ch)
+            i += 1
+        else:
+            j = i
+            while j < len(c) and (c[j].isalnum() or c[j] in "_."):
+                j += 1
+            if j == i:
+                return "U"
+            name = c[i:j]
+            if j < len(c) and c[j] == "(":
+                e = c.find(")", j)
+                if e < 0:
+                    return "U"
+                toks.append((name, c[j + 1:e].replace(" ", "")))
+                i = e + 1
+            else:
+                toks.append((name, None))
+                i = j
+    pos = [0]
+
+    def atom(t):
+        name, arg = t
+        if arg is None:
+            return "F" if name == "DEBUG" else ("T" if name == "true" else "F" if name == "false" else "U")
+        if name in ("os", "canImport", "arch", "targetEnvironment", "hasFeature", "hasAttribute"):
+            return "P"
+        if name in ("compiler", "swift") and arg.startswith((">=", "<")):
+            op = ">=" if arg.startswith(">=") else "<"
+            ver = arg[len(op):].split(".")
+            try:
+                v = (int(ver[0]), int(ver[1]) if len(ver) > 1 else 0)
+            except ValueError:
+                return "U"
+            # ImageCreator needs Swift 6.1 or later, so any toolchain that builds it is at least 6.1.
+            if v <= (6, 1):
+                return "T" if op == ">=" else "F"
+        return "U"
+
+    def unary():
+        if pos[0] >= len(toks):
+            return "U"
+        t = toks[pos[0]]
+        pos[0] += 1
+        if t == "!":
+            v = unary()
+            return {"T": "F", "F": "T"}.get(v, v)
+        if t == "(":
+            v = disj()
+            if pos[0] < len(toks) and toks[pos[0]] == ")":
+                pos[0] += 1
+                return v
+            return "U"
+        if isinstance(t, tuple):
+            return atom(t)
+        return "U"
+
+    def conj():
+        vals = [unary()]
+        while pos[0] < len(toks) and toks[pos[0]] == "&&":
+            pos[0] += 1
+            vals.append(unary())
+        if "F" in vals:
+            return "F"
+        if "U" in vals:
+            return "U"
+        return "P" if "P" in vals else "T"
+
+    def disj():
+        vals = [conj()]
+        while pos[0] < len(toks) and toks[pos[0]] == "||":
+            pos[0] += 1
+            vals.append(conj())
+        if "T" in vals:
+            return "T"
+        if "U" in vals:
+            return "U"
+        return "P" if "P" in vals else "F"
+
+    v = disj()
+    return v if pos[0] == len(toks) else "U"
+
+def cond_lines(text):
+    # Lines a Release build does not compile. A branch whose flag cannot be
+    # evaluated, such as a custom PRO flag, counts as compiled and is reported.
+    out = set()
+    stack = []
+    for n, raw in enumerate(text.split(chr(10)), 1):
+        s = raw.strip()
+        if s.startswith("#elseif"):
+            if stack:
+                stack[-1]["branches"].append((n, cond_value(s[7:])))
+        elif s.startswith("#else"):
+            if stack:
+                stack[-1]["branches"].append((n, "T"))
+        elif s.startswith("#if"):
+            stack.append({"start": n, "branches": [(n, cond_value(s[3:]))]})
+        elif s.startswith("#endif"):
+            if stack:
+                chain = stack.pop()
+                br = chain["branches"]
+                live = True
+                for idx, (bn, v) in enumerate(br):
+                    end_n = br[idx + 1][0] if idx + 1 < len(br) else n
+                    if not live or v == "F":
+                        out.update(range(bn, end_n + 1))
+                    if v == "T":
+                        live = False
+                out.add(n)
+    return out
+DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation", "using")
+
+def block_end(text, i, end):
+    # Swift block comments nest, Objective-C ones do not. Returns where the comment closes, or -1.
+    if not NEST:
+        return text.find("*/", i + 2, end)
+    depth = 0
+    while i < end:
+        if text.startswith("/*", i):
+            depth += 1
+            i += 2
+        elif text.startswith("*/", i):
+            depth -= 1
+            if depth == 0:
+                return i
+            i += 2
+        else:
+            i += 1
+    return -1
+
+def walk(text, i, end, line, stop_paren):
+    depth = 0
+    while i < end:
+        ch = text[i]
+        if ch == "\n":
+            line += 1
+            i += 1
+            continue
+        if stop_paren and ch == ")" and depth == 0:
+            return 0, i, line
+        if text.startswith("//", i):
+            nl = text.find("\n", i, end)
+            if nl < 0:
+                return 0, end, line
+            i = nl
+            continue
+        if text.startswith("/*", i):
+            close = block_end(text, i, end)
+            if close < 0:
+                line += text.count("\n", i, end)
+                return 0, end, line
+            line += text.count("\n", i, close + 2)
+            i = close + 2
+            continue
+        h = 0
+        j = i
+        while j < end and text[j] == "#":
+            h += 1
+            j += 1
+        if h and j < end and text[j] == '"':
+            got, i, line = skip_delim(text, j, end, line, h, text.startswith('"""', j))
+            if got:
+                return got, i, line
+            continue
+        if h and j < end and text[j] == "/":
+            # An extended regex literal #/.../# holds pattern text, never a call.
+            close = text.find("/" + "#" * h, j + 1, end)
+            stop_at = end if close < 0 else close + 1 + h
+            line += text.count(chr(10), i, stop_at)
+            i = stop_at
+            continue
+        if ch == "/" and text[i + 1:i + 2] not in ("", " ", "=", chr(10), "/", "*") and (text[:i].rstrip()[-1:] in ("=", "(", ",", ":", "[", chr(123), "!", "&", "|", "?", ";") or text[:i].rstrip().endswith("return")):
+            # A bare regex literal /.../ on one line.
+            r = i + 1
+            while r < end and text[r] not in ("/", chr(10)):
+                r += 2 if text[r] == chr(92) else 1
+            if r < end and text[r] == "/":
+                i = r + 1
+                continue
+        if ch == "@" and i + 1 < end and text[i + 1] == '"':
+            got, i, line = skip_delim(text, i + 1, end, line, 0, False, True)
+            if got:
+                return got, i, line
+            continue
+        if text.startswith('"""', i):
+            got, i, line = skip_delim(text, i, end, line, 0, True)
+            if got:
+                return got, i, line
+            continue
+        if ch == '"':
+            got, i, line = skip_delim(text, i, end, line, 0, False)
+            if got:
+                return got, i, line
+            continue
+        if ch == "'":
+            i = skip_char(text, i, end)
+            continue
+        if use_at(text, i, end):
+            b = i - 1
+            while b >= 0 and text[b] in (" ", chr(9)):
+                b -= 1
+            qual = False
+            if b >= 0 and text[b] == ".":
+                a = b - 1
+                while a >= 0 and text[a] in (" ", chr(9)):
+                    a -= 1
+                mod = "ImagePlayground"
+                s0 = a + 1 - len(mod)
+                qual = s0 >= 0 and text[s0:a + 1] == mod and not (s0 and (text[s0 - 1].isalnum() or text[s0 - 1] == "_"))
+            # Under any other namespace, Foo.ImageCreator is the app own type.
+            if qual or not (b >= 0 and text[b] == "."):
+                HITS.append((CUR, line, qual, i))
+            i += len("ImageCreator")
+            continue
+        if ch == "(":
+            depth += 1
+        elif ch == ")" and depth:
+            depth -= 1
+        i += 1
+    return 0, i, line
+
+def skip_char(text, i, end):
+    j = i + 1
+    if j < end and text[j] == "\\":
+        j += 2
+    elif j < end and text[j] != "'":
+        j += 1
+    if j < end and text[j] == "'":
+        return j + 1
+    return i + 1
+
+def skip_delim(text, i, end, line, h, triple, objc=False):
+    closer = '"""' if triple else '"'
+    i += len(closer)
+    while i < end:
+        if text[i] == "\n":
+            line += 1
+            i += 1
+            continue
+        if text[i] == "\\" and text.startswith("#" * h, i + 1):
+            j = i + 1 + h
+            if not objc and j < end and text[j] == "(":
+                got, i, line = walk(text, j + 1, end, line, True)
+                if got:
+                    return got, i, line
+                if i < end and text[i] == ")":
+                    i += 1
+                continue
+            i = j + (1 if j < end else 0)
+            continue
+        if text.startswith(closer, i) and text.startswith("#" * h, i + len(closer)):
+            return 0, i + len(closer) + h, line
+        i += 1
+    return 0, i, line
+
+for path in sys.stdin.read().split(chr(10)):
+    if not path:
+        continue
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        continue
+    NEST = path.endswith(".swift")
+    CUR = path
+    walk(text, 0, len(text), 1, False)
+    if NEST:
+        SKIP[path] = cond_lines(text)
+        code = no_comments(text)
+        how = imports_ip(code)
+        CODE[path] = code
+        if how == "other":
+            QUIET.add(path)
+            how = "file"
+        if how:
+            IMPORTS.add(path)
+        if how == "exported":
+            EXPORTED.append(path)
+# A typealias to the Apple type, as in typealias Gen = ImageCreator, makes Gen another name for it.
+ALIAS_HIT = set()
+for src, scode in list(CODE.items()):
+    for am in re.finditer(r"(?<![A-Za-z0-9_.])typealias\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(ImagePlayground\s*\.\s*)?ImageCreator(?![A-Za-z0-9_.<])", scode):
+        name, aq = am.group(1), bool(am.group(2))
+        if name == "ImageCreator" or not (src in IMPORTS or EXPORTED) or (not aq and src in QUIET):
+            continue
+        use = re.compile(r"(?<![A-Za-z0-9_.])" + re.escape(name) + r"\s*[?!]?[ \t]*[" + chr(40) + ".]")
+        for p, pcode in CODE.items():
+            for um in use.finditer(pcode):
+                HITS.append((p, pcode.count(chr(10), 0, um.start()) + 1, aq, um.start()))
+                ALIAS_HIT.add((p, um.start()))
+# With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
+# ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
+# Only the first ungated hit is printed, so stop there, and run the costly gated_at check last.
+live = [h for h in HITS if ((h[0], h[3]) in ALIAS_HIT or (h[2] or h[0] not in QUIET) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift")))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+GATED = dict()
+for h in live:
+    if h[0] not in GATED:
+        code = CODE.get(h[0], "")
+        GATED[h[0]] = gated_many(code, [x[3] for x in live if x[0] == h[0]])
+pick = next((h for h in live if not GATED[h[0]][min(h[3], len(CODE.get(h[0], "")))]), None)
+if pick:
+    sys.stdout.write("%s:%s" % (pick[0], pick[1]) + chr(10))
+ICPY
+)" 2>/dev/null)" || true
+  [ -n "$out" ] || return 1
+  IMAGECREATOR_HIT="${out%%$'\n'*}"
+  IMAGECREATOR_HIT="${IMAGECREATOR_HIT#"${DIR%/}"/}"
+  return 0
+}
+
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
 CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|\.ya?ml|/project\.json|/config\.xml|/Project\.swift|/Tuist/.*\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
@@ -1060,6 +2063,11 @@ SIWAPY
   # On-Demand Resources are deprecated from the 27 OS family (WWDC26).
   if grep_has 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'; then
     finding high "APPLE-ODR-DEPRECATED-27" "On-Demand Resources in use, deprecated starting iOS 27" "Migrate tagged resources to the Background Assets framework." src 'NSBundleResourceRequest|OnDemandResources|on-demand-resource'
+  fi
+  # ImageCreator is discontinued in iOS 27, iPadOS 27, macOS 27, and visionOS 27 (Apple news dz9wvq0r, 11 June 2026).
+  # A call or member use counts outside #if chains that Release may drop. The sheet does not.
+  if apple_imagecreator_hit; then
+    finding high "APPLE-IMAGEPLAYGROUND-IMAGECREATOR-DISCONTINUED" "ImageCreator will not work on iOS 27 or later" "Present the Image Playground sheet (ImagePlaygroundViewController or imagePlaygroundSheet), or use another image generation service, before the public release of iOS 27, iPadOS 27, macOS 27, and visionOS 27." at "$IMAGECREATOR_HIT"
   fi
   # A Podfile has no extension, so it is outside the source list. Read it directly.
   podfile_below_ios13() {
