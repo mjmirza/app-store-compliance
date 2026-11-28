@@ -1,6 +1,6 @@
 # Rules. Payments, in app purchase, subscriptions
 
-11 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+12 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## APPLE-3.1.1-EXTERNAL-PAYMENT
 
@@ -163,6 +163,23 @@ How to detect.
 
 ```bash
 grep -rqn 'ExternalPurchaseLink\|external-purchase-link\|openExternalPurchaseLink' . && ! grep -rqn 'Storefront\|storefront\|countryCode' .
+```
+
+## APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS
+
+- Title. Auto-renewable subscription without a Terms of Use link in the app
+- Platform. apple
+- Guideline or policy. 3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)
+- Severity. medium
+- What triggers it. The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its code. A terms label counts as a whole string literal, as UI text (a Link, Button or Text argument, or JSX text, also across lines, where a capitalized Terms, Legal, EULA or ToS word inside a longer label is enough), as a URL whose path has a terms segment such as /legal-terms, /subscription-terms, /terms-of-use-2024, /terms.pdf or /tou, as a markdown link to the terms, as a longer string holding a terms phrase that the code shows through a UI call or a .text or .title property, or as a localized strings value that holds a terms phrase or sits under a terms key. A terms phrase inside a log or analytics string, a comment or an identifier does not count, and neither does /terms-of-sale or an image or font file, and a subscription API named only in a comment or a string does not trigger the check. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
+- How to fix it. Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.
+- Detection signals. subscriptionPeriod, .autoRenewable, getSubscriptions(, requestSubscription(
+- Present means handled. SubscriptionStoreView, unless storeButton(.hidden, for: .policies), Terms of Use, Terms of Service, Terms and Conditions, EULA, End User License, stdeula, Nutzungsbedingungen, a URL path segment that holds terms or is tou, tos, eula, legal, agb, cgu, cgv or user-agreement, including a .pdf or .html document, a whole string literal such as Terms, Terms and Privacy, Subscription Terms, License Agreement, Legal Info, ToS or AGB
+
+How to detect.
+
+```bash
+grep -rnE 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\(' . && ! grep -rniE --include='*.swift' --include='*.dart' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.strings' --include='*.xcstrings' --include='*.arb' --include='strings.xml' '["`>][^"`<]*(terms (of use|of service|and conditions|& conditions)|eula|end.user licen|stdeula|nutzungsbedingungen|/(tos|terms|user-agreement|eula|agb|cgu|cgv)[/?#."]|利用規約|使用条款|服务条款|이용약관)' . && ! grep -rnE --include='*.swift' 'SubscriptionStoreView' .   # Schedule 2 section 3.8(b). The guard also drops comments and identifiers, and ignores SubscriptionStoreView when storeButton hides .policies
 ```
 
 ## ANDROID-RESTORE-CREDENTIALS-REQUIRED

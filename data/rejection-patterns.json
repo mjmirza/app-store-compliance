@@ -490,6 +490,34 @@
       "fix": "Show the actual amount the user will be charged at least as prominently as any per month figure. Source. truongduy2611 misleading_pricing rule."
     },
     {
+      "id": "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS",
+      "platform": "apple",
+      "guideline": "3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)",
+      "title": "Auto-renewable subscription without a Terms of Use link in the app",
+      "severity": "medium",
+      "detection": "The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its code. A terms label counts as a whole string literal, as UI text (a Link, Button or Text argument, or JSX text, also across lines, where a capitalized Terms, Legal, EULA or ToS word inside a longer label is enough), as a URL whose path has a terms segment such as /legal-terms, /subscription-terms, /terms-of-use-2024, /terms.pdf or /tou, as a markdown link to the terms, as a longer string holding a terms phrase that the code shows through a UI call or a .text or .title property, or as a localized strings value that holds a terms phrase or sits under a terms key. A terms phrase inside a log or analytics string, a comment or an identifier does not count, and neither does /terms-of-sale or an image or font file, and a subscription API named only in a comment or a string does not trigger the check. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.",
+      "signals": [
+        "subscriptionPeriod",
+        ".autoRenewable",
+        "getSubscriptions(",
+        "requestSubscription("
+      ],
+      "counterSignals": [
+        "SubscriptionStoreView, unless storeButton(.hidden, for: .policies)",
+        "Terms of Use",
+        "Terms of Service",
+        "Terms and Conditions",
+        "EULA",
+        "End User License",
+        "stdeula",
+        "Nutzungsbedingungen",
+        "a URL path segment that holds terms or is tou, tos, eula, legal, agb, cgu, cgv or user-agreement, including a .pdf or .html document",
+        "a whole string literal such as Terms, Terms and Privacy, Subscription Terms, License Agreement, Legal Info, ToS or AGB"
+      ],
+      "fix": "Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.",
+      "added": "2026-11-25"
+    },
+    {
       "id": "APPLE-4.0-SIWA-UX",
       "platform": "apple",
       "guideline": "4.0",
