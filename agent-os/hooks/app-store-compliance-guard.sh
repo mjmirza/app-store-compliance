@@ -1340,20 +1340,30 @@ LOCAL = rx("~b<?let|var|val|const>>~s+<?mut~s+>>?" + LP + "[A-Za-z_][A-Za-z0-9_]
 HOOK = rx("^use[A-Z]")
 # A real account deletion call. CLEAN needs one of these in the code the deletion reaches.
 Q = LS + DQ + SQ + BQ + RS
-REAL = [
-    rx("[Mm]ethod~s*[:=]~s*" + Q + "DELETE" + Q),
-    rx("@DELETE~b"),
-    rx("~.~s*delete~s*~" + LP + "~s*" + Q + "~s*/?<?[A-Za-z0-9_$" + LB + "]>>"),
-    rx("~b<?axios|http|https|httpClient|HttpClient|apiClient|client|ky|got|superagent|dio|AF|Alamofire|requests>>~s*~.~s*delete~s*~" + LP),
+SDK = [
     rx("~b<?user|currentUser>>~s*[!?]*~s*~.~s*delete~s*~" + LP + "~s*~" + RP),
     rx("~bauth~s*~.~s*admin~s*~.~s*deleteUser~s*~" + LP),
     rx("~b<?Admin>>?DeleteUserCommand~b|~badminDeleteUser~s*~" + LP),
     rx("~b<?auth0|cognito|cognitoUser|management~s*~.~s*users>>[A-Za-z]*~s*~.~s*<?deleteUser|delete>>~s*~" + LP),
 ]
-SEND = rx("~.~s*<?post|delete>>~s*~" + LP + "|[Mm]ethod~s*[:=]~s*" + Q + "<?POST|DELETE>>" + Q)
-LIT = rx(DQ + "[^" + DQ + "]*" + DQ + "|" + SQ + "[^" + SQ + "]*" + SQ)
-DELPATH = re.compile("delete", re.I)
-WHO = re.compile("account|user|/me" + BS + "b", re.I)
+# A verb call that takes the path as an argument, and a method option that names the verb.
+ARGCALL = rx(LP + "@DELETE|@POST|~.~s*delete|~.~s*post" + RP + "~s*~" + LP)
+METHOD_DEL = rx("[Mm]ethod~s*[:=]~s*<?" + Q + "DELETE" + Q + "|<?HTTPMethod>>?~.delete~b>>")
+METHOD_POST = rx("[Mm]ethod~s*[:=]~s*<?" + Q + "POST" + Q + "|<?HTTPMethod>>?~.post~b>>")
+VERB = rx("~.~s*<?get|post|put|patch|delete|request>>~s*~" + LP + "|@<?GET|POST|PUT|PATCH|DELETE|HTTP>>~b|[Mm]ethod~s*[:=]")
+LIT = rx(DQ + "[^" + DQ + "]*" + DQ + "|" + SQ + "[^" + SQ + "]*" + SQ + "|" + BQ + "[^" + BQ + "]*" + BQ)
+JOIN = rx("~s*~+~s*")
+JOIN_NAME = rx("~s*~+" + LS + "^,;" + RS + "*~+~s*")
+TAIL = rx("~s*~+")
+HEXID = rx(LS + "0-9a-fA-F-" + RS + LB + "8," + RB)
+QCUT = rx(LS + "?#" + RS)
+SEP = rx(LS + "-_" + RS)
+SLOT = LB + "x" + RB
+ACCT_LAST = set("me account user profile".split())
+ACCT_COLL = set("users accounts user account".split())
+ID_ALIAS = set("me current self".split())
+DEL_WORDS = set("deleteaccount deleteuser deleteme deleteprofile accountdelete userdelete".split())
+NEST_EXT = (".swift", ".kt", ".kts", ".rs", ".scala")
 LABEL = rx(LS + LP + "," + RS + "~s*" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP + ":" + LP + "?!:" + RP)
 
 
@@ -1375,13 +1385,159 @@ def code(line):
     return line
 
 
-def real_delete(line):
-    t = code(line)
-    if any(r.search(t) for r in REAL):
+def uncomment(text, nest):
+    # The text with every comment blanked and every newline kept, so line numbers still match.
+    out, k, q, depth, n = [], 0, None, 0, len(text)
+    while k < n:
+        ch = text[k]
+        if depth:
+            if text.startswith("*/", k):
+                depth, k = depth - 1, k + 2
+                out.append("  ")
+            elif nest and text.startswith("/*", k):
+                depth, k = depth + 1, k + 2
+                out.append("  ")
+            else:
+                out.append(NL if ch == NL else " ")
+                k += 1
+            continue
+        if q:
+            out.append(ch)
+            if ch == BS and k + 1 < n:
+                out.append(text[k + 1])
+                k += 2
+                continue
+            if ch == q or (ch == NL and q != BQ):
+                q = None
+            k += 1
+            continue
+        if text.startswith("//", k):
+            e = text.find(NL, k)
+            e = n if e < 0 else e
+            out.append(" " * (e - k))
+            k = e
+        elif text.startswith("/*", k):
+            depth, k = 1, k + 2
+            out.append("  ")
+        else:
+            if ch in DQ + SQ + BQ:
+                q = ch
+            out.append(ch)
+            k += 1
+    return "".join(out)
+
+
+def is_id(s):
+    t = s.strip()
+    if not t:
+        return False
+    if t.lower() in ID_ALIAS or t.isdigit() or HEXID.fullmatch(t):
         return True
-    return bool(SEND.search(t)) and any(
-        DELPATH.search(m.group(0)) and WHO.search(m.group(0)) for m in LIT.finditer(t)
-    )
+    return t[0] in LB + ":$<" or t.startswith(BS + LP)
+
+
+def segs(path):
+    return [s for s in QCUT.split(path, 1)[0].split("/") if s]
+
+
+def acct_segs(ss):
+    # The path ends on the account or user itself, never on a resource under it.
+    if not ss:
+        return False
+    if ss[-1].lower() in ACCT_LAST:
+        return True
+    return len(ss) >= 2 and ss[-2].lower() in ACCT_COLL and is_id(ss[-1])
+
+
+def del_segs(ss):
+    # A delete path whose delete word applies to the account or user.
+    low = [SEP.sub("", s.lower()) for s in ss]
+    if not low:
+        return False
+    if low[-1] in DEL_WORDS:
+        return True
+    if len(low) >= 2 and low[-2] in DEL_WORDS and is_id(ss[-1]):
+        return True
+    if low[-1] == "delete" and acct_segs(ss[:-1]):
+        return True
+    if "delete" in low[:-1]:
+        k = len(low) - 1 - low[::-1].index("delete")
+        return acct_segs(ss[k + 1 :]) and len(ss) - k - 1 <= 2
+    return False
+
+
+def paths(text):
+    # Each string literal joined to what it is concatenated with. A name in the join becomes a slot.
+    ms, out, cur = list(LIT.finditer(text)), [], None
+    for n, m in enumerate(ms):
+        body = m.group(0)[1:-1]
+        gap = text[ms[n - 1].end() : m.start()] if n else ""
+        if cur is not None and JOIN.fullmatch(gap):
+            cur += body
+        elif cur is not None and JOIN_NAME.fullmatch(gap):
+            cur += SLOT + body
+        else:
+            if cur is not None:
+                out.append(cur)
+            cur = body
+        nxt = ms[n + 1].start() if n + 1 < len(ms) else len(text)
+        rest = text[m.end() : nxt]
+        if TAIL.match(rest) and not JOIN.fullmatch(rest) and not JOIN_NAME.fullmatch(rest):
+            cur += SLOT
+    if cur is not None:
+        out.append(cur)
+    return out
+
+
+def args(t, k):
+    # The argument text of the call whose open paren sits just before column k.
+    depth = 1
+    for j in range(k, len(t)):
+        if t[j] == LP:
+            depth += 1
+        elif t[j] == RP:
+            depth -= 1
+            if depth == 0:
+                return t[k:j]
+    return t[k:]
+
+
+def hit(text, post, slash):
+    for p in paths(text):
+        if slash and "/" not in p:
+            continue
+        ss = segs(p)
+        if del_segs(ss) if post else acct_segs(ss):
+            return True
+    return False
+
+
+def real_delete(line, before=()):
+    t = code(line)
+    if any(r.search(t) for r in SDK):
+        return True
+    for m in ARGCALL.finditer(t):
+        verb = m.group(1)
+        post = verb.lower().endswith("post")
+        if hit(args(t, m.end()), post, not verb.startswith("@")):
+            return True
+    for pat, post in ((METHOD_DEL, False), (METHOD_POST, True)):
+        if pat.search(t) and any(hit(x, post, True) for x in (t,) + tuple(before)):
+            return True
+    return False
+
+
+def real_in(lines, region):
+    # A method option may name the verb a few lines after the path, with no other call between.
+    for n, j in enumerate(region):
+        before = []
+        for k in reversed(region[max(0, n - 3) : n]):
+            if VERB.search(code(lines[k])):
+                break
+            before.append(code(lines[k]))
+        if real_delete(lines[j], before):
+            return True
+    return False
 
 
 def pdepth(c, k):
@@ -1615,7 +1771,7 @@ def main():
     except OSError:
         print("UNSURE")
         return
-    src, clean, where, total, apptypes = {}, {}, {}, 0, set()
+    src, clean, nocom, where, total, apptypes = {}, {}, {}, {}, 0, set()
     skipped = False
     for p in paths:
         try:
@@ -1632,6 +1788,7 @@ def main():
             skipped = True
             continue
         src[p] = text.split(NL)
+        nocom[p] = uncomment(text, p.endswith(NEST_EXT)).split(NL)
         clean[p] = [scrub(x) for x in src[p]]
         for i, c in enumerate(clean[p]):
             for t in set(IDENT.findall(c)):
@@ -1684,7 +1841,7 @@ def main():
                     anchored = fn = True
             region, ok = block(lines, i, 0)
             state["unsure"] = state["unsure"] or not ok
-            state["real"] = state["real"] or any(real_delete(lines[j]) for j in region)
+            state["real"] = state["real"] or real_in(nocom[p], region)
             harvest(p, region, fn)
     if not anchored:
         print("UNSURE")
@@ -1739,7 +1896,7 @@ def main():
                 region = list(range(k, region[0])) + region
                 state["unsure"] = state["unsure"] or not ok
                 reached.extend((p, j) for j in region)
-                state["real"] = state["real"] or any(real_delete(src[p][j]) for j in region)
+                state["real"] = state["real"] or real_in(nocom[p], region)
                 harvest(p, region, scoped)
         for p, j in reached:
             if WEAK.search(LAYOUT.sub(" ", src[p][j])):

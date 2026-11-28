@@ -817,6 +817,61 @@ t2="$(now)"; bash "$GUARD" "$D" >/dev/null 2>&1; t3="$(now)"
 python3 -c "import sys; sys.exit(0 if ($t1 - $t0) - ($t3 - $t2) < 5 else 1)" && ok "ev-22 a 2 MB single line file does not slow the deletion follower" || bad "ev-22 a 2 MB single line file does not slow the deletion follower"
 rm -rf "$D"
 
+# Evidence must delete the account itself. A keychain, cache, photo, device or token delete is not account removal.
+dw_case "ad-1 a keychain delete before a support sheet is flagged" fire \
+  App/Account.swift 'struct AccountView: View {\n  @State private var showSupport = false\n  var body: some View {\n    Button("Delete") { deleteAccount() }\n      .sheet(isPresented: $showSupport) { SupportSheet() }\n  }\n  func deleteAccount() {\n    keychain.delete("authToken")\n    showSupport = true\n  }\n}\n' \
+  App/SupportSheet.swift 'struct SupportSheet: View {\n  var body: some View {\n    Link("Email us", destination: URL(string: "mailto:help@x.io")!)\n  }\n}\n'
+dw_case "ad-2 a cache path delete is not account removal" fire \
+  App/S.swift 'func deleteAccount() {\n  cache.delete("/tmp/cache")\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-3 a Retrofit photo delete before a support screen is flagged" fire \
+  App/Account.kt 'fun deleteAccount() {\n  api.removePhoto(id)\n  nav.navigate(Screen.Support)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("photos/{id}")\n  suspend fun removePhoto(@Path("id") id: String)\n}\n' \
+  App/Router.kt 'fun route(s: Screen) {\n  when (s) {\n    Screen.Support -> startMail("mailto:help@x.io")\n  }\n}\n'
+dw_case "ad-4 a React Native device delete before a contact screen is flagged" fire \
+  App/Account.tsx 'export const deleteAccount = async () => {\n  await api.delete("/devices/123");\n  navigation.navigate(\047Contact\047);\n};\n' \
+  App/Contact.tsx 'export default function Contact() {\n  return <Button onPress={() => Linking.openURL("mailto:help@x.io")} title="Mail" />;\n}\n'
+dw_case "ad-5 a POST that deletes a sub resource of the user is flagged" fire \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/user/notifications/delete")\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-6 a push token delete plus an inactive status patch is flagged" fire \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.delete("/tokens/push")\n  try await api.patch("/users/me", status: inactive)\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-7 a block commented deletion call is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* api.delete("/users/me") */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-8 a multi line block comment stub is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* TODO wire this up\n  api.delete("/users/me")\n  */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-9 a nested Swift block comment is not evidence" fire \
+  App/S.swift 'func deleteAccount() {\n  /* outer /* inner */\n  api.delete("/users/me")\n  */\n  showContact = true\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-10 a DELETE on the current user clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.delete("/users/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-11 a Retrofit DELETE on users by id clears an unrelated support link" quiet \
+  App/Account.kt 'suspend fun deleteAccount() = api.deleteUser(userId)\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
+  App/C.kt 'val contact = "mailto:help@x.io"\n'
+dw_case "ad-12 a POST to the account delete path clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/account/delete")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-13 a Firebase current user delete clears an unrelated support link" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  try await currentUser.delete()\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-14 a string holding a comment opener does not hide the deletion" quiet \
+  App/S.swift 'func deleteAccount() async throws {\n  let note = "a /* b"\n  try await api.delete("/users/me")\n}\n' \
+  App/C.swift 'let contact = URL(string: "mailto:help@x.io")!\n'
+dw_case "ad-15 a fetch with method DELETE on the current user clears a support link" quiet \
+  App/a.ts 'export async function deleteAccount() {\n  await fetch(`${API}/users/me`, { method: "DELETE" });\n}\n' \
+  App/c.ts 'export const C = "mailto:help@x.io";\n'
+fl_case "ad-16 a keychain delete is not a real deletion" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  keychain.delete("authToken")\n}\n'
+fl_case "ad-17 a block commented deletion is not a real deletion" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  /* api.delete("/users/me") */\n  log()\n}\nfunc log() {}\n'
+fl_case "ad-18 a DELETE on the current user is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n}\n'
+
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.
 mk_flutter_pay() {
