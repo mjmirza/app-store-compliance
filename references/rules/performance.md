@@ -376,7 +376,7 @@ grep -rn 'NSBundleResourceRequest\|OnDemandResources\|on-demand-resource' --incl
 How to detect.
 
 ```bash
-grep -rlE '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+ImagePlayground' --include='*.swift' --null . | xargs -0 grep -nE '(^|[^A-Za-z0-9_])ImageCreator[[:space:]]*[(.]'   # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can call it. The guard also skips comments, strings, app types of the same name, and code that only runs below version 27
+grep -rlE '^[[:space:]]*(@[A-Za-z_]+[[:space:]]+)*import[[:space:]]+ImagePlayground' --include='*.swift' --null . | xargs -0 grep -nE '(^|[^A-Za-z0-9_])ImageCreator[[:space:]]*[(.]'   # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can call it. The guard also skips comments, strings, app types of the same name, code that only runs below version 27, the DEBUG branch of an #if, and any #if chain whose custom build flag it cannot evaluate
 ```
 
 ## APPLE-MACOS-ROSETTA-SUNSET

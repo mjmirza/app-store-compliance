@@ -553,6 +553,12 @@ def use_at(text, i, end):
         m = open_of(text, b)
         st = max(text.rfind(";", 0, m), text.rfind(chr(123), 0, m), text.rfind(chr(125), 0, m)) + 1 if m > 0 else m
         typedef = m > 0 and "typedef" in text[st:m].split()
+    if text[w + 1:b + 1] == "typealias" and t2 < end and text[t2] == "=":
+        rhs = text[t2 + 1:end].lstrip()
+        q = len("ImagePlayground.ImageCreator")
+        if rhs.startswith("ImagePlayground.ImageCreator") and not (rhs[q:q + 1].isalnum() or rhs[q:q + 1] == "_"):
+            # An alias back to the Image Playground type is not an app type of the same name.
+            return False
     if generic or typedef or text[w + 1:b + 1] in DECL_WORDS:
         # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
         # app type of this name silences unqualified calls. Missing one is never worse than main.
@@ -1060,6 +1066,11 @@ def cond_gated(code, k):
 
 def gated_at(code, stop):
     # True when the block holding offset stop only runs below version 27.
+    k = min(stop, len(code))
+    return gated_many(code, [k])[k]
+
+def gated_many(code, stops):
+    # gated_at for every offset in stops, in one pass over the file.
     # One frame per open block: runs below 27, starts a lone #available chain, is a guard #unavailable.
     stack = []
     open_at = []
@@ -1068,7 +1079,15 @@ def gated_at(code, stop):
     exits_at = dict()
     tries_out = dict()
     top = False
-    for k in range(min(stop, len(code))):
+    want = sorted(set(min(x, len(code)) for x in stops))
+    res = dict()
+    wi = 0
+    for k in range((want[-1] if want else 0) + 1):
+        while wi < len(want) and want[wi] == k:
+            res[k] = top or any(f[0] for f in stack) or obsoleted_27(code, k) or cond_gated(code, k)
+            wi += 1
+        if k >= len(code) or wi >= len(want):
+            break
         c = code[k]
         if c == chr(123):
             d = len(stack)
@@ -1142,7 +1161,7 @@ def gated_at(code, stop):
                 else:
                     top = True
     # A declaration without a body, such as a typealias, carries its @available on the same statement.
-    return top or any(f[0] for f in stack) or obsoleted_27(code, min(stop, len(code))) or cond_gated(code, min(stop, len(code)))
+    return res
 
 def imports_ip(text):
     # import ImagePlayground in any form, with attributes, an access level or a declaration kind.
@@ -1164,41 +1183,131 @@ def imports_ip(text):
                 how = "file"
     return how
 
-def cond_unknown(cond):
-    # True unless the condition is only platform checks, which a Release build for that platform keeps.
-    c = cond.split("//")[0]
-    for name in ("os(", "canImport(", "arch(", "targetEnvironment("):
-        while True:
-            k = c.find(name)
-            if k < 0:
-                break
-            e = c.find(")", k)
-            if e < 0:
-                return True
-            c = c[:k] + c[e + 1:]
-    for ch in "!&|()":
-        c = c.replace(ch, "")
-    return c != ""
+def cond_value(cond):
+    # The value of an #if condition in a Release build for an Apple platform.
+    # T true, F false, P platform check (kept, later branches still possible), U unknown.
+    toks = []
+    c = cond.split("//")[0].strip()
+    i = 0
+    while i < len(c):
+        ch = c[i]
+        if ch.isspace():
+            i += 1
+        elif c.startswith("&&", i) or c.startswith("||", i):
+            toks.append(c[i:i + 2])
+            i += 2
+        elif ch in "!()":
+            toks.append(ch)
+            i += 1
+        else:
+            j = i
+            while j < len(c) and (c[j].isalnum() or c[j] in "_."):
+                j += 1
+            if j == i:
+                return "U"
+            name = c[i:j]
+            if j < len(c) and c[j] == "(":
+                e = c.find(")", j)
+                if e < 0:
+                    return "U"
+                toks.append((name, c[j + 1:e].replace(" ", "")))
+                i = e + 1
+            else:
+                toks.append((name, None))
+                i = j
+    pos = [0]
+
+    def atom(t):
+        name, arg = t
+        if arg is None:
+            return "F" if name == "DEBUG" else ("T" if name == "true" else "F" if name == "false" else "U")
+        if name in ("os", "canImport", "arch", "targetEnvironment", "hasFeature", "hasAttribute"):
+            return "P"
+        if name in ("compiler", "swift") and arg.startswith((">=", "<")):
+            op = ">=" if arg.startswith(">=") else "<"
+            ver = arg[len(op):].split(".")
+            try:
+                v = (int(ver[0]), int(ver[1]) if len(ver) > 1 else 0)
+            except ValueError:
+                return "U"
+            # ImageCreator needs Swift 6.1 or later, so any toolchain that builds it is at least 6.1.
+            if v <= (6, 1):
+                return "T" if op == ">=" else "F"
+        return "U"
+
+    def unary():
+        if pos[0] >= len(toks):
+            return "U"
+        t = toks[pos[0]]
+        pos[0] += 1
+        if t == "!":
+            v = unary()
+            return {"T": "F", "F": "T"}.get(v, v)
+        if t == "(":
+            v = disj()
+            if pos[0] < len(toks) and toks[pos[0]] == ")":
+                pos[0] += 1
+                return v
+            return "U"
+        if isinstance(t, tuple):
+            return atom(t)
+        return "U"
+
+    def conj():
+        vals = [unary()]
+        while pos[0] < len(toks) and toks[pos[0]] == "&&":
+            pos[0] += 1
+            vals.append(unary())
+        if "F" in vals:
+            return "F"
+        if "U" in vals:
+            return "U"
+        return "P" if "P" in vals else "T"
+
+    def disj():
+        vals = [conj()]
+        while pos[0] < len(toks) and toks[pos[0]] == "||":
+            pos[0] += 1
+            vals.append(conj())
+        if "T" in vals:
+            return "T"
+        if "U" in vals:
+            return "U"
+        return "P" if "P" in vals else "F"
+
+    v = disj()
+    return v if pos[0] == len(toks) else "U"
 
 def cond_lines(text):
-    # Any #if chain with DEBUG, compiler(), swift() or a custom flag may be dropped from Release,
-    # so every branch of it is skipped. Branch selection is never evaluated.
+    # Lines a Release build does not compile. A chain holding a flag that
+    # cannot be evaluated is skipped whole, never guessed.
     out = set()
     stack = []
     for n, raw in enumerate(text.split(chr(10)), 1):
-        s = raw.strip().replace(" ", "").replace(chr(9), "")
+        s = raw.strip()
         if s.startswith("#elseif"):
-            if stack and cond_unknown(s[7:]):
-                stack[-1][1] = True
+            if stack:
+                stack[-1]["branches"].append((n, cond_value(s[7:])))
         elif s.startswith("#else"):
-            pass
+            if stack:
+                stack[-1]["branches"].append((n, "T"))
         elif s.startswith("#if"):
-            stack.append([n, cond_unknown(s[3:])])
+            stack.append({"start": n, "branches": [(n, cond_value(s[3:]))]})
         elif s.startswith("#endif"):
             if stack:
-                start, unknown = stack.pop()
-                if unknown:
-                    out.update(range(start, n + 1))
+                chain = stack.pop()
+                br = chain["branches"]
+                if any(v == "U" for _, v in br):
+                    out.update(range(chain["start"], n + 1))
+                    continue
+                live = True
+                for idx, (bn, v) in enumerate(br):
+                    end_n = br[idx + 1][0] if idx + 1 < len(br) else n
+                    if not live or v == "F":
+                        out.update(range(bn, end_n + 1))
+                    if v == "T":
+                        live = False
+                out.add(n)
     return out
 DECL_WORDS = ("struct", "class", "enum", "actor", "typealias", "protocol", "associatedtype", "interface", "implementation", "using")
 
@@ -1370,9 +1479,16 @@ for path in sys.stdin.read().split(chr(10)):
             EXPORTED.append(path)
 # With an app type of that name, only a call qualified as ImagePlayground.ImageCreator is the Apple one.
 # ImageCreator is Swift-only, so only a Swift file that imports ImagePlayground can name it.
-pick = [h for h in HITS if (h[2] or h[0] not in QUIET) and not gated_at(CODE.get(h[0], ""), h[3]) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+# Only the first ungated hit is printed, so stop there, and run the costly gated_at check last.
+live = [h for h in HITS if (h[2] or h[0] not in QUIET) and (h[0] in IMPORTS or (EXPORTED and h[0].endswith(".swift"))) and (h[2] or not DECLARED) and h[1] not in SKIP.get(h[0], ())]
+GATED = dict()
+for h in live:
+    if h[0] not in GATED:
+        code = CODE.get(h[0], "")
+        GATED[h[0]] = gated_many(code, [x[3] for x in live if x[0] == h[0]])
+pick = next((h for h in live if not GATED[h[0]][min(h[3], len(CODE.get(h[0], "")))]), None)
 if pick:
-    sys.stdout.write("%s:%s" % (pick[0][0], pick[0][1]) + chr(10))
+    sys.stdout.write("%s:%s" % (pick[0], pick[1]) + chr(10))
 ICPY
 )" 2>/dev/null)" || true
   [ -n "$out" ] || return 1

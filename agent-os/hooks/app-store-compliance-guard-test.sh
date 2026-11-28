@@ -4225,14 +4225,61 @@ let mode = 1
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated" || bad "ImageCreator() in any branch of an #if DEBUG chain stays silent, branches are not evaluated"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of #if DEBUG fires, Release compiles it" || bad "ImageCreator() in the #else of #if DEBUG fires, Release compiles it"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 #if !DEBUG
 func make() async throws { _ = try await ImageCreator() }
 #endif')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated" || bad "ImageCreator() under #if !DEBUG stays silent, branches are not evaluated"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if !DEBUG fires, Release compiles it" || bad "ImageCreator() under #if !DEBUG fires, Release compiles it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func make() async throws {
+#if DEBUG
+    _ = try await ImageCreator()
+#endif
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if DEBUG alone stays silent, Release drops it" || bad "ImageCreator() under #if DEBUG alone stays silent, Release drops it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(>=6.1)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "ImageCreator() under #if compiler(>=6.1) fires, every SDK that has it passes" || bad "ImageCreator() under #if compiler(>=6.1) fires, every SDK that has it passes"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if compiler(<6.0)
+func make() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator() under #if compiler(<6.0) stays silent" || bad "ImageCreator() under #if compiler(<6.0) stays silent"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+#if os(macOS)
+let probe = true
+#else
+func probe() async throws { _ = try await ImageCreator() }
+#endif')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "ImageCreator() in the #else of #if os(macOS) fires" || bad "ImageCreator() in the #else of #if os(macOS) fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias ImageCreator = ImagePlayground.ImageCreator
+func make() async throws {
+    let creator = try await ImageCreator()
+    _ = creator
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a typealias back to ImagePlayground.ImageCreator does not silence calls" || bad "a typealias back to ImagePlayground.ImageCreator does not silence calls"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+typealias ImageCreator = MyRenderer
+let c = ImageCreator()')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a typealias to an app type named ImageCreator still silences calls" || bad "a typealias to an app type named ImageCreator still silences calls"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 protocol P { init() }
