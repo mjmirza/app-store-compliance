@@ -1269,6 +1269,231 @@ printf 'let x = "https://acme.example.io/.well-known/apple-app-site-association"
 OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "612-12 a mitigation in another file still pairs with its trigger" || bad "612-12 a mitigation in another file still pairs with its trigger (rc=$RC)"
 rm -rf "$D"
+# The app side of Universal Links is the associated domains entitlement. The apple-app-site-association file is on the website.
+# Only the entitlements a Release configuration of the app target signs with count. dl_pbx DIR DEBUG RELEASE [RELEASE-EXTRA].
+DL_SCHEME='<plist><dict><key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></array></dict></plist>'
+DL_AL='<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io</string></array></dict></plist>'
+dl_app() {
+  local d; d="$(mk_ios_clean)"
+  printf '%s' "$DL_SCHEME" > "$d/App/Info.plist"
+  echo "$d"
+}
+dl_pbx() {
+  mkdir -p "$1/App.xcodeproj"
+  printf '// !$*UTF8*$!\n{\n objects = {\n  P1 = {isa = PBXProject; buildConfigurationList = PL; mainGroup = G0; };\n  G0 = {isa = PBXGroup; children = (G1, ); sourceTree = "<group>"; };\n  G1 /* Config */ = {isa = PBXGroup; children = (F1 /* Release.xcconfig */, ); path = Config; sourceTree = "<group>"; };\n  F1 = {isa = PBXFileReference; path = Release.xcconfig; sourceTree = "<group>"; };\n  PL = {isa = XCConfigurationList; buildConfigurations = (PD, PR, ); };\n  PD = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; }; name = Debug; };\n  PR = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; }; name = Release; };\n  T1 /* App */ = {isa = PBXNativeTarget; buildConfigurationList = TL; name = App; productType = "com.apple.product-type.application"; };\n  TL = {isa = XCConfigurationList; buildConfigurations = (TD /* Debug */, TR /* Release */, ); };\n  TD = {\n   isa = XCBuildConfiguration;\n   buildSettings = {\n    %s\n    INFOPLIST_FILE = App/Info.plist;\n    PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n   };\n   name = Debug;\n  };\n  TR = {\n   isa = XCBuildConfiguration;\n   %s\n   buildSettings = {\n    %s\n    INFOPLIST_FILE = App/Info.plist;\n    PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n   };\n   name = Release;\n  };\n };\n rootObject = P1;\n}\n' "$2" "${4:-}" "$3" > "$1/App.xcodeproj/project.pbxproj"
+}
+dl_check() {  # dl_check NAME DIR WANT, where WANT 1 means the finding fires
+  local out; out="$(bash "$GUARD" "$2" 2>&1)"
+  if echo "$out" | grep -q 'BOTH-UNSAFE-DEEPLINK'; then [ "$3" = 1 ] && ok "$1" || bad "$1"
+  else [ "$3" = 0 ] && ok "$1" || bad "$1"; fi
+  rm -rf "$2"
+}
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-1 an applinks domain in the Release entitlements counts as Universal Links" "$D" 0
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-2 a wildcard applinks domain counts as Universal Links" "$D" 0
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>webcredentials:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-3 a webcredentials only associated domain is still flagged" "$D" 1
+D="$(dl_app)"
+dl_check "dl-4 a URL scheme with no Universal Links is flagged" "$D" 1
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><!-- <string>applinks:acme.example.io</string> --></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-comment an applinks entry inside an XML comment does not count" "$D" 1
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=developer</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-dev a developer-mode applinks entry does not count" "$D" 1
+D="$(dl_app)"; mkdir -p "$D/App.xcodeproj"
+printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Development.entitlements"
+printf '{\n R1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n CODE_SIGN_ENTITLEMENTS = App/Release.entitlements;\n INFOPLIST_FILE = App/Info.plist;\n IPHONEOS_DEPLOYMENT_TARGET = 16.0;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
+dl_check "dl-signing an entitlements file no release configuration signs with does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '<plist><dict/></plist>' > "$D/App/Development.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = App/Development.entitlements;' '"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "$(PROJECT_DIR)/App/App.entitlements";'
+dl_check "dl-vars an SDK-conditional key with PROJECT_DIR resolves to the signed file" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/App/Entitlements.plist";'
+dl_check "dl-plist a signed entitlements file named .plist counts" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '#include? "Missing.xcconfig"\n#include "Shared.xcconfig"\n' > "$D/Config/Release.xcconfig"
+printf 'CODE_SIGN_ENTITLEMENTS = App/$(TARGET_NAME).entitlements // signed\n' > "$D/Config/Shared.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig signing set through an included xcconfig counts" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Staging.entitlements"
+printf '#include "Shared.xcconfig"\n' > "$D/Config/Release.xcconfig"
+printf 'CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/App/Release.entitlements\n' > "$D/Config/Shared.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig-unsigned an entitlements file the xcconfig does not sign does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Dev.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = App/Dev.entitlements;' ''
+dl_check "dl-debug an entitlements file only the Debug configuration signs does not count" "$D" 1
+D="$(dl_app)"; printf '<plist><dict/></plist>' > "$D/App/App.entitlements"; printf '%s' "$DL_AL" > "$D/App/Staging-Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-plist-unsigned an unsigned .plist with applinks does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = $(MY_DIR)/App/Entitlements.plist;'
+dl_check "dl-unresolved a signing path with an unknown variable counts nothing" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' '"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = App/Entitlements.plist;'
+dl_check "dl-simulator entitlements only the simulator SDK signs do not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_check "dl-no-project without a project file the applinks entry counts nothing, as before" "$D" 1
+# Several targets per project. dl_proj DIR PROJECT SPEC..., where SPEC is ID|NAME|PRODUCTTYPE|CFG^SETTINGS@CFG^SETTINGS.
+dl_proj() {
+  local dir="$1" proj="$2" objs="" tids="" pids="" pcfgs="" spec id name type cfgs one cname cids n=0; shift 2
+  for spec in "$@"; do
+    id="${spec%%|*}"; spec="${spec#*|}"; name="${spec%%|*}"; spec="${spec#*|}"; type="${spec%%|*}"; cfgs="${spec#*|}"; cids=""
+    while [ -n "$cfgs" ]; do
+      one="${cfgs%%@*}"; if [ "$one" = "$cfgs" ]; then cfgs=""; else cfgs="${cfgs#*@}"; fi
+      n=$((n+1)); cname="${one%%^*}"
+      objs="$objs  C$n = {isa = XCBuildConfiguration; buildSettings = {${one#*^} }; name = \"$cname\"; };\n"; cids="$cids C$n,"
+      case " $pcfgs " in *" $cname "*) ;; *) pcfgs="$pcfgs $cname" ;; esac
+    done
+    objs="$objs  $id = {isa = PBXNativeTarget; buildConfigurationList = L$id; name = $name; productType = \"$type\"; };\n  L$id = {isa = XCConfigurationList; buildConfigurations = ($cids ); };\n"
+    tids="$tids $id,"
+  done
+  for cname in $pcfgs; do n=$((n+1)); objs="$objs  C$n = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; }; name = \"$cname\"; };\n"; pids="$pids C$n,"; done
+  mkdir -p "$dir/$proj.xcodeproj"
+  printf '{\n objects = {\n  PX = {isa = PBXProject; buildConfigurationList = PXL; targets = (%s ); };\n  PXL = {isa = XCConfigurationList; buildConfigurations = (%s ); };\n%b };\n rootObject = PX;\n}\n' "$tids" "$pids" "$objs" > "$dir/$proj.xcodeproj/project.pbxproj"
+}
+DL_APPTYPE='com.apple.product-type.application'
+DL_NONE='<plist><dict/></plist>'
+D="$(dl_app)"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"; mkdir -p "$D/Example/Example"
+printf '<plist><dict/></plist>' > "$D/Example/Example/Info.plist"; printf '%s' "$DL_AL" > "$D/Example/Example/Example.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;'
+dl_proj "$D/Example" Example "E1|Example|$DL_APPTYPE|Release^INFOPLIST_FILE = Example/Info.plist; CODE_SIGN_ENTITLEMENTS = Example/Example.entitlements;"
+dl_check "dl-sibling applinks signed by an Example project never clear the app that owns the scheme" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"; printf '%s' "$DL_AL" > "$D/App/Mac.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;" \
+  "T2|AppMac|$DL_APPTYPE|Release^SDKROOT = macosx; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Mac.entitlements;"
+dl_check "dl-macos applinks on a macOS target that shares the plist do not cover iOS" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;" \
+  "T2|AppMac|$DL_APPTYPE|Release^SDKROOT = macosx; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;"
+dl_check "dl-macos-ios a macOS target sharing the plist is not an iOS build of it" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^SDKROOT = auto; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-sdk-auto a target whose SDKROOT names no iOS platform counts nothing" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^SDKROOT = auto; SUPPORTED_PLATFORMS = \"iphoneos iphonesimulator\"; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-platforms SUPPORTED_PLATFORMS with iphoneos makes the target iOS" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf 'CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig-sdk an SDK-conditional key inside an xcconfig resolves" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+printf 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements\nCODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = App/Empty.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig-device the device key in an xcconfig beats the plain key" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_pbx "$D" '' '"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = App/Empty.entitlements; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-device-wins the device key beats a plain key that names other entitlements" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements; "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = App/App.entitlements;'
+dl_check "dl-simulator-plain the plain key wins over a simulator key and the simulator file does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_pbx "$D" '' '"CODE_SIGN_ENTITLEMENTS[sdk=*]" = App/App.entitlements;'
+dl_check "dl-sdk-star an any-SDK key counts as the plain key" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Acme.entitlements"
+dl_pbx "$D" '' 'PRODUCT_NAME = Acme; CODE_SIGN_ENTITLEMENTS = "App/$(PRODUCT_NAME).entitlements";'
+dl_check "dl-product-name PRODUCT_NAME from the build settings resolves" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = "App/$(PRODUCT_NAME).entitlements";'
+dl_check "dl-product-name-default PRODUCT_NAME defaults to the target name" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Release.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Debug.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = "App/$(CONFIGURATION).entitlements";' 'CODE_SIGN_ENTITLEMENTS = "App/$(CONFIGURATION).entitlements";'
+dl_check "dl-configuration CONFIGURATION resolves to the configuration being read" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_NONE" > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Debug.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = "App/$(CONFIGURATION).entitlements";' 'CODE_SIGN_ENTITLEMENTS = "App/$(CONFIGURATION).entitlements";'
+dl_check "dl-configuration-debug CONFIGURATION never resolves to Debug for the Release build" "$D" 1
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '#include "Shared.xcconfig" // shared settings\n' > "$D/Config/Release.xcconfig"
+printf 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements\n' > "$D/Config/Shared.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-include-comment an include with a trailing comment resolves" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '#include "../Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"\nCODE_SIGN_ENTITLEMENTS = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-include-pods a missing CocoaPods include sets nothing" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '#include "Missing.xcconfig"\nCODE_SIGN_ENTITLEMENTS = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-include-missing any other missing include counts nothing" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Debug^INFOPLIST_FILE = App/Info.plist;@Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;@Release-AppStore^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;"
+dl_check "dl-release-appstore every Release-like configuration must sign applinks" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Production^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;@Staging^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-production a Production configuration counts as the Release build" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"; mkdir -p "$D/Widget"; printf '<plist><dict/></plist>' > "$D/Widget/Info.plist"; printf '%s' "$DL_AL" > "$D/Widget/Widget.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;" \
+  "T2|Widget|com.apple.product-type.app-extension|Release^INFOPLIST_FILE = Widget/Info.plist; CODE_SIGN_ENTITLEMENTS = Widget/Widget.entitlements;"
+dl_check "dl-extension applinks on a widget extension never cover the app" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '<plist><dict/></plist>' > "$D/App/Host.plist"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Host.plist;" \
+  "T2|AppUnit|com.apple.product-type.bundle.unit-test|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-test-target a test bundle that owns the scheme plist never clears it" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Extra.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-unowned a scheme plist no app target owns keeps the finding" "$D" 1
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>webcredentials:acme.example.io</string></array><key>com.example.notes</key><array><string>applinks:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-other-key applinks under another entitlement key do not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements; "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = App/App.entitlements;'
+dl_check "dl-device-over-plain the device key that names applinks beats a plain key without them" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Production^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;@Staging^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;"
+dl_check "dl-production-only with a Production configuration a Staging one is not the Release build" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+printf 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements\nCODE_SIGN_ENTITLEMENTS[config=Release] = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-config-release a config condition naming Release applies to the Release build" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+printf 'CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements\nCODE_SIGN_ENTITLEMENTS[config=Debug] = App/App.entitlements\n' > "$D/Config/Release.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-config-debug a config condition naming Debug never applies to the Release build" "$D" 1
+# Only a plist, Expo app.json or app.config, or a build setting declares a scheme. A source comment does not.
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '// Read CFBundleURLSchemes from the bundle\nlet ready = true\n' > "$D/App/Links.swift"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-swift-comment a Swift comment naming CFBundleURLSchemes never blocks the clearing" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '{"expo":{"ios":{"infoPlist":{"CFBundleURLTypes":[{"CFBundleURLSchemes":["acme"]}]}}}}' > "$D/app.json"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-expo a scheme in Expo app.json that no target owns keeps the finding" "$D" 1
+D="$(mk_ios_clean)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_KEY_CFBundleURLTypes = CFBundleURLSchemes; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-settings a scheme in build settings clears with Release applinks" "$D" 0
+D="$(mk_ios_clean)"; printf '%s' "$DL_NONE" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_KEY_CFBundleURLTypes = CFBundleURLSchemes; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-settings-none a scheme in build settings without Release applinks is flagged" "$D" 1
+# INFOPLIST_FILE resolves per configuration. A plist only a Debug configuration owns never blocks.
+D="$(mk_ios_clean)"; printf '%s' "$DL_SCHEME" > "$D/App/Info-Debug.plist"; printf '%s' "$DL_SCHEME" > "$D/App/Info-Release.plist"
+printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Debug^INFOPLIST_FILE = \"App/Info-\$(CONFIGURATION).plist\";@Release^INFOPLIST_FILE = \"App/Info-\$(CONFIGURATION).plist\"; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-plist-debug a scheme plist only Debug owns never blocks the clearing" "$D" 0
+# Build-setting modifiers resolve when the base value is known.
+for m in identifier rfc1034identifier c99extidentifier lower upper; do
+  case "$m" in identifier|c99extidentifier) f="My_App" ;; rfc1034identifier) f="My-App" ;; lower) f="my app" ;; upper) f="MY APP" ;; esac
+  D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/$f.entitlements"
+  dl_pbx "$D" '' "PRODUCT_NAME = \"My App\"; CODE_SIGN_ENTITLEMENTS = \"App/\$(PRODUCT_NAME:$m).entitlements\";"
+  dl_check "dl-mod-$m PRODUCT_NAME:$m resolves" "$D" 0
+done
+# SDKROOT auto is iOS when an iOS deployment target is set.
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^SDKROOT = auto; IPHONEOS_DEPLOYMENT_TARGET = 16.0; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;"
+dl_check "dl-sdk-auto-ios SDKROOT auto with an iOS deployment target is iOS" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '%s' "$DL_NONE" > "$D/App/Empty.entitlements"
+dl_proj "$D" App "T1|App|$DL_APPTYPE|Release^INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/App.entitlements;" \
+  "T2|AppMac|$DL_APPTYPE|Release^SDKROOT = auto; SUPPORTED_PLATFORMS = macosx; IPHONEOS_DEPLOYMENT_TARGET = 16.0; INFOPLIST_FILE = App/Info.plist; CODE_SIGN_ENTITLEMENTS = App/Empty.entitlements;"
+dl_check "dl-sdk-auto-mac SDKROOT auto with only macOS platforms is not iOS" "$D" 0
+# Apple documents mode=managed as reaching only devices under an MDM profile.
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=managed</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-managed a managed-mode applinks entry does not count" "$D" 1
 
 # ===== Issue #612. Review findings, pinned =====
 # The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.

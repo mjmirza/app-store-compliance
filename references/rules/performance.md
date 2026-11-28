@@ -221,12 +221,12 @@ grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|p
 - What triggers it. Relying on custom URL schemes for sensitive routing, navigation, or passing tokens, without strict input validation.
 - How to fix it. Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters.
 - Detection signals. CFBundleURLSchemes, android:scheme
-- Present means handled. apple-app-site-association, assetlinks.json
+- Present means handled. apple-app-site-association, applinks: in the associated domains entitlement that the Release build of the iOS app target owning the scheme Info.plist signs with, assetlinks.json
 
 How to detect.
 
 ```bash
-grep -rn 'CFBundleURLSchemes\|android:scheme' . && ! grep -rn 'apple-app-site-association\|assetlinks.json' .
+{ grep -rln 'CFBundleURLSchemes' . && ! grep -rlq 'apple-app-site-association' . && ! { find . -name project.pbxproj -not -path '*/Pods/*' | while IFS= read -r p; do r="$(dirname "$(dirname "$p")")"; { cat "$p"; find "$r" -name '*.xcconfig' -not -path '*/Pods/*' -exec cat {} +; } | grep -oE '"?CODE_SIGN_ENTITLEMENTS(\[sdk=iphoneos\*\])?"? *= *[^;]+' | grep -iv debug | sed -E 's/^"?CODE_SIGN_ENTITLEMENTS(\[[^]]*\])?"? *= *"?//; s/ *\/\/.*$//; s/"? *$//; s/^\$.(PROJECT_DIR|SRCROOT|SOURCE_ROOT).\///' | while IFS= read -r e; do case "$e" in /*) echo "$e" ;; *) echo "$r/$e" ;; esac; done; done | sort -u | while IFS= read -r e; do /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' "$e" 2>/dev/null; done | grep -E '^ *applinks:' | grep -qv 'mode=developer'; }; } || { grep -rln 'android:scheme' . && ! grep -rlq 'assetlinks.json' .; }   # approximates the guard. paths resolve against the folder holding each .xcodeproj (SRCROOT). the guard also matches the app target that owns the scheme Info.plist, follows the xcconfig chain, and requires every Release-like configuration
 ```
 
 ## RN-OTA-UNDECLARED

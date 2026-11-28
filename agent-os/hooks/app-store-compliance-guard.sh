@@ -1210,7 +1210,421 @@ PBXPY
     fi
   fi
   if grep_has 'CFBundleURLSchemes'; then
-    if ! grep_has 'apple-app-site-association'; then
+    # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
+    # A scheme plist is cleared only by applinks in the Release entitlements of the iOS app target that owns it.
+    universal_links_cover() {
+      command -v python3 >/dev/null 2>&1 || return 1
+      # A scheme is declared in a plist, in Expo app.json or app.config, or in build settings. Source code never declares one.
+      local schemes in_settings=0
+      schemes="$(grep -E '[.]plist$|/app[.]json$|/app[.]config[.][cm]?[jt]s$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -lIs -e 'CFBundleURLSchemes' 2>/dev/null)"
+      [ -n "$(grep -E '[.](pbxproj|xcconfig)$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -lIs -e 'INFOPLIST_KEY_CFBundleURLTypes' 2>/dev/null)" ] && in_settings=1
+      [ -n "$schemes" ] || [ "$in_settings" -eq 1 ] || return 1
+      grep '[.]pbxproj$' "$FILELIST" | tr '\n' '\0' | DL_SCHEMES="$schemes" DL_IN_SETTINGS="$in_settings" xargs -0 python3 -c "$(cat <<'ENTPY'
+import fnmatch
+import os
+import plistlib
+import re
+import sys
+
+LB, RB, LP, RP, LS, RS = chr(123), chr(125), chr(40), chr(41), chr(91), chr(93)
+DQ, NL, BS, DOL = chr(34), chr(10), chr(92), chr(36)
+PUNCT = LB + RB + LP + RP + "=;,"
+DOMAINS = "com.apple.developer.associated-domains"
+UNSURE = object()
+
+
+def tokens(text):
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c.isspace():
+            i += 1
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif text.startswith("//", i):
+            j = text.find(NL, i)
+            i = n if j < 0 else j + 1
+        elif c == DQ:
+            j, buf = i + 1, []
+            while j < n and text[j] != DQ:
+                if text[j] == BS and j + 1 < n:
+                    j += 1
+                buf.append(text[j])
+                j += 1
+            out.append(("s", "".join(buf)))
+            i = j + 1
+        elif c in PUNCT:
+            out.append(("p", c))
+            i += 1
+        else:
+            j = i
+            while j < n and not text[j].isspace() and text[j] not in PUNCT and text[j] != DQ and not text.startswith("/*", j):
+                j += 1
+            out.append(("s", text[i:j]))
+            i = j
+    return out
+
+
+def parse(toks, k):
+    kind, val = toks[k]
+    if kind == "p" and val == LB:
+        obj, k = dict(), k + 1
+        while toks[k] != ("p", RB):
+            key = toks[k][1]
+            value, k = parse(toks, k + 2)
+            obj[key] = value
+            if toks[k] == ("p", ";"):
+                k += 1
+        return obj, k + 1
+    if kind == "p" and val == LP:
+        arr, k = [], k + 1
+        while toks[k] != ("p", RP):
+            value, k = parse(toks, k)
+            arr.append(value)
+            if toks[k] == ("p", ","):
+                k += 1
+        return arr, k + 1
+    return val, k + 1
+
+
+def split_key(raw):
+    raw = raw.replace(" ", "")
+    i = 0
+    while i < len(raw) and (raw[i].isalnum() or raw[i] == "_"):
+        i += 1
+    name, rest, conds = raw[:i], raw[i:], []
+    while rest.startswith(LS):
+        j = rest.find(RS)
+        if j < 0:
+            return None
+        for part in rest[1:j].split(","):
+            k, _, v = part.partition("=")
+            conds.append((k, v))
+        rest = rest[j + 1:]
+    if rest or not name:
+        return None
+    return name, conds
+
+
+def is_pods(path):
+    return "Pods" in path.split(os.sep) or os.path.basename(path).startswith("Pods-")
+
+
+def xcconfig(path, depth=0):
+    if depth > 8:
+        return UNSURE
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return UNSURE
+    found = dict()
+    for line in lines:
+        s = line.split("//", 1)[0].strip()
+        if s.startswith("#include"):
+            rest = s[len("#include"):]
+            optional = rest.startswith("?")
+            name = rest.lstrip("?").strip().strip(DQ).strip()
+            if DOL in name or not name:
+                return UNSURE
+            inc = name if os.path.isabs(name) else os.path.join(os.path.dirname(path), name)
+            if not os.path.exists(inc):
+                if optional or is_pods(inc):
+                    continue
+                return UNSURE
+            sub = xcconfig(inc, depth + 1)
+            if sub is UNSURE:
+                return UNSURE
+            found.update(sub)
+            continue
+        level, cut = 0, -1
+        for idx, ch in enumerate(s):
+            if ch == LS:
+                level += 1
+            elif ch == RS:
+                level -= 1
+            elif ch == "=" and level == 0:
+                cut = idx
+                break
+        if cut < 0:
+            continue
+        key = s[:cut].replace(" ", "")
+        if split_key(key) is None:
+            continue
+        found[key] = s[cut + 1:].strip().rstrip(";").strip().strip(DQ)
+    return found
+
+
+def cond_state(conds, cfg_name):
+    known_false, unknown, spec = False, False, 0
+    for k, v in conds:
+        if k == "sdk":
+            hit = fnmatch.fnmatchcase("iphoneos", v) or fnmatch.fnmatchcase("iphoneos26.0", v)
+        elif k == "config":
+            hit = fnmatch.fnmatchcase(cfg_name, v)
+        else:
+            unknown = True
+            continue
+        if not hit:
+            known_false = True
+        elif v.strip("*"):
+            spec += 1
+    if known_false:
+        return False, 0
+    if unknown:
+        return None, 0
+    return True, spec
+
+
+def pick(settings, name, cfg_name):
+    if settings is UNSURE:
+        return UNSURE
+    best, top, unsure = [], -1, False
+    for raw, value in settings.items():
+        if isinstance(value, list):
+            value = " ".join(str(x) for x in value)
+        if not isinstance(value, str):
+            continue
+        parsed = split_key(raw)
+        if parsed is None or parsed[0] != name:
+            continue
+        ok, spec = cond_state(parsed[1], cfg_name)
+        if ok is False:
+            continue
+        if ok is None:
+            unsure = True
+        elif spec > top:
+            best, top = [value], spec
+        elif spec == top:
+            best.append(value)
+    if unsure:
+        return UNSURE
+    if not best:
+        return None
+    return best[0] if len(set(best)) == 1 else UNSURE
+
+
+def setting(levels, name, cfg_name):
+    for settings in levels:
+        value = pick(settings, name, cfg_name)
+        if value is not None:
+            return value
+    return None
+
+
+REF_RE = re.compile(re.escape(DOL) + LP + "?:" + re.escape(LP) + "([A-Za-z0-9_]+)((?::[A-Za-z0-9_]+)*)" + re.escape(RP)
+                    + "|" + re.escape(LB) + "([A-Za-z0-9_]+)((?::[A-Za-z0-9_]+)*)" + re.escape(RB) + RP)
+
+
+def modify(value, mods):
+    for mod in mods.split(":")[1:]:
+        if mod in ("identifier", "c99extidentifier"):
+            value = re.sub("[^A-Za-z0-9_]", "_", value)
+            if value[:1].isdigit():
+                value = "_" + value
+        elif mod == "rfc1034identifier":
+            value = re.sub("[^A-Za-z0-9.-]", "-", value)
+        elif mod == "lower":
+            value = value.lower()
+        elif mod == "upper":
+            value = value.upper()
+        else:
+            return None
+    return value
+
+
+def expand(value, names):
+    def sub(m):
+        var, mods = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+        if var not in names:
+            return m.group(0)
+        real = modify(names[var], mods)
+        return m.group(0) if real is None else real
+    for _ in range(6):
+        before = value
+        value = REF_RE.sub(sub, value)
+        if value == before:
+            break
+    return UNSURE if DOL in value else value
+
+
+def resolve(value, proj_dir, names):
+    value = value.strip()
+    if not value:
+        return UNSURE
+    value = expand(value, names)
+    if value is UNSURE:
+        return UNSURE
+    if not os.path.isabs(value):
+        value = os.path.join(proj_dir, value)
+    return os.path.realpath(os.path.normpath(value))
+
+
+def file_path(objects, parents, ref, proj_dir):
+    parts, cur = [], ref
+    for _ in range(64):
+        node = objects.get(cur)
+        if not isinstance(node, dict):
+            return UNSURE
+        if node.get("path"):
+            parts.append(node["path"])
+        tree = node.get("sourceTree", "<group>")
+        if tree == "<group>" and cur in parents:
+            cur = parents[cur]
+            continue
+        if tree == "<absolute>":
+            return os.path.normpath(os.path.join(*reversed(parts)))
+        if tree in ("<group>", "SOURCE_ROOT"):
+            return os.path.normpath(os.path.join(proj_dir, *reversed(parts)))
+        return UNSURE
+    return UNSURE
+
+
+def base_settings(objects, parents, cfg, proj_dir):
+    ref = cfg.get("baseConfigurationReference")
+    if not ref:
+        return dict()
+    path = file_path(objects, parents, ref, proj_dir)
+    if path is UNSURE:
+        return UNSURE
+    if not os.path.exists(path):
+        return dict() if is_pods(path) else UNSURE
+    return xcconfig(path)
+
+
+def configs(objects, list_id):
+    lst = objects.get(list_id)
+    if not isinstance(lst, dict):
+        return []
+    return [objects[c] for c in lst.get("buildConfigurations", []) if isinstance(objects.get(c), dict)]
+
+
+def release_only(cfgs):
+    words = ("release", "appstore", "app store", "production")
+    named = [c for c in cfgs if any(w in str(c.get("name", "")).lower() for w in words)]
+    return named or [c for c in cfgs if "debug" not in str(c.get("name", "")).lower()]
+
+
+def is_ios(sdk, plats, dep):
+    if isinstance(plats, str) and "iphoneos" in plats.split():
+        return True
+    if isinstance(sdk, str) and sdk.strip().lower() not in ("", "auto"):
+        return sdk.strip().lower().startswith("iphoneos")
+    if isinstance(plats, str) and plats.strip():
+        return False
+    return isinstance(dep, str) and bool(dep.strip())
+
+
+def applinks(path):
+    try:
+        with open(path, "rb") as fh:
+            data = plistlib.load(fh)
+    except Exception:
+        return False
+    doms = data.get(DOMAINS) if isinstance(data, dict) else None
+    if not isinstance(doms, list):
+        return False
+    for entry in doms:
+        if isinstance(entry, str):
+            entry = entry.strip()
+            mode = entry.partition("?")[2].partition("mode=")[2]
+            if entry.startswith("applinks:") and len(entry.partition("?")[0]) > 9 and "developer" not in mode and "managed" not in mode:
+                return True
+    return False
+
+
+pairs, in_settings, unshipped, blind = [], [], set(), []
+for pbx in sys.argv[1:]:
+    try:
+        with open(pbx, encoding="utf-8", errors="replace") as fh:
+            root, _ = parse(tokens(fh.read()), 0)
+    except (OSError, IndexError, TypeError):
+        continue
+    if not isinstance(root, dict):
+        continue
+    objects = root.get("objects", root)
+    if not isinstance(objects, dict):
+        continue
+    proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(pbx)))
+    proj_name = os.path.splitext(os.path.basename(os.path.dirname(os.path.abspath(pbx))))[0]
+    parents = dict()
+    for oid, obj in objects.items():
+        if isinstance(obj, dict) and isinstance(obj.get("children"), list):
+            for child in obj["children"]:
+                parents[child] = oid
+    project = next((o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "PBXProject"), None)
+    project_cfgs = configs(objects, project.get("buildConfigurationList")) if project else []
+    by_name = dict((str(c.get("name", "")), c) for c in project_cfgs)
+    targets = [o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "PBXNativeTarget"]
+    work = []
+    for t in targets:
+        if t.get("productType") == "com.apple.product-type.application":
+            work.append((str(t.get("name", "")), configs(objects, t.get("buildConfigurationList"))))
+    if not targets:
+        loose = [o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "XCBuildConfiguration"
+                 and o not in project_cfgs and "PRODUCT_BUNDLE_IDENTIFIER" in (o.get("buildSettings") or dict())]
+        work.append(("", loose))
+    for target_name, cfgs in work:
+        shipped = release_only(cfgs)
+        for cfg in cfgs:
+            cname = str(cfg.get("name", ""))
+            ships = any(cfg is c for c in shipped)
+            levels = [cfg.get("buildSettings") or dict(), base_settings(objects, parents, cfg, proj_dir)]
+            if cname in by_name:
+                proj_cfg = by_name[cname]
+                levels += [proj_cfg.get("buildSettings") or dict(), base_settings(objects, parents, proj_cfg, proj_dir)]
+            sdk = setting(levels, "SDKROOT", cname)
+            plats = setting(levels, "SUPPORTED_PLATFORMS", cname)
+            dep = setting(levels, "IPHONEOS_DEPLOYMENT_TARGET", cname)
+            if not is_ios(sdk, plats, dep):
+                if UNSURE in (sdk, plats, dep):
+                    blind.append(ships)
+                continue
+            names = dict(PROJECT_DIR=proj_dir, SRCROOT=proj_dir, SOURCE_ROOT=proj_dir, PROJECT_NAME=proj_name, CONFIGURATION=cname)
+            if target_name:
+                names["TARGET_NAME"] = target_name
+            product = setting(levels, "PRODUCT_NAME", cname)
+            if product is None and target_name:
+                product = target_name
+            if isinstance(product, str):
+                product = expand(product, names)
+                if isinstance(product, str) and product:
+                    names["PRODUCT_NAME"] = product
+            ent = setting(levels, "CODE_SIGN_ENTITLEMENTS", cname)
+            if isinstance(ent, str):
+                ent = resolve(ent, proj_dir, names)
+            signed = isinstance(ent, str) and applinks(ent)
+            if ships and setting(levels, "INFOPLIST_KEY_CFBundleURLTypes", cname) is not None:
+                in_settings.append(signed)
+            plist = setting(levels, "INFOPLIST_FILE", cname)
+            if isinstance(plist, str):
+                plist = resolve(plist, proj_dir, names)
+            if not isinstance(plist, str):
+                blind.append(ships)
+                continue
+            if ships:
+                pairs.append((plist, signed))
+            else:
+                unshipped.add(plist)
+
+schemes = [os.path.realpath(os.path.abspath(p)) for p in os.environ.get("DL_SCHEMES", "").split(NL) if p.strip()]
+by_settings = os.environ.get("DL_IN_SETTINGS") == "1"
+covered = bool(schemes) or by_settings
+if by_settings and (not in_settings or not all(in_settings)):
+    covered = False
+for scheme in schemes:
+    owners = [ok for plist, ok in pairs if plist == scheme]
+    if not owners and scheme in unshipped and not any(blind):
+        continue
+    if not owners or not all(owners):
+        covered = False
+if covered:
+    print("CLEAR")
+ENTPY
+)" 2>/dev/null | grep -qx CLEAR
+    }
+    if ! grep_has 'apple-app-site-association' && ! universal_links_cover; then
       finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without Universal Links configuration" "Configure Universal Links (iOS) using apple-app-site-association verification to prevent URL hijacking." src 'CFBundleURLSchemes'
     fi
   fi
