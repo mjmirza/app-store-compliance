@@ -548,6 +548,11 @@ def use_at(text, i, end):
     # A C typedef names its alias last, as in typedef Renderer ImageCreator;
     st = max(text.rfind(";", 0, i), text.rfind(chr(123), 0, i), text.rfind(chr(125), 0, i)) + 1
     typedef = t2 < end and text[t2] in (";", ",") and "typedef" in text[st:i].split()
+    if not typedef and t2 < end and text[t2] in (";", ",") and b >= 0 and text[b] == chr(125):
+        # An anonymous body, as in typedef struct { int width; } ImageCreator;
+        m = open_of(text, b)
+        st = max(text.rfind(";", 0, m), text.rfind(chr(123), 0, m), text.rfind(chr(125), 0, m)) + 1 if m > 0 else m
+        typedef = m > 0 and "typedef" in text[st:m].split()
     if generic or typedef or text[w + 1:b + 1] in DECL_WORDS:
         # A text scan cannot follow Swift lookup through nesting, extensions or subclasses, so any
         # app type of this name silences unqualified calls. Missing one is never worse than main.
