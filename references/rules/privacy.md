@@ -229,7 +229,7 @@ grep -rn 'AppsFlyer\|Adjust\|FBSDK\|advertisingIdentifier\|ASIdentifierManager' 
 How to detect.
 
 ```bash
-grep -rl --null 'deleteAccount\|delete account' --include='*.swift' . | xargs -0 grep -n 'mailto:\|deactivate' ; grep -rlq 'deleteAccount\|delete account' --include='*.swift' . && grep -rnE '/deactivate|deactivate(Account|User)|([Dd]elet|[Rr]emov|[Aa]ccount).*mailto:|mailto:[^"]*([Dd]elet|[Rr]emov|[Aa]ccount)' --include='*.swift' . | grep -vE '[Dd]evices?/deactivate'   # deletion must truly delete, not a mailto or deactivate in the deleting file, a deactivation endpoint, or a deletion mailto
+grep -rl --null 'deleteAccount\|delete account' --include='*.swift' . | xargs -0 grep -n 'mailto:\|deactivate' ; grep -rlq 'deleteAccount\|delete account' --include='*.swift' . && grep -rnE '/deactivate|deactivate(Account|User)|([Dd]elet|[Rr]emov|[Aa]ccount).*mailto:|mailto:[^"]*([Dd]elet|[Rr]emov|[Aa]ccount)' --include='*.swift' . | grep -vE '[Dd]evices?/deactivate'   # deletion must truly delete. The guard also follows the deleting function into the code it calls across files. Where a call cannot be resolved, any mailto: or deactivate in the app counts
 ```
 
 ## APPLE-PRIVACY-NUTRITION-LABELS

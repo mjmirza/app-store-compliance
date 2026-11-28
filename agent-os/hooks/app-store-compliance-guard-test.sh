@@ -666,6 +666,7 @@ dw_case "df-6 a real deletion through an API client ignores an unrelated support
 dw_case "df-7 a Kotlin deletion through a repository ignores a sensor deactivate" quiet \
   App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
   App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n' \
   App/Sensor.kt 'fun onPause() { sensor.deactivate() }\n'
 dw_case "df-8 a TypeScript deletion that opens a mailto constant is flagged" fire \
   App/account.ts 'export async function deleteAccount() {\n  await accountApi.remove();\n}\n' \
@@ -673,6 +674,74 @@ dw_case "df-8 a TypeScript deletion that opens a mailto constant is flagged" fir
   App/links.ts 'export const SUPPORT_MAIL = "mailto:help@acme.example.io";\n'
 dw_case "df-9 a plain real deletion stays quiet" quiet \
   App/Account.swift 'func deleteAccount() async throws {\n  try await api.delete("/users/me")\n  try await session.signOut()\n}\n'
+# The follower itself, not the fallback. Its verdict is WEAK, CLEAN, or UNSURE, which sends the check back to any match.
+fl_case() {  # name expected-verdict file content [file content ...]
+  local name="$1" want="$2" D got; shift 2; D="$(mktemp -d)"; mkdir -p "$D/App"
+  while [ "$#" -ge 2 ]; do mkdir -p "$(dirname "$D/$1")"; printf '%b' "$2" > "$D/$1"; shift 2; done
+  find "$D" -type f > "$D.list"
+  got="$(python3 -c "$(sed -n "/<<'DELPY'/,/^DELPY/p" "$HERE/app-store-compliance-guard.sh" | sed '1d;$d')" "$D.list" 2>&1 | head -1 | sed "s|$D/||" | tr '\t' ' ')"
+  [ "$got" = "$want" ] && ok "$name" || bad "$name (got: $got)"
+  rm -rf "$D" "$D.list"
+}
+fl_case "fl-1 a one line Java method body is followed" "WEAK App/S.java 2" \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc {\n  void remove() { currentUser.deactivate(); }\n}\n'
+dw_case "fl-1 a one line Java method body is flagged" fire \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc {\n  void remove() { currentUser.deactivate(); }\n}\n'
+fl_case "fl-1b a one line TypeScript class method is followed" "WEAK App/s.ts 2" \
+  App/a.ts 'class A {\n  async deleteAccount() {\n    await svc.remove();\n  }\n}\n' \
+  App/s.ts 'class Svc {\n  async remove() { await currentUser.deactivate(); }\n}\n'
+fl_case "fl-2 an Allman brace method is followed" "WEAK App/S.java 5" \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+dw_case "fl-2 an Allman brace method is flagged" fire \
+  App/Acct.java 'class A {\n  void deleteAccount() {\n    svc.remove();\n  }\n}\n' \
+  App/S.java 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+fl_case "fl-2b an Allman C# deletion is anchored and followed" "WEAK App/S.cs 5" \
+  App/Acct.cs 'class A\n{\n  public void deleteAccount()\n  {\n    svc.remove();\n  }\n}\n' \
+  App/S.cs 'class Svc\n{\n  public void remove()\n  {\n    currentUser.deactivate();\n  }\n}\n'
+fl_case "fl-3 a Kotlin extension function is followed" "WEAK App/R.kt 1" \
+  App/Vm.kt 'class Vm {\n  suspend fun deleteAccount() {\n    repo.close()\n  }\n}\n' \
+  App/R.kt 'suspend fun UserRepo.close() { api.deactivate(uid) }\n'
+dw_case "fl-3 a Kotlin extension function is flagged" fire \
+  App/Vm.kt 'class Vm {\n  suspend fun deleteAccount() {\n    repo.close()\n  }\n}\n' \
+  App/R.kt 'suspend fun UserRepo.close() { api.deactivate(uid) }\n'
+fl_case "fl-4 a member call named open is followed" "WEAK App/Sup.swift 2" \
+  App/S.swift 'func deleteAccount() { Support.open() }\n' \
+  App/Sup.swift 'enum Support {\n  static func open() { UIApplication.shared.open(URL(string: "mailto:help@acme.io")!) }\n}\n'
+dw_case "fl-4 a member call named open is flagged" fire \
+  App/S.swift 'func deleteAccount() { Support.open() }\n' \
+  App/Sup.swift 'enum Support {\n  static func open() { UIApplication.shared.open(URL(string: "mailto:help@acme.io")!) }\n}\n'
+fl_case "fl-a a called name with no definition is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/Sup.swift 'let support = URL(string: "mailto:help@acme.io")\n'
+dw_case "fl-a a called name with no definition falls back and reports" fire \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/Sup.swift 'let support = URL(string: "mailto:help@acme.io")\n'
+fl_case "fl-a2 an API client method with no definition is unsure" "UNSURE" \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n'
+fl_case "fl-a3 constructing an app type is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { present(DeleteAccountView()) }\n' \
+  App/D.swift 'struct DeleteAccountView {\n  let mail = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "fl-d a local let is not resolved to a same named property elsewhere" "CLEAN" \
+  App/Acct.swift 'func deleteAccount() async throws {\n  let url = URL(string: base + "/users/me")!\n  try await api.send(url, method: "DELETE")\n}\n' \
+  App/Api.swift 'final class Api {\n  func send(_ u: URL, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: u))\n  }\n}\n' \
+  App/SupportView.swift 'struct SupportView {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n'
+dw_case "fl-d a local let is not resolved to a same named property elsewhere" quiet \
+  App/Acct.swift 'func deleteAccount() async throws {\n  let url = URL(string: base + "/users/me")!\n  try await api.send(url, method: "DELETE")\n}\n' \
+  App/Api.swift 'final class Api {\n  func send(_ u: URL, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: u))\n  }\n}\n' \
+  App/SupportView.swift 'struct SupportView {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "fl-d2 a name used before a later local is still followed" "WEAK App/L.swift 2" \
+  App/Acct.swift 'final class A {\n  func deleteAccount() {\n    UIApplication.shared.open(url)\n    let url = 1\n  }\n}\n' \
+  App/L.swift 'struct L {\n  let url = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "fl-df4 the follower reports the closure it cannot follow" "UNSURE" \
+  App/V.swift 'struct V {\n  var onDelete: (() -> Void)?\n  func deleteAccount() { onDelete?() }\n}\n' \
+  App/Support.swift 'let support = URL(string: "mailto:help@acme.example.io")\n'
+fl_case "fl-df5 the follower reaches the mailto from the deletion switch arm" "WEAK App/Links.swift 2" \
+  App/Router.swift 'enum Route { case deleteAccount, faq }\nfunc go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    UIApplication.shared.open(Links.support)\n  case .faq:\n    break\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@acme.example.io")!\n}\n'
 
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.

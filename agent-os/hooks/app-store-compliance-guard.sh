@@ -1277,7 +1277,7 @@ LP, RP, LB, RB, DQ, SQ, BS = (
     chr(39),
     chr(92),
 )
-NL, TAB = chr(10), chr(9)
+NL, TAB, LS, RS = chr(10), chr(9), chr(91), chr(93)
 MAX_HOPS, MAX_NAMES, MAX_BYTES = 6, 3000, 40000000
 
 
@@ -1303,7 +1303,42 @@ print println console log error Error Task DispatchQueue main shared""".split()
 TYPEKW = set(
     "class struct enum interface protocol extension object record data typealias".split()
 )
+# Words that look like a call but are syntax, and words that open a definition.
+CTRL = set(
+    """if else elif while for switch when guard return throw try await catch do case match yield
+not and or in is as typeof sizeof assert function init constructor selector available""".split()
+)
+DEFKW = set(
+    "func fun function def fn sub class struct enum interface protocol extension object record typealias".split()
+)
+# Calls that are clearly the platform, never app code that could hide a mailto or a deactivate.
+BUILTIN = set(
+    """fetch print println require setTimeout setInterval clearTimeout parseInt parseFloat alert
+encodeURIComponent decodeURIComponent precondition fatalError withAnimation len str int float list
+dict range isinstance launch withContext runBlocking coroutineScope error""".split()
+)
+FW_ROOTS = set(
+    "firebase axios supabase window document navigator console process globalThis localStorage sessionStorage".split()
+)
+STD_MEMBERS = set(
+    """map filter reduce forEach compactMap flatMap sorted sort first last contains append insert
+removeAll push pop slice splice join joined split trim replace lowercased uppercased toLowerCase
+toUpperCase toString includes indexOf startsWith endsWith hasPrefix hasSuffix then finally json
+text resume cancel sink store encode decode navigate goBack dismiss""".split()
+)
+HTTP = set("get post put patch delete request".split())
+ACCT_SDK = set([("user", "delete"), ("currentUser", "delete")])
+JS_EXT = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue", ".svelte")
 MODS = "<?[A-Za-z_@][A-Za-z0-9_<>?,.~[~]]*~s+>>*"
+GEN = "<?<[^>]*>~s*>>?"
+REC = "<?[A-Za-z_][A-Za-z0-9_<>?,.]*~.>>?"
+CALL = re.compile(LP + "[A-Za-z_][A-Za-z0-9_]*" + RP)
+TYPEDEF = rx(
+    "~b<?class|struct|enum|interface|protocol|object|record|typealias|extension>>~s+" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP
+)
+LOCAL = rx("~b<?let|var|val|const>>~s+<?mut~s+>>?" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP)
+HOOK = rx("^use[A-Z]")
+LABEL = rx(LS + LP + "," + RS + "~s*" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP + ":" + LP + "?!:" + RP)
 
 
 def scrub(line):
@@ -1364,21 +1399,75 @@ def block(lines, i, col):
     return [i], True
 
 
-def fn_defs(n):
+def fn_pats(n):
+    # The last pattern is the method head that body_def follows to its brace.
     return [
-        rx("~b<?func|fun|function|def|fn|sub>>~s+" + n + "~b"),
-        rx("^~s*" + MODS + n + "~s*~" + LP + "[^;]*~" + LB + "~s*$"),
-        rx("^~s*" + MODS + n + "~s*~" + LP + "[^;]*=>"),
+        rx("~b<?func|fun|function|def|fn|sub>>~s+" + GEN + REC + n + "~b"),
+        rx("^~s*" + MODS + n + "~s*" + GEN + "~" + LP + "[^;]*~" + RP + "[^;=]*=>"),
         rx(
             "~b"
             + n
             + "~s*[:=]~s*<?async~s*>>?<?function~b|~"
             + LP
-            + "[^=;]*=>|~"
+            + "[^=;]*=>|[A-Za-z_][A-Za-z0-9_]*~s*=>|~"
             + LB
             + ">>"
         ),
+        rx("^~s*" + LP + MODS + RP + n + "~s*" + GEN + "~" + LP),
     ]
+
+
+def body_def(lines, cl, i, head, js):
+    # A method head whose brace body opens on the same line, the next line, or after a multi line parameter list.
+    m = head.search(cl[i])
+    if not m:
+        return None
+    words = m.group(1).split()
+    if any(w in CTRL for w in words) or (not words and not js):
+        return None
+    depth, j, col = 0, i, m.end() - 1
+    while j < len(lines) and j < i + 10:
+        text = cl[j]
+        k = col if j == i else 0
+        while k < len(text):
+            ch = text[k]
+            if ch == LP:
+                depth += 1
+            elif ch == RP:
+                depth -= 1
+                if depth == 0:
+                    rest = text[k + 1 :]
+                    cut = rest.find(LB)
+                    tail = rest if cut < 0 else rest[:cut]
+                    if any(x in tail for x in ";=" + LP + RP + RB):
+                        return None
+                    if cut >= 0:
+                        return j, k + 1 + cut
+                    for q in range(j + 1, min(len(lines), j + 3)):
+                        s = cl[q].strip()
+                        if not s:
+                            continue
+                        return (q, cl[q].find(LB)) if s.startswith(LB) else None
+                    return None
+            elif ch in ";" + LB + RB:
+                return None
+            k += 1
+        j += 1
+    return None
+
+
+def def_at(lines, cl, i, pats, js):
+    m = pats[0].search(cl[i])
+    if m:
+        return i, m.start()
+    d = body_def(lines, cl, i, pats[-1], js)
+    if d:
+        return d
+    for pat in pats[1:-1]:
+        m = pat.search(cl[i])
+        if m:
+            return i, m.start()
+    return None
 
 
 def val_defs(n):
@@ -1397,6 +1486,81 @@ def val_defs(n):
     ]
 
 
+def skip_back(c, j):
+    # From a closing paren or bracket at j, the index just before its opener.
+    depth = 0
+    while j >= 0:
+        if c[j] in RP + RS:
+            depth += 1
+        elif c[j] in LP + LS:
+            depth -= 1
+            if depth == 0:
+                return j - 1
+        j -= 1
+    return -1
+
+
+def receiver(c, k):
+    # Leftmost name of the dotted chain ending at column k. None means a bare call, ? an unnamed receiver.
+    root = None
+    while True:
+        j = k
+        if j < 0 or c[j] != ".":
+            return root
+        j -= 1
+        if j >= 0 and c[j] in "?!":
+            j -= 1
+        while j >= 0 and c[j] in RP + RS:
+            j = skip_back(c, j)
+            if j >= 0 and c[j] in "?!":
+                j -= 1
+        e = j + 1
+        while j >= 0 and (c[j].isalnum() or c[j] == "_"):
+            j -= 1
+        ident = c[j + 1 : e]
+        if not ident:
+            return "?"
+        root, k = ident, j
+
+
+def calls(c):
+    out = []
+    for m in CALL.finditer(c):
+        name, q = m.group(1), m.end()
+        if q < len(c) and c[q] in "?!":
+            q += 1
+        while q < len(c) and c[q] == " ":
+            q += 1
+        if q >= len(c) or c[q] != LP:
+            continue
+        s = m.start()
+        if s > 0 and (c[s - 1] in chr(35) + chr(64) or c[s - 1].isalnum() or c[s - 1] == "_"):
+            continue
+        if name in CTRL or name.startswith("__"):
+            continue
+        before = c[:s].split()
+        if before and before[-1] in DEFKW:
+            continue
+        r = q + 1
+        while r < len(c) and c[r] == " ":
+            r += 1
+        out.append((name, receiver(c, s - 1), r < len(c) and c[r] == DQ))
+    return out
+
+
+def allowed(name, root, lit, apptypes):
+    # A call that needs no definition in the app because it is clearly the platform.
+    if HOOK.search(name):
+        return True
+    if root is None or root in ("self", "this", "super"):
+        return name in BUILTIN or (name[0].isupper() and name not in apptypes)
+    if root == "?" or root in FW_ROOTS or (root, name) in ACCT_SDK:
+        return True
+    if root[0].isupper() and root not in apptypes:
+        return True
+    return (name in HTTP and lit) or name in STD_MEMBERS
+
+
 def main():
     try:
         with open(sys.argv[1], encoding="utf-8", errors="replace") as fh:
@@ -1404,7 +1568,7 @@ def main():
     except OSError:
         print("UNSURE")
         return
-    src, clean, where, total = {}, {}, {}, 0
+    src, clean, where, total, apptypes = {}, {}, {}, 0, set()
     for p in paths:
         try:
             with open(p, encoding="utf-8", errors="replace") as fh:
@@ -1420,20 +1584,54 @@ def main():
         for i, c in enumerate(clean[p]):
             for t in set(IDENT.findall(c)):
                 where.setdefault(t, []).append((p, i))
-    unsure, anchored, seen, frontier = False, False, set(), set()
+            for m in TYPEDEF.finditer(c):
+                apptypes.add(m.group(1))
+    state = {"unsure": False}
+    frontier, called, defined = set(), [], set()
+
+    def harvest(p, region, scoped):
+        # Names a region uses. A local declared before its first use, or an argument label, is never chased elsewhere.
+        own = {}
+        if scoped:
+            for j in region[1:]:
+                for m in LOCAL.finditer(clean[p][j]):
+                    own.setdefault(m.group(1), j)
+            for t, d in list(own.items()):
+                pat = rx("~b" + re.escape(t) + "~b")
+                if any(pat.search(clean[p][j]) for j in region[1:] if j < d):
+                    del own[t]
+        for j in region:
+            c = clean[p][j]
+            labels = set(m.start(1) for m in LABEL.finditer(c))
+            for m in IDENT.finditer(c):
+                t = m.group(0)
+                if t not in STOP and t not in own and m.start() not in labels:
+                    frontier.add(t)
+            for name, root, lit in calls(c):
+                if name in own:
+                    continue
+                called.append((name, root, lit))
+                platform = root == "?" or root in FW_ROOTS or (
+                    root is not None and root[0].isupper() and root not in apptypes
+                )
+                if name in STOP and not name[0].isupper() and not platform:
+                    frontier.add(name)
+
+    anchored, seen = False, set()
     for p, lines in src.items():
+        js = p.endswith(JS_EXT)
         for i, line in enumerate(lines):
             if not TRIG.search(line):
                 continue
+            # A deleting function, or a switch arm labelled with the deletion, is where the path starts.
+            fn = is_label(clean[p][i]) and "deleteAccount" in clean[p][i]
+            anchored = anchored or fn
             for t in IDENT.findall(clean[p][i]):
-                if "deleteAccount" in t and any(
-                    f.search(clean[p][i]) for f in fn_defs(re.escape(t))
-                ):
-                    anchored = True
+                if "deleteAccount" in t and def_at(lines, clean[p], i, fn_pats(re.escape(t)), js):
+                    anchored = fn = True
             region, ok = block(lines, i, 0)
-            unsure = unsure or not ok
-            for j in region:
-                frontier.update(t for t in IDENT.findall(clean[p][j]) if t not in STOP)
+            state["unsure"] = state["unsure"] or not ok
+            harvest(p, region, fn)
     if not anchored:
         print("UNSURE")
         return
@@ -1443,10 +1641,11 @@ def main():
         if len(seen) > MAX_NAMES:
             print("UNSURE")
             return
-        frontier, reached = set(), []
+        frontier.clear()
+        reached = []
         for name in names:
             n = re.escape(name)
-            pats = fn_defs(n) + val_defs(n)
+            vpats, fpats = val_defs(n), fn_pats(n)
             closure = rx(
                 "~b<?let|var|val|lateinit var>>~s+"
                 + n
@@ -1462,29 +1661,38 @@ def main():
                 if any(w in TYPEKW for w in c.split(name)[0].split()):
                     continue
                 if closure.search(c):
-                    unsure = True
+                    state["unsure"] = True
                     continue
                 if bound.search(c) and "mailto:" in src[p][i]:
                     reached.append((p, i))
-                for pat in pats:
-                    m = pat.search(c)
-                    if not m:
-                        continue
-                    region, ok = block(src[p], i, m.start())
-                    unsure = unsure or not ok
-                    for j in region:
-                        reached.append((p, j))
-                        frontier.update(
-                            t for t in IDENT.findall(clean[p][j]) if t not in STOP
-                        )
-                    break
+                d = def_at(src[p], clean[p], i, fpats, p.endswith(JS_EXT))
+                scoped = d is not None
+                if not d:
+                    for pat in vpats:
+                        m = pat.search(c)
+                        if m:
+                            d = (i, m.start())
+                            break
+                if not d:
+                    continue
+                defined.add(name)
+                region, ok = block(src[p], d[0], d[1])
+                if d[0] != i:
+                    region = list(range(i, d[0])) + region
+                state["unsure"] = state["unsure"] or not ok
+                reached.extend((p, j) for j in region)
+                harvest(p, region, scoped)
         for p, j in reached:
-            line = src[p][j]
-            if WEAK.search(LAYOUT.sub(" ", line)):
+            if WEAK.search(LAYOUT.sub(" ", src[p][j])):
                 print("WEAK" + TAB + p + TAB + str(j + 1))
                 return
         if not (frontier - seen):
-            print("UNSURE" if unsure else "CLEAN")
+            if any(
+                nm not in defined and not allowed(nm, rt, lit, apptypes)
+                for nm, rt, lit in called
+            ):
+                state["unsure"] = True
+            print("UNSURE" if state["unsure"] else "CLEAN")
             return
     print("UNSURE")
 
