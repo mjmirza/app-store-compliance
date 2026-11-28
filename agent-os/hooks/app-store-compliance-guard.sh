@@ -774,6 +774,11 @@ def alone(h, key, joins):
     rest = h[:k] + h[e + 1:] if k >= 0 and e > 0 else h
     return not any(j in rest for j in joins)
 
+def first_word(s):
+    # The leading keyword of a statement, so return(nil) and if(x) read as return and if.
+    m = re.match(r"\s*([A-Za-z_]+)", s)
+    return m.group(1) if m else ""
+
 def last_stmt(body, raw=False):
     # The last top-level statement of a block, split on semicolons and line breaks outside brackets.
     depth = 0
@@ -786,7 +791,7 @@ def last_stmt(body, raw=False):
             depth -= 1
         nxt = body[i + 1:].lstrip(" " + chr(9))
         prev = cur.rstrip()
-        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.split(chr(123))[0].split("(")[0].strip().split(" ")[0] in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
+        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.startswith(chr(123)) or first_word(nxt) in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
             # A line that starts with a member access, or sits inside a multiline string, continues the statement above.
             cur += " "
         elif depth == 0 and c in (";", chr(10)):
@@ -910,7 +915,7 @@ def body_exits(body):
 def stmt_exits(stmt):
     # True when a statement always leaves the function: return, throw, continue,
     # or an if chain that ends in else and whose every branch does.
-    first = stmt.split()[0] if stmt.split() else ""
+    first = first_word(stmt)
     if first in ("return", "throw", "continue"):
         return True
     if first == "switch":
@@ -988,7 +993,7 @@ def switch_exits(body):
         rest = part[colon + 1:] if colon >= 0 else ""
         last = last_stmt(rest, True)
         # fallthrough runs the next case, so it exits when that case does.
-        here = body_exits(rest) or (last.split()[:1] == ["fallthrough"] and n + 1 < len(starts) and nxt)
+        here = body_exits(rest) or (first_word(last) == "fallthrough" and n + 1 < len(starts) and nxt)
         if not here:
             return False
         nxt = here
@@ -1102,7 +1107,7 @@ def gated_at(code, stop):
             chain_exits = exits_at.get(d, False)
             body = code[open_at[-1] + 1:k]
             # A block exits when its last statement does, or when it ends with an if and else that both exit.
-            ends_out = last_stmt(body).split(" ")[0] in ("return", "throw", "continue", "break") or body_exits(body) or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
+            ends_out = first_word(last_stmt(body)) in ("return", "throw", "continue", "break") or body_exits(body) or (done[6] >= 0 and not code[done[6] + 1:k].strip(" ;" + chr(9) + chr(10)))
             exits = done[4] in ("if", "elif") and ends_out
             if done[4] == "else" and ends_out and chain_exits and stack:
                 stack[-1][6] = k
