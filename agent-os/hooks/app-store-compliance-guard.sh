@@ -696,6 +696,33 @@ if [ -z "$FILELIST" ] || ! : > "$FILELIST" 2>/dev/null; then
 fi
 SCAN_ERROR=""
 
+# Terms of Use evidence for an auto-renewable subscription (Schedule 2 section 3.8(b)).
+# Literals are read from comment-stripped source, so a comment, license header or identifier never counts.
+TERMS_LIT_AWK='BEGIN { sq=sprintf("%c", 39); bt=sprintf("%c", 96) }
+  { l=$0; n=length(l); i=1
+    while (i <= n) { c=substr(l, i, 1)
+      if (c == "\"" || c == sq || c == bt) { j=i+1; s=""
+        while (j <= n && substr(l, j, 1) != c) { if (substr(l, j, 1) == "\\") j++; else s=s substr(l, j, 1); j++ }
+        print s; i=j+1; continue }
+      i++ }
+    while (match(l, />[^<>{}]+</)) { print substr(l, RSTART+1, RLENGTH-2); l=substr(l, RSTART+RLENGTH-1) } }'
+TERMS_PHRASE_RE='terms[[:space:]]+(of[[:space:]]+(use|service)|(&|&amp;|and)[[:space:]]+conditions)|(^|[^a-z])eula([^a-z]|$)|stdeula|end[- ]user[[:space:]]+licen[cs]e|nutzungsbedingungen|gesch.{1,2}ftsbedingungen|t.{1,2}rminos[[:space:]]+(de[[:space:]]+(uso|servicio)|y[[:space:]]+condiciones)|termos[[:space:]]+(de[[:space:]]+(uso|servi)|e[[:space:]]+condi)|termini[[:space:]]+(di[[:space:]]+(utilizzo|uso|servizio)|e[[:space:]]+condizioni)|condizioni[[:space:]]+d.{1,3}uso|conditions[[:space:]]+(d.{1,3}utilisation|g.{1,2}n.{1,2}rales)|(^|[^a-z])(cgu|cgv)([^a-z]|$)|gebruiksvoorwaarden|algemene[[:space:]]+voorwaarden|kullan.{1,2}m[[:space:]]+ko.{1,2}ullar|利用規約|使用条款|服务条款|服務條款|用户协议|이용약관|(У|у)словия[[:space:]]+(использования|пользования|обслуживания)|(П|п)ользовательское[[:space:]]+соглашение'
+TERMS_URL_RE='/(tos|terms[a-z_-]*|user-agreement|eula|agb|cgu|cgv)([/?#.]|$)'
+TERMS_LABEL_RE='^[[:space:]]*(Terms|Legal|Rechtliches|AGB)[[:space:]]*$'
+terms_link_present() {
+  local lits
+  # SubscriptionStoreView shows the policy links Apple configures, unless storeButton hides them.
+  if impl_has 'SubscriptionStoreView' && ! impl_has 'storeButton\([[:space:]]*\.hidden[[:space:]]*,[[:space:]]*for:[^)]*\.policies'; then return 0; fi
+  lits="$({ if [ "${CODE_OK:-0}" -eq 1 ]; then awk "$TERMS_LIT_AWK" "$FILELIST.impl"
+      else grep -E "$SRC_EXT_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 awk "$TERMS_LIT_AWK"; fi
+    find_app 12 \( -name '*.strings' -o -name '*.xcstrings' -o -name '*.arb' -o -name 'strings.xml' -o -name '*.json' \) -type f \
+      | grep -E '[.](strings|xcstrings|arb)$|/res/values[^/]*/strings[.]xml$|/(locales?|i18n|l10n|lang|langs|languages|translations|messages)/[^/]*[.]json$|/[a-z][a-z]([-_][A-Za-z]+)?[.]json$' \
+      | tr '\n' '\0' | xargs -0 awk "$TERMS_LIT_AWK"; } 2>/dev/null)"
+  [ -n "$lits" ] || return 1
+  printf '%s\n' "$lits" | grep -Ei -e "$TERMS_PHRASE_RE" -e "$TERMS_URL_RE" >/dev/null && return 0
+  printf '%s\n' "$lits" | grep -E -e "$TERMS_LABEL_RE" >/dev/null
+}
+
 # ----- the scan of one tree (issue #612). Runs once per app root, or once on the project root -----
 detect_frameworks() {  # sets the IS_<framework> flags for the tree under DIR
 IS_FLUTTER=0; IS_RN=0; IS_IONIC=0
@@ -1198,11 +1225,10 @@ PBXPY
   if grep_has 'Stripe|PayPalCheckout|braintree|razorpay'; then
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
-  # Developer Program License Agreement Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
-  # SubscriptionStoreView shows the policy links Apple configures. Terms, Legal, AGB as a word, EULA or a translation count.
-  # Word starts only, so illegalState, preconditions and AGBlue do not hide a missing link.
+  # Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
+  # A terms phrase, URL path or Legal label counts only in a string literal, JSX text or a strings file.
   if grep_has 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('; then
-    grep_has 'SubscriptionStoreView|(^|[^A-Za-z])([Tt]erms|TERMS|legal|conditions|AGB([^A-Za-z]|$))|(^|[^A-Z])(Legal|Conditions)|EULA|[Ee]ula|[Nn]utzungsbedingungen|[Tt][eé]rminos|[Tt]ermos|[Cc]ondizioni|利用規約|服务条款|服務條款|이용약관|[Уу]слови' || finding medium "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
+    terms_link_present || finding medium "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'

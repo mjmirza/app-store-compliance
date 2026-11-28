@@ -495,7 +495,7 @@
       "guideline": "3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)",
       "title": "Auto-renewable subscription without a Terms of Use link in the app",
       "severity": "medium",
-      "detection": "The app sells an auto-renewable subscription and no Terms of Use or EULA link appears in its sources. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.",
+      "detection": "The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its string literals, JSX text or localized strings files. Comments and identifiers do not count. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.",
       "signals": [
         "subscriptionPeriod",
         ".autoRenewable",
@@ -503,14 +503,16 @@
         "requestSubscription("
       ],
       "counterSignals": [
-        "SubscriptionStoreView",
-        "Terms (as a word)",
-        "legal",
+        "SubscriptionStoreView, unless storeButton(.hidden, for: .policies)",
         "Terms of Use",
-        "termsOfUse",
         "Terms of Service",
+        "Terms and Conditions",
         "EULA",
-        "stdeula"
+        "End User License",
+        "stdeula",
+        "Nutzungsbedingungen",
+        "a /terms, /tos, /user-agreement, /eula, /agb, /cgu or /cgv URL",
+        "a string literal Terms, Legal, Rechtliches or AGB"
       ],
       "fix": "Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.",
       "added": "2026-11-25"

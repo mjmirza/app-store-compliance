@@ -3294,8 +3294,9 @@ let link = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev
 gs_check "subt-3 the Apple standard EULA link stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
 D="$(gs_ios Store.swift 'let result = try await coins.purchase()')"
 gs_check "subt-4 a one-time purchase with no subscription stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
-D="$(gs_ios Paywall.swift 'SubscriptionStoreView(groupID: "premium").storeButton(.visible, for: .policies)')"
-gs_check "subt-5 SubscriptionStoreView shows the policy links Apple configures" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+SubscriptionStoreView(groupID: "premium").storeButton(.hidden, for: .policies)')"
+gs_check "subt-5 SubscriptionStoreView with hidden policies is flagged" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
 D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
 Link("Terms", destination: URL(string: "https://realbackend.io/terms")!)')"
 gs_check "subt-6 a link labelled Terms stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
@@ -3326,6 +3327,47 @@ gs_check "subt-14 an AGB link stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS
 D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod')"
 rr_run "$D"; rm -rf "$D"
 rr_has 'MEDIUM.*APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' && ok "subt-15 the finding is medium severity" || bad "subt-15 the finding is medium severity"
+# Identifiers, comments and license headers are not a terms link, even when they hold a counter word.
+n=15
+for c in 'let isLegal = true' 'let legalAge = 18' 'let weatherConditions = [today]' '// handle edge conditions here' 'var termsAccepted = false' 'struct TermsOfSale {}' '// Licensed under the terms of the MIT license' '/* Terms of Use go here */' '// SubscriptionStoreView later'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n not a terms link. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+done
+# A terms URL path or a translated terms phrase in a string literal is a link.
+for c in 'let u = URL(string: "https://realbackend.io/tos")' 'let u = "https://realbackend.io/user-agreement"' 'let u = "https://realbackend.io/eula"' 'let u = "https://realbackend.fr/cgv"' 'Text("使用条款")' 'Text("Kullanım Koşulları")' 'Text("Gebruiksvoorwaarden")' "Text(\"Conditions d'utilisation\")" 'Text("CGU")' 'Text("Términos de uso")' 'Text("Termini di utilizzo")' 'Text("Termos de uso")' 'Text("이용약관")'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n a terms link stays silent. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+done
+# A key resolved from a localized strings file counts when the file holds the terms phrase.
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Text("paywall.footer")')"
+printf '{"strings":{"paywall.footer":{"localizations":{"en":{"stringUnit":{"value":"Terms of Use"}}}}}}' > "$D/App/Localizable.xcstrings"
+gs_check "subt-38 a terms phrase in Localizable.xcstrings stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Text("footer")')"
+printf '"footer" = "Terms of Use";\n' > "$D/App/Localizable.strings"
+gs_check "subt-39 a terms phrase in Localizable.strings stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# Flutter and React Native reach the subscription through a plugin. Dart literals and JSX text count.
+subt_flutter() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/Runner" "$d/lib"
+  printf 'name: t\ndependencies:\n  in_app_purchase: ^3.2.0\n' > "$d/pubspec.yaml"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/Runner/Info.plist"
+  printf "const policy = 'https://realbackend.io/privacy-policy';\nfinal p = details.subscriptionPeriod;\n%s\n" "$1" > "$d/lib/paywall.dart"
+  echo "$d"
+}
+subt_rn() {
+  local d; d="$(mktemp -d)"; mkdir -p "$d/ios/App" "$d/src"
+  printf '{"dependencies":{"react-native":"0.74.0","react-native-iap":"12.0.0"}}' > "$d/package.json"
+  printf '<plist><dict><key>ITSAppUsesNonExemptEncryption</key><false/></dict></plist>' > "$d/ios/App/Info.plist"
+  printf "const policy = 'https://realbackend.io/privacy-policy';\nconst subs = await getSubscriptions({skus});\n%s\n" "$1" > "$d/src/Paywall.tsx"
+  echo "$d"
+}
+gs_check "subt-40 a Flutter subscription with no terms link is flagged" "$(subt_flutter 'final termsAccepted = false;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+gs_check "subt-41 a Flutter Text with Terms of Use stays silent" "$(subt_flutter "Text('Terms of Use')")" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+gs_check "subt-42 a React Native subscription with no terms link is flagged" "$(subt_rn 'const termsAccepted = false;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+gs_check "subt-43 React Native JSX text Terms of Use stays silent" "$(subt_rn 'return <Text onPress={open}>Terms of Use</Text>;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
 
 D="$(mk_android_perm '<application android:debuggable="true"/>')"
 gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1

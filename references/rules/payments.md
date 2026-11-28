@@ -171,15 +171,15 @@ grep -rqn 'ExternalPurchaseLink\|external-purchase-link\|openExternalPurchaseLin
 - Platform. apple
 - Guideline or policy. 3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)
 - Severity. medium
-- What triggers it. The app sells an auto-renewable subscription and no Terms of Use or EULA link appears in its sources. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
+- What triggers it. The iOS app (native, Flutter or React Native) sells an auto-renewable subscription and no Terms of Use or EULA link appears in its string literals, JSX text or localized strings files. Comments and identifiers do not count. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
 - How to fix it. Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.
 - Detection signals. subscriptionPeriod, .autoRenewable, getSubscriptions(, requestSubscription(
-- Present means handled. SubscriptionStoreView, Terms (as a word), legal, Terms of Use, termsOfUse, Terms of Service, EULA, stdeula
+- Present means handled. SubscriptionStoreView, unless storeButton(.hidden, for: .policies), Terms of Use, Terms of Service, Terms and Conditions, EULA, End User License, stdeula, Nutzungsbedingungen, a /terms, /tos, /user-agreement, /eula, /agb, /cgu or /cgv URL, a string literal Terms, Legal, Rechtliches or AGB
 
 How to detect.
 
 ```bash
-grep -rn 'subscriptionPeriod\|\.autoRenewable\|getSubscriptions(\|requestSubscription(' . && ! grep -rniE 'subscriptionstoreview|(^|[^a-z])(terms|legal|conditions|agb([^a-z]|$))|eula|nutzungsbedingungen|t[eé]rminos|termos|condizioni|利用規約|服务条款|服務條款|이용약관|услови' .   # Schedule 2 section 3.8(b), Terms of Use and Privacy Policy links in the app
+grep -rnE 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\(' . && ! grep -rniE --include='*.swift' --include='*.dart' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.strings' --include='*.xcstrings' --include='*.arb' --include='strings.xml' '["`>][^"`<]*(terms (of use|of service|and conditions|& conditions)|eula|end.user licen|stdeula|nutzungsbedingungen|/(tos|terms|user-agreement|eula|agb|cgu|cgv)[/?#."]|利用規約|使用条款|服务条款|이용약관)' . && ! grep -rnE --include='*.swift' 'SubscriptionStoreView' .   # Schedule 2 section 3.8(b). The guard also drops comments and identifiers, and ignores SubscriptionStoreView when storeButton hides .policies
 ```
 
 ## ANDROID-RESTORE-CREDENTIALS-REQUIRED
