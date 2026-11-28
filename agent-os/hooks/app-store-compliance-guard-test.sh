@@ -4066,7 +4066,7 @@ module.exports = p;"
   NOGLOBAL="$(mktemp -d)"; printf '#!/bin/sh\necho /nonexistent\n' > "$NOGLOBAL/npm"; chmod +x "$NOGLOBAL/npm"
   D="$(mk_js api.js "const a = 'https://staging.acme.io';
 const b = \"http://localhost:3000\";")"; plant_parser "$D"
-  OUT="$(BABEL_PARSER_DIR= PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
+  OUT="$(BABEL_PARSER_DIR="" PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
   sh_at 'src/api.js:2' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-51 a parser planted in the app is not loaded, the double-quoted grep runs" || bad "js-51 a parser planted in the app is not loaded, the double-quoted grep runs"
   OUT="$(bash "$GUARD" "$D" 2>&1)"
   sh_at 'src/api.js:1' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-52 with a trusted parser the planted one is still not loaded" || bad "js-52 with a trusted parser the planted one is still not loaded"
