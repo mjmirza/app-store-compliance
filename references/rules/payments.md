@@ -83,23 +83,6 @@ How to detect.
 python3 scripts/metadata-audit.py ./metadata
 ```
 
-## APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS
-
-- Title. Auto-renewable subscription without a Terms of Use link in the app
-- Platform. apple
-- Guideline or policy. 3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)
-- Severity. high
-- What triggers it. The app sells an auto-renewable subscription and no Terms of Use or EULA link appears in its sources. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
-- How to fix it. Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.
-- Detection signals. subscriptionPeriod, .autoRenewable, getSubscriptions(, requestSubscription(
-- Present means handled. SubscriptionStoreView, Terms (as a word), legal, Terms of Use, termsOfUse, Terms of Service, EULA, stdeula
-
-How to detect.
-
-```bash
-grep -rn 'subscriptionPeriod\|\.autoRenewable\|getSubscriptions(\|requestSubscription(' . && ! grep -rniE 'subscriptionstoreview|(^|[^a-z])terms|eula|legal|nutzungsbedingungen|agb|conditions|t[eé]rminos|termos|condizioni|利用規約|服务条款|服務條款|이용약관|услови' .   # Schedule 2 section 3.8(b), Terms of Use and Privacy Policy links in the app
-```
-
 ## APPLE-RESTORE-PURCHASES-MISSING
 
 - Title. Non consumable purchase without a Restore Purchases control
@@ -180,6 +163,23 @@ How to detect.
 
 ```bash
 grep -rqn 'ExternalPurchaseLink\|external-purchase-link\|openExternalPurchaseLink' . && ! grep -rqn 'Storefront\|storefront\|countryCode' .
+```
+
+## APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS
+
+- Title. Auto-renewable subscription without a Terms of Use link in the app
+- Platform. apple
+- Guideline or policy. 3.1.2(c) and Apple Developer Program License Agreement Schedule 2 section 3.8(b)
+- Severity. medium
+- What triggers it. The app sells an auto-renewable subscription and no Terms of Use or EULA link appears in its sources. Guideline 3.1.2(c) points to Schedule 2 of the Apple Developer Program License Agreement, whose section 3.8(b) says links to the Privacy Policy and the Terms of Use must be accessible within the app.
+- How to fix it. Link the Terms of Use, your own or Apple's standard EULA at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/, and the Privacy Policy from inside the app, for example on the subscription screen.
+- Detection signals. subscriptionPeriod, .autoRenewable, getSubscriptions(, requestSubscription(
+- Present means handled. SubscriptionStoreView, Terms (as a word), legal, Terms of Use, termsOfUse, Terms of Service, EULA, stdeula
+
+How to detect.
+
+```bash
+grep -rn 'subscriptionPeriod\|\.autoRenewable\|getSubscriptions(\|requestSubscription(' . && ! grep -rniE 'subscriptionstoreview|(^|[^a-z])(terms|legal|conditions|agb([^a-z]|$))|eula|nutzungsbedingungen|t[eé]rminos|termos|condizioni|利用規約|服务条款|服務條款|이용약관|услови' .   # Schedule 2 section 3.8(b), Terms of Use and Privacy Policy links in the app
 ```
 
 ## ANDROID-RESTORE-CREDENTIALS-REQUIRED

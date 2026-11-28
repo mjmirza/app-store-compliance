@@ -1,6 +1,6 @@
 # Rules. Google Play specific
 
-37 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
+39 rules in this category. Generated from data/rejection-patterns.json. Each rule names the guideline, the severity, what triggers it, and the fix.
 
 ## ANDROID-HEALTH-PERMISSIONS
 
@@ -516,6 +516,22 @@ How to detect.
 grep -rn 'abiFilters' --include='*.gradle' --include='*.kts' . | grep armeabi-v7a | grep -v arm64-v8a
 ```
 
+## GOOGLE-AGENTIC-DIGITAL-PURCHASE
+
+- Title. Digital purchase through an AI or agent outside Play Billing
+- Platform. google
+- Guideline or policy. Payments policy clarification of 29 October 2026 (Play Console Help answers 18100766, 10281818, and 9858738)
+- Severity. high
+- What triggers it. An in-app AI assistant, chat agent, or third-party embedded experience or plugin buys or initiates a purchase of digital content, credits, a subscription, or a feature. The 29 October 2026 announcement (https://support.google.com/googleplay/android-developer/answer/18100766) places this under clarifications and says enforcement standards and practices remain the same. It says: Payments: We're providing additional guidance on how our Payments policy applies to Google Play apps that facilitate digital purchases through AI or agentic experiences. The linked guidance (https://support.google.com/googleplay/android-developer/answer/10281818#AI_agentic_experience), read 26 November 2026, answers: Yes, if a Play-managed app facilitates the purchase of digital goods, services, content, features, or functionality, it must comply with Google Play's Payments policy. This applies across all implementations, including but not limited to, when the transaction is initiated within a chat agent or inside a third-party embedded app experience or plugin. The Payments policy page (https://support.google.com/googleplay/android-developer/answer/9858738), read the same day, has no AI or agentic section. Sections 1 and 2 require Google Play's billing system for paid downloads and for in-app digital goods and services. Section 4 bars leading the user to another payment method. Section 3 keeps physical goods and physical services, and the other cases it lists, outside Play Billing. Sections 8 and 9 are the enrolled alternative billing program and the enrolled program for leading the user outside the app. A digital purchase completed on a web checkout the user was not led to under section 8 or 9 is the same violation as any other digital purchase. Checked by hand. The same FAQ says a purchase of digital goods or services that can only be consumed outside of a Play-distributed app, such as web-only content never consumed in the app, does not require Google Play's billing system.
+- How to fix it. Route the purchase through Google Play's billing system, or through an alternative billing system inside the app (section 8) or an outside-the-app flow (section 9) that the app is enrolled in. Do not complete a digital purchase on a web checkout the user was not led to under those programs. Physical goods and services stay outside Play Billing under section 3. The same FAQ says a purchase of digital goods or services that can only be consumed outside of a Play-distributed app, such as web-only content never consumed in the app, does not require Google Play's billing system.
+- Detection signals. chat agent, agentic
+
+How to detect.
+
+```bash
+echo 'manual. if an in-app AI assistant, chat agent, or embedded experience buys digital content, credits, a subscription, or a feature, confirm the purchase uses Google Play billing or an enrolled Payments policy section 8 or 9 program, and is not completed on a web checkout outside those programs. Content only consumed outside any Play app, such as web-only content, is exempt'
+```
+
 ## ANDROID-ACCESSIBILITY-FONTSCALING
 
 - Title. Font scaling disabled due to dp text sizing
@@ -595,4 +611,21 @@ How to detect.
 
 ```bash
 grep -rq 'BillingClient\|com.android.billingclient' --include='*.kt' --include='*.java' --include='*.gradle' --include='*.kts' . && ! grep -rqi 'PendingRefundReviewNotification\|reviewrefund' .
+```
+
+## GOOGLE-ADAPTIVE-TIER3-ORIENTATION-LOCK
+
+- Title. Fixed orientation or resize opt-out on a foldable
+- Platform. google
+- Guideline or policy. Android adaptive app quality Tier 3, Config_Changes, tests T-Config_Orientation and T-Config_State (developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3). Required on Google Play for foldables from April 2027 (Android Developers Blog, 18 November 2026).
+- Severity. medium
+- What triggers it. From April 2027 (exact day not published) an app must meet Tier 3 (Adaptive ready) on foldables or it will no longer be able to publish or update, and it may have reduced visibility. Existing un-updated apps remain downloadable. Tier 3 requires the app to fill the display without letterboxing or compatibility mode, keep scroll position, text input, and media playback across rotation, folding, and resizing, and support multi-window. On a large screen (sw >= 600dp), including the 1:1 and 4:3 foldable emulators, the device supports every orientation regardless of android:screenOrientation and multi-window even when android:resizeableActivity is false. A manifest that sets resizeableActivity to false, or sets a fixed screenOrientation on an activity (portrait, landscape, sensorPortrait, sensorLandscape, reversePortrait, reverseLandscape, userPortrait, userLandscape, nosensor, locked), is the static opt-out. unspecified, user, fullSensor, sensor, fullUser, and behind are not locks. A value that appears only inside an XML comment does not count. This is a manual check, not a guard finding. Confirm it against the merged release manifest, because a flavor, build type, or library manifest can override the value set in src/main. Games meet a separate Tier 3 (Ready) bar from August 2027 and may render in their supported orientation and letterbox in-engine when rotated to an unsupported one.
+- How to fix it. Remove the orientation lock and the resizeableActivity opt-out, keep state across configuration changes, and test on the 1:1 and 4:3 foldable emulators.
+- Detection signals. android:resizeableActivity="false", android:screenOrientation="portrait", android:screenOrientation="landscape", android:screenOrientation="sensorPortrait", android:screenOrientation="sensorLandscape", android:screenOrientation="reversePortrait", android:screenOrientation="reverseLandscape", android:screenOrientation="userPortrait", android:screenOrientation="userLandscape", android:screenOrientation="nosensor", android:screenOrientation="locked"
+- Present means handled. android:screenOrientation="unspecified", android:screenOrientation="user", android:screenOrientation="fullSensor", android:screenOrientation="sensor", android:screenOrientation="fullUser", android:screenOrientation="behind"
+
+How to detect.
+
+```bash
+grep -rnE 'android:(resizeableActivity="false"|screenOrientation="(portrait|landscape|sensorPortrait|sensorLandscape|reversePortrait|reverseLandscape|userPortrait|userLandscape|nosensor|locked)")' --include='AndroidManifest.xml' .   # a lead only, confirm each hit in the merged release manifest, since a variant or library manifest can override it
 ```

@@ -130,7 +130,7 @@ These are limits, not bugs waiting for a fix. Plan around them.
 - **Monitor source verification.** The regulatory and privacy monitors mark a claim as corroborated when an official source shares its keywords, not when that source states the same claim. Read the official source before acting on a monitor item.
 - **Store console state.** The guard cannot see App Store Connect or Play Console, so the age rating, social media declaration, and closed testing items are reminders, not proof of a problem.
 
-## Known gaps (found by Codex and Qwen adversarial review, not yet fixed)
+## Known gaps (found in review, not yet fixed)
 
 - **Newline-containing file paths.** The `package.json`/`config.xml` scan loops
   are safe against spaces and shell metacharacters (quoted `IFS= read -r`), but

@@ -34,6 +34,7 @@ import sys
 import re
 import json
 import glob
+import unicodedata
 from urllib.parse import urlparse
 
 FIELD_LIMITS = {
@@ -158,6 +159,72 @@ def has_emoji(s):
 
 def lc(s):
     return (s or "").lower()
+
+
+_KEYWORD_MARKS_RE = re.compile(r"[\u0307\u0640\u064b-\u065f\u0670\u06d6-\u06ed]")
+
+
+def _norm_kw_text(s):
+    return _KEYWORD_MARKS_RE.sub("", unicodedata.normalize("NFC", (s or "").lower()))
+
+
+def _char_script(ch):
+    if not ch.isalpha():
+        return None
+    if ch.isascii():
+        return "LATIN"
+    o = ord(ch)
+    if (
+        0x3040 <= o <= 0x30FF
+        or 0x31F0 <= o <= 0x31FF
+        or 0x3400 <= o <= 0x4DBF
+        or 0x4E00 <= o <= 0x9FFF
+        or 0xF900 <= o <= 0xFAFF
+        or 0xFF66 <= o <= 0xFF9F
+        or 0xAC00 <= o <= 0xD7AF
+        or 0x1100 <= o <= 0x11FF
+        or 0x3130 <= o <= 0x318F
+        or 0xFFA0 <= o <= 0xFFDC
+        or 0x20000 <= o <= 0x323AF
+        or o in (0x3005, 0x3006)
+    ):
+        return "CJK"
+    name = unicodedata.name(ch, "")
+    if name.startswith(("LATIN ", "FULLWIDTH LATIN ")):
+        return "LATIN"
+    return name.split(" ", 1)[0] or "OTHER"
+
+
+def _name_words(s):
+    """Extract 3+ letter tokens from name/subtitle, splitting at script boundaries (e.g. PDF阅读器, PDFリーダー)."""
+    words = set()
+    buf = []
+    letters = 0
+    prev_script = None
+    for ch in _norm_kw_text(s):
+        sc = _char_script(ch)
+        if sc is None:
+            if buf and unicodedata.category(ch).startswith("M"):
+                buf.append(ch)
+                continue
+            if letters >= 3:
+                words.add("".join(buf))
+            buf = []
+            letters = 0
+            prev_script = None
+        elif sc == prev_script or prev_script is None:
+            buf.append(ch)
+            letters += 1
+            prev_script = sc
+        else:
+            if letters >= 3:
+                words.add("".join(buf))
+            buf = [ch]
+            letters = 1
+            prev_script = sc
+    if letters >= 3:
+        words.add("".join(buf))
+    return words
 
 
 def _word_break(raw, i, j, side):
@@ -302,8 +369,9 @@ def audit_fields(fields, check_urls=False, platform="apple"):
                 )
 
     # keywords formatting (Apple only, Google Play has no keywords field)
+    # App Store Connect accepts ASCII (,) and Chinese/fullwidth (，) commas as separators.
     if keywords and apple:
-        if ", " in keywords:
+        if re.search(r"[,\uff0c]\s", keywords):
             add(
                 findings,
                 "low",
@@ -312,8 +380,12 @@ def audit_fields(fields, check_urls=False, platform="apple"):
                 "keywords field has spaces after commas, which wastes the 100 char budget",
                 "Use commas with no spaces between keywords",
             )
-        kw = set(w for w in re.split(r"[,\s]+", lc(keywords)) if w)
-        dup = kw & set(re.findall(r"[a-z]{3,}", lc(name + " " + subtitle)))
+        kw = set(
+            w
+            for w in re.split(r"[,\uff0c\s]+", _norm_kw_text(keywords))
+            if w
+        )
+        dup = kw & _name_words(name + " " + subtitle)
         if dup:
             add(
                 findings,

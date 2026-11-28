@@ -471,6 +471,33 @@ manifest_has() {  # 0 if regex found in any AndroidManifest.xml in the source li
   [ -n "$out" ]
 }
 
+# Prints the first file:line that matches $1, or nothing. With $2 = manifest only AndroidManifest.xml counts.
+# A <uses-permission> with tools:node="remove" strips a permission that an SDK merges in, so the merged manifest
+# declares none. A removal scoped with tools:selector strips one library only, so the others still merge it in.
+permission_at() {
+  local re="$1" hits f n
+  grep_has "$re" || return 0
+  hits="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$re" 2>/dev/null)"
+  [ "${2:-}" = "manifest" ] && hits="$(grep '/AndroidManifest[.]xml$' <<< "$hits")"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$f" in */AndroidManifest.xml)  # one element per line, so a tools:node on the next line is read
+      [ -n "$(tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -Ev "tools:node[[:space:]]*=[[:space:]]*[\"']remove[\"']" ; tr '\n\r\t' '   ' < "$f" | tr '<' '\n' | grep -E -e "$re" | grep -E 'tools:selector')" ] || continue ;;
+    esac
+    n="$(grep -En -m1 -e "$re" "$f" 2>/dev/null | cut -d: -f1)"
+    printf '%s%s' "${f#"${DIR%/}"/}" "${n:+:$n}"
+    return 0
+  done <<< "$hits"
+}
+
+APPLE_SRC_RE='[.](swift|m|mm|h)$'
+apple_has() {  # 0 if regex found in a Swift or Objective-C source. Compose, Flutter and JS share names like Image( and Button
+  [ -s "$FILELIST" ] || return 1
+  local out
+  out="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$1" 2>/dev/null | head -1)"
+  [ -n "$out" ]
+}
+
 # Where a purpose string can live. Info.plist and its strings, build settings, XcodeGen, Expo config.
 CONFIG_FILES_RE='(\.plist|\.pbxproj|\.xcconfig|\.ya?ml|/project\.json|/config\.xml|/Project\.swift|/Tuist/.*\.swift|\.csproj|/app\.json|/app\.config\.[cm]?[jt]s)$'
 config_has() {  # 0 if regex found in a config file, never in Swift or Kotlin source or a comment there
@@ -485,13 +512,18 @@ SRC_EXT_RE='\.(swift|m|mm|h|kt|kts|java|js|jsx|ts|tsx|dart|cs|rs)$'
 # Only the implementation buffer is stripped. Triggers read every line raw, as in 1.0.0, so no comment rule can hide a call.
 STRIP_AWK='BEGIN { sq=sprintf("%c", 39) }
     function opener(s, m,   i) { for (i=2; i<length(s); i++) if (substr(s, i, 2) == m && substr(s, i-1, 1) ~ /[ \t;{},)]/) return i; return 0 }
-    { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { print l; next }
+    FNR == 1 { blk=0 }
+    { l=$0; if (index(l, "/") == 0 && index(l, "*") == 0) { blk=0; print l; next }
       t=l; sub(/^[ \t]+/, "", t)
       if (substr(t, 1, 2) == "//") { print ""; next }
-      if (substr(t, 1, 2) == "*/") { print substr(t, 3); next }
-      if (t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t") { print ""; next }
+      if (substr(t, 1, 2) == "*/") { blk=0; print substr(t, 3); next }
+      # With gate=1 a leading * is comment text only in the unbroken run of lines right under a line that
+      # opens /*. Any other line ends the run, so a /* misread in a string or regex hides no code (#2421).
+      if ((!gate || blk) && (t == "*" || substr(t, 1, 2) == "* " || substr(t, 1, 2) == "*\t")) { if (index(t, "*/")) blk=0; print ""; next }
       if (substr(t, 1, 2) == "/*") { r=t; sub(/[ \t]+$/, "", r); j=index(substr(r, 3), "*/")
-        if (j == 0 || j + 3 == length(r)) { print ""; next } }
+        if (j == 0) { blk=1; print ""; next }
+        if (j + 3 == length(r)) { print ""; next } }
+      blk=0
       if (tc) {
         while (index(l, "/*") && (o=opener(l, "/*")) > 0 && (c=index(substr(l, o+2), "*/")) > 0) { pre=substr(l, 1, o-1); if (pre !~ /#"/) gsub(/\\./, "", pre); gsub(/(^|[=(,:&|!?{};+*%<>~^-]|return)[ \t]*\/[^\/]+\//, " ", pre); p2=pre
           nq=gsub(/[\"`]/, "", pre); ns=gsub(sq, "", p2); if (nq % 2 || ns % 2) break; l=substr(l, 1, o-1) " ; " substr(l, o+c+3) }
@@ -553,20 +585,30 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
 release_string_has() {
   RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f m
+  local f m src
   while IFS= read -r f; do
+    # Source comments go first (issue #2413). STRIP_AWK keeps one line per line and, with gate=1, only blanks
+    # a line that itself looks like a comment, so a /* in a string or regex never hides later lines (#2421).
+    # It runs in the C locale, and the raw file is read if awk still fails, so no byte can hide a file.
+    src=""
+    if [[ "$f" =~ $SRC_EXT_RE ]]; then src="$(LC_ALL=C awk -v tc=1 -v gate=1 "$STRIP_AWK" "$f" 2>/dev/null)" || src="$(cat "$f" 2>/dev/null)"; fi
     # Removed lines print empty, so a line number counts the lines of a DEBUG block too.
     case "$f" in
       *.swift)
-        m="$(awk '
+        m="$(printf '%s\n' "$src" | LC_ALL=C awk '
           /^[ \t]*#if/    { d++; if ($0 ~ /#if[ \t]+DEBUG/ || $0 ~ /#if[ \t]+!RELEASE/) { dbg=d; skip=1 } print ""; next }
           /^[ \t]*#else/  { if (skip && d==dbg) skip=0; print ""; next }
           /^[ \t]*#elseif/ { print ""; next }
           /^[ \t]*#endif/ { if (skip && d==dbg) { skip=0; dbg=0 } d--; print ""; next }
           skip { print ""; next }
           { print }
-        ' "$f" 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
-      *) m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)" ;;
+        ' 2>/dev/null | LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" 2>/dev/null)" ;;
+      *)
+        if [[ "$f" =~ $SRC_EXT_RE ]]; then
+          m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" <<< "$src" 2>/dev/null)"
+        else
+          m="$(LC_ALL=C grep -aEn "\"[^\"]*($1)[^\"]*\"" "$f" 2>/dev/null)"
+        fi ;;
     esac
     # NOTE. no `grep -q` or `-m 1`. Either one stops reading early, the awk producer gets SIGPIPE,
     # and pipefail reports a miss though grep matched (timing-dependent, seen on the CI runner).
@@ -576,7 +618,7 @@ release_string_has() {
   return 1
 }
 
-# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship or manifest.
+# Prints the first file and line that match, relative to the scanned folder. $1 is src, ship, manifest or apple.
 # ship reads SHIPLIST, so a check that leaves test files out never names one (issue #2397).
 hit_file() {
   [ -s "$FILELIST" ] || return 0
@@ -585,6 +627,8 @@ hit_file() {
     f="$(grep '/AndroidManifest[.]xml$' "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   elif [ "$1" = "ship" ]; then
     f="$(tr '\n' '\0' < "${SHIPLIST:-$FILELIST}" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
+  elif [ "$1" = "apple" ]; then
+    f="$(grep -E "$APPLE_SRC_RE" "$FILELIST" | tr '\n' '\0' | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   else
     f="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIls -e "$2" 2>/dev/null | head -1)"
   fi
@@ -1039,6 +1083,17 @@ BLOCK_RE = re.compile(
 DT_RE = re.compile(
     r"IPHONEOS_DEPLOYMENT_TARGET(?:\[[^\]]*\])?\s*=\s*\"?([0-9]+)(?:\.[0-9]+)*\"?\s*;"
 )
+# Xcode writes an SDK-conditional key in quotes. Only the device SDK ships, and only a value
+# below the minimum is read from it, so a quoted key can add a finding but never hide one.
+QDT_RE = re.compile(r'"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"\s*=\s*"?([0-9]+)')
+CONDITIONAL_RE = re.compile(r'IPHONEOS_DEPLOYMENT_TARGET\[')
+COMMENT_RE = re.compile(r"//[^\n]*|/[*].*?[*]/", re.S)
+PROJECT_RE = re.compile(r"isa = PBXProject;.*?buildConfigurationList = (\w+)", re.S)
+TARGET_RE = re.compile(r"isa = PBXNativeTarget;((?:(?!isa = ).)*?)productType = " + chr(34) + "?([^" + chr(34) + ";]+)", re.S)
+LIST_REF_RE = re.compile(r"buildConfigurationList = (\w+)")
+ID_RE = re.compile(r"\w+")
+OWNER_RE = re.compile(r"(\w+)(?:\s*/[*][^*]*[*]/)?\s*=\s*" + re.escape(chr(123)) + r"\s*$")
+NAME_RE = re.compile(r"\s*name = ([^;]+);")
 DEPENDENCY_MARKERS = (
     "SKIP_INSTALL = YES",
     "DYLIB_INSTALL_NAME_BASE",
@@ -1060,8 +1115,38 @@ for path in sys.argv[1:]:
     except OSError:
         continue
     app, project = [], []
-    for settings in BLOCK_RE.findall(text):
+    # The PBXProject configurations are project defaults, never the settings of a target.
+    project_ids = set()
+    pbx = PROJECT_RE.search(text)
+    if pbx:
+        lst = re.search(re.escape(pbx.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+        if lst:
+            project_ids = set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
+    # When the file names its targets, only an application target configuration is read.
+    app_ids, has_targets = set(), False
+    for target in TARGET_RE.finditer(text):
+        has_targets = True
+        ref = LIST_REF_RE.search(target.group(1))
+        if ref and target.group(2) == "com.apple.product-type.application":
+            lst = re.search(re.escape(ref.group(1)) + r"\b[^=]*=\s*" + re.escape(chr(123)) + r"\s*isa = XCConfigurationList;\s*buildConfigurations = \((.*?)\);", text, re.S)
+            if lst:
+                app_ids |= set(ID_RE.findall(COMMENT_RE.sub(" ", lst.group(1))))
+    for block in BLOCK_RE.finditer(text):
+        owner = OWNER_RE.search(text[max(0, block.start() - 300):block.start()])
+        settings = block.group(1)
         flags = below(settings)
+        name = NAME_RE.match(text, block.end())
+        live = COMMENT_RE.sub(" ", settings)
+        # Only the Release configuration of an app with its own bundle id, and only when no
+        # other conditional deployment key could override the quoted one.
+        certain = ("PRODUCT_BUNDLE_IDENTIFIER" in live
+                   and not any(marker in live for marker in DEPENDENCY_MARKERS)
+                   and len(CONDITIONAL_RE.findall(live)) == len(QDT_RE.findall(live)))
+        certain = certain and not (owner and owner.group(1) in project_ids)
+        if has_targets:
+            certain = certain and bool(owner) and owner.group(1) in app_ids
+        if certain and name and name.group(1).strip().strip('"').lower() == "release":
+            flags += [True for value in QDT_RE.findall(live) if int(value) < 13]
         if not flags:
             continue
         if "PRODUCT_BUNDLE_IDENTIFIER" in settings or "PRODUCT_NAME" in settings:
@@ -1081,7 +1166,7 @@ PBXPY
     grep '[.]xcconfig$' "$FILELIST" | grep -viE '(test|framework|pods)' | tr '\n' '\0' | xargs -0 grep -EIls -e 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.' 2>/dev/null | grep . >/dev/null
   }
   if podfile_below_ios13 || pbx_below_ios13 || xcconfig_below_ios13; then
-    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.'
+    finding high "APPLE-MIN-DEPLOYMENT-TARGET-IOS13" "iOS deployment target below iOS 13" "Raise the app target IPHONEOS_DEPLOYMENT_TARGET and the Podfile platform to 13.0 or later. A lower target on a dependency or test target alone is fine. App Store Connect refuses uploads that target an earlier iOS." src 'IPHONEOS_DEPLOYMENT_TARGET(\[[^]]*\])?[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*"?[[:space:]]*(;|//|$)|platform[[:space:]]+:ios,[[:space:]]*.(8|9|10|11|12)(\.[0-9]+)*.|"IPHONEOS_DEPLOYMENT_TARGET\[sdk=iphoneos[*]\]"[[:space:]]*=[[:space:]]*"?(8|9|10|11|12)(\.[0-9]+)*'
   fi
   # App Review runs on an IPv6-only NAT64 network (2.5.5). IPv4-only socket calls fail there.
   # C, C++ and Objective-C++ sit outside the shared source list, so read the app's own ones here.
@@ -1114,9 +1199,10 @@ PBXPY
     grep_has "StoreKit|SKProduct|Product\.purchase|$XPLAT_IAP" || finding critical "APPLE-3.1.1-EXTERNAL-PAYMENT" "External payment SDK without StoreKit" "Route digital goods through in app purchase unless the app is a documented exempt category (Apple 3.1.1)." src 'Stripe|PayPalCheckout|braintree|razorpay'
   fi
   # Developer Program License Agreement Schedule 2 section 3.8(b). Privacy Policy and Terms of Use links within the app.
-  # SubscriptionStoreView shows the policy links Apple configures. Terms as a word, legal, EULA or a translation counts as a link.
+  # SubscriptionStoreView shows the policy links Apple configures. Terms, Legal, AGB as a word, EULA or a translation count.
+  # Word starts only, so illegalState, preconditions and AGBlue do not hide a missing link.
   if grep_has 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('; then
-    grep_has 'SubscriptionStoreView|(^|[^A-Za-z])([Tt]erms|TERMS)|EULA|[Ee]ula|[Ll]egal|[Nn]utzungsbedingungen|AGB|[Cc]onditions|[Tt][eé]rminos|[Tt]ermos|[Cc]ondizioni|利用規約|服务条款|服務條款|이용약관|[Уу]слови' || finding high "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
+    grep_has 'SubscriptionStoreView|(^|[^A-Za-z])([Tt]erms|TERMS|legal|conditions|AGB([^A-Za-z]|$))|(^|[^A-Z])(Legal|Conditions)|EULA|[Ee]ula|[Nn]utzungsbedingungen|[Tt][eé]rminos|[Tt]ermos|[Cc]ondizioni|利用規約|服务条款|服務條款|이용약관|[Уу]слови' || finding medium "APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS" "Auto-renewable subscription without a Terms of Use link in the app" "Link the Terms of Use (your own, or Apple's standard EULA) and the Privacy Policy from inside the app, for example on the subscription screen (Apple 3.1.2, License Agreement Schedule 2 section 3.8(b))." src 'subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\('
   fi
   if grep_has 'api\.openai\.com|anthropic|generativelanguage|chat/completions'; then
     finding medium "APPLE-5.1.2-AI-NO-CONSENT-MODAL" "Third party AI integration detected" "If personal data is sent, show a consent modal naming the AI provider and data types (Apple 5.1.2)." src 'api\.openai\.com|anthropic|generativelanguage|chat/completions'
@@ -1188,9 +1274,9 @@ PBXPY
   if grep_has 'fixed-odds|betting'; then
     finding critical "APPLE-GAMBLING-BRAZIL-LICENSE" "Fixed-odds or betting keyword detected in sources" "Provide a valid fixed-odds betting license from the Secretariat of Prizes and Bets (SPA) in App Review Info, set age rating to A18, and submit a new version to trigger verification (Apple policy May 8, 2026)." src 'fixed-odds|betting'
   fi
-  if grep_has 'Image\('; then
+  if apple_has 'Image\('; then
     if ! grep_has 'accessibilityLabel|accessibilityIdentifier|accessibilityHidden|accessibilityElement'; then
-      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)." src 'Image\('
+      finding medium "APPLE-ACCESSIBILITY-VOICEOVER" "SwiftUI Image or UIKit component without VoiceOver accessibility attribute" "Provide an accessibilityLabel or use decorative initializers (Apple Design - Accessibility)." apple 'Image\('
     fi
   fi
   if grep_has '\.system\(size:'; then
@@ -1206,9 +1292,9 @@ PBXPY
       finding medium "APPLE-ACCESSIBILITY-COLORCONTRAST" "Raw RGB UIColor without system dynamic color or high contrast checks" "Utilize dynamic named asset colors or check isDarkerSystemColorsEnabled (Apple Design - Accessibility)." src 'UIColor\(\s*red:'
     fi
   fi
-  if grep_has 'onTapGesture|Button'; then
+  if apple_has 'onTapGesture|Button'; then
     if ! grep_has 'FeedbackGenerator|CoreHaptics'; then
-      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)." src 'onTapGesture|Button'
+      finding medium "APPLE-ACCESSIBILITY-HAPTICS" "Taps or button interactions without tactile feedback" "Integrate haptic feedback generators to improve interaction accessibility (Apple Design - Accessibility)." apple 'onTapGesture|Button'
     fi
   fi
   if grep_has 'focusable'; then
@@ -1226,14 +1312,17 @@ fi
 
 # ===== Android checks =====
 if [ "$IS_AND" -eq 1 ]; then
-  if grep_has 'ACCESS_BACKGROUND_LOCATION'; then
-    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location." src 'ACCESS_BACKGROUND_LOCATION'
+  PERM_AT="$(permission_at 'ACCESS_BACKGROUND_LOCATION')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-BACKGROUND-LOCATION" "Background location permission declared" "Justify with a core feature and prominent disclosure, or use foreground location." at "$PERM_AT"
   fi
-  if grep_has 'MANAGE_EXTERNAL_STORAGE'; then
-    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case." src 'MANAGE_EXTERNAL_STORAGE'
+  PERM_AT="$(permission_at 'MANAGE_EXTERNAL_STORAGE')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-ALL-FILES" "All files access declared" "Use scoped storage. Request all files access only for a qualifying use case." at "$PERM_AT"
   fi
-  if grep_has 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'; then
-    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it." src 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)'
+  PERM_AT="$(permission_at 'android\.permission\.(READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG)')"
+  if [ -n "$PERM_AT" ]; then
+    finding critical "GOOGLE-PERM-SMS-CALLLOG" "SMS or Call Log permission declared" "Use the permissions declaration for an approved core use case, or drop it." at "$PERM_AT"
   fi
   if grep_has 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'; then
     finding critical "GOOGLE-PERM-ACCESSIBILITY-MISUSE" "AccessibilityService present" "Use it only for genuine accessibility and declare the use, or remove it." src 'BIND_ACCESSIBILITY_SERVICE|AccessibilityService'
@@ -1321,9 +1410,20 @@ if [ "$IS_AND" -eq 1 ]; then
       finding high "ANDROID-INSECURE-BACKUP" "Android allowBackup is enabled without strict filters" "Disable backups using android:allowBackup=\"false\", or restrict backup folders using dataExtractionRules." src 'allowBackup="true"'
     fi
   fi
-  if grep_has 'android:scheme'; then
+  # A scheme inside <queries> names apps this app wants to see (package visibility), not a link it handles.
+  # Each manifest is read element by element, so the first android:scheme outside <queries> and comments is named.
+  DL_AT="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -l 'android:scheme' 2>/dev/null | tr '\n' '\0' | xargs -0 awk 'BEGIN { RS = "<" } FNR == 1 { q = 0; c = 0; ln = 1 }
+    { s = $0
+      if (c) { if (s ~ /-->/) c = 0 }
+      else if (s ~ /^!--/) { if (s !~ /-->/) c = 1 }
+      else if (s ~ /^queries[^>]*\/>/) { }
+      else if (s ~ /^queries[ \t\r\n>]/) q = 1
+      else if (s ~ /^\/queries[ \t\r\n>]/) q = 0
+      else if (!q && s !~ /^!--/ && (p = index(s, "android:scheme")) > 0) { pre = substr(s, 1, p); print FILENAME ":" ln + gsub(/\n/, "", pre); exit }
+      ln += gsub(/\n/, "", s) }' 2>/dev/null | head -1)"
+  if [ -n "$DL_AT" ]; then
     if ! grep_has 'assetlinks.json'; then
-      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." src 'android:scheme'
+      finding high "BOTH-UNSAFE-DEEPLINK" "Custom URL deep link schemes declared without App Links configuration" "Configure App Links (Android) using assetlinks.json verification to prevent URL hijacking." at "${DL_AT#"${DIR%/}"/}"
     fi
   fi
   # Play Console refuses a debuggable APK or app bundle.
@@ -1516,14 +1616,21 @@ ABIPY
   fi
   # Declared permissions in AndroidManifest.xml, the surface Play enforces on (#542). English words matched prose,
   # and bare API symbols match imports, comments and vendored SDKs. READ_MEDIA_* has its own check below.
-  if manifest_has 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'; then
+  PERM_AT="$(permission_at 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)' manifest)"
+  if [ -n "$PERM_AT" ]; then
     if ! grep_has 'prominent disclosure|user consent|privacy consent|accept policy|[Pp]rominentDisclosure|[Dd]isclosureDialog|[Cc]onsentDialog|showDisclosure|requestConsent'; then
-      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." manifest 'android\.permission\.(READ_CONTACTS|WRITE_CONTACTS|READ_SMS|SEND_SMS|RECEIVE_SMS|READ_CALL_LOG|WRITE_CALL_LOG|GET_ACCOUNTS|MANAGE_EXTERNAL_STORAGE)'
+      finding critical "ANDROID-USER-DATA-DISCLOSURE" "Missing prominent disclosure for sensitive user data" "Provide a prominent in-app disclosure before collecting sensitive personal data, and obtain explicit user consent." at "$PERM_AT"
     fi
   fi
-  if grep_has 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'; then
+  # Prints the first file:line that uses the advertising ID, or nothing. A removed AD_ID permission (firebase-analytics
+  # merges one in) does not count. AD_ID after a letter or digit is the end of a longer word (THREAD_ID, UPLOAD_ID).
+  advertising_id_at() {
+    permission_at 'com\.google\.android\.gms\.permission\.AD_ID|(^|[^A-Za-z0-9])AD_ID|getAdvertisingIdInfo'
+  }
+  ADID_AT="$(advertising_id_at)"
+  if [ -n "$ADID_AT" ]; then
     if ! grep_has 'opt-out|reset AD_ID|advertisingIdConsent|delete AD_ID'; then
-      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy." src 'com\.google\.android\.gms\.permission\.AD_ID|AD_ID|getAdvertisingIdInfo'
+      finding high "ANDROID-ADVERTISING-ID" "Google Play Advertising ID usage without disclosure or opt-out" "Declare the AD_ID permission in AndroidManifest.xml and handle user opt-out or deletion requests in full compliance with Google Play policy." at "$ADID_AT"
     fi
   fi
   if grep_has 'requestPermissions|checkSelfPermission|shouldShowRequestPermissionRationale'; then

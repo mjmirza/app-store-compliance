@@ -149,8 +149,8 @@ cat << 'STEMS' > "$STEM_JSON"
 STEMS
 python3 scripts/monitor-ai-policy.py --mock "$STEM_JSON" --dir . --output-docs "$STEM_DOCS" --pr-output "$STEM_PR" >/dev/null 2>&1
 TOPICS="$(grep 'Key Topics' "$STEM_DOCS")"
-echo "$TOPICS" | grep -q "User disclosure requirements" && echo "$TOPICS" | grep -q "Safety expectations" && ok "Apple topics are matched from the stems disclose and harmful" || bad "Apple topics are matched from the stems disclose and harmful"
-echo "$TOPICS" | grep -q "Google Play AI policies" && echo "$TOPICS" | grep -q "AI-generated content disclosures" && echo "$TOPICS" | grep -q "User safety requirements" && ok "Google topics are matched from the stems policies, disclose and safe" || bad "Google topics are matched from the stems policies, disclose and safe"
+grep -q "User disclosure requirements" <<<"$TOPICS" && grep -q "Safety expectations" <<<"$TOPICS" && ok "Apple topics are matched from the stems disclose and harmful" || bad "Apple topics are matched from the stems disclose and harmful"
+grep -q "Google Play AI policies" <<<"$TOPICS" && grep -q "AI-generated content disclosures" <<<"$TOPICS" && grep -q "User safety requirements" <<<"$TOPICS" && ok "Google topics are matched from the stems policies, disclose and safe" || bad "Google topics are matched from the stems policies, disclose and safe"
 rm -f "$STEM_JSON" "$STEM_DOCS" "$STEM_PR"
 
 # Feed descriptions carry HTML. The parser keeps only the visible text, so a keyword

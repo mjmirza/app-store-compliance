@@ -97,6 +97,7 @@ For a deep-dive reference across platform best practices, see the [mobile securi
 - [ ] Every sensitive permission has a qualifying core use case and the required declaration.
 - [ ] Background location, all files access, SMS, call log, and AccessibilityService each map to a visible core feature, or are removed.
 - [ ] The app targets the current required Android API level.
+- [ ] From April 2027 the app meets adaptive Tier 3 on foldables (fills the screen, keeps state across rotation, fold, and resize, and supports multi-window) and the listing adds 3 foldable screenshots: one 1:1 unfolded inner display, one 4:3 unfolded inner display, and one 10:16 portrait folded outer screen, on top of the phone screenshots. A game supplies them in its primary orientation. Games add the screenshots from April 2027 and meet Tier 3 (Ready) from August 2027.
 - [ ] For a new personal developer account, the closed test of at least 12 testers over 14 consecutive days is complete.
 - [ ] Play Billing is used for in app digital goods.
 - [ ] The IARC content rating questionnaire is complete.
@@ -151,7 +152,7 @@ Apple.
 
 Android.
 
-- [ ] Developer identity verified if the app is distributed to Brazil, Indonesia, Singapore, or Thailand (required since 30 September 2026), and every Play package name registered in Play Console.
+- [ ] Developer identity verified if the app is distributed to Brazil, Indonesia, Singapore, or Thailand (required since 30 September 2026), and every Play package name registered in Play Console. The global rollout begins in January 2027 (month only, tracked as 1 January 2027) with Google Play, Galaxy Store, Honor, Oppo, Xiaomi, Transsion, and Vivo, then expands over several months. A limited distribution account shares to 50 authorized devices.
 - [ ] Every foreground service declares `foregroundServiceType` in the manifest with the matching permission, and each type is declared in the Play Console with a demo video.
 - [ ] No SafetyNet Attestation. attestation uses the Play Integrity API, verified server-side.
 - [ ] Play Billing Library at version 8 or later (required for new apps and updates since 31 August 2026, extension available to 1 November 2026), and digital goods route through Play Billing.
