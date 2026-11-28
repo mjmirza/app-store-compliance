@@ -1262,13 +1262,253 @@ PBXPY
   if grep_has "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"; then
     grep_has "$RESTORE_RE" || finding high "APPLE-RESTORE-PURCHASES-MISSING" "In-app purchases without a Restore Purchases control" "Add a visible Restore Purchases control. Required for non consumables." src "SKProduct|Product\\.purchase|StoreKit|$XPLAT_IAP"
   fi
+  del_follow() {  # follows the deleting code into the functions and constants it uses. WEAK<tab>file<tab>line, CLEAN or UNSURE
+    command -v python3 >/dev/null 2>&1 || { echo UNSURE; return; }
+    python3 -c "$(cat <<'DELPY'
+import re
+import sys
+
+LP, RP, LB, RB, DQ, SQ, BS = (
+    chr(40),
+    chr(41),
+    chr(123),
+    chr(125),
+    chr(34),
+    chr(39),
+    chr(92),
+)
+NL, TAB = chr(10), chr(9)
+MAX_HOPS, MAX_NAMES, MAX_BYTES = 6, 3000, 40000000
+
+
+def rx(s):
+    # Tilde stands for a backslash, the angle pair for a group.
+    return re.compile(s.replace("~", BS).replace("<?", LP + "?:").replace(">>", RP))
+
+
+TRIG = re.compile("deleteAccount|delete account")
+WEAK = re.compile("mailto:|deactivate")
+LAYOUT = rx("NSLayoutConstraint~s*~.~s*deactivate")
+STR = rx(
+    DQ + "<?~~.|[^" + DQ + "~~]>>*" + DQ + "|" + SQ + "<?~~.|[^" + SQ + "~~]>>*" + SQ
+)
+IDENT = re.compile("[A-Za-z_][A-Za-z0-9_]*")
+STOP = set(
+    """func fun function def fn let var val const static final private public protected internal
+open override async await try catch throw throws return if else guard switch case default for while do in
+self this super new nil null true false void Void String Int Bool Double Float URL some any is as
+import class struct enum interface protocol extension object record data where get set willSet didSet
+print println console log error Error Task DispatchQueue main shared""".split()
+)
+TYPEKW = set(
+    "class struct enum interface protocol extension object record data typealias".split()
+)
+MODS = "<?[A-Za-z_@][A-Za-z0-9_<>?,.~[~]]*~s+>>*"
+
+
+def scrub(line):
+    s = STR.sub(DQ + DQ, line)
+    i = s.find("//")
+    return s if i < 0 else s[:i]
+
+
+def indent(line):
+    return len(line) - len(line.lstrip())
+
+
+def is_label(text):
+    t = text.strip()
+    return t.endswith(":") and (
+        t.startswith("case ") or t.startswith("case.") or t.startswith("default")
+    )
+
+
+def block(lines, i, col):
+    # Lines of the brace block opened from column col of line i, a switch arm, an indented block, or line i.
+    depth, started, out = 0, False, []
+    for j in range(i, min(len(lines), i + 600)):
+        text = scrub(lines[j])[col if j == i else 0 :]
+        out.append(j)
+        for ch in text:
+            if ch == LB:
+                depth, started = depth + 1, True
+            elif ch == RB:
+                depth -= 1
+                if depth < 0 and not started:
+                    return [i], True
+                if started and depth == 0:
+                    return out, True
+        if not started:
+            nxt = lines[j + 1].strip() if j + 1 < len(lines) else ""
+            if not nxt.startswith(LB):
+                break
+    if started:
+        return out, False
+    head = scrub(lines[i])
+    if is_label(head):
+        out, depth = [i], 0
+        for j in range(i + 1, min(len(lines), i + 600)):
+            text = scrub(lines[j])
+            if depth == 0 and (is_label(text) or text.strip().startswith(RB)):
+                return out, True
+            depth += text.count(LB) - text.count(RB)
+            out.append(j)
+        return out, False
+    if head.rstrip().endswith(":"):
+        ind, out = indent(lines[i]), [i]
+        for j in range(i + 1, min(len(lines), i + 600)):
+            if lines[j].strip() and indent(lines[j]) <= ind:
+                break
+            out.append(j)
+        return out, True
+    return [i], True
+
+
+def fn_defs(n):
+    return [
+        rx("~b<?func|fun|function|def|fn|sub>>~s+" + n + "~b"),
+        rx("^~s*" + MODS + n + "~s*~" + LP + "[^;]*~" + LB + "~s*$"),
+        rx("^~s*" + MODS + n + "~s*~" + LP + "[^;]*=>"),
+        rx(
+            "~b"
+            + n
+            + "~s*[:=]~s*<?async~s*>>?<?function~b|~"
+            + LP
+            + "[^=;]*=>|~"
+            + LB
+            + ">>"
+        ),
+    ]
+
+
+def val_defs(n):
+    return [
+        rx(
+            "~b<?let|var|val|const|final|static|readonly|case>>~b[^=]*?~b"
+            + n
+            + "~b~s*<?:[^=]*>>?="
+            + LP
+            + "?!="
+            + RP
+        ),
+        rx("~b<?let|var|val>>~s+" + n + "~s*:[^=]*~" + LB),
+        rx("~b<?self|this>>~s*~.~s*" + n + "~s*=" + LP + "?!=" + RP),
+        rx("^~s*" + n + "~s*[:=]" + LP + "?!=" + RP + "~s*~S"),
+    ]
+
+
+def main():
+    try:
+        with open(sys.argv[1], encoding="utf-8", errors="replace") as fh:
+            paths = [p for p in fh.read().split(NL) if p]
+    except OSError:
+        print("UNSURE")
+        return
+    src, clean, where, total = {}, {}, {}, 0
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError:
+            continue
+        total += len(text)
+        if total > MAX_BYTES:
+            print("UNSURE")
+            return
+        src[p] = text.split(NL)
+        clean[p] = [scrub(x) for x in src[p]]
+        for i, c in enumerate(clean[p]):
+            for t in set(IDENT.findall(c)):
+                where.setdefault(t, []).append((p, i))
+    unsure, anchored, seen, frontier = False, False, set(), set()
+    for p, lines in src.items():
+        for i, line in enumerate(lines):
+            if not TRIG.search(line):
+                continue
+            for t in IDENT.findall(clean[p][i]):
+                if "deleteAccount" in t and any(
+                    f.search(clean[p][i]) for f in fn_defs(re.escape(t))
+                ):
+                    anchored = True
+            region, ok = block(lines, i, 0)
+            unsure = unsure or not ok
+            for j in region:
+                frontier.update(t for t in IDENT.findall(clean[p][j]) if t not in STOP)
+    if not anchored:
+        print("UNSURE")
+        return
+    for hop in range(MAX_HOPS):
+        names = sorted(t for t in frontier if t not in seen)
+        seen.update(names)
+        if len(seen) > MAX_NAMES:
+            print("UNSURE")
+            return
+        frontier, reached = set(), []
+        for name in names:
+            n = re.escape(name)
+            pats = fn_defs(n) + val_defs(n)
+            closure = rx(
+                "~b<?let|var|val|lateinit var>>~s+"
+                + n
+                + "~s*:[^=~"
+                + LB
+                + "]*" + LP + "?:->|=>" + RP + "[^=~"
+                + LB
+                + "]*$"
+            )
+            bound = rx("~b" + n + "~s*[:=]")
+            for p, i in where.get(name, []):
+                c = clean[p][i]
+                if any(w in TYPEKW for w in c.split(name)[0].split()):
+                    continue
+                if closure.search(c):
+                    unsure = True
+                    continue
+                if bound.search(c) and "mailto:" in src[p][i]:
+                    reached.append((p, i))
+                for pat in pats:
+                    m = pat.search(c)
+                    if not m:
+                        continue
+                    region, ok = block(src[p], i, m.start())
+                    unsure = unsure or not ok
+                    for j in region:
+                        reached.append((p, j))
+                        frontier.update(
+                            t for t in IDENT.findall(clean[p][j]) if t not in STOP
+                        )
+                    break
+        for p, j in reached:
+            line = src[p][j]
+            if WEAK.search(LAYOUT.sub(" ", line)):
+                print("WEAK" + TAB + p + TAB + str(j + 1))
+                return
+        if not (frontier - seen):
+            print("UNSURE" if unsure else "CLEAN")
+            return
+    print("UNSURE")
+
+
+main()
+DELPY
+  )" "$FILELIST" 2>/dev/null || echo UNSURE
+  }
   if grep_has 'deleteAccount|delete account'; then
-    # A mailto: or deactivate in the deleting file, a deactivation endpoint other than a device one, or a mailto: on a line that names deletion.
+    # The deleting file, then the code the deletion calls across files, then an account deactivation endpoint or a deletion mailto.
+    # Where the calls cannot be followed, any mailto: or deactivate counts, as before.
     DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e 'deleteAccount|delete account' 2>/dev/null | tr '\n' '\0' | xargs -0 grep -EIl -e 'mailto:|deactivate' 2>/dev/null | head -1)"
+    DEL_N=""; DEL_FOLLOW=""
+    if [ -z "$DEL_WEAK" ]; then
+      DEL_FOLLOW="$(del_follow | head -1)"
+      case "$DEL_FOLLOW" in WEAK*) DEL_WEAK="$(printf '%s\n' "$DEL_FOLLOW" | cut -f2)"; DEL_N="$(printf '%s\n' "$DEL_FOLLOW" | cut -f3)" ;; esac
+    fi
     [ -n "$DEL_WEAK" ] || DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e '/deactivate|deactivate(Account|User)' 2>/dev/null | while IFS= read -r f; do grep -E '/deactivate|deactivate(Account|User)' "$f" | grep -vqE '[Dd]evices?/deactivate' && echo "$f"; done | head -1)"
     [ -n "$DEL_WEAK" ] || DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e '([Dd]elet|[Rr]emov|[Aa]ccount).*mailto:|mailto:[^\"]*([Dd]elet|[Rr]emov|[Aa]ccount)' 2>/dev/null | head -1)"
+    if [ -z "$DEL_WEAK" ] && [ "$DEL_FOLLOW" != CLEAN ]; then
+      DEL_WEAK="$(tr '\n' '\0' < "$FILELIST" | xargs -0 grep -EIl -e 'mailto:|deactivate' 2>/dev/null | head -1)"
+    fi
     if [ -n "$DEL_WEAK" ]; then
-      DEL_N="$(grep -En -m1 -e 'mailto:|deactivate' "$DEL_WEAK" 2>/dev/null | cut -d: -f1)"
+      [ -n "$DEL_N" ] || DEL_N="$(grep -En -m1 -e 'mailto:|deactivate' "$DEL_WEAK" 2>/dev/null | cut -d: -f1)"
       finding high "APPLE-ACCOUNT-DELETION-WEAK" "Account removal may be deactivate or mailto only" "Provide genuine in app deletion of the account and its data, not a deactivate or external form." at "${DEL_WEAK#"${DIR%/}"/}${DEL_N:+:$DEL_N}"
     fi
   fi

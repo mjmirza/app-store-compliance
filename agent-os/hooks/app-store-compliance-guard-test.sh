@@ -632,6 +632,47 @@ printf 'func deleteAccount() { api.post("/users/me/deactivate") }\n' > "$D/App/A
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK ' && ok "dw-3 a deletion that only deactivates is flagged" || bad "dw-3 a deletion that only deactivates is flagged"
 rm -rf "$D"
+# The deletion is followed into the functions and constants it calls in other files.
+dw_case() {  # name expect(fire|quiet) file content [file content ...]
+  local name="$1" want="$2" D; shift 2; D="$(mktemp -d)"; mkdir -p "$D/App"
+  printf '<plist/>' > "$D/App/Info.plist"
+  while [ "$#" -ge 2 ]; do mkdir -p "$(dirname "$D/$1")"; printf '%b' "$2" > "$D/$1"; shift 2; done
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  if echo "$OUT" | grep -Eq '^  \[(CRITICAL|HIGH|MEDIUM)\] +APPLE-ACCOUNT-DELETION-WEAK '; then got=fire; else got=quiet; fi
+  [ "$got" = "$want" ] && ok "$name" || bad "$name"
+  rm -rf "$D"
+}
+dw_case "df-1 a deactivate in a service the deletion calls is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { accountService.remove() }\n' \
+  App/AccountService.swift 'func remove() { currentUser.deactivate() }\n'
+dw_case "df-2 a support mailto constant the deletion opens is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { UIApplication.shared.open(Links.supportEmail) }\n' \
+  App/Links.swift 'enum Links {\n  static let supportEmail = URL(string: "mailto:help@acme.example.io")!\n}\n'
+dw_case "df-3 a deactivate two calls away is flagged" fire \
+  App/Settings.swift 'func deleteAccount() { accountService.remove() }\n' \
+  App/AccountService.swift 'func remove() { session.end() }\n' \
+  App/Session.swift 'class Session {\n  func end() {\n    currentUser.deactivate()\n  }\n}\n'
+dw_case "df-4 a deletion through a closure that cannot be followed still reports" fire \
+  App/V.swift 'struct V {\n  var onDelete: (() -> Void)?\n  func deleteAccount() { onDelete?() }\n}\n' \
+  App/Support.swift 'let support = URL(string: "mailto:help@acme.example.io")\n'
+dw_case "df-5 a deletion switch arm that opens a mailto constant is flagged" fire \
+  App/Router.swift 'enum Route { case deleteAccount, faq }\nfunc go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    UIApplication.shared.open(Links.support)\n  case .faq:\n    break\n  }\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@acme.example.io")!\n}\n'
+dw_case "df-6 a real deletion through an API client ignores an unrelated support link" quiet \
+  App/AccountViewModel.swift 'final class AccountViewModel {\n  private let api: APIClient\n  var user: User?\n  func deleteAccount() async {\n    do {\n      try await api.deleteUser(id: user?.id ?? "")\n    } catch {\n      showError = true\n    }\n  }\n}\n' \
+  App/APIClient.swift 'final class APIClient {\n  func deleteUser(id: String) async throws {\n    try await send(path: "/users/" + id, method: "DELETE")\n  }\n  func send(path: String, method: String) async throws {\n    _ = try await URLSession.shared.data(for: URLRequest(url: base))\n  }\n}\n' \
+  App/SupportView.swift 'let contact = Link("Contact us", destination: URL(string: "mailto:help@acme.example.io")!)\n' \
+  App/Layout.swift 'func relayout(_ old: [NSLayoutConstraint]) { NSLayoutConstraint.deactivate(old) }\n'
+dw_case "df-7 a Kotlin deletion through a repository ignores a sensor deactivate" quiet \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n' \
+  App/Sensor.kt 'fun onPause() { sensor.deactivate() }\n'
+dw_case "df-8 a TypeScript deletion that opens a mailto constant is flagged" fire \
+  App/account.ts 'export async function deleteAccount() {\n  await accountApi.remove();\n}\n' \
+  App/api.ts 'export const accountApi = {\n  remove: () => Linking.openURL(SUPPORT_MAIL),\n};\n' \
+  App/links.ts 'export const SUPPORT_MAIL = "mailto:help@acme.example.io";\n'
+dw_case "df-9 a plain real deletion stays quiet" quiet \
+  App/Account.swift 'func deleteAccount() async throws {\n  try await api.delete("/users/me")\n  try await session.signOut()\n}\n'
 
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.
