@@ -4883,7 +4883,7 @@ D="$(ic_app A.swift 'import ImagePlayground
 @available(macOS, introduced: 15.4, obsoleted: 27.0)
 func legacy() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-! ic_has && ok "@available(macOS, obsoleted: 27.0) keeps the body off 27" || bad "@available(macOS, obsoleted: 27.0) keeps the body off 27"
+ic_has && ic_at 'App/A.swift:3' && ok "@available(macOS, obsoleted: 27.0) still compiles the body for iOS" || bad "@available(macOS, obsoleted: 27.0) still compiles the body for iOS"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 struct Renderer {}

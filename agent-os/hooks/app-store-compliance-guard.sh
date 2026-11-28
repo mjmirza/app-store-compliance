@@ -889,7 +889,7 @@ def obsoleted_27(code, k):
                 if args[0] in ("iOS", "iPadOS", "iOSApplicationExtension", "*"):
                     return True
                 continue
-            if a.startswith("obsoleted"):
+            if a.startswith("obsoleted") and args[0] in ("iOS", "iPadOS", "iOSApplicationExtension"):
                 v = a.split(":", 1)[-1].strip().split(".")
                 if v[0].isdigit() and (int(v[0]), int(v[1]) if len(v) > 1 and v[1].isdigit() else 0) <= (27, 0):
                     return True
