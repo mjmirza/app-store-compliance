@@ -1277,8 +1277,8 @@ LP, RP, LB, RB, DQ, SQ, BS = (
     chr(39),
     chr(92),
 )
-NL, TAB, LS, RS = chr(10), chr(9), chr(91), chr(93)
-MAX_HOPS, MAX_NAMES, MAX_BYTES = 6, 3000, 40000000
+NL, TAB, LS, RS, BQ = chr(10), chr(9), chr(91), chr(93), chr(96)
+MAX_HOPS, MAX_NAMES, MAX_BYTES, MAX_LINE = 6, 3000, 40000000, 20000
 
 
 def rx(s):
@@ -1315,7 +1315,7 @@ DEFKW = set(
 BUILTIN = set(
     """fetch print println require setTimeout setInterval clearTimeout parseInt parseFloat alert
 encodeURIComponent decodeURIComponent precondition fatalError withAnimation len str int float list
-dict range isinstance launch withContext runBlocking coroutineScope error""".split()
+dict range isinstance launch withContext runBlocking coroutineScope error async""".split()
 )
 FW_ROOTS = set(
     "firebase axios supabase window document navigator console process globalThis localStorage sessionStorage".split()
@@ -1338,7 +1338,54 @@ TYPEDEF = rx(
 )
 LOCAL = rx("~b<?let|var|val|const>>~s+<?mut~s+>>?" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP)
 HOOK = rx("^use[A-Z]")
+# A real account deletion call. CLEAN needs one of these in the code the deletion reaches.
+Q = LS + DQ + SQ + BQ + RS
+REAL = [
+    rx("[Mm]ethod~s*[:=]~s*" + Q + "DELETE" + Q),
+    rx("@DELETE~b"),
+    rx("~.~s*delete~s*~" + LP + "~s*" + Q + "~s*/?<?[A-Za-z0-9_$" + LB + "]>>"),
+    rx("~b<?axios|http|https|httpClient|HttpClient|apiClient|client|ky|got|superagent|dio|AF|Alamofire|requests>>~s*~.~s*delete~s*~" + LP),
+    rx("~b<?user|currentUser>>~s*[!?]*~s*~.~s*delete~s*~" + LP + "~s*~" + RP),
+    rx("~bauth~s*~.~s*admin~s*~.~s*deleteUser~s*~" + LP),
+    rx("~b<?Admin>>?DeleteUserCommand~b|~badminDeleteUser~s*~" + LP),
+    rx("~b<?auth0|cognito|cognitoUser|management~s*~.~s*users>>[A-Za-z]*~s*~.~s*<?deleteUser|delete>>~s*~" + LP),
+]
+SEND = rx("~.~s*<?post|delete>>~s*~" + LP + "|[Mm]ethod~s*[:=]~s*" + Q + "<?POST|DELETE>>" + Q)
+LIT = rx(DQ + "[^" + DQ + "]*" + DQ + "|" + SQ + "[^" + SQ + "]*" + SQ)
+DELPATH = re.compile("delete", re.I)
+WHO = re.compile("account|user|/me" + BS + "b", re.I)
 LABEL = rx(LS + LP + "," + RS + "~s*" + LP + "[A-Za-z_][A-Za-z0-9_]*" + RP + ":" + LP + "?!:" + RP)
+
+
+def code(line):
+    # The line without a trailing slash comment, strings kept.
+    q, k = None, 0
+    while k < len(line):
+        ch = line[k]
+        if q:
+            if ch == BS:
+                k += 1
+            elif ch == q:
+                q = None
+        elif ch in DQ + SQ + BQ:
+            q = ch
+        elif line.startswith("//", k):
+            return line[:k]
+        k += 1
+    return line
+
+
+def real_delete(line):
+    t = code(line)
+    if any(r.search(t) for r in REAL):
+        return True
+    return bool(SEND.search(t)) and any(
+        DELPATH.search(m.group(0)) and WHO.search(m.group(0)) for m in LIT.finditer(t)
+    )
+
+
+def pdepth(c, k):
+    return c[:k].count(LP) - c[:k].count(RP)
 
 
 def scrub(line):
@@ -1465,7 +1512,7 @@ def def_at(lines, cl, i, pats, js):
         return d
     for pat in pats[1:-1]:
         m = pat.search(cl[i])
-        if m:
+        if m and pdepth(cl[i], m.start()) <= 0:
             return i, m.start()
     return None
 
@@ -1538,8 +1585,8 @@ def calls(c):
             continue
         if name in CTRL or name.startswith("__"):
             continue
-        before = c[:s].split()
-        if before and before[-1] in DEFKW:
+        w = re.search("([A-Za-z_]+)[ " + TAB + "]+$", c[max(0, s - 40) : s])
+        if w and (w.start() > 0 or s <= 40) and w.group(1) in DEFKW:
             continue
         r = q + 1
         while r < len(c) and c[r] == " ":
@@ -1569,6 +1616,7 @@ def main():
         print("UNSURE")
         return
     src, clean, where, total, apptypes = {}, {}, {}, 0, set()
+    skipped = False
     for p in paths:
         try:
             with open(p, encoding="utf-8", errors="replace") as fh:
@@ -1579,6 +1627,10 @@ def main():
         if total > MAX_BYTES:
             print("UNSURE")
             return
+        if max((len(x) for x in text.split(NL)), default=0) > MAX_LINE:
+            # A minified file cannot be followed, so nothing reached through it is vouched for.
+            skipped = True
+            continue
         src[p] = text.split(NL)
         clean[p] = [scrub(x) for x in src[p]]
         for i, c in enumerate(clean[p]):
@@ -1586,7 +1638,7 @@ def main():
                 where.setdefault(t, []).append((p, i))
             for m in TYPEDEF.finditer(c):
                 apptypes.add(m.group(1))
-    state = {"unsure": False}
+    state = {"unsure": skipped, "real": False}
     frontier, called, defined = set(), [], set()
 
     def harvest(p, region, scoped):
@@ -1605,7 +1657,8 @@ def main():
             labels = set(m.start(1) for m in LABEL.finditer(c))
             for m in IDENT.finditer(c):
                 t = m.group(0)
-                if t not in STOP and t not in own and m.start() not in labels:
+                member = c[: m.start()].rstrip().endswith(".")
+                if t not in STOP and (t not in own or member) and m.start() not in labels:
                     frontier.add(t)
             for name, root, lit in calls(c):
                 if name in own:
@@ -1631,6 +1684,7 @@ def main():
                     anchored = fn = True
             region, ok = block(lines, i, 0)
             state["unsure"] = state["unsure"] or not ok
+            state["real"] = state["real"] or any(real_delete(lines[j]) for j in region)
             harvest(p, region, fn)
     if not anchored:
         print("UNSURE")
@@ -1679,8 +1733,13 @@ def main():
                 region, ok = block(src[p], d[0], d[1])
                 if d[0] != i:
                     region = list(range(i, d[0])) + region
+                k = region[0]
+                while k > 0 and k > region[0] - 5 and src[p][k - 1].strip().startswith("@"):
+                    k -= 1
+                region = list(range(k, region[0])) + region
                 state["unsure"] = state["unsure"] or not ok
                 reached.extend((p, j) for j in region)
+                state["real"] = state["real"] or any(real_delete(src[p][j]) for j in region)
                 harvest(p, region, scoped)
         for p, j in reached:
             if WEAK.search(LAYOUT.sub(" ", src[p][j])):
@@ -1692,7 +1751,8 @@ def main():
                 for nm, rt, lit in called
             ):
                 state["unsure"] = True
-            print("UNSURE" if state["unsure"] else "CLEAN")
+            # CLEAN needs a real deletion call in what the deletion reaches, not just nothing weak found.
+            print("CLEAN" if state["real"] and not state["unsure"] else "UNSURE")
             return
     print("UNSURE")
 

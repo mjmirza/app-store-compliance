@@ -743,6 +743,80 @@ fl_case "fl-df5 the follower reaches the mailto from the deletion switch arm" "W
   App/Router.swift 'enum Route { case deleteAccount, faq }\nfunc go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    UIApplication.shared.open(Links.support)\n  case .faq:\n    break\n  }\n}\n' \
   App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@acme.example.io")!\n}\n'
 
+# Evidence. A deletion is called clean only when the code it reaches makes a real deletion call and nothing weak.
+dw_case "ev-1 a Swift local that reads a mailto member in another file is flagged" fire \
+  App/Settings.swift 'func deleteAccount() {\n  guard let support = Links.support else { return }\n  UIApplication.shared.open(support)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@x.io")\n}\n'
+fl_case "ev-1b the follower chases the member a same named local reads" "WEAK App/Links.swift 2" \
+  App/Settings.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  guard let support = Links.support else { return }\n  UIApplication.shared.open(support)\n}\n' \
+  App/Links.swift 'enum Links {\n  static let support = URL(string: "mailto:help@x.io")\n}\n'
+dw_case "ev-2 a TypeScript constructor parameter closure is not a definition" fire \
+  App/controller.ts 'export class Controller {\n  constructor(private onDelete: () => void) {}\n  async deleteAccount() {\n    this.onDelete();\n  }\n}\n' \
+  App/app.ts 'const c = new Controller(() => Linking.openURL("mailto:help@x.io"));\n'
+fl_case "ev-2b a constructor parameter closure is unsure even with a real deletion" "UNSURE" \
+  App/controller.ts 'export class Controller {\n  constructor(private onDelete: () => void) {}\n  async deleteAccount() {\n    await api.delete("/users/me");\n    this.onDelete();\n  }\n}\n' \
+  App/app.ts 'const c = new Controller(() => Linking.openURL("mailto:help@x.io"));\n'
+dw_case "ev-3 a SwiftUI flag that opens a contact sheet is flagged" fire \
+  App/Account.swift 'struct AccountView: View {\n  @State private var showContact = false\n  var body: some View {\n    Button("Delete") { deleteAccount() }\n      .sheet(isPresented: $showContact) { ContactSheet() }\n  }\n  func deleteAccount() {\n    showContact = true\n  }\n}\n' \
+  App/ContactSheet.swift 'struct ContactSheet: View {\n  var body: some View {\n    Link("Email us", destination: URL(string: "mailto:help@x.io")!)\n  }\n}\n'
+dw_case "ev-4 a Kotlin navigation to a support screen is flagged" fire \
+  App/Account.kt 'fun deleteAccount() {\n  nav.navigate(Screen.Support)\n}\n' \
+  App/Router.kt 'fun route(s: Screen) {\n  when (s) {\n    Screen.Support -> startMail("mailto:help@x.io")\n  }\n}\n'
+dw_case "ev-5 a React Native navigation to a contact screen is flagged" fire \
+  App/Account.tsx 'export const deleteAccount = () => navigation.navigate(\047Contact\047);\n' \
+  App/Contact.tsx 'export default function Contact() {\n  return <Button onPress={() => Linking.openURL("mailto:help@x.io")} title="Mail" />;\n}\n'
+fl_case "ev-6 a deletion with no real deletion call is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  session.signOut()\n  showContact = true\n}\nfunc signOut() {}\n'
+fl_case "ev-7 a Firebase user delete is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() async throws {\n  try await currentUser.delete()\n}\n'
+fl_case "ev-8 a closure property declaration is unsure" "UNSURE" \
+  App/a.ts 'let onDelete: () => void;\nexport async function deleteAccount() {\n  await api.delete("/users/me");\n  onDelete();\n}\n'
+fl_case "ev-9 a mailto bound on an assignment the deletion reads is weak" "WEAK App/Config.swift 1" \
+  App/Settings.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  UIApplication.shared.open(contact)\n}\n' \
+  App/Config.swift 'func setup() { Config.shared.contact = URL(string: "mailto:help@acme.io") }\n'
+fl_case "ev-10 a deletion string with no deleting function is unsure" "UNSURE" \
+  App/S.swift 'Button("delete account") { api.delete("/users/me") }\n'
+fl_case "ev-11 a layout constraint deactivate the deletion reaches is not weak" "CLEAN" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  relayout()\n}\n' \
+  App/L.swift 'func relayout() { NSLayoutConstraint.deactivate(old) }\n'
+fl_case "ev-12 constructing an app class with a primary constructor is unsure" "UNSURE" \
+  App/Account.kt 'fun deleteAccount() {\n  Helper(ctx).run()\n}\n' \
+  App/Helper.kt 'class Helper(private val c: Ctx) {\n  fun run() { api.delete("/users/me") }\n}\n'
+fl_case "ev-13 an unclosed deleting function is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n'
+fl_case "ev-14 an unclosed callee is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() { svc.wipe() }\n' \
+  App/W.swift 'func wipe() {\n  api.delete("/users/me")\n'
+fl_case "ev-15 a React hook call needs no definition" "CLEAN" \
+  App/a.ts 'export const deleteAccount = async () => {\n  const nav = useNavigation();\n  await api.delete("/users/me");\n  nav.goBack();\n};\n'
+fl_case "ev-16 constructing an app view after a real deletion is unsure" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  api.delete("/users/me")\n  let s = ContactSheet()\n}\n' \
+  App/C.swift 'struct ContactSheet {\n  let mail = URL(string: "mailto:help@acme.io")!\n}\n'
+fl_case "ev-17 a Retrofit annotation above the called method is a real deletion" "CLEAN" \
+  App/Account.kt 'suspend fun deleteAccount() = repo.delete(userId)\n' \
+  App/Repo.kt 'class Repo(private val api: Api) {\n  suspend fun delete(id: String) = api.deleteUser(id)\n}\n' \
+  App/Api.kt 'interface Api {\n  @DELETE("users/{id}")\n  suspend fun deleteUser(@Path("id") id: String)\n}\n'
+fl_case "ev-18 a POST to an account delete path is a real deletion" "CLEAN" \
+  App/S.swift 'func deleteAccount() async throws {\n  try await api.post("/account/delete")\n}\n'
+fl_case "ev-19 a commented out deletion call is not evidence" "UNSURE" \
+  App/S.swift 'func deleteAccount() {\n  // api.delete("/users/me")\n  log()\n}\nfunc log() {}\n'
+fl_case "ev-20 an unclosed deletion switch arm is unsure" "UNSURE" \
+  App/R.swift 'func go(_ r: Route) {\n  switch r {\n  case .deleteAccount:\n    api.delete("/users/me")\n'
+EV21="$(python3 -c 'print("var a=1;" * 3000 + "function wipe(){api.delete(" + chr(34) + "/users/me" + chr(34) + ")}")')"
+fl_case "ev-21 a callee in a minified file is not followed" "UNSURE" \
+  App/a.ts 'export async function deleteAccount() {\n  await svc.wipe();\n}\n' \
+  App/bundle.js "$EV21"
+# A 2 MB minified single line file costs the follower no more than a few seconds over the check without it.
+D="$(mktemp -d)"; mkdir -p "$D/App"
+printf '<plist/>' > "$D/App/Info.plist"
+python3 -c 'print("function deleteAccount(){svc.wipe()};" + "x(1);a.b(c)(d);" * 150000)' > "$D/App/bundle.js"
+now() { python3 -c 'import time; print(time.time())'; }
+t0="$(now)"; bash "$GUARD" "$D" >/dev/null 2>&1; t1="$(now)"
+sed 's/deleteAccount/keepAccount/' "$D/App/bundle.js" > "$D/b" && mv "$D/b" "$D/App/bundle.js"
+t2="$(now)"; bash "$GUARD" "$D" >/dev/null 2>&1; t3="$(now)"
+python3 -c "import sys; sys.exit(0 if ($t1 - $t0) - ($t3 - $t2) < 5 else 1)" && ok "ev-22 a 2 MB single line file does not slow the deletion follower" || bad "ev-22 a 2 MB single line file does not slow the deletion follower"
+rm -rf "$D"
+
 # 52 A cross-platform app selling digital goods through a store plugin, and physical goods through a
 # payment SDK, is not an external-payment violation. Without the plugin it still is.
 mk_flutter_pay() {
