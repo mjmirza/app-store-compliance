@@ -740,7 +740,7 @@ def head_of(code, k):
             cur = code[j + 1:k].strip()
             # A blank line, including one that held a comment, does not end the condition.
             ends_kw = prev.split()[-1:] in (["guard"], ["if"], ["while"])
-            if cur and prev.strip() and not ends_kw and not prev.endswith((",", "&&", "||", "(")) and not cur.startswith((",", "&&", "||", ")", "else")):
+            if cur and prev.strip() and not ends_kw and not prev.endswith((",", "&&", "||", "(", "=")) and not cur.startswith((",", "&&", "||", ")", "else")):
                 break
         j -= 1
     h = " ".join(code[j + 1:k].split())
@@ -992,12 +992,49 @@ def switch_exits(body):
         nxt = here
     return True
 
+def split_top(h):
+    # The comma-separated clauses of a condition, ignoring commas inside parentheses.
+    parts, cur, depth = [], "", 0
+    for c in h:
+        depth += {"(": 1, ")": -1}.get(c, 0)
+        if c == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += c
+    return parts + [cur]
+
+def else_below_27(code, k):
+    # True when the else if holding k follows a branch whose whole condition is #available(iOS 27),
+    # so its condition is only evaluated below 27.
+    p = code.rfind("else", 0, k)
+    while p > 0:
+        b = code.rfind(chr(125), 0, p)
+        if b < 0 or code[b + 1:p].strip():
+            return False
+        m = open_of(code, b)
+        if m <= 0:
+            return False
+        ph = outer(head_of(code, m))
+        cond = ph[len("else if"):] if ph.startswith("else if") else ph[len("if"):] if ph.split(" ")[0] == "if" else None
+        if cond is None:
+            return False
+        parts = split_top(cond)
+        if len(parts) == 1 and gates_27(parts[0], ("#available(",)):
+            return True
+        if not ph.startswith("else if"):
+            return False
+        p = code.rfind("else", 0, m)
+    return False
+
 def cond_gated(code, k):
     # True when k sits in a condition after a clause such as #unavailable(iOS 27), which
     # short-circuits, so the rest of the condition never runs on 27.
     h = outer(head_of(code, k))
     if not (h.split(" ")[0] in ("if", "guard", "while") or h.startswith("else if")):
         return False
+    if h.startswith("else if") and else_below_27(code, k):
+        return True
     parts, cur, depth = [], "", 0
     for c in h:
         depth += {"(": 1, ")": -1}.get(c, 0)

@@ -5093,6 +5093,22 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "returning a multiline string is an early return" || bad "returning a multiline string is an early return"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #available(iOS 27, *) { print(27) } else if let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if condition after if #available(iOS 27) is gated" || bad "an else if condition after if #available(iOS 27) is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async { if #available(iOS 27, *), x { print(27) } else if let c = try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an else if after #available with another clause still fires" || bad "an else if after #available with another clause still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f() async { if #unavailable(iOS 27), let c =
+ try? await ImageCreator() { print(c) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a condition that wraps after = keeps its #unavailable gate" || bad "a condition that wraps after = keeps its #unavailable gate"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
