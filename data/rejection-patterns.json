@@ -1033,7 +1033,7 @@
       ],
       "counterSignals": [
         "apple-app-site-association",
-        "applinks:",
+        "applinks: in the associated domains entitlement that the Release build of the iOS app target owning the scheme Info.plist signs with",
         "assetlinks.json"
       ],
       "fix": "Use Universal Links (iOS) and App Links (Android) for secure domain-validated link routing, and sanitize all deep link parameters."
