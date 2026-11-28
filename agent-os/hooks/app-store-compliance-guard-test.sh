@@ -5023,6 +5023,38 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:8' && ok "#if with no #else still fires" || bad "#if with no #else still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, *) { switch n { case 0: if b { return }
+else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else on its own line continues the if" || bad "an else on its own line continues the if"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ b: Bool) async throws { if #available(iOS 27, *) { switch n { case 0: if b { return }
+else { print(1) }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:3' && ok "an else on its own line that falls through still fires" || bad "an else on its own line that falls through still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int) async throws {
+ if #available(iOS 27, *) {
+  switch n {
+  case 0:
+   do { return }
+   catch { return }
+  default: return
+  }
+ }
+ _ = try await ImageCreator()
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a catch on its own line continues the do" || bad "a catch on its own line continues the do"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ n: Int, _ xs: [Int]) async throws { if #available(iOS 27, *) { switch n { case 0: if xs.contains { $0 > 0 } { return } else { return }; default: return } }; _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a trailing closure in the condition is not a branch" || bad "a trailing closure in the condition is not a branch"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"

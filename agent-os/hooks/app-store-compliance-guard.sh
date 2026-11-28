@@ -779,7 +779,7 @@ def last_stmt(body, raw=False):
             depth -= 1
         nxt = body[i + 1:].lstrip(" " + chr(9))
         prev = cur.rstrip()
-        if depth == 0 and c == chr(10) and prev and ((nxt.startswith(".") and not nxt.startswith("..")) or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
+        if depth == 0 and c == chr(10) and prev and ((nxt.startswith(".") and not nxt.startswith("..")) or nxt.split(chr(123))[0].split("(")[0].strip().split(" ")[0] in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
             # A line that starts with a member access continues the statement above.
             cur += " "
         elif depth == 0 and c in (";", chr(10)):
@@ -935,6 +935,14 @@ def stmt_exits(stmt):
     tail = stmt[prev:].strip()
     if not blocks or tail:
         return False
+    # Two blocks with nothing between them mean the first was a trailing closure in the condition.
+    i = 1
+    while i < len(blocks):
+        if not gaps[i].strip():
+            del blocks[i - 1]
+            del gaps[i]
+        else:
+            i += 1
     if first == "do":
         # A do and its catches, each of which must exit.
         if gaps[0].strip() != "do" or not all(g.strip().startswith("catch") for g in gaps[1:]):
