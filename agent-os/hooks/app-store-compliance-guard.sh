@@ -791,7 +791,7 @@ def last_stmt(body, raw=False):
             depth -= 1
         nxt = body[i + 1:].lstrip(" " + chr(9))
         prev = cur.rstrip()
-        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.startswith(chr(123)) or first_word(nxt) in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
+        if depth == 0 and c == chr(10) and prev and (cur.count(chr(34) * 3) % 2 == 1 or (nxt.startswith(".") and not nxt.startswith("..")) or nxt.startswith(chr(123)) or nxt.startswith(("? ", ": ", "?? ", "&& ", "|| ", "+ ", "- ", "* ", "/ ", "== ", "!= ", "< ", "> ", "<= ", ">= ")) or first_word(nxt) in ("else", "catch") or prev.split()[-1] in ("try", "try?", "try!", "await", "return", "throw") or prev[-1] in "=+-*/&|<>?:,"):
             # A line that starts with a member access, or sits inside a multiline string, continues the statement above.
             cur += " "
         elif depth == 0 and c in (";", chr(10)):

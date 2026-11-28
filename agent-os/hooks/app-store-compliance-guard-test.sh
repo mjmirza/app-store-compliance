@@ -5151,6 +5151,20 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:5' && ok "a call after a multiline regex is still reported on its own line" || bad "a call after a multiline regex is still reported on its own line"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ b: Bool) async throws -> String { if #available(iOS 27, *) { return b
+ ? "sheet"
+ : "service" }; _ = try await ImageCreator(); return "legacy" }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "a ternary wrapped over lines after return is still a return" || bad "a ternary wrapped over lines after return is still a return"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ b: Bool) async throws -> String { if #available(iOS 27, *) { let s = b
+ ? "sheet"
+ : "service"; print(s) }; _ = try await ImageCreator(); return "legacy" }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:4' && ok "a wrapped ternary that is not returned still fires" || bad "a wrapped ternary that is not returned still fires"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func f(_ x: Bool) async {
  if #available(iOS 27, *) {
   print(27)
