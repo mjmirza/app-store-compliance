@@ -4136,6 +4136,161 @@ let api = "http://localhost:3000"')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'App/Net.swift:6' && ok "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it" || bad "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it"
 rm -rf "$D"
+# Issue #2425. React Native strips if (__DEV__) from the release build. The dev region is skipped.
+# The else, the prod side of a ternary, and any host outside the guard still fire.
+D="$(mk_rn_ship api.ts 'if (__DEV__) { fetch("http://localhost:3000"); }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-1 a localhost inside if (__DEV__) stays silent" || bad "dev-1 a localhost inside if (__DEV__) stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.tsx 'if (__DEV__) {
+  const el = <View style={{ flex: 1 }} />;
+  fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-2 a localhost inside a JSX __DEV__ block stays silent" || bad "dev-2 a localhost inside a JSX __DEV__ block stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__) {
+  fetch("http://localhost:1");
+} else {
+  fetch("https://staging.acme.io");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:4' && ok "dev-3 the else of if (__DEV__) still fires" || bad "dev-3 the else of if (__DEV__) still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const u = __DEV__
+  ? "http://localhost:3000"
+  : "https://staging.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:3' && ok "dev-4 the prod side of a __DEV__ ternary still fires" || bad "dev-4 the prod side of a __DEV__ ternary still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const u = __DEV__ ? "http://localhost:3000" : "https://api.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-5 the dev side of a __DEV__ ternary stays silent" || bad "dev-5 the dev side of a __DEV__ ternary stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (!__DEV__) {
+  fetch("https://api.acme.io");
+} else {
+  fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-6 the else of if (!__DEV__) stays silent" || bad "dev-6 the else of if (!__DEV__) stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (!__DEV__) {
+  fetch("https://staging.acme.io");
+} else {
+  fetch("https://api.acme.io");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:2' && ok "dev-7 the if branch of if (!__DEV__) still fires" || bad "dev-7 the if branch of if (!__DEV__) still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__) { fetch("http://localhost:1"); }
+const api = "http://localhost:3000";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:2' && ok "dev-8 a localhost outside __DEV__ still fires" || bad "dev-8 a localhost outside __DEV__ still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__ && flag) { fetch("http://localhost:3000"); }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:1' && ok "dev-9 a __DEV__ condition with extra terms still fires" || bad "dev-9 a __DEV__ condition with extra terms still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__) {
+fetch("http://localhost:3000");')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:2' && ok "dev-10 an unclosed __DEV__ block still fires" || bad "dev-10 an unclosed __DEV__ block still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__) fetch("http://localhost:3000");')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:1' && ok "dev-11 a __DEV__ body with no braces still fires" || bad "dev-11 a __DEV__ body with no braces still fires"
+rm -rf "$D"
+body=$(cat <<'EOF'
+if (__DEV__) { const s = 'brace { here'; }
+const api = "http://localhost:3000";
+EOF
+)
+D="$(mk_rn_ship api.ts "$body")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:2' && ok "dev-12 a brace inside a string does not hide the next host" || bad "dev-12 a brace inside a string does not hide the next host"
+rm -rf "$D"
+body=$(cat <<'EOF'
+if (__DEV__) { const s = 'brace } here'; fetch("http://localhost:3000"); }
+EOF
+)
+D="$(mk_rn_ship api.ts "$body")"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-13 a closing brace inside a string does not end the __DEV__ block" || bad "dev-13 a closing brace inside a string does not end the __DEV__ block"
+rm -rf "$D"
+D="$(mk_rn_ship api.js 'const u = __DEV__ ?? "http://localhost:3000";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.js:1' && ok "dev-14 a host after __DEV__ ?? still fires" || bad "dev-14 a host after __DEV__ ?? still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'if (__DEV__) {
+  fetch("http://localhost:1");
+} else if (ok) {
+  fetch("https://staging.acme.io");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:4' && ok "dev-15 an else if after if (__DEV__) still fires" || bad "dev-15 an else if after if (__DEV__) still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const u = !__DEV__ ? "https://api.acme.io" : "http://localhost:3000";
+const api = "https://staging.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:2' && ok "dev-16 the dev side of !__DEV__ ? prod : dev is skipped" || bad "dev-16 the dev side of !__DEV__ ? prod : dev is skipped"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const api = preview || __DEV__ ? "http://localhost:3000" : "https://api.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:1' && ok "dev-17 a ternary whose condition only contains __DEV__ still fires" || bad "dev-17 a ternary whose condition only contains __DEV__ still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const api = preview ? !__DEV__ ? "https://api.acme.io" : "http://localhost:3000" : "https://staging.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:1' && ok "dev-18 a !__DEV__ ternary nested in another ternary still fires" || bad "dev-18 a !__DEV__ ternary nested in another ternary still fires"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const api = !!__DEV__ ? "https://api.acme.io" : "http://localhost:3000";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.ts:1' && ok "dev-19 !!__DEV__ is not read as !__DEV__" || bad "dev-19 !!__DEV__ is not read as !__DEV__"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const config = { apiUrl: __DEV__ ? "http://localhost:3000" : "https://api.acme.io" };')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-20 a __DEV__ ternary as an object property value stays silent" || bad "dev-20 a __DEV__ ternary as an object property value stays silent"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const api = prod ? "https://api.acme.io" : __DEV__ ? "http://localhost:3000" : "https://beta.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-21 a __DEV__ ternary on the else side of another ternary stays silent" || bad "dev-21 a __DEV__ ternary on the else side of another ternary stays silent"
+rm -rf "$D"
+# A file over 512 KB is searched as it is, so the blanking cannot run past the hook timeout.
+D="$(mk_rn_ship big.js 'if (__DEV__) { fetch("http://localhost:3000"); }')"
+awk 'BEGIN { for (i = 0; i < 16000; i++) print "{ id: 1, label: \"Generated data\" }," }' >> "$D/src/big.js"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/big.js:1' && ok "dev-22 a file over 512 KB is searched without the __DEV__ blanking" || bad "dev-22 a file over 512 KB is searched without the __DEV__ blanking"
+rm -rf "$D"
+D="$(mk_rn_ship App.tsx 'function App() {
+ if (__DEV__) { return <Text>You'"'"'re in development</Text>; }
+ fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/App.tsx:3' && ok "dev-23 an apostrophe in JSX text does not hide a later URL" || bad "dev-23 an apostrophe in JSX text does not hide a later URL"
+rm -rf "$D"
+D="$(mk_rn_ship api.js 'function setup(payload) {
+ if (__DEV__) {
+  if (payload) /^\{/.test(payload) || console.warn("Expected JSON");
+ }
+ fetch("http://localhost:3000");
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/api.js:5' && ok "dev-24 a brace inside a regex does not hide a later URL" || bad "dev-24 a brace inside a regex does not hide a later URL"
+rm -rf "$D"
+D="$(mk_rn_ship App.tsx 'function App() {
+  const banner = !__DEV__ ? null : <Text>Dev'"'"'s on</Text>;
+  fetch("http://localhost:3000");
+  return banner;
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+sh_at 'src/App.tsx:3' && ok "dev-25 an apostrophe in JSX on the dev side of a ternary does not hide the next statement" || bad "dev-25 an apostrophe in JSX on the dev side of a ternary does not hide the next statement"
+rm -rf "$D"
+D="$(mk_rn_ship api.ts 'const u = __DEV__
+  ? "http://localhost:3000"
+  : "https://api.acme.io";')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+rr_has 'Coverage. complete ios=1' && ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "dev-26 a __DEV__ ternary split over three lines stays silent" || bad "dev-26 a __DEV__ ternary split over three lines stays silent"
+rm -rf "$D"
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"
