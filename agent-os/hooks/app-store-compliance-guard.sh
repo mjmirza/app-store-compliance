@@ -735,14 +735,23 @@ SEP = r"(\s*(&amp;|&|·|•|\||/|,|\+|(?<![a-z])(and|und|et|y)(?![a-z]))\s*|\s+)
 ANY = "(" + ITEM + "|" + PRIV + ")"
 WHOLE_RE = re.compile(r"^\W*" + ANY + "(" + SEP + ANY + r")*\W*$", re.I)
 ITEM_RE = re.compile(r"(?<![a-z])(" + ITEM + r")(?![a-z])", re.I)
-URLPATH_RE = re.compile(
-    r"/(terms([-_](of[-_](use|service)|and[-_]conditions|conditions))?|termsofuse|termsofservice|tos|eula"
-    r"|stdeula|legal|agb|cgu|cgv|user[-_]agreement)(\.(html?|php|aspx?|jsp))?(?=[/?#]|$)",
-    re.I,
+SEG_RE = re.compile(
+    r"terms|^(tou|tos|eula|stdeula|legal|agb|cgu|cgv|user[-_]agreement)(?![a-z])", re.I
 )
+SALE_RE = re.compile(r"terms[-_]?of[-_]?sale", re.I)
+DOC_EXT = ("html", "htm", "php", "aspx", "asp", "jsp", "pdf", "md", "txt")
 UI_RE = re.compile(
     r"((?<![A-Za-z0-9_])(Link|Button|Text|Label|NavigationLink|TextButton|Tab)\s*\(\s*([A-Za-z_]+\s*[:=]\s*)?"
     r"|(?<![A-Za-z0-9_])href\s*[=:]\s*\{?\s*)$"
+)
+BARE_RE = re.compile(r"(?<![A-Za-z])(Terms|TERMS|Legal|LEGAL|EULA|ToS|TOS|AGB|Rechtliches)(?![A-Za-z])")
+PAREN = BS + chr(40)
+PROP_RE = re.compile(
+    r"(\.(text|title|attributedText|placeholder)\s*=\s*|(?<![A-Za-z0-9_])set(Title|Text)\s*" + PAREN + r"\s*)$"
+)
+ASSIGN_RE = re.compile(r"(?<![A-Za-z0-9_.])([A-Za-z_][A-Za-z0-9_]*)\s*(:\s*[A-Za-z_?]+\s*)?=\s*$")
+UI_CALL = (
+    r"(?<![A-Za-z0-9_])(Link|Button|Text|Label|NavigationLink|TextButton|Tab)\s*" + PAREN + r"\s*([A-Za-z_]+\s*[:=]\s*)?"
 )
 TRIGGER_RE = re.compile(
     r"subscriptionPeriod|\.autoRenewable|getSubscriptions\(|requestSubscription\("
@@ -755,11 +764,53 @@ def norm(s):
     return " ".join(s.split())
 
 
+def seg_terms(seg):
+    seg = seg.lower()
+    stem, dot, ext = seg.rpartition(".")
+    if dot and stem:
+        if ext not in DOC_EXT:
+            return False
+        seg = stem
+    return bool(SEG_RE.search(seg)) and not SALE_RE.search(seg)
+
+
 def is_url_terms(s):
     s = s.strip()
     if not re.match(r"^(https?://\S+|/\S*)$", s):
         return False
-    return bool(URLPATH_RE.search(re.sub(r"^https?://[^/]+", "", s)))
+    path = re.split("[?#]", re.sub(r"^https?://[^/]+", "", s), maxsplit=1)[0]
+    return any(seg_terms(g) for g in path.split("/") if g)
+
+
+def md_links(body):
+    out, i = [], 0
+    while True:
+        j = body.find(chr(93) + chr(40), i)
+        if j < 0:
+            return out
+        k = body.rfind(chr(91), 0, j)
+        e = body.find(chr(41), j + 2)
+        if k >= 0 and e > j:
+            out.append((body[k + 1 : j], body[j + 2 : e].strip()))
+        i = j + 2
+
+
+def md_hit(body):
+    for label, url in md_links(body):
+        if PHRASE_RE.search(label) or is_label(label) or BARE_RE.search(label) or is_url_terms(url):
+            return True
+    return False
+
+
+def shown_var(code, name):
+    n = re.escape(name)
+    pats = (
+        UI_CALL + n + r"(?![A-Za-z0-9_])",
+        r"\.(text|title|attributedText|placeholder)\s*=\s*" + n + r"(?![A-Za-z0-9_])",
+        r"(?<![A-Za-z0-9_])set(Title|Text)\s*" + PAREN + r"\s*" + n + r"(?![A-Za-z0-9_])",
+        r">\s*\{\s*" + n + r"\s*\}",
+    )
+    return any(re.search(x, code) for x in pats)
 
 
 def is_label(s):
@@ -846,6 +897,9 @@ def source_hit(path):
         for t in re.findall(r">([^<>]+)<", text):
             if PHRASE_RE.search(t) or is_label(t):
                 return True
+        for t in re.findall(r"<a\s[^>]*>([^<>]+)</a>", text, re.I):
+            if BARE_RE.search(t):
+                return True
         for u in re.findall(
             r"href\s*=\s*[" + Q2 + Q1 + r"]([^" + Q2 + Q1 + r"]+)", text, re.I
         ):
@@ -855,13 +909,21 @@ def source_hit(path):
     ext = "." + low.rsplit(".", 1)[-1]
     code, lits = scan(text, ext)
     for body, pos in lits:
-        if is_label(body) or is_url_terms(body):
+        if is_label(body) or is_url_terms(body) or md_hit(body):
             return True
-        if UI_RE.search(code[max(0, pos - 80) : pos]) and PHRASE_RE.search(body):
+        before = code[max(0, pos - 80) : pos]
+        if UI_RE.search(before) and (PHRASE_RE.search(body) or BARE_RE.search(body)):
+            return True
+        if not PHRASE_RE.search(body):
+            continue
+        if PROP_RE.search(before):
+            return True
+        m = ASSIGN_RE.search(before)
+        if m and shown_var(code, m.group(1)):
             return True
     if ext in JSX_EXT:
         for t in jsx_texts(code, lits):
-            if PHRASE_RE.search(t) or is_label(t):
+            if PHRASE_RE.search(t) or is_label(t) or BARE_RE.search(t):
                 return True
     return False
 
@@ -876,7 +938,7 @@ def value_counts(key, val):
         return False
     if is_label(val) or is_url_terms(val):
         return True
-    if len(val.split()) <= 6 and PHRASE_RE.search(val):
+    if PHRASE_RE.search(val) or md_hit(val):
         return True
     if any(t in KEY_TOKENS for t in key_tokens(key)) and (
         PHRASE_RE.search(val) or ITEM_RE.search(val)

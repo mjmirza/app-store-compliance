@@ -3410,15 +3410,37 @@ for c in 'print("Terms of Service loaded")' 'Analytics.log("terms of use viewed"
 $c")"
   gs_check "subt-$n not a terms link. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
 done
-# A strings value counts when it is short, or its key names the terms.
+# A strings value counts when it holds a full terms phrase, or its key names the terms.
 D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
 Text("footer")')"
-printf '"footer" = "By subscribing you accept the Terms of Use and the renewal rules shown here";\n' > "$D/App/Localizable.strings"
-gs_check "subt-68 a long strings value with a terms phrase is not a link" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+printf '"footer" = "By subscribing you accept the terms and the renewal rules shown here";\n' > "$D/App/Localizable.strings"
+gs_check "subt-68 a long strings value with only a bare terms word is not a link" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
 D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
 Text("terms_link")')"
 printf '"terms_link" = "Read the legal details before you subscribe to the premium plan";\n' > "$D/App/Localizable.strings"
 gs_check "subt-69 a strings value under a terms key stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# A bare Terms or Legal word inside a UI label, a terms path segment, a markdown link, or a phrase shown in the UI counts.
+n=69
+for c in 'Link("View Terms", destination: URL(string: "https://realbackend.io/x")!)' 'Text("Read our Terms")' 'let u = "https://realbackend.io/legal-terms"' 'let u = "/subscription-terms"' 'let u = "https://realbackend.io/policies/terms-of-use-2024"' 'let u = "https://realbackend.io/docs/terms.pdf"' 'let u = "https://realbackend.io/tou"' 'let md = "You agree to our [Terms of Use](https://realbackend.io/x) today"' 'let footer = "By subscribing you agree to our Terms of Use"
+Text(footer)' 'label.text = "By subscribing you agree to our Terms of Use"' 'let t = "Read the Terms of Service"
+button.title = t'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n a terms link stays silent. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+done
+D="$(gs_ios Paywall.swift 'let period = product.subscription?.subscriptionPeriod
+Text("paywall.footer")')"
+printf '"paywall.footer" = "By subscribing you agree to our Terms of Use and Privacy Policy";\n' > "$D/App/Localizable.strings"
+gs_check "subt-81 a strings sentence with a terms phrase under any key stays silent" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+gs_check "subt-82 JSX text View Terms stays silent" "$(subt_rn 'return <Text onPress={open}>View Terms</Text>;')" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 0
+# A phrase only logged, a lowercase search word, and a tours path are still not a terms link.
+n=82
+for c in 'let m = "Terms of Use opened"
+print(m)' 'Text("Your search terms returned nothing")' 'let u = "https://realbackend.io/tours"'; do
+  n=$((n+1)); D="$(gs_ios Paywall.swift "let period = product.subscription?.subscriptionPeriod
+$c")"
+  gs_check "subt-$n not a terms link. $c" "$D" 'APPLE-3.1.2-SUBSCRIPTION-TERMS-LINKS' 1
+done
 
 D="$(mk_android_perm '<application android:debuggable="true"/>')"
 gs_check "dbg-1 debuggable true is flagged" "$D" 'ANDROID-DEBUGGABLE-RELEASE' 1
