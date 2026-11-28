@@ -4031,11 +4031,11 @@ module.exports = p;"
   # #2423 review. A backslash in a file name, and the dev-only configs, stories and test setup files.
   js_case "js-55 a double-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' 'export const a = "http://localhost:3000";'
   js_case "js-56 a single-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' "export const a = 'http://localhost:3000';"
-  js_at "js-57 a single-quoted host in next.config.js stays silent" 0 next.config.js "module.exports = { env: { API: 'http://localhost:3000' } };"
+  js_at "js-57 a single-quoted host in next.config.js env still fires, env values ship in the bundle" next.config.js:1 next.config.js "module.exports = { env: { API: 'http://localhost:3000' } };"
   js_at "js-58 a double-quoted host in next.config.js still fires, as on main" next.config.js:1 next.config.js 'module.exports = { env: { API: "http://localhost:3000" } };'
   js_at "js-59 a single-quoted host in vue.config.js stays silent" 0 vue.config.js "module.exports = { devServer: { proxy: 'http://localhost:8080' } };"
-  js_at "js-60 a single-quoted host in nuxt.config.ts stays silent" 0 nuxt.config.ts "export default { devServer: { url: 'http://localhost:3000' } };"
-  js_at "js-61 a single-quoted host in svelte.config.js stays silent" 0 svelte.config.js "export default { kit: { dev: 'http://localhost:5173' } };"
+  js_at "js-60 a single-quoted host under devServer in nuxt.config.ts stays silent" 0 nuxt.config.ts "export default { devServer: { url: 'http://localhost:3000' } };"
+  js_at "js-61 a single-quoted host outside devServer in svelte.config.js still fires" svelte.config.js:1 svelte.config.js "export default { kit: { dev: 'http://localhost:5173' } };"
   js_at "js-62 a single-quoted host in .storybook/main.js stays silent" 0 .storybook/main.js "module.exports = { url: 'http://localhost:6006' };"
   js_at "js-63 a single-quoted host in a stories file stays silent" 0 src/Button.stories.tsx "export const u = 'http://localhost:6006';"
   js_at "js-64 a single-quoted host in setupTests.ts stays silent" 0 src/setupTests.ts "global.API = 'http://localhost:3000';"
@@ -4062,6 +4062,52 @@ module.exports = p;"
   js_case "js-83 a host glued to a variable in a require() path still fires" src/a.js:1 a.js "const w = require(base + 'staging.acme.io/w.js');"
   js_case "js-84 a host folder after a dir variable in a require() path still fires" src/a.js:1 a.js 'const c = require(`${dir}/staging.acme.io/w.js`);'
   js_case "js-85 a host after a scheme variable and // in an import() template still fires" src/a.js:1 a.js 'const w = import(`${scheme}//staging.acme.io/widget.js`);'
+  # #2423 round 2. Framework configs ship values, only devServer and proxy settings are dev-only.
+  js_at "js-86 a staging host in Nuxt runtimeConfig.public fires" nuxt.config.ts:1 nuxt.config.ts "export default defineNuxtConfig({ runtimeConfig: { public: { api: 'https://staging.acme.io' } } });"
+  js_at "js-87 a staging host in Next env fires" next.config.js:1 next.config.js "module.exports = { env: { API: 'https://staging.acme.io' } };"
+  js_at "js-88 a staging host in a Vite define fires" vite.config.ts:1 vite.config.ts "export default { define: { __API__: JSON.stringify('https://staging.acme.io') } };"
+  js_at "js-89 a next.config.js inside app source is scanned in full" src/config/next.config.js:1 src/config/next.config.js "module.exports = { devServer: { proxy: 'https://staging.acme.io' } };"
+  js_at "js-90 a double-quoted devServer proxy in vue.config.js stays silent" 0 vue.config.js 'module.exports = { devServer: { proxy: "http://localhost:3000" } };'
+  js_at "js-91 a Next rewrites destination on localhost still fires" next.config.js:1 next.config.js "module.exports = { async rewrites() { return [{ source: '/api/:p*', destination: 'http://localhost:3000/:p*' }]; } };"
+  js_at "js-92 a Vite server.proxy target stays silent" 0 vite.config.ts "export default { server: { proxy: { '/api': { target: 'http://localhost:8080' } } } };"
+  js_at "js-93 a jest.config.js inside app source is scanned in full" src/config/jest.config.js:1 src/config/jest.config.js "module.exports = { testURL: 'http://localhost:3000' };"
+  js_at "js-94 a single-quoted host in a root jest.config.js stays silent" 0 jest.config.js "module.exports = { testURL: 'http://localhost:3000' };"
+  js_at "js-95 a single-quoted host in an msw handler under src/mocks stays silent" 0 src/mocks/handlers.ts "export const h = rest.get('http://localhost:3000/user', r);"
+  js_at "js-96 a single-quoted host in setupJest.ts stays silent" 0 src/setupJest.ts "global.API = 'http://localhost:3000';"
+  # A localhost that is not a backend. a hostname check, a Capacitor or Ionic origin, a dev-only branch.
+  js_case "js-97 a localhost compared with location.hostname stays silent" 0 a.js "export const dev = location.hostname === 'localhost';"
+  js_case "js-98 a double-quoted localhost compared with hostname stays silent" 0 a.js 'export const dev = "localhost" == window.location.hostname;'
+  js_case "js-99 hostname.includes localhost stays silent" 0 a.js "export const dev = url.hostname.includes('localhost');"
+  js_case "js-100 a capacitor://localhost origin stays silent" 0 a.js "export const origins = ['capacitor://localhost', \"ionic://localhost\"];"
+  js_case "js-101 a localhost in the true branch of __DEV__ stays silent" 0 a.js "export const api = __DEV__ ? 'http://localhost:3000' : 'https://api.acme.io';"
+  js_case "js-102 a localhost under NODE_ENV development stays silent" 0 a.js "let api = 'https://api.acme.io';
+if (process.env.NODE_ENV === 'development') { api = \"http://localhost:3000\"; }"
+  js_case "js-103 a localhost axios baseURL outside a dev guard fires" src/a.js:1 a.js "export const client = axios.create({ baseURL: 'http://localhost:3000' });"
+  js_case "js-104 a localhost in the false branch of __DEV__ fires" src/a.js:1 a.js "export const api = __DEV__ ? 'https://api.acme.io' : 'http://localhost:3000';"
+  js_case "js-105 a staging host in the true branch of __DEV__ still fires" src/a.js:1 a.js "export const api = __DEV__ ? 'https://staging.acme.io' : 'https://api.acme.io';"
+  js_case "js-106 a capacitor origin with a staging path still fires" src/a.js:1 a.js "export const u = 'capacitor://localhost/https://staging.acme.io';"
+  # The global parser lookup leaves no node-compile-cache behind (npm turns the cache on).
+  CC_PFX="$(mktemp -d)"; mkdir -p "$CC_PFX/lib/node_modules/@babel"; ln -s "$BABEL_PARSER_DIR" "$CC_PFX/lib/node_modules/@babel/parser"
+  CC_TMP="$(mktemp -d)"; D="$(mk_js api.ts "export const api = 'https://staging.acme.io';")"
+  OUT="$(BABEL_PARSER_DIR="" TMPDIR="$CC_TMP" npm_config_prefix="$CC_PFX" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.ts:1' && [ ! -e "$CC_TMP/node-compile-cache" ] && ok "js-107 the global parser lookup leaves no node-compile-cache in TMPDIR" || bad "js-107 the global parser lookup leaves no node-compile-cache in TMPDIR"
+  rm -rf "$D" "$CC_PFX" "$CC_TMP"
+  # A file over 4 MB is not parsed. It takes the double-quoted grep.
+  D="$(mk_js big.js x)"; { printf "export const a = 'http://localhost:3000';\n"; head -c 4300000 /dev/zero | tr '\0' ' '; printf '\n'; } > "$D/src/big.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"; ! rr_has 'APPLE-2.1-STAGING-BACKEND' && R1=1 || R1=0
+  { printf 'export const a = "http://localhost:3000";\n'; head -c 4300000 /dev/zero | tr '\0' ' '; printf '\n'; } > "$D/src/big.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  [ "$R1" = 1 ] && sh_at 'src/big.js:1' && ok "js-108 a file over 4 MB skips the parser and takes the double-quoted grep" || bad "js-108 a file over 4 MB skips the parser and takes the double-quoted grep"
+  rm -rf "$D"
+  # A file the parser returns no row for takes the double-quoted grep, never a hit with no line.
+  FN="$(mktemp -d)"; REALNODE="$(command -v node)"
+  printf '#!/bin/bash\ncase "$2" in *firstHits*) "%s" "$@" | grep -v /drop.js; exit "${PIPESTATUS[0]}" ;; esac\nexec "%s" "$@"\n' "$REALNODE" "$REALNODE" > "$FN/node"; chmod +x "$FN/node"
+  D="$(mk_js drop.js "export const a = 'http://localhost:3000';")"
+  OUT="$(PATH="$FN:$PATH" bash "$GUARD" "$D" 2>&1)"; ! rr_has 'APPLE-2.1-STAGING-BACKEND' && R1=1 || R1=0
+  printf 'export const a = "http://localhost:3000";\n' > "$D/src/drop.js"
+  OUT="$(PATH="$FN:$PATH" bash "$GUARD" "$D" 2>&1)"
+  [ "$R1" = 1 ] && sh_at 'src/drop.js:1' && ok "js-109 a file with no parser row takes the double-quoted grep" || bad "js-109 a file with no parser row takes the double-quoted grep"
+  rm -rf "$D" "$FN"
   # #2423 review. A parser planted in the scanned app is never loaded unless APP_STORE_GUARD_TRUST_PROJECT_BABEL=1.
   NOGLOBAL="$(mktemp -d)"; printf '#!/bin/sh\necho /nonexistent\n' > "$NOGLOBAL/npm"; chmod +x "$NOGLOBAL/npm"
   D="$(mk_js api.js "const a = 'https://staging.acme.io';
@@ -4082,7 +4128,7 @@ export const b = \"http://localhost:3000\";")"
   sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
   rm -rf "$D" "$NONODE"
 else
-  echo "SKIP  js-1 to js-85 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+  echo "SKIP  js-1 to js-109 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
 fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"

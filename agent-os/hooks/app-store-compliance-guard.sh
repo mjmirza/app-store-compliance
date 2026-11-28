@@ -15,7 +15,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" "$FILELIST.js" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" "$FILELIST.js" "$FILELIST.jscfg" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -587,15 +587,38 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
 # where line is the first match in any quote style and dq the first double-quoted one ("-" if none),
 # and "file<TAB>?" for a file it could not parse, which then falls back to the double-quoted grep.
 JS_STR_EXT_RE='\.(js|jsx|ts|tsx|mjs|cjs)$'
-# Test files, test folders and build and test tool configs never ship. The new quote styles do not count in
+# Test files, test folders, stories, test setup and msw mocks never ship. The new quote styles do not count in
 # them, so only today's double-quoted strings can fire there, as before (#2402).
-# Expo app.config and capacitor.config do ship, so they stay out of this list.
-JS_NOSHIP_RE='(^|/|[.])(test|spec)[.][cm]?[jt]sx?$|[.]e2e[.][cm]?[jt]sx?$|(^|/)(__tests__|__mocks__|__fixtures__|test|tests|e2e|detox|cypress|playwright|[.]storybook)/|(^|/)(playwright|jest|vitest|cypress|detox|karma|wdio|metro|babel|webpack|rollup|vite|eslint|prettier|tailwind|postcss|stylelint|commitlint|next|vue|nuxt|svelte|astro)[.]config[.][cm]?[jt]s$|[.]stories[.]([cm]?[jt]sx?|mdx)$|(^|/)(setupTests|(jest|vitest)[.]setup)[.][cm]?[jt]sx?$'
+JS_NOSHIP_RE='(^|/|[.])(test|spec)[.][cm]?[jt]sx?$|[.]e2e[.][cm]?[jt]sx?$|(^|/)(__tests__|__mocks__|__fixtures__|test|tests|e2e|detox|cypress|playwright|[.]storybook)/|(^|/)src/mocks/|[.]stories[.]([cm]?[jt]sx?|mdx)$|(^|/)(setupTests|setupJest|(jest|vitest)[.]setup)[.][cm]?[jt]sx?$'
+# Test, lint and style tool configs never ship either, but only at the scan root or a package root (#2423).
+JS_TOOLCFG_RE='^(playwright|jest|vitest|cypress|detox|karma|wdio|eslint|prettier|tailwind|postcss|stylelint|commitlint)[.]config[.][cm]?[jt]s$'
+# Build configs can put values in the bundle, so they are read in full except devServer and proxy settings.
+JS_BUILDCFG_RE='^(next|vue|nuxt|svelte|astro|vite|webpack|rollup|babel|metro)[.]config[.][cm]?[jt]s$'
+js_root_cfg() {  # $1 file, $2 name regex. True when the name matches and it sits at the scan root or a package root
+  local b="${1##*/}" d="${1%/*}"
+  [[ "$b" =~ $2 ]] || return 1
+  [ "$d" = "${DIR%/}" ] || [ -f "$d/package.json" ]
+}
 # shellcheck disable=SC2016
 JS_STRINGS_JS='const fs = require("fs");
-const [parserPath, pattern] = process.argv.slice(1);
+const [parserPath, pattern, cfgList] = process.argv.slice(1);
 const { parse } = require(parserPath);
 const re = new RegExp(pattern);
+// Build configs at a package root. A string under their devServer or proxy settings never ships.
+const CFG = new Set(cfgList ? fs.readFileSync(cfgList, "utf8").split("\n").filter(Boolean) : []);
+const DEV_KEYS = new Set(["devServer", "proxy"]);
+const keyName = (k) => !k ? null : k.type === "Identifier" ? k.name : k.type === "StringLiteral" ? k.value : null;
+// A localhost that is no backend. a dev-only branch or a hostname check holding only a localhost,
+// or a Capacitor or Ionic app origin with nothing else that matches.
+const LOCAL = /localhost|127[.]0[.]0[.]1/gi;
+const localOnly = (t) => { LOCAL.lastIndex = 0; return !re.test(t.replace(LOCAL, "")); };
+const APP_ORIGIN = /^(capacitor|ionic):\/\/localhost/i;
+const appOrigin = (t) => APP_ORIGIN.test(t) && !re.test(t.replace(APP_ORIGIN, ""));
+const hostnameRef = (a) => !!a && ((a.type === "Identifier" && a.name === "hostname") || (a.type === "MemberExpression" && !a.computed && a.property.type === "Identifier" && a.property.name === "hostname"));
+const envMember = (a) => !!a && a.type === "MemberExpression" && !a.computed && a.property.name === "NODE_ENV" && a.object.type === "MemberExpression" && !a.object.computed && a.object.property.name === "env" && a.object.object.type === "Identifier" && a.object.object.name === "process";
+// 1 when the test is true only in a dev build, -1 when it is false only there, else 0.
+const devTest = (t) => !t ? 0 : (t.type === "Identifier" && t.name === "__DEV__") ? 1 : (t.type === "UnaryExpression" && t.operator === "!") ? -devTest(t.argument) : (t.type === "BinaryExpression" && /^={2,3}$/.test(t.operator) && ((envMember(t.left) && plainText(t.right) === "development") || (envMember(t.right) && plainText(t.left) === "development"))) ? 1 : 0;
+const DEVSRV = 1, LOCALOK = 2;
 const TS_CODE = /^TS(AsExpression|SatisfiesExpression|NonNullExpression|TypeAssertion|InstantiationExpression|ParameterProperty|EnumDeclaration|EnumBody|EnumMember|ExportAssignment|ModuleDeclaration|ModuleBlock)$/;
 const FLOW_TYPE = new Set(["TypeAlias", "OpaqueType", "InterfaceDeclaration", "TypeAnnotation", "TypeParameterDeclaration", "TypeParameterInstantiation", "DeclareModule", "DeclareModuleExports", "DeclareVariable", "DeclareFunction", "DeclareClass", "DeclareTypeAlias", "DeclareOpaqueType", "DeclareInterface", "DeclareExportDeclaration", "DeclareExportAllDeclaration"]);
 const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", "leadingComments", "trailingComments", "innerComments", "tokens"]);
@@ -639,21 +662,32 @@ const pathKeys = (n, amd, cont) => n.type === "BinaryExpression" ? (n.operator =
 // Keys whose values continue a file path already seen, so their own first piece need not start with . or /.
 const contKey = (n, k) => k === "arguments" || ((n.type === "TemplateLiteral" || n.type === "BinaryExpression") && k !== "quasis");
 const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
-function firstHits(ast) {
+function firstHits(ast, isCfg) {
   let best = null, dq = null;
   const stack = [ast.program];
+  // Bits a node passes to its children. DEVSRV under a devServer or proxy key, LOCALOK in a dev-only branch.
+  const bits = new WeakMap();
   // Nodes inside a module path: the first argument of require(), import() or require.resolve(), and the source
   // of a static import or export. A string there is a piece of a module path unless it is a URL (#2423 review).
   const inPath = new WeakSet(), amd = new WeakSet(), cont = new WeakSet();
-  const push = (v, path, more) => { if (path && v && typeof v === "object") { inPath.add(v); if (more) cont.add(v); } stack.push(v); };
+  let nb = 0, extra = null;
+  const push = (v, path, more) => { if (v && typeof v === "object") { if (path) { inPath.add(v); if (more) cont.add(v); } const b = nb | (extra ? extra(v) : 0); if (b) bits.set(v, (bits.get(v) | 0) | b); } stack.push(v); };
+  const mark = (v, b) => { if (v && typeof v === "object") bits.set(v, (bits.get(v) | 0) | b); };
   while (stack.length) {
     const n = stack.pop();
+    nb = (n && typeof n === "object") ? (bits.get(n) | 0) : 0; extra = null;
     if (Array.isArray(n)) { for (const c of n) push(c, inPath.has(n), cont.has(n)); continue; }
     if (!n || typeof n.type !== "string" || typeOnly(n)) continue;
     let text = null;
     if (n.type === "StringLiteral") text = n.value;
     else if (n.type === "TemplateElement") text = n.value.cooked == null ? n.value.raw : n.value.cooked;
-    if (text !== null && re.test(text) && (!inPath.has(n) || URL_LIKE.test(text))) {
+    // The value of a devServer or proxy key in a build config, and both sides of a hostname check.
+    if (isCfg && (n.type === "ObjectProperty" || n.type === "ObjectMethod") && !n.computed && DEV_KEYS.has(keyName(n.key))) extra = (v) => v === n.key ? 0 : DEVSRV;
+    if (n.type === "BinaryExpression" && /^[!=]={1,2}$/.test(n.operator) && (hostnameRef(n.left) || hostnameRef(n.right))) { mark(n.left, LOCALOK); mark(n.right, LOCALOK); }
+    if (n.type === "CallExpression" && n.callee.type === "MemberExpression" && !n.callee.computed && n.callee.property.name === "includes" && hostnameRef(n.callee.object)) mark(n.arguments[0], LOCALOK);
+    if (n.type === "ConditionalExpression" || n.type === "IfStatement") { const d = devTest(n.test); if (d) mark(d > 0 ? n.consequent : n.alternate, LOCALOK); }
+    const quiet = text !== null && ((nb & DEVSRV) || ((nb & LOCALOK) && localOnly(text)) || appOrigin(text));
+    if (text !== null && !quiet && re.test(text) && (!inPath.has(n) || URL_LIKE.test(text))) {
       if (best === null || n.start < best.start) best = n;
       if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
     }
@@ -688,7 +722,7 @@ for (const f of fs.readFileSync(0, "utf8").split("\n")) {
   let ast;
   try { ast = parse(code, { sourceType: "unambiguous", errorRecovery: false, allowReturnOutsideFunction: true, allowImportExportEverywhere: true, allowAwaitOutsideFunction: true, allowUndeclaredExports: true, plugins: plugins.concat(["decorators-legacy"]) }); }
   catch (e) { out.push(f + "\t?"); continue; }
-  const [hit, dq] = firstHits(ast);
+  const [hit, dq] = firstHits(ast, CFG.has(f));
   out.push(f + "\t" + (hit ? hit.loc.start.line : "-") + "\t" + (dq ? dq.loc.start.line : "-"));
 }
 process.stdout.write(out.join("\n") + (out.length ? "\n" : ""));'
@@ -725,7 +759,10 @@ js_strings() {  # $1 regex. Writes $FILELIST.js and returns 0 when Node and @bab
   local parser
   parser="$(js_parser)"
   [ -n "$parser" ] || return 1
-  grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}" | node -e "$JS_STRINGS_JS" "$parser" "$1" > "$FILELIST.js" 2>/dev/null
+  local f
+  : > "$FILELIST.jscfg" 2>/dev/null || return 1
+  while IFS= read -r f; do js_root_cfg "$f" "$JS_BUILDCFG_RE" && printf '%s\n' "$f"; done < <(grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}") > "$FILELIST.jscfg"
+  grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}" | node -e "$JS_STRINGS_JS" "$parser" "$1" "$FILELIST.jscfg" > "$FILELIST.js" 2>/dev/null
 }
 # RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
@@ -736,7 +773,7 @@ release_string_has() {
   while IFS= read -r f; do
     # A JS or TS file Babel read is decided by its strings alone. One it could not parse takes the path below.
     if [ "$js" -eq 1 ] && [[ "$f" =~ $JS_STR_EXT_RE ]]; then
-      if [[ "${f#"${DIR%/}"/}" =~ $JS_NOSHIP_RE ]]; then r=3; else r=2; fi
+      if [[ "${f#"${DIR%/}"/}" =~ $JS_NOSHIP_RE ]] || js_root_cfg "$f" "$JS_TOOLCFG_RE"; then r=3; else r=2; fi
       # The path goes through ENVIRON, since awk -v would turn a backslash in a file name into an escape.
       r="$(ASCG_F="$f" awk -v c="$r" 'BEGIN { f = ENVIRON["ASCG_F"] "\t"; n = length(f) } substr($0, 1, n) == f { split(substr($0, n + 1), a, "\t"); print (a[1] == "?") ? "?" : a[c - 1]; exit }' "$FILELIST.js" 2>/dev/null)"
       # A file with no row was never read by Babel, so it takes the double-quoted grep below.
