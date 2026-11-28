@@ -5131,6 +5131,26 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ic_has && ic_at 'App/A.swift:2' && ok "a call named returnValue is not a return and still fires" || bad "a call named returnValue is not a return and still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+let diagnosticPattern = /ImageCreator(.+)/')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside a regex literal is not a call" || bad "ImageCreator inside a regex literal is not a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let p = #/
+  ImageCreator(.+)
+/#')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "ImageCreator inside an extended regex literal is not a call" || bad "ImageCreator inside an extended regex literal is not a call"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+let p = #/
+  x
+/#
+func f() async throws { _ = try await ImageCreator() }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:5' && ok "a call after a multiline regex is still reported on its own line" || bad "a call after a multiline regex is still reported on its own line"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func f(_ x: Bool) async {
  if #available(iOS 27, *) {
   print(27)

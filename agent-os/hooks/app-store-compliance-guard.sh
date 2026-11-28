@@ -1254,6 +1254,21 @@ def walk(text, i, end, line, stop_paren):
             if got:
                 return got, i, line
             continue
+        if h and j < end and text[j] == "/":
+            # An extended regex literal #/.../# holds pattern text, never a call.
+            close = text.find("/" + "#" * h, j + 1, end)
+            stop_at = end if close < 0 else close + 1 + h
+            line += text.count(chr(10), i, stop_at)
+            i = stop_at
+            continue
+        if ch == "/" and text[i + 1:i + 2] not in ("", " ", "=", chr(10), "/", "*") and (text[:i].rstrip()[-1:] in ("=", "(", ",", ":", "[", chr(123), "!", "&", "|", "?", ";") or text[:i].rstrip().endswith("return")):
+            # A bare regex literal /.../ on one line.
+            r = i + 1
+            while r < end and text[r] not in ("/", chr(10)):
+                r += 2 if text[r] == chr(92) else 1
+            if r < end and text[r] == "/":
+                i = r + 1
+                continue
         if ch == "@" and i + 1 < end and text[i + 1] == '"':
             got, i, line = skip_delim(text, i + 1, end, line, 0, False, True)
             if got:
