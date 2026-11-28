@@ -693,7 +693,8 @@ js_parser() {  # prints the path of a trusted @babel/parser, or nothing
     g="$(cd "$BABEL_PARSER_DIR" && pwd -P)" && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g" "$d" 2>/dev/null)"
   fi
   if [ -z "$p" ] && command -v npm >/dev/null 2>&1; then
-    g="$(cd / && npm root -g 2>/dev/null)"
+    # npm turns on Node's compile cache, which would leave node-compile-cache in $TMPDIR after the scan.
+    g="$(cd / && NODE_DISABLE_COMPILE_CACHE=1 npm root -g 2>/dev/null)"
     [ -n "$g" ] && [ -d "$g/@babel/parser" ] && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g/@babel/parser" "$d" 2>/dev/null)"
   fi
   printf '%s' "$p"
