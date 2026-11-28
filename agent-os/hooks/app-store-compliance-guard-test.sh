@@ -5020,7 +5020,7 @@ func f() async throws {
  _ = try await ImageCreator()
 }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
-ic_has && ic_at 'App/A.swift:7' && ok "#if with no #else still fires" || bad "#if with no #else still fires"
+ic_has && ic_at 'App/A.swift:8' && ok "#if with no #else still fires" || bad "#if with no #else still fires"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
