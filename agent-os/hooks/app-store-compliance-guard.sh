@@ -1211,39 +1211,246 @@ PBXPY
   fi
   if grep_has 'CFBundleURLSchemes'; then
     # The app side of Universal Links is an applinks: entry in the associated domains entitlement. The file is on the website.
-    # It counts outside an XML comment and outside a Debug file or folder, never with ?mode=developer (development-signed apps only).
-    # A project file names the entitlements each configuration signs with. Only a non-Debug one counts then.
+    # Only the file a Release configuration of an app target signs with counts. Unresolved signing counts nothing, as before.
     release_entitlements() {
       command -v python3 >/dev/null 2>&1 || return 0
       grep '[.]pbxproj$' "$FILELIST" | tr '\n' '\0' | xargs -0 python3 -c "$(cat <<'ENTPY'
-import re
+import os
 import sys
 
-OPEN, CLOSE, DQ = chr(123), chr(125), chr(34)
-BLOCK = re.compile("isa = XCBuildConfiguration;.*?buildSettings = " + re.escape(OPEN) + "(.*?)" + re.escape(CLOSE) + ";" + "[^;]*?name = ([^;]+);", re.S)
-ENT = re.compile("CODE_SIGN_ENTITLEMENTS[^=]*= *" + DQ + "?([^;" + DQ + "]+)")
-for path in sys.argv[1:]:
+LB, RB, LP, RP, DQ, NL, BS = chr(123), chr(125), chr(40), chr(41), chr(34), chr(10), chr(92)
+PUNCT = LB + RB + LP + RP + "=;,"
+KEY = "CODE_SIGN_ENTITLEMENTS"
+UNSURE = object()
+
+
+def tokens(text):
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c.isspace():
+            i += 1
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif text.startswith("//", i):
+            j = text.find(NL, i)
+            i = n if j < 0 else j + 1
+        elif c == DQ:
+            j, buf = i + 1, []
+            while j < n and text[j] != DQ:
+                if text[j] == BS and j + 1 < n:
+                    j += 1
+                buf.append(text[j])
+                j += 1
+            out.append(("s", "".join(buf)))
+            i = j + 1
+        elif c in PUNCT:
+            out.append(("p", c))
+            i += 1
+        else:
+            j = i
+            while j < n and not text[j].isspace() and text[j] not in PUNCT and text[j] != DQ and not text.startswith("/*", j):
+                j += 1
+            out.append(("s", text[i:j]))
+            i = j
+    return out
+
+
+def parse(toks, k):
+    kind, val = toks[k]
+    if kind == "p" and val == LB:
+        obj, k = dict(), k + 1
+        while toks[k] != ("p", RB):
+            key = toks[k][1]
+            value, k = parse(toks, k + 2)
+            obj[key] = value
+            if toks[k] == ("p", ";"):
+                k += 1
+        return obj, k + 1
+    if kind == "p" and val == LP:
+        arr, k = [], k + 1
+        while toks[k] != ("p", RP):
+            value, k = parse(toks, k)
+            arr.append(value)
+            if toks[k] == ("p", ","):
+                k += 1
+        return arr, k + 1
+    return val, k + 1
+
+
+def xcconfig(path, depth=0):
+    if depth > 8:
+        return UNSURE
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
+            lines = fh.read().splitlines()
     except OSError:
-        continue
-    for block in BLOCK.finditer(text):
-        if "debug" in block.group(2).lower():
+        return UNSURE
+    found = dict()
+    for line in lines:
+        s = line.strip()
+        if s.startswith("#include"):
+            rest = s[len("#include"):]
+            optional = rest.startswith("?")
+            name = rest.lstrip("?").strip().strip(DQ)
+            if "$" in name or not name:
+                return UNSURE
+            inc = name if os.path.isabs(name) else os.path.join(os.path.dirname(path), name)
+            if optional and not os.path.exists(inc):
+                continue
+            sub = xcconfig(inc, depth + 1)
+            if sub is UNSURE:
+                return UNSURE
+            found.update(sub)
             continue
-        for value in ENT.findall(block.group(1)):
-            print(value.replace("$(SRCROOT)/", "").strip())
+        s = s.split("//", 1)[0]
+        if "=" not in s:
+            continue
+        key, value = s.split("=", 1)
+        key = key.replace(" ", "")
+        if key == KEY or key.startswith(KEY + "["):
+            found[key] = value.strip().rstrip(";").strip().strip(DQ)
+    return found
+
+
+def pick(settings):
+    if settings is UNSURE:
+        return UNSURE
+    plain, device, other = None, None, False
+    for key, value in settings.items():
+        key = key.replace(" ", "")
+        if key == KEY and isinstance(value, str):
+            plain = value
+        elif key == KEY + "[sdk=iphoneos*]" and isinstance(value, str):
+            device = value
+        elif key.startswith(KEY + "[") and "iphonesimulator" not in key:
+            other = True
+    if device is not None:
+        return device
+    if plain is not None:
+        return plain
+    return UNSURE if other else None
+
+
+def resolve(value, proj_dir, names):
+    value = value.strip()
+    if not value:
+        return ""
+    for var, real in names.items():
+        for form in ("$" + LP + var + RP, "$" + LB + var + RB):
+            value = value.replace(form, real)
+    if "$" in value:
+        return UNSURE
+    if not os.path.isabs(value):
+        value = os.path.join(proj_dir, value)
+    return os.path.normpath(value)
+
+
+def file_path(objects, parents, ref, proj_dir):
+    parts, cur = [], ref
+    for _ in range(64):
+        node = objects.get(cur)
+        if not isinstance(node, dict):
+            return UNSURE
+        if node.get("path"):
+            parts.append(node["path"])
+        tree = node.get("sourceTree", "<group>")
+        if tree == "<group>" and cur in parents:
+            cur = parents[cur]
+            continue
+        if tree == "<absolute>":
+            return os.path.normpath(os.path.join(*reversed(parts)))
+        if tree in ("<group>", "SOURCE_ROOT"):
+            return os.path.normpath(os.path.join(proj_dir, *reversed(parts)))
+        return UNSURE
+    return UNSURE
+
+
+def base_settings(objects, parents, cfg, proj_dir):
+    ref = cfg.get("baseConfigurationReference")
+    if not ref:
+        return dict()
+    path = file_path(objects, parents, ref, proj_dir)
+    if path is UNSURE:
+        return UNSURE
+    if not os.path.exists(path):
+        # CocoaPods writes its xcconfigs at install time and never sets this key.
+        pods = "Pods" in path.split(os.sep) or os.path.basename(path).startswith("Pods-")
+        return dict() if pods else UNSURE
+    return xcconfig(path)
+
+
+def configs(objects, list_id):
+    lst = objects.get(list_id)
+    if not isinstance(lst, dict):
+        return []
+    return [objects[c] for c in lst.get("buildConfigurations", []) if isinstance(objects.get(c), dict)]
+
+
+def release_only(cfgs):
+    named = [c for c in cfgs if str(c.get("name", "")).lower() == "release"]
+    return named or [c for c in cfgs if "debug" not in str(c.get("name", "")).lower()]
+
+
+for pbx in sys.argv[1:]:
+    try:
+        with open(pbx, encoding="utf-8", errors="replace") as fh:
+            root, _ = parse(tokens(fh.read()), 0)
+    except (OSError, IndexError, TypeError):
+        continue
+    if not isinstance(root, dict):
+        continue
+    objects = root.get("objects", root)
+    if not isinstance(objects, dict):
+        continue
+    proj_dir = os.path.dirname(os.path.dirname(os.path.abspath(pbx)))
+    proj_name = os.path.splitext(os.path.basename(os.path.dirname(os.path.abspath(pbx))))[0]
+    parents = dict()
+    for oid, obj in objects.items():
+        if isinstance(obj, dict) and isinstance(obj.get("children"), list):
+            for child in obj["children"]:
+                parents[child] = oid
+    project = next((o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "PBXProject"), None)
+    project_cfgs = configs(objects, project.get("buildConfigurationList")) if project else []
+    by_name = dict((str(c.get("name", "")), c) for c in project_cfgs)
+    targets = [o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "PBXNativeTarget"]
+    work = []
+    for t in targets:
+        if t.get("productType") == "com.apple.product-type.application":
+            work.append((str(t.get("name", "")), release_only(configs(objects, t.get("buildConfigurationList")))))
+    if not targets:
+        loose = [o for o in objects.values() if isinstance(o, dict) and o.get("isa") == "XCBuildConfiguration"
+                 and o not in project_cfgs and "PRODUCT_BUNDLE_IDENTIFIER" in (o.get("buildSettings") or dict())]
+        work.append(("", release_only(loose)))
+    for target_name, cfgs in work:
+        names = dict(PROJECT_DIR=proj_dir, SRCROOT=proj_dir, SOURCE_ROOT=proj_dir, PROJECT_NAME=proj_name)
+        if target_name:
+            names["TARGET_NAME"] = target_name
+        for cfg in cfgs:
+            levels = [cfg]
+            if str(cfg.get("name", "")) in by_name:
+                levels.append(by_name[str(cfg.get("name", ""))])
+            value = None
+            for level in levels:
+                for settings in (level.get("buildSettings") or dict(), base_settings(objects, parents, level, proj_dir)):
+                    value = pick(settings)
+                    if value is not None:
+                        break
+                if value is not None:
+                    break
+            if isinstance(value, str):
+                path = resolve(value, proj_dir, names)
+                if isinstance(path, str) and path:
+                    print(path)
 ENTPY
 )" 2>/dev/null
     }
     applinks_prod() {
       local ents; ents="$(release_entitlements)"
-      grep -E '[.](entitlements|plist)$' "$FILELIST" | while IFS= read -r f; do
-        if [ -n "$ents" ] && [ "${f%.entitlements}" != "$f" ]; then
-          printf '%s\n' "$ents" | while IFS= read -r e; do case "$f" in */"$e") echo y ;; esac; done | grep -q . || continue
-        else
-          case "${f#"${DIR%/}"/}" in *[Dd]ebug*|*DEBUG*) continue ;; esac
-        fi
+      [ -n "$ents" ] || return 1
+      printf '%s\n' "$ents" | while IFS= read -r f; do
+        [ -f "$f" ] || continue
         tr '\n' ' ' < "$f" | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -v 'mode=developer' || true
       done | grep -q .
     }

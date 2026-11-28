@@ -226,7 +226,7 @@ grep -rn 'UserDefaults.standard.set\|getSharedPreferences' . | grep -i 'token\|p
 How to detect.
 
 ```bash
-{ grep -rln 'CFBundleURLSchemes' . && ! grep -rlq 'apple-app-site-association' . && ! { find . \( -name '*.entitlements' -o -name '*.plist' \) ! -ipath '*debug*' -exec cat {} + | tr '\n' ' ' | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -qv 'mode=developer'; }; } || { grep -rln 'android:scheme' . && ! grep -rlq 'assetlinks.json' .; }
+{ grep -rln 'CFBundleURLSchemes' . && ! grep -rlq 'apple-app-site-association' . && ! { grep -rhoE '"?CODE_SIGN_ENTITLEMENTS(\[sdk=iphoneos\*\])?"? *= *[^;]+' --include='project.pbxproj' --include='*.xcconfig' . | grep -iv debug | sed -E 's/^"?CODE_SIGN_ENTITLEMENTS(\[[^]]*\])?"? *= *"?//; s/ *\/\/.*$//; s/"? *$//; s/^\$.(PROJECT_DIR|SRCROOT|SOURCE_ROOT).\///' | sort -u | while IFS= read -r e; do cat "$e" 2>/dev/null; done | tr '\n' ' ' | sed -E 's/<!--([^-]|-[^-])*-->//g' | grep -oE 'applinks:[^<[:space:]]+' | grep -qv 'mode=developer'; }; } || { grep -rln 'android:scheme' . && ! grep -rlq 'assetlinks.json' .; }
 ```
 
 ## RN-OTA-UNDECLARED

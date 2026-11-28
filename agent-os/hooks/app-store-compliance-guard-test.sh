@@ -1270,61 +1270,74 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
 ! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "612-12 a mitigation in another file still pairs with its trigger" || bad "612-12 a mitigation in another file still pairs with its trigger (rc=$RC)"
 rm -rf "$D"
 # The app side of Universal Links is the associated domains entitlement. The apple-app-site-association file is on the website.
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-1 an applinks associated domain counts as Universal Links" || bad "dl-1 an applinks associated domain counts as Universal Links (rc=$RC)"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><!-- <string>applinks:acme.example.io</string> --></array></dict></plist>' > "$D/App/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-comment an applinks entry inside an XML comment does not count" || bad "dl-comment an applinks entry inside an XML comment does not count"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=developer</string></array></dict></plist>' > "$D/App/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-dev a developer-mode applinks entry does not count" || bad "dl-dev a developer-mode applinks entry does not count"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Debug.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug an applinks entry only in a Debug entitlements file does not count" || bad "dl-debug an applinks entry only in a Debug entitlements file does not count"
-rm -rf "$D"
-D="$(mk_ios_clean)"; mkdir -p "$D/App/Debug"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Debug/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-debug-dir an applinks entry only under a Debug folder does not count" || bad "dl-debug-dir an applinks entry only under a Debug folder does not count"
-rm -rf "$D"
-D="$(mk_ios_clean)"; mkdir -p "$D/App.xcodeproj"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:qa.acme.io</string></array></dict></plist>' > "$D/App/Development.entitlements"
+# Only the entitlements a Release configuration of the app target signs with count. dl_pbx DIR DEBUG RELEASE [RELEASE-EXTRA].
+DL_AL='<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io</string></array></dict></plist>'
+dl_app() {
+  local d; d="$(mk_ios_clean)"
+  printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$d/App/Scheme.plist"
+  echo "$d"
+}
+dl_pbx() {
+  mkdir -p "$1/App.xcodeproj"
+  printf '// !$*UTF8*$!\n{\n objects = {\n  P1 = {isa = PBXProject; buildConfigurationList = PL; mainGroup = G0; };\n  G0 = {isa = PBXGroup; children = (G1, ); sourceTree = "<group>"; };\n  G1 /* Config */ = {isa = PBXGroup; children = (F1 /* Release.xcconfig */, ); path = Config; sourceTree = "<group>"; };\n  F1 = {isa = PBXFileReference; path = Release.xcconfig; sourceTree = "<group>"; };\n  PL = {isa = XCConfigurationList; buildConfigurations = (PD, PR, ); };\n  PD = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; }; name = Debug; };\n  PR = {isa = XCBuildConfiguration; buildSettings = {SDKROOT = iphoneos; }; name = Release; };\n  T1 /* App */ = {isa = PBXNativeTarget; buildConfigurationList = TL; name = App; productType = "com.apple.product-type.application"; };\n  TL = {isa = XCConfigurationList; buildConfigurations = (TD /* Debug */, TR /* Release */, ); };\n  TD = {\n   isa = XCBuildConfiguration;\n   buildSettings = {\n    %s\n    PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n   };\n   name = Debug;\n  };\n  TR = {\n   isa = XCBuildConfiguration;\n   %s\n   buildSettings = {\n    %s\n    PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n   };\n   name = Release;\n  };\n };\n rootObject = P1;\n}\n' "$2" "${4:-}" "$3" > "$1/App.xcodeproj/project.pbxproj"
+}
+dl_check() {  # dl_check NAME DIR WANT, where WANT 1 means the finding fires
+  local out; out="$(bash "$GUARD" "$2" 2>&1)"
+  if echo "$out" | grep -q 'BOTH-UNSAFE-DEEPLINK'; then [ "$3" = 1 ] && ok "$1" || bad "$1"
+  else [ "$3" = 0 ] && ok "$1" || bad "$1"; fi
+  rm -rf "$2"
+}
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-1 an applinks domain in the Release entitlements counts as Universal Links" "$D" 0
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-2 a wildcard applinks domain counts as Universal Links" "$D" 0
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>webcredentials:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-3 a webcredentials only associated domain is still flagged" "$D" 1
+D="$(dl_app)"
+dl_check "dl-4 a URL scheme with no Universal Links is flagged" "$D" 1
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><!-- <string>applinks:acme.example.io</string> --></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-comment an applinks entry inside an XML comment does not count" "$D" 1
+D="$(dl_app)"; printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:acme.example.io?mode=developer</string></array></dict></plist>' > "$D/App/App.entitlements"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-dev a developer-mode applinks entry does not count" "$D" 1
+D="$(dl_app)"; mkdir -p "$D/App.xcodeproj"
+printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Development.entitlements"
 printf '{\n R1 = {\n isa = XCBuildConfiguration;\n buildSettings = {\n CODE_SIGN_ENTITLEMENTS = App/Release.entitlements;\n PRODUCT_BUNDLE_IDENTIFIER = com.x.app;\n };\n name = Release;\n };\n}\n' > "$D/App.xcodeproj/project.pbxproj"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && ok "dl-signing an entitlements file no release configuration signs with does not count" || bad "dl-signing an entitlements file no release configuration signs with does not count"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>applinks:*.acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"; RC=$?
-! echo "$OUT" | grep -q 'UNSAFE-DEEPLINK' && [ "$RC" -eq 0 ] && ok "dl-2 a wildcard applinks domain counts as Universal Links" || bad "dl-2 a wildcard applinks domain counts as Universal Links (rc=$RC)"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-printf '<plist><dict><key>com.apple.developer.associated-domains</key><array><string>webcredentials:acme.example.io</string></array></dict></plist>' > "$D/App/App.entitlements"
-OUT="$(bash "$GUARD" "$D" 2>&1)"
-echo "$OUT" | grep -q 'BOTH-UNSAFE-DEEPLINK' && ok "dl-3 a webcredentials only associated domain is still flagged" || bad "dl-3 a webcredentials only associated domain is still flagged"
-rm -rf "$D"
-D="$(mk_ios_clean)"
-printf '<plist><dict><key>CFBundleURLSchemes</key><array><string>acme</string></array></dict></plist>' > "$D/App/Scheme.plist"
-OUT="$(bash "$GUARD" "$D" 2>&1)"
-echo "$OUT" | grep -q 'BOTH-UNSAFE-DEEPLINK' && ok "dl-4 a URL scheme with no Universal Links is flagged" || bad "dl-4 a URL scheme with no Universal Links is flagged"
-rm -rf "$D"
+dl_check "dl-signing an entitlements file no release configuration signs with does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"; printf '<plist><dict/></plist>' > "$D/App/Development.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = App/Development.entitlements;' '"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "$(PROJECT_DIR)/App/App.entitlements";'
+dl_check "dl-vars an SDK-conditional key with PROJECT_DIR resolves to the signed file" "$D" 0
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/App/Entitlements.plist";'
+dl_check "dl-plist a signed entitlements file named .plist counts" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+printf '#include? "Missing.xcconfig"\n#include "Shared.xcconfig"\n' > "$D/Config/Release.xcconfig"
+printf 'CODE_SIGN_ENTITLEMENTS = App/$(TARGET_NAME).entitlements // signed\n' > "$D/Config/Shared.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig signing set through an included xcconfig counts" "$D" 0
+D="$(dl_app)"; mkdir -p "$D/Config"; printf '<plist><dict/></plist>' > "$D/App/Release.entitlements"; printf '%s' "$DL_AL" > "$D/App/Staging.entitlements"
+printf '#include "Shared.xcconfig"\n' > "$D/Config/Release.xcconfig"
+printf 'CODE_SIGN_ENTITLEMENTS = $(SRCROOT)/App/Release.entitlements\n' > "$D/Config/Shared.xcconfig"
+dl_pbx "$D" '' '' 'baseConfigurationReference = F1;'
+dl_check "dl-xcconfig-unsigned an entitlements file the xcconfig does not sign does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Dev.entitlements"
+dl_pbx "$D" 'CODE_SIGN_ENTITLEMENTS = App/Dev.entitlements;' ''
+dl_check "dl-debug an entitlements file only the Debug configuration signs does not count" "$D" 1
+D="$(dl_app)"; printf '<plist><dict/></plist>' > "$D/App/App.entitlements"; printf '%s' "$DL_AL" > "$D/App/Staging-Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = App/App.entitlements;'
+dl_check "dl-plist-unsigned an unsigned .plist with applinks does not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' 'CODE_SIGN_ENTITLEMENTS = $(MY_DIR)/App/Entitlements.plist;'
+dl_check "dl-unresolved a signing path with an unknown variable counts nothing" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/Entitlements.plist"
+dl_pbx "$D" '' '"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = App/Entitlements.plist;'
+dl_check "dl-simulator entitlements only the simulator SDK signs do not count" "$D" 1
+D="$(dl_app)"; printf '%s' "$DL_AL" > "$D/App/App.entitlements"
+dl_check "dl-no-project without a project file the applinks entry counts nothing, as before" "$D" 1
 
 # ===== Issue #612. Review findings, pinned =====
 # The project root is itself an Expo app and a nested Expo app lives under it. The child must not vouch for the root.
