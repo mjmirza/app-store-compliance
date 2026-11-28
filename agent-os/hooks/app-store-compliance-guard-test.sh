@@ -3911,6 +3911,225 @@ let api = "http://localhost:3000"')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
 sh_at 'App/Net.swift:6' && ok "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it" || bad "cmt-15 a /* inside a Swift raw multiline string does not hide the lines after it"
 rm -rf "$D"
+# Issue #2402. JS and TS strings in every quote style, read by @babel/parser from the scanned app.
+# CI installs @babel/parser globally. Elsewhere set BABEL_PARSER_DIR, or these print SKIP. The guard reads it
+# from BABEL_PARSER_DIR or the global npm root, never from the scanned app.
+BABEL_PARSER_DIR="${BABEL_PARSER_DIR:-$(npm root -g 2>/dev/null)/@babel/parser}"; export BABEL_PARSER_DIR
+mk_js() { mk_rn_ship "$@"; }  # a React Native app whose src/$1 holds $2
+plant_parser() {  # $1 app. A fake @babel/parser in its node_modules that leaves a MARKER file when loaded
+  mkdir -p "$1/node_modules/@babel/parser"
+  printf '{"name":"@babel/parser","main":"index.js"}\n' > "$1/node_modules/@babel/parser/package.json"
+  printf 'require("fs").writeFileSync(require("path").join(__dirname, "MARKER"), "ran");\nmodule.exports = {};\n' > "$1/node_modules/@babel/parser/index.js"
+}
+js_case() {  # name, expect (file:line that fires, or 0 for silent), file name, file content
+  local d; d="$(mk_js "$3" "$4")"
+  OUT="$(bash "$GUARD" "$d" 2>&1)"
+  if [ "$2" = 0 ]; then ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "$1" || bad "$1"
+  else sh_at "$2" && ok "$1" || bad "$1"; fi
+  rm -rf "$d"
+}
+if command -v node >/dev/null 2>&1 && [ -f "$BABEL_PARSER_DIR/package.json" ]; then
+  js_case "js-1 a single-quoted staging URL fires" src/api.ts:1 api.ts "export const api = 'https://staging.acme.io';"
+  js_case "js-2 a template-literal localhost URL fires" src/api.ts:2 api.ts 'const port = 3000;
+export const api = `http://localhost:${port}/v1`;'
+  js_case "js-3 a host after a nested \${...} in a template fires" src/api.ts:1 api.ts 'export const api = `${`https://`}${"x"}staging.acme.io/${1 + 1}`;'
+  js_case "js-4 a single-quoted URL in a JSX attribute fires" src/App.tsx:1 App.tsx "export const A = () => <WebView source={{ uri: 'http://localhost:8081' }} />;"
+  js_case "js-5 a double-quoted URL still fires" src/api.js:1 api.js 'export const api = "http://localhost:3000";'
+  js_case "js-6 a host in a comment after an apostrophe string stays silent" 0 api.ts "const s = \"don't\"; // try 'http://localhost:3000'
+export const api = 'https://api.acme.io';"
+  js_case "js-7 JSX text that quotes a host stays silent" 0 App.tsx 'export const A = () => <Text>Open "http://localhost:3000" in a browser</Text>;'
+  js_case "js-8 a multi-line union type alias with a leading | stays silent" 0 env.ts "type Env =
+  | 'https://staging.acme.io'
+  | 'https://api.acme.io';
+export const env: Env = 'https://api.acme.io';"
+  js_case "js-9 an interface with generic arguments stays silent" 0 cfg.ts "interface Cfg extends Base<'http://localhost:1'> { url: 'http://localhost:3000' }
+export const n = 1;"
+  js_case "js-10 typeof in a type position stays silent" 0 map.ts "const MAP = { a: 1 };
+type K = (typeof MAP)['http://localhost:3000'];
+export const k = 1;"
+  js_case "js-11 a regex literal with quotes stays silent" 0 re.js 'export const re = /"http:\/\/localhost:3000"/;'
+  js_case "js-12 an import path stays silent" 0 api.ts "import cfg from './staging.config';
+export default cfg;"
+  js_case "js-13 a Flow type alias stays silent, its code string fires" src/api.js:3 api.js "// @flow
+type T = 'http://localhost:1';
+export const api = 'https://staging.acme.io';"
+  js_case "js-14 a file Babel cannot parse falls back to the double-quoted grep" src/api.js:2 api.js 'export const = {
+const api = "http://localhost:3000";'
+  js_case "js-16 a string in a TypeScript namespace fires, a declare module stays silent" src/api.ts:2 api.ts "declare module 'x' { const u: 'http://localhost:1'; }
+namespace Cfg { export const api = 'https://staging.acme.io'; }"
+  D="$(mk_js index.ts "import './api.test';")"
+  printf "const a = 'http://localhost:1';\n" > "$D/src/api.test.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-17 a single-quoted host in an imported test file stays silent" || bad "js-17 a single-quoted host in an imported test file stays silent"
+  printf "const a = 'http://localhost:1';\nconst b = \"http://localhost:2\";\n" > "$D/src/api.test.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.test.ts:2' && ok "js-18 a double-quoted host in an imported test file still fires, as before" || bad "js-18 a double-quoted host in an imported test file still fires, as before"
+  rm -rf "$D"
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  printf "export default { use: { baseURL: 'http://localhost:8100' } };\n" > "$D/playwright.config.ts"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-19 a single-quoted host in playwright.config.ts stays silent" || bad "js-19 a single-quoted host in playwright.config.ts stays silent"
+  rm -rf "$D"
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  mkdir -p "$D/src/url" "$D/detox"
+  printf "export const u = 'http://localhost:8065';\n" > "$D/src/url/test.ts"
+  printf "export const c = 'http://localhost:3000';\n" > "$D/src/TestCtrls.e2e.tsx"
+  printf "module.exports = 'http://localhost:3000';\n" > "$D/detox/server.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent" || bad "js-20 single-quoted hosts in test.ts, .e2e.tsx and detox/ stay silent"
+  rm -rf "$D"
+  js_case "js-21 a single-quoted require() path stays silent" 0 api.js "const cfg = require('./staging.config');
+module.exports = cfg;"
+  js_case "js-22 a single-quoted dynamic import() path stays silent" 0 api.ts "export const m = import('./staging.config');"
+  js_case "js-23 a double-quoted require() path stays silent too" 0 api.js 'const cfg = require("./staging.config");
+module.exports = cfg;'
+  js_case "js-24 a URL passed to fetch() still fires" src/api.ts:1 api.ts "export const r = fetch('http://localhost:3000');"
+  # RequireJS (common in Cordova apps) configures its loader with require.config(), whose first argument
+  # is an options object that can hold a real backend URL, so only require.resolve() names a module path.
+  js_case "js-25 a double-quoted URL in require.config() still fires" src/api.js:1 api.js 'require.config({baseUrl: "http://localhost:3000/scripts"});'
+  js_case "js-26 a single-quoted URL in require.config() fires" src/api.js:1 api.js "require.config({baseUrl: 'http://localhost:3000/scripts'});"
+  js_case "js-27 a single-quoted require.resolve() path stays silent" 0 api.js "const p = require.resolve('./staging.config');
+module.exports = p;"
+  # #2423 review. Only a relative or bare module specifier is a module path. A URL, or any other expression, is read.
+  js_case "js-28 a template-literal require.resolve() path stays silent" 0 loader.js "const p = require.resolve(\`./staging.config\`);
+module.exports = p;"
+  js_case "js-29 a require['resolve']() path stays silent" 0 loader.js "const p = require['resolve']('./staging.config');
+module.exports = p;"
+  js_case "js-30 a URL passed to import() still fires" src/loader.js:1 loader.js 'export const widget = import(/* webpackIgnore: true */ "http://localhost:3000/widget.js");'
+  js_case "js-31 a URL inside an expression passed to import() still fires" src/loader.js:1 loader.js 'export const mod = import(fetch("http://localhost:3000/module-name").then(r => r.text()));'
+  js_case "js-32 a URL passed to require() still fires" src/loader.js:1 loader.js 'const w = require("http://localhost:3000/widget.js");'
+  js_case "js-33 a URL in a static import still fires" src/loader.js:1 loader.js 'import "http://localhost:3000/polyfill.js";'
+  js_case "js-34 an AMD require() array of module paths stays silent" 0 loader.js "require(['./staging.config'], callback);"
+  js_case "js-35 a require() path built with + stays silent" 0 loader.js "const c = require('./staging.config.' + platform);"
+  js_case "js-36 an import() path built with + stays silent" 0 loader.js "const c = await import('./staging.config.' + platform);"
+  js_case "js-37 a require.resolve() path built with + stays silent" 0 loader.js "const p = require.resolve('./staging.config.' + platform);"
+  js_case "js-38 a URL in the callback of an AMD require() still fires" src/loader.js:1 loader.js "require(['./staging.config'], function () { fetch('http://localhost:3000'); });"
+  js_case "js-39 a host inside an import() template that starts with https:// still fires" src/widget.js:1 widget.js 'export const widget = import(/* webpackIgnore: true */ `https://${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  js_case "js-40 a host after a built scheme in an import() template still fires" src/widget.js:1 widget.js 'export const widget = import(`${proto}://${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  js_case "js-41 a host in an import() concatenation that starts with // still fires" src/widget.js:1 widget.js 'export const widget = import("//" + (process.env.WIDGET_HOST || "staging.acme.io") + "/widget.js");'
+  js_case "js-42 a template module path without a URL stays silent" 0 loader.js 'const c = await import(`./staging.config.${platform}.js`);'
+  js_case "js-43 a host passed to a call inside import() still fires" src/loader.js:1 loader.js 'const url = host => `https://${host}/widget.js`; export const widget = import(/* webpackIgnore: true */ url("staging.acme.io"));'
+  js_case "js-44 a host in an object inside require() still fires" src/loader.js:1 loader.js "const w = require(widgetPath({ host: 'staging.acme.io' }));"
+  js_case "js-45 a host passed to a call in an AMD require() array still fires" src/loader.js:1 loader.js "require([widgetPath('staging.acme.io')], callback);"
+  js_case "js-46 a host in an array inside import() still fires" src/loader.js:1 loader.js "export const w = import(pick(['staging.acme.io', 'api.acme.io']));"
+  js_case "js-47 the branches of a conditional require() path stay silent" 0 loader.js "const c = require(dev ? './staging.config' : './prod.config');"
+  js_case "js-48 a fallback in a require() path stays silent" 0 loader.js "const c = require(process.env.CFG_PATH || './staging.config');"
+  js_case "js-49 a host after a scheme held in a variable in an import() template still fires" src/loader.js:1 loader.js 'const scheme = "https://"; export const widget = import(/* webpackIgnore: true */ `${scheme}${process.env.WIDGET_HOST || "staging.acme.io"}/widget.js`);'
+  D="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+  printf "const path = require('path'); module.exports = require(path.join(__dirname, './staging.config.js'));\n" > "$D/app.config.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "js-50 a path.join() file path inside require() stays silent" || bad "js-50 a path.join() file path inside require() stays silent"
+  rm -rf "$D"
+  js_at() {  # name, expect, path from the app root, content. Like js_case, for a file outside src/
+    local d; d="$(mk_js api.ts "export const api = 'https://api.acme.io';")"
+    mkdir -p "$(dirname "$d/$3")"; printf '%s\n' "$4" > "$d/$3"
+    OUT="$(bash "$GUARD" "$d" 2>&1)"
+    if [ "$2" = 0 ]; then ! rr_has 'APPLE-2.1-STAGING-BACKEND' && ok "$1" || bad "$1"
+    else sh_at "$2" && ok "$1" || bad "$1"; fi
+    rm -rf "$d"
+  }
+  # #2423 review. A backslash in a file name, and the dev-only configs, stories and test setup files.
+  js_case "js-55 a double-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' 'export const a = "http://localhost:3000";'
+  js_case "js-56 a single-quoted host in a file whose name has a backslash fires" 'src/a\\b.js:1' 'a\b.js' "export const a = 'http://localhost:3000';"
+  js_at "js-57 a single-quoted host in next.config.js env still fires, env values ship in the bundle" next.config.js:1 next.config.js "module.exports = { env: { API: 'http://localhost:3000' } };"
+  js_at "js-58 a double-quoted host in next.config.js still fires, as on main" next.config.js:1 next.config.js 'module.exports = { env: { API: "http://localhost:3000" } };'
+  js_at "js-59 a single-quoted host in vue.config.js stays silent" 0 vue.config.js "module.exports = { devServer: { proxy: 'http://localhost:8080' } };"
+  js_at "js-60 a single-quoted host under devServer in nuxt.config.ts stays silent" 0 nuxt.config.ts "export default { devServer: { url: 'http://localhost:3000' } };"
+  js_at "js-61 a single-quoted host outside devServer in svelte.config.js still fires" svelte.config.js:1 svelte.config.js "export default { kit: { dev: 'http://localhost:5173' } };"
+  js_at "js-62 a single-quoted host in .storybook/main.js stays silent" 0 .storybook/main.js "module.exports = { url: 'http://localhost:6006' };"
+  js_at "js-63 a single-quoted host in a stories file stays silent" 0 src/Button.stories.tsx "export const u = 'http://localhost:6006';"
+  js_at "js-64 a single-quoted host in setupTests.ts stays silent" 0 src/setupTests.ts "global.API = 'http://localhost:3000';"
+  js_at "js-65 a single-quoted host in jest.setup.js stays silent" 0 jest.setup.js "global.API = 'http://localhost:3000';"
+  js_at "js-66 a single-quoted host in vitest.setup.ts stays silent" 0 vitest.setup.ts "global.API = 'http://localhost:3000';"
+  js_at "js-67 a single-quoted host in an Expo app.config.js still fires" app.config.js:1 app.config.js "export default { extra: { api: 'http://localhost:3000' } };"
+  js_at "js-68 a single-quoted host in capacitor.config.ts still fires" capacitor.config.ts:1 capacitor.config.ts "export default { server: { url: 'http://localhost:3000' } };"
+  js_at "js-69 a single-quoted host in bundled Capacitor web assets still fires, as double quotes do on main" ios/App/App/public/assets/vendor.js:1 ios/App/App/public/assets/vendor.js "var u = 'http://localhost:3000';"
+  # Module paths in new URL(), import.meta, require.context and the jest and vi mocks, only in the first argument.
+  js_case "js-70 a worker path in new URL() with import.meta.url stays silent" 0 a.js "const w = new URL('./staging.worker.js', import.meta.url);"
+  js_case "js-71 a host URL in new URL() with import.meta.url still fires" src/a.js:1 a.js "const w = new URL('https://staging.acme.io/x', import.meta.url);"
+  js_case "js-72 a path in import.meta.glob() stays silent" 0 a.js "const m = import.meta.glob('./staging.config.js');"
+  js_case "js-73 a path in import.meta.resolve() stays silent" 0 a.js "const m = import.meta.resolve('./staging.config.js');"
+  js_case "js-74 a path in require.context() stays silent" 0 a.js "const ctx = require.context('./staging.config.js');"
+  js_case "js-75 a path in jest.mock() stays silent" 0 a.js "jest.mock('./staging.api');"
+  js_case "js-76 a path in jest.requireActual() stays silent" 0 a.js "const a = jest.requireActual('./staging.api');"
+  js_case "js-77 a path in vi.mock() stays silent" 0 a.js "vi.mock('./staging.api');"
+  js_case "js-78 a path in vi.importActual() stays silent" 0 a.js "const a = vi.importActual('./staging.api');"
+  js_case "js-79 a host in a jest.mock() factory still fires" src/a.js:1 a.js "jest.mock('./api', () => ({ base: 'https://staging.acme.io' }));"
+  js_case "js-80 a host as the first argument of jest.mock() still fires" src/a.js:1 a.js "jest.mock('staging.acme.io');"
+  # A template or + path that starts with a variable and ends in a source file name.
+  js_case "js-81 a template require() path after a dir variable stays silent" 0 a.js 'const c = require(`${dir}/staging.config.js`);'
+  js_case "js-82 a concatenated require() path after a dir variable stays silent" 0 a.js "const c = require(base + '/staging.config.js');"
+  js_case "js-83 a host glued to a variable in a require() path still fires" src/a.js:1 a.js "const w = require(base + 'staging.acme.io/w.js');"
+  js_case "js-84 a host folder after a dir variable in a require() path still fires" src/a.js:1 a.js 'const c = require(`${dir}/staging.acme.io/w.js`);'
+  js_case "js-85 a host after a scheme variable and // in an import() template still fires" src/a.js:1 a.js 'const w = import(`${scheme}//staging.acme.io/widget.js`);'
+  # #2423 round 2. Framework configs ship values, only devServer and proxy settings are dev-only.
+  js_at "js-86 a staging host in Nuxt runtimeConfig.public fires" nuxt.config.ts:1 nuxt.config.ts "export default defineNuxtConfig({ runtimeConfig: { public: { api: 'https://staging.acme.io' } } });"
+  js_at "js-87 a staging host in Next env fires" next.config.js:1 next.config.js "module.exports = { env: { API: 'https://staging.acme.io' } };"
+  js_at "js-88 a staging host in a Vite define fires" vite.config.ts:1 vite.config.ts "export default { define: { __API__: JSON.stringify('https://staging.acme.io') } };"
+  js_at "js-89 a next.config.js inside app source is scanned in full" src/config/next.config.js:1 src/config/next.config.js "module.exports = { devServer: { proxy: 'https://staging.acme.io' } };"
+  js_at "js-90 a double-quoted devServer proxy in vue.config.js stays silent" 0 vue.config.js 'module.exports = { devServer: { proxy: "http://localhost:3000" } };'
+  js_at "js-91 a Next rewrites destination on localhost still fires" next.config.js:1 next.config.js "module.exports = { async rewrites() { return [{ source: '/api/:p*', destination: 'http://localhost:3000/:p*' }]; } };"
+  js_at "js-92 a Vite server.proxy target stays silent" 0 vite.config.ts "export default { server: { proxy: { '/api': { target: 'http://localhost:8080' } } } };"
+  js_at "js-93 a jest.config.js inside app source is scanned in full" src/config/jest.config.js:1 src/config/jest.config.js "module.exports = { testURL: 'http://localhost:3000' };"
+  js_at "js-94 a single-quoted host in a root jest.config.js stays silent" 0 jest.config.js "module.exports = { testURL: 'http://localhost:3000' };"
+  js_at "js-95 a single-quoted host in an msw handler under src/mocks stays silent" 0 src/mocks/handlers.ts "export const h = rest.get('http://localhost:3000/user', r);"
+  js_at "js-96 a single-quoted host in setupJest.ts stays silent" 0 src/setupJest.ts "global.API = 'http://localhost:3000';"
+  # A localhost that is not a backend. a hostname check, a Capacitor or Ionic origin, a dev-only branch.
+  js_case "js-97 a localhost compared with location.hostname stays silent" 0 a.js "export const dev = location.hostname === 'localhost';"
+  js_case "js-98 a double-quoted localhost compared with hostname stays silent" 0 a.js 'export const dev = "localhost" == window.location.hostname;'
+  js_case "js-99 hostname.includes localhost stays silent" 0 a.js "export const dev = url.hostname.includes('localhost');"
+  js_case "js-100 a capacitor://localhost origin stays silent" 0 a.js "export const origins = ['capacitor://localhost', \"ionic://localhost\"];"
+  js_case "js-101 a localhost in the true branch of __DEV__ stays silent" 0 a.js "export const api = __DEV__ ? 'http://localhost:3000' : 'https://api.acme.io';"
+  js_case "js-102 a localhost under NODE_ENV development stays silent" 0 a.js "let api = 'https://api.acme.io';
+if (process.env.NODE_ENV === 'development') { api = \"http://localhost:3000\"; }"
+  js_case "js-103 a localhost axios baseURL outside a dev guard fires" src/a.js:1 a.js "export const client = axios.create({ baseURL: 'http://localhost:3000' });"
+  js_case "js-104 a localhost in the false branch of __DEV__ fires" src/a.js:1 a.js "export const api = __DEV__ ? 'https://api.acme.io' : 'http://localhost:3000';"
+  js_case "js-105 a staging host in the true branch of __DEV__ still fires" src/a.js:1 a.js "export const api = __DEV__ ? 'https://staging.acme.io' : 'https://api.acme.io';"
+  js_case "js-106 a capacitor origin with a staging path still fires" src/a.js:1 a.js "export const u = 'capacitor://localhost/https://staging.acme.io';"
+  # The global parser lookup leaves no node-compile-cache behind (npm turns the cache on).
+  CC_PFX="$(mktemp -d)"; mkdir -p "$CC_PFX/lib/node_modules/@babel"; ln -s "$BABEL_PARSER_DIR" "$CC_PFX/lib/node_modules/@babel/parser"
+  CC_TMP="$(mktemp -d)"; D="$(mk_js api.ts "export const api = 'https://staging.acme.io';")"
+  OUT="$(BABEL_PARSER_DIR="" TMPDIR="$CC_TMP" npm_config_prefix="$CC_PFX" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.ts:1' && [ ! -e "$CC_TMP/node-compile-cache" ] && ok "js-107 the global parser lookup leaves no node-compile-cache in TMPDIR" || bad "js-107 the global parser lookup leaves no node-compile-cache in TMPDIR"
+  rm -rf "$D" "$CC_PFX" "$CC_TMP"
+  # A file over 4 MB is not parsed. It takes the double-quoted grep.
+  D="$(mk_js big.js x)"; { printf "export const a = 'http://localhost:3000';\n"; head -c 4300000 /dev/zero | tr '\0' ' '; printf '\n'; } > "$D/src/big.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"; ! rr_has 'APPLE-2.1-STAGING-BACKEND' && R1=1 || R1=0
+  { printf 'export const a = "http://localhost:3000";\n'; head -c 4300000 /dev/zero | tr '\0' ' '; printf '\n'; } > "$D/src/big.js"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  [ "$R1" = 1 ] && sh_at 'src/big.js:1' && ok "js-108 a file over 4 MB skips the parser and takes the double-quoted grep" || bad "js-108 a file over 4 MB skips the parser and takes the double-quoted grep"
+  rm -rf "$D"
+  # A file the parser returns no row for takes the double-quoted grep, never a hit with no line.
+  FN="$(mktemp -d)"; REALNODE="$(command -v node)"
+  printf '#!/bin/bash\ncase "$2" in *firstHits*) "%s" "$@" | grep -v /drop.js; exit "${PIPESTATUS[0]}" ;; esac\nexec "%s" "$@"\n' "$REALNODE" "$REALNODE" > "$FN/node"; chmod +x "$FN/node"
+  D="$(mk_js drop.js "export const a = 'http://localhost:3000';")"
+  OUT="$(PATH="$FN:$PATH" bash "$GUARD" "$D" 2>&1)"; ! rr_has 'APPLE-2.1-STAGING-BACKEND' && R1=1 || R1=0
+  printf 'export const a = "http://localhost:3000";\n' > "$D/src/drop.js"
+  OUT="$(PATH="$FN:$PATH" bash "$GUARD" "$D" 2>&1)"
+  [ "$R1" = 1 ] && sh_at 'src/drop.js:1' && ok "js-109 a file with no parser row takes the double-quoted grep" || bad "js-109 a file with no parser row takes the double-quoted grep"
+  rm -rf "$D" "$FN"
+  # #2423 review. A parser planted in the scanned app is never loaded unless APP_STORE_GUARD_TRUST_PROJECT_BABEL=1.
+  NOGLOBAL="$(mktemp -d)"; printf '#!/bin/sh\necho /nonexistent\n' > "$NOGLOBAL/npm"; chmod +x "$NOGLOBAL/npm"
+  D="$(mk_js api.js "const a = 'https://staging.acme.io';
+const b = \"http://localhost:3000\";")"; plant_parser "$D"
+  OUT="$(BABEL_PARSER_DIR="" PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:2' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-51 a parser planted in the app is not loaded, the double-quoted grep runs" || bad "js-51 a parser planted in the app is not loaded, the double-quoted grep runs"
+  OUT="$(bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:1' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-52 with a trusted parser the planted one is still not loaded" || bad "js-52 with a trusted parser the planted one is still not loaded"
+  OUT="$(BABEL_PARSER_DIR="$D/node_modules/@babel/parser" PATH="$NOGLOBAL:$PATH" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.js:2' && [ ! -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-53 a BABEL_PARSER_DIR inside the scanned app is refused" || bad "js-53 a BABEL_PARSER_DIR inside the scanned app is refused"
+  OUT="$(APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 bash "$GUARD" "$D" 2>&1)"
+  [ -e "$D/node_modules/@babel/parser/MARKER" ] && ok "js-54 APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 uses the copy in the app" || bad "js-54 APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 uses the copy in the app"
+  rm -rf "$D" "$NOGLOBAL"
+  D="$(mk_js api.ts "export const api = 'https://staging.acme.io';
+export const b = \"http://localhost:3000\";")"
+  NONODE="$(mktemp -d)"; for b in bash grep sed awk find xargs tr head mktemp cat rm printf wc sort uniq cut plutil xmllint dirname basename date; do p="$(command -v "$b" 2>/dev/null)"; [ -n "$p" ] && ln -s "$p" "$NONODE/$b"; done
+  OUT="$(PATH="$NONODE" bash "$GUARD" "$D" 2>&1)"
+  sh_at 'src/api.ts:2' && ok "js-15 without node the double-quoted grep still runs" || bad "js-15 without node the double-quoted grep still runs"
+  rm -rf "$D" "$NONODE"
+else
+  echo "SKIP  js-1 to js-109 (no node or no @babel/parser at $BABEL_PARSER_DIR)"
+fi
 
 D="$(mk_ship 'let api = "https://api.acme.io"')"; mkdir -p "$D/.github/workflows"
 printf 'jobs:\n  e2e:\n    steps:\n      - run: curl "http://localhost:8081/status"\n' > "$D/.github/workflows/e2e.yml"

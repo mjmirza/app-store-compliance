@@ -15,7 +15,7 @@ log_err() { if type hlog_error >/dev/null 2>&1; then hlog_error "app-store-compl
 CRIT=0; HIGH=0; MED=0; ANY_IOS=0; ANY_AND=0; ANY_NATIVE=0; ANY_RN=0; ANY_WEB=0; ANY_NEEDS_NATIVE=0; NATIVE_HINT=""; UNCHECKED=""; EXPO_READ=0
 FILELIST=""
 REPORT=""; REPORT_DEGRADED=0
-cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
+cleanup() { [ -n "$FILELIST" ] && rm -f "$FILELIST" "$FILELIST.blob" "$FILELIST.manifest" "$FILELIST.code" "$FILELIST.impl" "$FILELIST.ship" "$FILELIST.js" "$FILELIST.jscfg" 2>/dev/null; [ -n "$REPORT" ] && rm -f "$REPORT" 2>/dev/null; true; }
 trap cleanup EXIT
 
 # ----- resolve mode and project dir -----
@@ -581,12 +581,206 @@ ship_has() {  # grep_has over the files that ship. Test files are left out when 
   # with no match would otherwise make the whole pipeline fail under pipefail.
   [ -n "$(tr '\n' '\0' < "$SHIPLIST" | xargs -0 grep -EIl -e "$1" 2>/dev/null | head -n 1)" ]
 }
+# JS and TS strings in every quote style (#2402), read by a trusted @babel/parser (see js_parser). It reads single
+# quotes, template literals, JSX, TypeScript and Flow as a compiler does, so comments, JSX text, regex literals,
+# import paths and type-only code are never read as strings. Prints "file<TAB>line<TAB>dq" for each file it read,
+# where line is the first match in any quote style and dq the first double-quoted one ("-" if none),
+# and "file<TAB>?" for a file it could not parse, which then falls back to the double-quoted grep.
+JS_STR_EXT_RE='\.(js|jsx|ts|tsx|mjs|cjs)$'
+# Test files, test folders, stories, test setup and msw mocks never ship. The new quote styles do not count in
+# them, so only today's double-quoted strings can fire there, as before (#2402).
+JS_NOSHIP_RE='(^|/|[.])(test|spec)[.][cm]?[jt]sx?$|[.]e2e[.][cm]?[jt]sx?$|(^|/)(__tests__|__mocks__|__fixtures__|test|tests|e2e|detox|cypress|playwright|[.]storybook)/|(^|/)src/mocks/|[.]stories[.]([cm]?[jt]sx?|mdx)$|(^|/)(setupTests|setupJest|(jest|vitest)[.]setup)[.][cm]?[jt]sx?$'
+# Test, lint and style tool configs never ship either, but only at the scan root or a package root (#2423).
+JS_TOOLCFG_RE='^(playwright|jest|vitest|cypress|detox|karma|wdio|eslint|prettier|tailwind|postcss|stylelint|commitlint)[.]config[.][cm]?[jt]s$'
+# Build configs can put values in the bundle, so they are read in full except devServer and proxy settings.
+JS_BUILDCFG_RE='^(next|vue|nuxt|svelte|astro|vite|webpack|rollup|babel|metro)[.]config[.][cm]?[jt]s$'
+js_root_cfg() {  # $1 file, $2 name regex. True when the name matches and it sits at the scan root or a package root
+  local b="${1##*/}" d="${1%/*}"
+  [[ "$b" =~ $2 ]] || return 1
+  [ "$d" = "${DIR%/}" ] || [ -f "$d/package.json" ]
+}
+# shellcheck disable=SC2016
+JS_STRINGS_JS='const fs = require("fs");
+const [parserPath, pattern, cfgList] = process.argv.slice(1);
+const { parse } = require(parserPath);
+const re = new RegExp(pattern);
+// Build configs at a package root. A string under their devServer or proxy settings never ships.
+const CFG = new Set(cfgList ? fs.readFileSync(cfgList, "utf8").split("\n").filter(Boolean) : []);
+const DEV_KEYS = new Set(["devServer", "proxy"]);
+const keyName = (k) => !k ? null : k.type === "Identifier" ? k.name : k.type === "StringLiteral" ? k.value : null;
+// A localhost that is no backend. a dev-only branch or a hostname check holding only a localhost,
+// or a Capacitor or Ionic app origin with nothing else that matches.
+const LOCAL = /localhost|127[.]0[.]0[.]1/gi;
+const localOnly = (t) => { LOCAL.lastIndex = 0; return !re.test(t.replace(LOCAL, "")); };
+const APP_ORIGIN = /^(capacitor|ionic):\/\/localhost/i;
+const appOrigin = (t) => APP_ORIGIN.test(t) && !re.test(t.replace(APP_ORIGIN, ""));
+const hostnameRef = (a) => !!a && ((a.type === "Identifier" && a.name === "hostname") || (a.type === "MemberExpression" && !a.computed && a.property.type === "Identifier" && a.property.name === "hostname"));
+const envMember = (a) => !!a && a.type === "MemberExpression" && !a.computed && a.property.name === "NODE_ENV" && a.object.type === "MemberExpression" && !a.object.computed && a.object.property.name === "env" && a.object.object.type === "Identifier" && a.object.object.name === "process";
+// 1 when the test is true only in a dev build, -1 when it is false only there, else 0.
+const devTest = (t) => !t ? 0 : (t.type === "Identifier" && t.name === "__DEV__") ? 1 : (t.type === "UnaryExpression" && t.operator === "!") ? -devTest(t.argument) : (t.type === "BinaryExpression" && /^={2,3}$/.test(t.operator) && ((envMember(t.left) && plainText(t.right) === "development") || (envMember(t.right) && plainText(t.left) === "development"))) ? 1 : 0;
+const DEVSRV = 1, LOCALOK = 2;
+const TS_CODE = /^TS(AsExpression|SatisfiesExpression|NonNullExpression|TypeAssertion|InstantiationExpression|ParameterProperty|EnumDeclaration|EnumBody|EnumMember|ExportAssignment|ModuleDeclaration|ModuleBlock)$/;
+const FLOW_TYPE = new Set(["TypeAlias", "OpaqueType", "InterfaceDeclaration", "TypeAnnotation", "TypeParameterDeclaration", "TypeParameterInstantiation", "DeclareModule", "DeclareModuleExports", "DeclareVariable", "DeclareFunction", "DeclareClass", "DeclareTypeAlias", "DeclareOpaqueType", "DeclareInterface", "DeclareExportDeclaration", "DeclareExportAllDeclaration"]);
+const SKIP_KEYS = new Set(["loc", "start", "end", "extra", "range", "comments", "leadingComments", "trailingComments", "innerComments", "tokens"]);
+// The text of a string literal or of a template literal with no ${...}, else null.
+const plainText = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "TemplateLiteral" && a.expressions.length === 0) ? (a.quasis[0].value.cooked ?? a.quasis[0].value.raw) : null;
+// A URL: a scheme (http:, ws:) or a leading //host.
+const URL_LIKE = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
+// The fixed text of a template literal or a + concatenation, pieces joined in order.
+const staticText = (a) => !a ? "" : a.type === "StringLiteral" ? a.value : a.type === "TemplateLiteral" ? a.quasis.map((q) => q.value.cooked ?? q.value.raw).join("") : (a.type === "BinaryExpression" && a.operator === "+") ? staticText(a.left) + staticText(a.right) : "";
+// A path built around a URL, like `https://${host}/w.js` or "//" + host: what sits inside it is a host, not a module path.
+const builtUrl = (n) => (n.type === "TemplateLiteral" || (n.type === "BinaryExpression" && n.operator === "+")) && (URL_LIKE.test(staticText(n)) || staticText(n).includes("://"));
+// The keys of a module path node whose values are still that path: the pieces of a template or a + concatenation,
+// the branches of a ?: or a fallback, and the items of an AMD require([...]) list. A string inside anything else,
+// a nested call, object or array, is read as before (#2423 review).
+const PATH_KEYS = { ConditionalExpression: ["consequent", "alternate"], LogicalExpression: ["left", "right"] };
+// The leading piece of a template or a + concatenation, __dirname read as /. Only . or / there is visibly a file path.
+const DIR_VARS = new Set(["__dirname", "__filename"]);
+const lead = (a) => !a ? null : a.type === "StringLiteral" ? a.value : (a.type === "Identifier" && DIR_VARS.has(a.name)) ? "/" : a.type === "TemplateLiteral" ? (((a.quasis[0].value.cooked ?? a.quasis[0].value.raw) === "" && a.expressions.length) ? lead(a.expressions[0]) : (a.quasis[0].value.cooked ?? a.quasis[0].value.raw)) : (a.type === "BinaryExpression" && a.operator === "+") ? lead(a.left) : null;
+// A template or + path whose fixed text is /dir/file.js with no scheme or host, and with no host string in its
+// dynamic parts, like a dir variable then /a.js. A URL built from a scheme and a host string is not (#2423 review).
+const SRC_EXT = /[.](js|cjs|mjs|ts|tsx|jsx|json)$/;
+const tail = (a) => !a ? null : a.type === "StringLiteral" ? a.value : a.type === "TemplateLiteral" ? (a.quasis[a.quasis.length - 1].value.cooked ?? a.quasis[a.quasis.length - 1].value.raw) : (a.type === "BinaryExpression" && a.operator === "+") ? tail(a.right) : null;
+const strTexts = (n, acc = []) => { if (Array.isArray(n)) { for (const c of n) strTexts(c, acc); return acc; } if (!n || typeof n.type !== "string") return acc; if (n.type === "StringLiteral") acc.push(n.value); else if (n.type === "TemplateElement") acc.push(n.value.cooked ?? n.value.raw); for (const k of Object.keys(n)) if (!SKIP_KEYS.has(k)) strTexts(n[k], acc); return acc; };
+const dynTexts = (a) => a.type === "StringLiteral" ? [] : a.type === "TemplateLiteral" ? strTexts(a.expressions) : (a.type === "BinaryExpression" && a.operator === "+") ? dynTexts(a.left).concat(dynTexts(a.right)) : strTexts(a);
+const hostish = (t) => URL_LIKE.test(t) || t.includes("://") || (re.test(t) && !SRC_EXT.test(t));
+const fixedDir = (t) => /^\/[^\/]/.test(t) && !/https?:/i.test(t) && !t.split("/").slice(0, -1).some((seg) => re.test(seg));
+const endsAsFile = (a) => (a.type === "TemplateLiteral" || (a.type === "BinaryExpression" && a.operator === "+")) && SRC_EXT.test(tail(a) ?? "") && fixedDir(staticText(a)) && !dynTexts(a).some(hostish);
+const fileLike = (n, cont) => cont.has(n) || (n.type === "TemplateLiteral" && n.expressions.length === 0) || /^[.\/]/.test(lead(n) ?? "") || endsAsFile(n);
+// Calls whose first argument is a module or file path. new URL(p, import.meta.url), import.meta.glob and resolve,
+// require.context, and the jest and vi module mocks. It counts only when it is relative or module-looking.
+const isMeta = (o) => !!o && o.type === "MetaProperty" && o.meta.name === "import" && o.property.name === "meta";
+const isId = (name) => (o) => !!o && o.type === "Identifier" && o.name === name;
+const member = (c, obj, names) => !!c && c.type === "MemberExpression" && !c.computed && c.property.type === "Identifier" && names.test(c.property.name) && obj(c.object);
+const pathCall = (n) => n.type === "NewExpression" ? (isId("URL")(n.callee) && n.arguments.length > 1 && member(n.arguments[1], isMeta, /^url$/)) : n.type === "CallExpression" && (member(n.callee, isMeta, /^(glob|globEager|resolve)$/) || member(n.callee, isId("require"), /^context$/) || member(n.callee, isId("jest"), /^(mock|doMock|unmock|requireActual|requireMock|createMockFromModule)$/) || member(n.callee, isId("vi"), /^(mock|doMock|unmock|importActual|importMock)$/));
+const modText = (t) => !URL_LIKE.test(t) && !t.includes("://") && (/^[.]{0,2}\//.test(t) || (/^@?[\w-]+(\/[\w.@-]+)*$/.test(t) && !re.test(t)));
+const modLike = (a) => !!a && (a.type === "ArrayExpression" ? a.elements.length > 0 && a.elements.every(modLike) : plainText(a) !== null ? modText(plainText(a)) : (/^[.\/]/.test(lead(a) ?? "") || endsAsFile(a)));
+// path.join(), path.resolve() and their posix and win32 forms take file path pieces (#2423 review).
+const PATH_FNS = new Set(["join", "resolve"]);
+const joinsPath = (n) => n.type === "CallExpression" && n.callee.type === "MemberExpression" && !n.callee.computed && PATH_FNS.has(n.callee.property.name) && (n.callee.object.type === "Identifier" ? n.callee.object.name === "path" : n.callee.object.type === "MemberExpression" && !n.callee.object.computed && /^(posix|win32)$/.test(n.callee.object.property.name) && n.callee.object.object.type === "Identifier" && n.callee.object.object.name === "path");
+const pathKeys = (n, amd, cont) => n.type === "BinaryExpression" ? (n.operator === "+" && fileLike(n, cont) ? ["left", "right"] : []) : n.type === "TemplateLiteral" ? (fileLike(n, cont) ? ["quasis", "expressions"] : []) : n.type === "ArrayExpression" ? (amd.has(n) ? ["elements"] : []) : joinsPath(n) ? ["arguments"] : (PATH_KEYS[n.type] || []);
+// Keys whose values continue a file path already seen, so their own first piece need not start with . or /.
+const contKey = (n, k) => k === "arguments" || ((n.type === "TemplateLiteral" || n.type === "BinaryExpression") && k !== "quasis");
+const typeOnly = (n) => (n.type.startsWith("TS") && !TS_CODE.test(n.type)) || FLOW_TYPE.has(n.type) || n.declare === true || n.importKind === "type" || n.exportKind === "type" || (n.type === "TSModuleDeclaration" && n.declare);
+function firstHits(ast, isCfg) {
+  let best = null, dq = null;
+  const stack = [ast.program];
+  // Bits a node passes to its children. DEVSRV under a devServer or proxy key, LOCALOK in a dev-only branch.
+  const bits = new WeakMap();
+  // Nodes inside a module path: the first argument of require(), import() or require.resolve(), and the source
+  // of a static import or export. A string there is a piece of a module path unless it is a URL (#2423 review).
+  const inPath = new WeakSet(), amd = new WeakSet(), cont = new WeakSet();
+  let nb = 0, extra = null;
+  const push = (v, path, more) => { if (v && typeof v === "object") { if (path) { inPath.add(v); if (more) cont.add(v); } const b = nb | (extra ? extra(v) : 0); if (b) bits.set(v, (bits.get(v) | 0) | b); } stack.push(v); };
+  const mark = (v, b) => { if (v && typeof v === "object") bits.set(v, (bits.get(v) | 0) | b); };
+  while (stack.length) {
+    const n = stack.pop();
+    nb = (n && typeof n === "object") ? (bits.get(n) | 0) : 0; extra = null;
+    if (Array.isArray(n)) { for (const c of n) push(c, inPath.has(n), cont.has(n)); continue; }
+    if (!n || typeof n.type !== "string" || typeOnly(n)) continue;
+    let text = null;
+    if (n.type === "StringLiteral") text = n.value;
+    else if (n.type === "TemplateElement") text = n.value.cooked == null ? n.value.raw : n.value.cooked;
+    // The value of a devServer or proxy key in a build config, and both sides of a hostname check.
+    if (isCfg && (n.type === "ObjectProperty" || n.type === "ObjectMethod") && !n.computed && DEV_KEYS.has(keyName(n.key))) extra = (v) => v === n.key ? 0 : DEVSRV;
+    if (n.type === "BinaryExpression" && /^[!=]={1,2}$/.test(n.operator) && (hostnameRef(n.left) || hostnameRef(n.right))) { mark(n.left, LOCALOK); mark(n.right, LOCALOK); }
+    if (n.type === "CallExpression" && n.callee.type === "MemberExpression" && !n.callee.computed && n.callee.property.name === "includes" && hostnameRef(n.callee.object)) mark(n.arguments[0], LOCALOK);
+    if (n.type === "ConditionalExpression" || n.type === "IfStatement") { const d = devTest(n.test); if (d) mark(d > 0 ? n.consequent : n.alternate, LOCALOK); }
+    const quiet = text !== null && ((nb & DEVSRV) || ((nb & LOCALOK) && localOnly(text)) || appOrigin(text));
+    if (text !== null && !quiet && re.test(text) && (!inPath.has(n) || URL_LIKE.test(text))) {
+      if (best === null || n.start < best.start) best = n;
+      if (n.type === "StringLiteral" && n.extra && String(n.extra.raw).startsWith("\"") && (dq === null || n.start < dq.start)) dq = n;
+    }
+    // Module paths: require(), import(), require.resolve() and require["resolve"]. No other require member:
+    // RequireJS require.config() takes an options object that can hold a real backend URL.
+    const c = n.type === "CallExpression" ? n.callee : null;
+    const resolvesPath = !!c && c.type === "MemberExpression" && c.object.type === "Identifier" && c.object.name === "require" && (c.computed ? plainText(c.property) === "resolve" : c.property.type === "Identifier" && c.property.name === "resolve");
+    const loadsModule = !!c && (c.type === "Import" || (c.type === "Identifier" && c.name === "require") || resolvesPath);
+    const takesPath = !loadsModule && pathCall(n) && modLike(n.arguments[0]);
+    for (const k of Object.keys(n)) {
+      if (SKIP_KEYS.has(k) || k === "directives") continue;
+      if (takesPath && k === "arguments") { n.arguments.forEach((a, i) => push(a, i === 0)); continue; }
+      if (loadsModule && k === "arguments") {
+        const a0 = n.arguments[0];
+        if (a0 && a0.type === "ArrayExpression" && c.type === "Identifier") amd.add(a0);
+        n.arguments.forEach((a, i) => push(a, i === 0));
+        continue;
+      }
+      const along = inPath.has(n) && !builtUrl(n) && pathKeys(n, amd, cont).includes(k);
+      push(n[k], along || (k === "source" && /^(Import|Export)/.test(n.type)), along && contKey(n, k));
+    }
+  }
+  return [best, dq];
+}
+const out = [];
+for (const f of fs.readFileSync(0, "utf8").split("\n")) {
+  if (!f) continue;
+  let code;
+  try { if (fs.statSync(f).size > 4194304) { out.push(f + "\t?"); continue; } code = fs.readFileSync(f, "utf8"); } catch (e) { out.push(f + "\t?"); continue; }
+  const ts = /\.(ts|tsx|mts|cts)$/.test(f);
+  const plugins = ts ? (/\.tsx$/.test(f) ? ["typescript", "jsx"] : ["typescript"]) : ["jsx", "flow"];
+  let ast;
+  try { ast = parse(code, { sourceType: "unambiguous", errorRecovery: false, allowReturnOutsideFunction: true, allowImportExportEverywhere: true, allowAwaitOutsideFunction: true, allowUndeclaredExports: true, plugins: plugins.concat(["decorators-legacy"]) }); }
+  catch (e) { out.push(f + "\t?"); continue; }
+  const [hit, dq] = firstHits(ast, CFG.has(f));
+  out.push(f + "\t" + (hit ? hit.loc.start.line : "-") + "\t" + (dq ? dq.loc.start.line : "-"));
+}
+process.stdout.write(out.join("\n") + (out.length ? "\n" : ""));'
+# The scanned app never supplies the parser, since loading it would run its code. BABEL_PARSER_DIR or the global
+# npm root is used, and APP_STORE_GUARD_TRUST_PROJECT_BABEL=1 opts in to the copy inside the scanned app.
+JS_PARSER_JS='const fs = require("fs"), path = require("path");
+const [mode, where, dir] = process.argv.slice(1);
+let p = "";
+try {
+  if (mode === "project") p = require.resolve("@babel/parser", { paths: [where] });
+  else if (JSON.parse(fs.readFileSync(path.join(where, "package.json"), "utf8")).name === "@babel/parser") p = require.resolve(path.resolve(where));
+  if (p && mode !== "project") { const real = fs.realpathSync(p), root = fs.realpathSync(dir) + path.sep; if (real.startsWith(root)) p = ""; }
+} catch (e) { p = ""; }
+process.stdout.write(p);'
+js_parser() {  # prints the path of a trusted @babel/parser, or nothing
+  local p="" g d
+  d="$(cd "$DIR" 2>/dev/null && pwd -P)" || return 0
+  if [ "${APP_STORE_GUARD_TRUST_PROJECT_BABEL:-0}" = 1 ]; then
+    p="$(cd / && node -e "$JS_PARSER_JS" project "$d" "$d" 2>/dev/null)"
+  fi
+  if [ -z "$p" ] && [ -n "${BABEL_PARSER_DIR:-}" ] && [ -d "$BABEL_PARSER_DIR" ]; then
+    g="$(cd "$BABEL_PARSER_DIR" && pwd -P)" && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g" "$d" 2>/dev/null)"
+  fi
+  if [ -z "$p" ] && command -v npm >/dev/null 2>&1; then
+    # npm turns on Node's compile cache, which would leave node-compile-cache in $TMPDIR after the scan.
+    g="$(cd / && NODE_DISABLE_COMPILE_CACHE=1 npm root -g 2>/dev/null)"
+    [ -n "$g" ] && [ -d "$g/@babel/parser" ] && p="$(cd / && node -e "$JS_PARSER_JS" trusted "$g/@babel/parser" "$d" 2>/dev/null)"
+  fi
+  printf '%s' "$p"
+}
+js_strings() {  # $1 regex. Writes $FILELIST.js and returns 0 when Node and @babel/parser read the shipped JS and TS files
+  : > "$FILELIST.js" 2>/dev/null || return 1
+  command -v node >/dev/null 2>&1 || return 1
+  local parser
+  parser="$(js_parser)"
+  [ -n "$parser" ] || return 1
+  local f
+  : > "$FILELIST.jscfg" 2>/dev/null || return 1
+  while IFS= read -r f; do js_root_cfg "$f" "$JS_BUILDCFG_RE" && printf '%s\n' "$f"; done < <(grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}") > "$FILELIST.jscfg"
+  grep -E "$JS_STR_EXT_RE" "${SHIPLIST:-$FILELIST}" | node -e "$JS_STRINGS_JS" "$parser" "$1" "$FILELIST.jscfg" > "$FILELIST.js" 2>/dev/null
+}
 # RELEASE_HIT is set to the file and line of the string that matched, for the finding to name (issue #2397).
 release_string_has() {
   RELEASE_HIT=""
   [ -s "$FILELIST" ] || return 1
-  local f m src
+  local f m src js=0 r
+  js_strings "$1" && js=1
   while IFS= read -r f; do
+    # A JS or TS file Babel read is decided by its strings alone. One it could not parse takes the path below.
+    if [ "$js" -eq 1 ] && [[ "$f" =~ $JS_STR_EXT_RE ]]; then
+      if [[ "${f#"${DIR%/}"/}" =~ $JS_NOSHIP_RE ]] || js_root_cfg "$f" "$JS_TOOLCFG_RE"; then r=3; else r=2; fi
+      # The path goes through ENVIRON, since awk -v would turn a backslash in a file name into an escape.
+      r="$(ASCG_F="$f" awk -v c="$r" 'BEGIN { f = ENVIRON["ASCG_F"] "\t"; n = length(f) } substr($0, 1, n) == f { split(substr($0, n + 1), a, "\t"); print (a[1] == "?") ? "?" : a[c - 1]; exit }' "$FILELIST.js" 2>/dev/null)"
+      # A file with no row was never read by Babel, so it takes the double-quoted grep below.
+      if [ "$r" = "-" ]; then continue; fi
+      if [ -z "$r" ]; then r="?"; fi
+      if [ "$r" != "?" ]; then RELEASE_HIT="${f#"${DIR%/}"/}:$r"; return 0; fi
+    fi
     # Source comments go first (issue #2413). STRIP_AWK keeps one line per line and, with gate=1, only blanks
     # a line that itself looks like a comment, so a /* in a string or regex never hides later lines (#2421).
     # It runs in the C locale, and the raw file is read if awk still fails, so no byte can hide a file.
