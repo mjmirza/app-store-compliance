@@ -1,6 +1,6 @@
 {
-  "version": "2.5.1",
-  "updated": "2026-11-21",
+  "version": "2.5.3",
+  "updated": "2026-11-25",
   "description": "Machine readable taxonomy of App Store and Google Play rejection patterns. Drives the pre submission guard. Each pattern carries a platform, the cited guideline or policy, a severity, an automatable detection signal, and the fix.",
   "sources": [
     "https://developer.apple.com/app-store/review/guidelines/",
@@ -2034,6 +2034,51 @@
       "severity": "medium",
       "detection": "Automated. The guard flags a button titled Allow or Allow plus a noun (SwiftUI Button with a string title, UIKit or Objective-C setTitle, or a React Native Button title) in an Apple source file that also requests a permission. It ignores comments in the common forms and Android-only files. A comment marker inside a Swift multiline raw string or a JavaScript regex literal can hide a button, and a comment inside a template literal interpolation can still be read. A button and a request in one file is evidence, not proof, so the finding is reported as possible. A permission requested from another file, and a SwiftUI button whose label is a separate Text view, are not seen. Manual. A Close or Cancel action on the pre-alert screen, an incentive, or an image of the system alert. Apple's Human Interface Guidelines say a custom screen that takes advantage of quick taps to influence the choice leads to rejection.",
       "fix": "Give the pre-alert screen one button titled Continue or Next that opens the system alert, with no incentive and no image of the alert. Do not offer Close or Cancel there, unless the screen also collects legally required consent, which Apple allows. Where possible, offer a way to use the app without the permission (5.1.1(iv)). A Settings toggle or a plain label that says Allow is fine. Sources. https://developer.apple.com/design/human-interface-guidelines/privacy, https://developer.apple.com/app-store/review/guidelines/#5.1.1"
+    },
+    {
+      "id": "GOOGLE-ADAPTIVE-TIER3-ORIENTATION-LOCK",
+      "platform": "google",
+      "guideline": "Android adaptive app quality Tier 3, Config_Changes, tests T-Config_Orientation and T-Config_State (developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-3). Required on Google Play for foldables from April 2027 (Android Developers Blog, 18 November 2026).",
+      "title": "Fixed orientation or resize opt-out on a foldable",
+      "severity": "medium",
+      "detection": "From April 2027 (exact day not published) an app must meet Tier 3 (Adaptive ready) on foldables or it will no longer be able to publish or update, and it may have reduced visibility. Existing un-updated apps remain downloadable. Tier 3 requires the app to fill the display without letterboxing or compatibility mode, keep scroll position, text input, and media playback across rotation, folding, and resizing, and support multi-window. On a large screen (sw >= 600dp), including the 1:1 and 4:3 foldable emulators, the device supports every orientation regardless of android:screenOrientation and multi-window even when android:resizeableActivity is false. A manifest that sets resizeableActivity to false, or sets a fixed screenOrientation on an activity (portrait, landscape, sensorPortrait, sensorLandscape, reversePortrait, reverseLandscape, userPortrait, userLandscape, nosensor, locked), is the static opt-out. unspecified, user, fullSensor, sensor, fullUser, and behind are not locks. A value that appears only inside an XML comment does not count. This is a manual check, not a guard finding. Confirm it against the merged release manifest, because a flavor, build type, or library manifest can override the value set in src/main. Games meet a separate Tier 3 (Ready) bar from August 2027 and may render in their supported orientation and letterbox in-engine when rotated to an unsupported one.",
+      "signals": [
+        "android:resizeableActivity=\"false\"",
+        "android:screenOrientation=\"portrait\"",
+        "android:screenOrientation=\"landscape\"",
+        "android:screenOrientation=\"sensorPortrait\"",
+        "android:screenOrientation=\"sensorLandscape\"",
+        "android:screenOrientation=\"reversePortrait\"",
+        "android:screenOrientation=\"reverseLandscape\"",
+        "android:screenOrientation=\"userPortrait\"",
+        "android:screenOrientation=\"userLandscape\"",
+        "android:screenOrientation=\"nosensor\"",
+        "android:screenOrientation=\"locked\""
+      ],
+      "counterSignals": [
+        "android:screenOrientation=\"unspecified\"",
+        "android:screenOrientation=\"user\"",
+        "android:screenOrientation=\"fullSensor\"",
+        "android:screenOrientation=\"sensor\"",
+        "android:screenOrientation=\"fullUser\"",
+        "android:screenOrientation=\"behind\""
+      ],
+      "fix": "Remove the orientation lock and the resizeableActivity opt-out, keep state across configuration changes, and test on the 1:1 and 4:3 foldable emulators.",
+      "added": "2026-11-25"
+    },
+    {
+      "id": "GOOGLE-AGENTIC-DIGITAL-PURCHASE",
+      "platform": "google",
+      "guideline": "Payments policy clarification of 29 October 2026 (Play Console Help answers 18100766, 10281818, and 9858738)",
+      "title": "Digital purchase through an AI or agent outside Play Billing",
+      "severity": "high",
+      "detection": "An in-app AI assistant, chat agent, or third-party embedded experience or plugin buys or initiates a purchase of digital content, credits, a subscription, or a feature. The 29 October 2026 announcement (https://support.google.com/googleplay/android-developer/answer/18100766) places this under clarifications and says enforcement standards and practices remain the same. It says: Payments: We're providing additional guidance on how our Payments policy applies to Google Play apps that facilitate digital purchases through AI or agentic experiences. The linked guidance (https://support.google.com/googleplay/android-developer/answer/10281818#AI_agentic_experience), read 26 November 2026, answers: Yes, if a Play-managed app facilitates the purchase of digital goods, services, content, features, or functionality, it must comply with Google Play's Payments policy. This applies across all implementations, including but not limited to, when the transaction is initiated within a chat agent or inside a third-party embedded app experience or plugin. The Payments policy page (https://support.google.com/googleplay/android-developer/answer/9858738), read the same day, has no AI or agentic section. Sections 1 and 2 require Google Play's billing system for paid downloads and for in-app digital goods and services. Section 4 bars leading the user to another payment method. Section 3 keeps physical goods and physical services, and the other cases it lists, outside Play Billing. Sections 8 and 9 are the enrolled alternative billing program and the enrolled program for leading the user outside the app. A digital purchase completed on a web checkout the user was not led to under section 8 or 9 is the same violation as any other digital purchase. Checked by hand. The same FAQ says a purchase of digital goods or services that can only be consumed outside of a Play-distributed app, such as web-only content never consumed in the app, does not require Google Play's billing system.",
+      "signals": [
+        "chat agent",
+        "agentic"
+      ],
+      "fix": "Route the purchase through Google Play's billing system, or through an alternative billing system inside the app (section 8) or an outside-the-app flow (section 9) that the app is enrolled in. Do not complete a digital purchase on a web checkout the user was not led to under those programs. Physical goods and services stay outside Play Billing under section 3. The same FAQ says a purchase of digital goods or services that can only be consumed outside of a Play-distributed app, such as web-only content never consumed in the app, does not require Google Play's billing system.",
+      "added": "2026-11-26"
     }
   ]
 }

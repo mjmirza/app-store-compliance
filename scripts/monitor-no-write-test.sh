@@ -11,13 +11,13 @@ for m in regulatory android ai-policy privacy security; do
   W="$T/$m"; mkdir -p "$W/app"; cd "$W" || exit 1
   flag="--dir"; [ "$m" = "regulatory" ] && flag="--project"
   OUT="$(python3 "$REPO/scripts/monitor-$m.py" "$flag" app 2>&1)"; RC=$?
-  N="$(printf '%s\n' "$OUT" | grep -cE '^Data\. (sample|live) ')"
+  N="$(grep -cE '^Data\. (sample|live) ' <<<"$OUT")"
   [ "$RC" -eq 0 ] && [ "$N" -eq 1 ] && ok "$m says once whether its items are live or sample" || bad "$m says once whether its items are live or sample (rc=$RC lines=$N)"
-  printf '%s\n' "$OUT" | grep -qE '^Data\. sample ' && ok "$m run with no feed flag is labelled sample" || bad "$m run with no feed flag is labelled sample"
+  grep -qE '^Data\. sample ' <<<"$OUT" && ok "$m run with no feed flag is labelled sample" || bad "$m run with no feed flag is labelled sample"
   FILES="$(find "$W" -type f | wc -l | tr -d ' ')"
   [ "$FILES" -eq 0 ] && ok "$m writes no file when no output flag is passed" || bad "$m writes no file when no output flag is passed (files=$FILES)"
   [ "$m" = "regulatory" ] && continue
-  printf '%s\n' "$OUT" | grep -q '^No file written\. ' && ok "$m says how to save the report" || bad "$m says how to save the report"
+  grep -q '^No file written\. ' <<<"$OUT" && ok "$m says how to save the report" || bad "$m says how to save the report"
   python3 "$REPO/scripts/monitor-$m.py" --dir app --output-docs "$W/out/report.md" >/dev/null 2>&1
   [ -s "$W/out/report.md" ] && ok "$m writes the report when the output flag is passed" || bad "$m writes the report when the output flag is passed"
 done
