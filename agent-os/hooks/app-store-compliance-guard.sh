@@ -713,7 +713,7 @@ def open_of(code, j):
         j -= 1
     return -1
 
-def head_of(code, k):
+def head_of(code, k, pos=False):
     # The condition before the brace at k. Scans back past parentheses, which hold any closure,
     # and across a line break only when the condition continues on the next line.
     depth = 0
@@ -743,6 +743,8 @@ def head_of(code, k):
             if cur and prev.strip() and not ends_kw and not prev.endswith((",", "&&", "||", "(", "=")) and not cur.startswith((",", "&&", "||", ")", "else")):
                 break
         j -= 1
+    if pos:
+        return j + 1
     h = " ".join(code[j + 1:k].split())
     for key in ("#available", "#unavailable"):
         h = h.replace(key + " (", key + "(")
@@ -1007,7 +1009,13 @@ def split_top(h):
 def else_below_27(code, k):
     # True when the else if holding k follows a branch whose whole condition is #available(iOS 27),
     # so its condition is only evaluated below 27.
-    p = code.rfind("else", 0, k)
+    def start(at):
+        q = head_of(code, at, True)
+        while q < at and code[q].isspace():
+            q += 1
+        return q if code.startswith("else", q) else -1
+    # The else that begins this condition, never one inside a closure in it.
+    p = start(k)
     while p > 0:
         b = code.rfind(chr(125), 0, p)
         if b < 0 or code[b + 1:p].strip():
@@ -1024,7 +1032,7 @@ def else_below_27(code, k):
             return True
         if not ph.startswith("else if"):
             return False
-        p = code.rfind("else", 0, m)
+        p = start(m)
     return False
 
 def cond_gated(code, k):

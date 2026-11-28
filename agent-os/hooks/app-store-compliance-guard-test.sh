@@ -5109,6 +5109,24 @@ OUT="$(bash "$GUARD" "$D" 2>&1)"
 ! ic_has && ok "a condition that wraps after = keeps its #unavailable gate" || bad "a condition that wraps after = keeps its #unavailable gate"
 rm -rf "$D"
 D="$(ic_app A.swift 'import ImagePlayground
+func f(_ disabled: Bool, _ flags: [Flag]) async { if disabled {} else if flags.contains(where: { flag in if #available(iOS 27, *) { return flag.enabled } else { return flag.legacyEnabled } }), let creator = try? await ImageCreator() { print(creator) } }')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+ic_has && ic_at 'App/A.swift:2' && ok "an else inside a closure in an else if condition does not gate it" || bad "an else inside a closure in an else if condition does not gate it"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
+func f(_ x: Bool) async {
+ if #available(iOS 27, *) {
+  print(27)
+ } else if x {
+  print(1)
+ } else if let c = try? await ImageCreator() {
+  print(c)
+ }
+}')"
+OUT="$(bash "$GUARD" "$D" 2>&1)"
+! ic_has && ok "an else if chain on separate lines after if #available(iOS 27) is gated" || bad "an else if chain on separate lines after if #available(iOS 27) is gated"
+rm -rf "$D"
+D="$(ic_app A.swift 'import ImagePlayground
 func a() { if #available(iOS 27, *) { print(1) } }
 func b() async throws { _ = try await ImageCreator() }')"
 OUT="$(bash "$GUARD" "$D" 2>&1)"
